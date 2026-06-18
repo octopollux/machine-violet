@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Agfacolor"
+rating: "?"
+description: "Early Agfacolor European stock: warm-but-muted earthy ambers, dusty reds and olive, low saturation, faded continental feel"
+tags: [film-stock, period, muted, warm, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame shot on early AGFACOLOR film — the mid-century European colour stock. The signature: a distinctive warm-but-muted European palette leaning into soft earthy ambers, dusty reds, olive greens and gentle teals; lower saturation and softer contrast than American Technicolor; a slightly faded, nostalgic, continental quality; fine grain; and the understated, naturalistic colour of a 1930s-40s European film. Warm-muted, earthy, understated, period-European. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family — AGFACOLOR (mid-century EUROPEAN stock): warm-but-muted earthy palette (ambers, dusty reds, olive), low saturation, understated, faded-continental. For period-European / COLD-WAR-adjacent moods. SCENE AFFINITY: reads cold-war strongest on a grim institutional scene; on the sunny clearing (where validated) it reads warm-muted — a cold-war re-roll was attempted but the codex SESSION died mid-render (auth). Caption = title only (this one leaked "AGFACOLOR FILM", the trigger for the family-wide caption rule). A keeper (user). Keep the warm-muted European palette.
+
+# Example
+
+![Agfacolor](../ImageStyleExample/Agfacolor.example.png)

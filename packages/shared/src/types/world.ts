@@ -153,7 +153,10 @@ export interface WorldFile {
    * possible campaign this seed can produce. Branch-specific worldbuilding does
    * NOT live here — it lives in each fork option's `detail` (see {@link WorldFork})
    * and is spliced in only when that branch is selected. The campaign's final
-   * `campaign_detail` is `assembleCampaignDetail(detail, forks, selections)`.
+   * `campaign_detail` is `assembleCampaignDetail(detail, forks, selections)`,
+   * optionally followed by setup-agent-supplied detail appended at finalize (a
+   * setup-time DM directive the agent was asked to record, e.g. a chosen
+   * visual-style include).
    */
   detail?: string;
 

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "InkWash"
+rating: "?"
+description: "Sumi-e ink-wash on fibrous washi paper: graded black washes, decisive strokes, and large areas of bare paper as space"
+tags: [painting, painterly, monochrome, dreamy, wide-vista]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an atmospheric INK-WASH painting in the East Asian sumi-e tradition, brushed on heavy fibrous handmade paper — black ink and water on a real textured rag and mulberry (washi) sheet. Strict process discipline: paint with economical, confident brush strokes and graded washes of diluted black ink, from deep black to palest grey, with large areas of bare paper left empty as mist, sky and space; let the ink bleed and feather softly into the fibrous TOOTH of the paper, the paper's grain and fibre showing through, carrying the texture instead of rendered detail. A few decisive strokes describe the focal forms; everything else dissolves into soft graded wash or empty paper. Spare, calm, meditative, monochrome with at most one restrained accent. The economy of the brush and the character of the paper are the whole craft. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An atmospheric sumi-e INK-WASH on fibrous washi / rag paper — a spare, calm, meditative MONOCHROME register. The strongest economy lever in this traditional-media pair: LARGE AREAS OF BARE PAPER left empty as mist / sky / space (intrinsic sumi-e anti-cram) plus the ink bleeding into the paper's fibrous tooth as the texture-target (the cotton-rag / washi lever, user idea). The tic is well-MITIGATED — bare paper dominates and the distance dissolves into emptiness. Monochrome with at most one restrained accent (e.g. a red seal). The portrait-prior keeps the figure a touch rendered (accepted, see [Charcoal](./Charcoal.mvstyle)). Caption = clean type. Validated on the Xera dusk scene. Keep the bare-paper economy, the fibrous-paper ink bleed, and the brush economy.
+
+# Example
+
+![InkWash](../ImageStyleExample/InkWash.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "SilverAgeAirbrush"
+rating: "?"
+description: "1950s three-ink masked-airbrush sci-fi cover on a heavily aged, foxed, creased paperback carrying the fine detail"
+tags: [illustration, vintage, limited-palette, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Illustrated as a genuine 1950s science-fiction magazine illustration in technical masked airbrush, printed in only THREE flat process inks plus the paper — a warm red-orange, a teal-cyan, and a dark navy-black — with every color built from masked, airbrushed separations of those three inks and their limited overlapping mixes; exactly three inks, no fourth hue, no full-spectrum rendering. Build forms as crisp frisket-masked shapes filled with smooth airbrushed gradients of a single ink, with a faint visible mis-registration. CRUCIALLY, present the whole picture as the worn cover of a heavily aged vintage paperback, and lavish the richest detail on that aging: deeply yellowed and tanned pulp paper, brown foxing spots and faint water-staining, a soft rubbed and creased spine, rounded softened corners and frayed edges, fine surface scuffs and scratches, hairline fold-lines and crease marks crossing the cover, flaking and faded ink, and the tactile tooth of old cheap paper stock — make the physical aging of the paperback the most worked, richest texture in the image. The illustration itself stays bold and flat in its three inks; the wear is what carries the fine detail. Close with a caption set in clean 1950s magazine type, integrated like an aged paperback cover's title.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. This style carries TWO load-bearing devices and both are positive demanding work, never negations. (1) The strict three-ink palette: it reads period (cheap pulp printing, not a pretty full-spectrum render) AND the masked ink-separation is exacting color work — a full saturated palette both looked un-period and let the tic cram varied color everywhere. (2) The aged-paperback material: lavishing the richest detail on the physical wear (foxing, creases, edge fray, flaking ink) gives the model's detail drive a better outlet than the scene, so the illustration itself stays flat while the wear carries the fine texture — and it antiques/mutes the scene detail into one coherent vintage artifact. The wear is a TEXTURE TARGET, not a filter; keep "the wear carries the fine detail" explicit. Bright sibling of the moody [DarkAirbrush](./DarkAirbrush.mvstyle). Keep the three inks, the masked airbrush, and the heavy paperback aging.
+
+# Example
+
+![SilverAgeAirbrush](../ImageStyleExample/SilverAgeAirbrush.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "CrossProcess"
+rating: "?"
+description: "Cross-processed film: wildly shifted colour with cyan-green shadows and acid highlights, boosted contrast, lurid analog look"
+tags: [film-stock, stylized, high-saturation, gritty, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film process name in the caption.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE / film family, TECHNIQUE-SPECIFIED — CROSS-PROCESS (wrong-chemistry development): wildly shifted unnatural colour (cyan-green shadows, acid-yellow highlights), boosted contrast, skewed skin, grungy lurid analog look. A great "something's wrong here" register. Reveal on a colour scene. Caption overlaid. Validated on the clearing; an instant bank (user, "face-meltingly gorgeous"). Keep the toxic shifted colour + boosted contrast.
+
+# Example
+
+![CrossProcess](../ImageStyleExample/CrossProcess.example.png)

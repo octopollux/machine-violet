@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "CandlelitNatural"
+rating: "?"
+description: "Film shot purely by natural candlelight: warm low-light glow, ultra-shallow focus, painterly old-master tableau, fine grain"
+tags: [motion-picture, painterly, warm, intimate, interior-friendly, tender]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a film shot ENTIRELY BY NATURAL CANDLELIGHT on specially-made ultra-fast large-aperture lenses — NOT artificially lit. The technique's signature: a soft, warm, low-light interior glow with light falling off naturally into gentle shadow; an extremely SHALLOW depth of field with a delicate focus plane and creamy soft backgrounds (the cost of the wide-open fast lens); a painterly old-master composition like a period oil portrait; warm candle-amber colour, fine grain, and a still, quiet, contemplative atmosphere. Natural, painterly, intimate, luminous. Close with a small caption in an elegant period font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (the user's framing: specify the technique / tech, NEVER name the auteur — both better, genre-agnostic results AND [[feedback_no_artist_imitation]]-compliant). NATURAL-CANDLELIGHT technique: warm low-light glow, ultra-fast-lens SHALLOW focus, painterly old-master tableau, fine grain. SCENE AFFINITY: warm low-lit interiors. AAA-TIER (user: the motion-picture looks are likely to land in MOST campaign seeds). Caption = elegant period font. Validated on a candlelit interior; an instant bank (user, "bank every single one"). Keep the natural-candlelight glow + shallow focus + painterly composition.
+
+# Example
+
+![CandlelitNatural](../ImageStyleExample/CandlelitNatural.example.png)

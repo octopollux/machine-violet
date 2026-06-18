@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "InkComicColor"
+rating: "?"
+description: "Bold brush-and-ink comic with flat cel color: heavy spotted blacks, limited two-temperature palette, hard key light"
+tags: [comic, graphic, color, limited-palette, tense]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as bold brush-and-ink comic art with flat colour: confident black India-ink linework and heavy spotted blacks, finished with flat, limited comic-book colour. Strict process discipline: keep dramatic high-contrast lighting and let the deepest shadows still collapse into large, flat, solid black ink shapes that carry the dark — the blacks do the shadow work, not rendered shading. Draw the forms with a bold, varied brush line, swelling and tapering. Over the inks lay FLAT cel-style colour in clean, hard-edged fills from a restrained, slightly punchy limited palette — a few coherent hues only, no smooth gradients, no airbrushed rendering and no photographic texture; the colour holds flat inside the ink shapes the way comic flatting does, with one or two bold accent hues from the light sources (instrument glow, signage) and everything else kept in a cooler unified ground. Hard cinematic key light — saturated where it's lit, deep ink-black where it's not. Graphic, moody, high-impact. Close with a caption set into a small hand-lettered comic caption box, fully legible.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Colour sibling of [InkNoir](./InkNoir.mvstyle) (same bold-ink + heavy-blacks technique — this one adds flat limited comic colour, that one stays near-monochrome with a single accent), the same DarkAirbrush/SilverAgeAirbrush pairing. WORDING QUIRK, kept on purpose (the [InkNoir](./InkNoir.mvstyle) / [PenAndInk](./PenAndInk.mvstyle) family): asks for FLAT cel-style colour but gpt-image-2 renders a polished, richly detailed MODERN digital-comic panel — clean, glossy, slightly "cute". That clean modern look IS this variant's register and it's the validated prompt, so don't "fix" it. The anti-tic work that holds even so: heavy spotted blacks carry the shadow (rest for free) and the limited two-temperature palette keeps colour from sprawling into the rainbow tic. For a grittier, more serious period register, see [NinetiesComic](./NinetiesComic.mvstyle) (late-90s CMYK halftone, dark-age ink, muddier palette). Keep the heavy blacks, the limited palette, and the caption box.
+
+# Example
+
+![InkComicColor](../ImageStyleExample/InkComicColor.example.png)

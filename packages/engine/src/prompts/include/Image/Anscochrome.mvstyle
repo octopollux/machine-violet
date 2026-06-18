@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Anscochrome"
+rating: "?"
+description: "1950s Anscochrome slide film: warm off-balance magenta-shifting colour, gently faded low-contrast mid-century album feel"
+tags: [film-stock, vintage, warm, muted, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph on 1950s ANSCOCHROME colour slide film — an amateur mid-century colour-transparency stock. The signature: warm but slightly off-balance vintage colour with a tendency to shift toward magenta-pink and amber; gently faded, slightly low-contrast tones; a nostalgic mid-century snapshot quality; fine grain; soft highlights; and the cosy, faded, family-album atmosphere of a 1950s colour slide. Faded, warm, nostalgic, mid-century. Close with a small caption in a casual period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family — ANSCOCHROME (1950s amateur slide): warm, slightly off-balance, magenta-shifting, gently faded mid-century family-album colour. The nostalgic transitional member; sits near [Agfacolor](./Agfacolor.mvstyle) in the muted-vintage zone (I'd flagged it as the least-differentiated, but the user kept the whole set). Caption = title only (no process name). A keeper (user). Keep the faded warm nostalgic cast.
+
+# Example
+
+![Anscochrome](../ImageStyleExample/Anscochrome.example.png)

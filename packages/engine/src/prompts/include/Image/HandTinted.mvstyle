@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "HandTinted"
+rating: "?"
+description: "Hand-tinted early photo: soft black-and-white or sepia base with delicate brushed-on pastel washes that escape the lines"
+tags: [photographic, vintage, sepia, tender, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a HAND-TINTED / hand-coloured early photograph or film frame — a monochrome image with delicate colour applied by hand on top. The signature: an underlying soft black-and-white or sepia photographic base showing through; translucent, delicately brushed-on pastel COLOUR washes that don't quite stay in the lines, applied only to select areas (cheeks, lips, foliage, sky); slightly imprecise, artisanal registration; a gentle, antique, handmade quality; and the quiet charm of early hand-colouring. Delicate, handmade, pastel-on-monochrome, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the process or technique name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family — HAND-TINTED: soft B&W / sepia base + delicate hand-brushed pastel colour washes that don't stay in the lines, artisanal antique charm. Jazz-era. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the monochrome base + hand-applied pastel washes.
+
+# Example
+
+![HandTinted](../ImageStyleExample/HandTinted.example.png)

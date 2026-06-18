@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "DX9Interior"
+rating: "?"
+description: "2004 DirectX 9 game screenshot: hard stencil-volume shadows, normal-mapped speculars, DXT blocking, early-HDR bloom"
+tags: [game-render, stylized, interior-friendly, nostalgic]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an authentic in-game screenshot from a 2004-era DirectX 9 AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period rendering tech is the whole point and is what keeps it honest: DirectX 9 / Shader Model 2.0 per-pixel lighting, with HARD-EDGED DYNAMIC SHADOWS cast by stencil shadow volumes — sharp, crisp shadow shapes thrown from the strong light sources in the scene, with no soft penumbra. Bump and normal-mapped surfaces catch tight specular highlights; textures seen at a grazing angle stay sharp into the distance thanks to ANISOTROPIC FILTERING; DXT-compressed textures show their characteristic mild blocking; crisp clean polygon edges from multisample anti-aliasing. Moderate polygon counts with honestly faceted geometry, a restrained early-HDR bloom off the brightest lights, slightly crushed near-black shadows, and a mild filmic colour grade. The era's asset economy is the discipline: honest game-asset budgeting, a limited set of repeated tiling textures, clean simple shapes. Atmospheric, nostalgic, technically confident for its year. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([Image](./Image.mvstyle) / [WesternRPG](./WesternRPG.mvstyle) / [BakedAAA](./BakedAAA.mvstyle)) — the 2004-era DX9 / SM2.0 HARD-DYNAMIC-SHADOW take, sibling to [BakedAAA](./BakedAAA.mvstyle) (which uses the era's OTHER lighting approach — precomputed baked lightmaps / static GI). Its identity is the era's HARD DYNAMIC SHADOWS (stencil shadow volumes — sharp shadows, no soft penumbra), DX9 / SM2.0 per-pixel lighting, normal/bump mapping with tight speculars, anisotropic filtering, DXT blocking, faceted geometry, and early-HDR bloom. SCENE-NEUTRAL BY DESIGN (user, important): the style line is kept to RENDERING TECHNIQUE only — it deliberately does NOT name an interior / corridor / dark scene, because content + mood words in a style line make it SCENE-COUPLED and would force e.g. an outdoor campaign beat to render as a dark interior (same lesson as [Blockbook](./Blockbook.mvstyle)'s hell-lock fix — keep the style line about the MEDIUM, let the DM's scene supply the content). We proof it on INDOOR scenes OURSELVES (where the hard-shadow look reads strongest, and where the gallery example lives), but that steering stays OUT of the shipped prompt. HONEST: like [BakedAAA](./BakedAAA.mvstyle) it renders at near-MODERN fidelity (~2018), NOT strictly 2004 — the in-game-render prior gravitates modern; for the unmistakably-period 2004 look see the hard-degraded sibling [RetroDX9](./RetroDX9.mvstyle). The user's eye keeps it as the clean, grounded, atmospheric narrative-game render — the leverage for illuminating a narrative game. Caption overlaid in a tasteful font. Validated on the Xera station-corridor scene; a keeper (user). Keep the hard stencil-shadow + anisotropic + DX9 technique callouts (scene-neutral), and the overlaid caption.
+
+# Example
+
+![DX9Interior](../ImageStyleExample/DX9Interior.example.png)

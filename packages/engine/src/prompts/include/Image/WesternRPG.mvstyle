@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "WesternRPG"
+rating: "?"
+description: "Realistic gritty Western open-world RPG photo-mode screenshot with PBR materials and naturalistic global-illumination lighting"
+tags: [game-render, photoreal, gritty, establishing, outdoor-revealing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an in-game screenshot from a high-end modern Western open-world RPG, in photo mode (no HUD, no nameplates) — a realistic, gritty, atmospheric game-engine render. Physically-based realistic materials, naturalistic global-illumination lighting and weather, detailed but grounded environments, a believable lived-in world, cinematic depth of field and subtle film grain. Grounded, immersive, high-fidelity but not anime — the realistic counterpart to a Japanese MMO render. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family anchored by the default [Image](./Image.mvstyle) style (a GPU-rendered Japanese MMO in photo mode) — this is the REALISTIC / grounded Western open-world RPG counterpart (think a modern photoreal open-world game in photo mode), distinct from the anime MMO. Game renders are an in-distribution prior, so it renders clean with no real tic problem. Caption overlaid in a tasteful font (the [Image](./Image.mvstyle) family caption). Reach for it on grittier, grounded, non-anime campaigns. Validated on the Xera dusk scene; an instant keeper (user). Keep the photo-mode / no-HUD framing, the realistic PBR + naturalistic lighting, and the overlaid caption.
+
+# Example
+
+![WesternRPG](../ImageStyleExample/WesternRPG.example.png)

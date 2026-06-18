@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "DigitalPainting"
+rating: "?"
+description: "Polished painterly concept art: confident digital brushwork, harmonious limited palette, focal hierarchy, depth haze"
+tags: [painting, painterly, muted, epic, any-scene]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a polished modern digital illustration — rich painterly concept art in the manner of a high-end fantasy or science-fiction book or game illustration. Confident digital brushwork with soft, controlled rendering; a strong harmonious limited palette and a clear focal hierarchy, the main subject carrying the crisp detail while the background falls into softer, simpler atmospheric shapes with depth haze, so detail concentrates rather than spreading. Cinematic lighting with a clear key and a warm/cool balance, a few bold value masses, painterly edges. Lush but disciplined, never cluttered. Close with a small tasteful caption in clean modern type, like an illustration-plate title.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. ANCHOR of the GENERAL-PURPOSE / bulk-fill ILLUSTRATION family (with [ModernIllustration](./ModernIllustration.mvstyle), [AnimeIllustration](./AnimeIllustration.mvstyle), [Gouache](./Gouache.mvstyle), [GraphicNovel](./GraphicNovel.mvstyle)). DIFFERENT DESIGN TARGET from the flair styles: a workhorse must be QUIET, versatile, genre-neutral and fatigue-resistant (pleasant across hundreds of images), not loud/distinctive — these are meant to bulk-fill most campaigns as the everyday default. THE TIC IS PRESENT here: digital painting is "too easy", the model coasts and over-details (the render-pull). The user judged it FORGIVABLE in this lush painted register — a busy painted illustration absorbs reflexive detail where a stark style would expose it. The weak in-line anti-tic levers (focal hierarchy + limited palette + depth haze) help but don't fully counter it; the real counter is the MATERIAL-CONSTRAINT approach (give the model real-medium process work — photo-of-a-real-painting / traditional media), explored as constrained siblings. CONVERGENCE FINDING (important): asking gpt-image-2 for "modern illustration" in most sub-flavours COLLAPSES into this one polished painted-concept-art default — [ModernIllustration](./ModernIllustration.mvstyle) and [GraphicNovel](./GraphicNovel.mvstyle) rendered nearly identical to this; only [AnimeIllustration](./AnimeIllustration.mvstyle) (a strong distinct prior) and the hard-flat [Screenprint](./Screenprint.mvstyle) escaped. Treat the family as ONE default + a few distinct siblings. Caption = a small tasteful plate-title. Validated on one Xera dusk scene only — GENRE stress-testing (fantasy/horror/modern) still pending before relying on it as a true bulk-fill default. Keep the focal hierarchy + limited palette.
+
+# Example
+
+![DigitalPainting](../ImageStyleExample/DigitalPainting.example.png)

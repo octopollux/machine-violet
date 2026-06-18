@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "SilentFilm"
+rating: "?"
+description: "Early-1920s silent-film frame: high-contrast ortho black-and-white, iris vignette, film damage, ornate intertitle caption"
+tags: [motion-picture, period, black-and-white, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family — early-1920s SILENT FILM: high-contrast ortho B&W, a soft IRIS vignette, film damage (dust / scratches / flicker / jitter), an under-cranked feel, archival ghostliness, and an ornate INTERTITLE-CARD caption. A distinct vintage B&W lane (vs [NoirCinema](./NoirCinema.mvstyle) dramatic chiaroscuro, [TriX](./TriX.mvstyle) reportage grain, [LandCamera](./LandCamera.mvstyle) flash). The intertitle card is the signature caption. Validated on the clearing; an instant take (user). Keep the iris vignette + film damage + intertitle card.
+
+# Example
+
+![SilentFilm](../ImageStyleExample/SilentFilm.example.png)

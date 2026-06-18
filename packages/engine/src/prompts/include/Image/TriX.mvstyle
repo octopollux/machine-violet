@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "TriX"
+rating: "?"
+description: "Kodak Tri-X 400 B&W reportage film: gritty visible grain, rich tonal range, punchy contrast, raw documentary feel"
+tags: [film-stock, photoreal, black-and-white, gritty, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a black-and-white photograph shot on Kodak Tri-X 400 — the classic photojournalism and street film. Tri-X's signature: gritty, distinctive visible GRAIN, a rich tonal range with deep blacks and bright highlights, punchy contrast, a raw documentary feel, and hand-developed character. The timeless look of 35mm reportage black-and-white. Close with a small caption in a plain documentary font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. FILM-STOCK family — KODAK TRI-X 400, the classic B&W reportage / street film: gritty visible GRAIN, rich tonal range, punchy contrast, documentary feel. Distinct B&W lane from [NoirCinema](./NoirCinema.mvstyle) (dramatic chiaroscuro) and [LandCamera](./LandCamera.mvstyle) (harsh flash) — Tri-X = naturalistic documentary B&W (the B&W cousin of [DocumentaryPhoto](./DocumentaryPhoto.mvstyle)). Photorealism lever (see [Kodachrome](./Kodachrome.mvstyle)). Caption = plain documentary font. Validated on the clearing; a keeper (user). Keep the gritty grain + documentary tonality.
+
+# Example
+
+![TriX](../ImageStyleExample/TriX.example.png)

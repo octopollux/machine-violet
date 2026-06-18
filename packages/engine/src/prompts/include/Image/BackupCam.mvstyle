@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "BackupCam"
+rating: "?"
+description: "Cheap car reversing-camera still: extreme fisheye, washed automotive colour, green/amber/red guideline overlay, dash UI bar"
+tags: [surveillance, lo-fi, muted, clinical]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a cheap car reversing (backup) camera — a low-resolution wide colour feed from a small camera mounted low on the rear bumper, looking backward and slightly down. THE LENS IS AN EXTREME FISHEYE: heavy barrel distortion bows every straight line into a curve and stretches the foreground ground plane huge and warped toward the lens, the corners squeezed and darkened. Colour is LOW-SATURATION and washed out — a day/night-optimized automotive sensor tuned for visibility, not for looks, so hues are muted and desaturated, nearly colourless in the shadows, never pretty. The picture is a soft, low-resolution automotive feed — smeared low detail, mild motion blur and video lag, compression softness, a little chromatic fringing, and at night a faint greenish IR cast with the bumper edge glowing in the near foreground. Overlay the car's REVERSING GUIDELINES: bright translucent coloured trajectory lines projected onto the ground behind the car — green near, amber at mid distance, red close — curving and converging into the distance as parking guides, with small distance tick marks. Close with a caption as a translucent dark UI bar across the bottom of the screen in blocky vehicle-dashboard lettering: a short reversing warning or location label, fully legible. Banal, functional, faintly ominous.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Fourth member of the MODERN-MEDIA SURVEILLANCE cluster (with [NightVisionCam](./NightVisionCam.mvstyle), [ThermalCam](./ThermalCam.mvstyle), [ThermalGrain](./ThermalGrain.mvstyle)): a cheap car reversing/backup camera. LOAD-BEARING LEVERS, all positive/structural: (1) the EXTREME FISHEYE is demanding structural work — bowing every line and warping the whole ground plane occupies the model instead of letting it cram (and the squeezed dark corners composite into the TUI); (2) LOW-SATURATION, day/night-optimized colour — the user's fix: the first cut was too "pretty"/saturated, and asking for muted, desaturated, nearly-colourless automotive colour is what makes it read as a REAL backup cam, not a glossy render; (3) the cheap low-res automotive feed (smear, lag, compression) sinks detail. The REVERSING GUIDELINES (green-near / amber-mid / red-close trajectory curves with distance ticks) are both the iconic backup-cam signature AND a bright native HUD; they stay saturated because they are a UI OVERLAY, not part of the desaturated camera image — keep that split. Caption = a translucent vehicle-UI bar of blocky text across the bottom (e.g. "CHECK SURROUNDINGS"); NO time-clock here — backup cams don't show one, so the cluster's time-only OSD rule simply doesn't apply to this member (medium-honest). REFERENCE HOLDS: Xera read recognizably even as the distant watched figure. Excellent urban-paranoia beat (someone standing dead-still behind your car). Validated landscape (and it suits the wide reversing view). Keep the extreme fisheye, the low-saturation feed vs bright-overlay guidelines split, and the UI-bar caption.
+
+# Example
+
+![BackupCam](../ImageStyleExample/BackupCam.example.png)

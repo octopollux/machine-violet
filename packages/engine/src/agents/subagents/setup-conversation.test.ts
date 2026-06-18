@@ -1029,6 +1029,30 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.forkSelections).toEqual({ wrapper: "scifi", faction: "iron" });
   });
 
+  it("finalize_setup appends agent-supplied campaign_detail after the seed base", async () => {
+    // The new rule: on a seeded campaign the agent MAY pass its own
+    // campaign_detail (e.g. a setup-time visual-style include); it is appended
+    // after the code-assembled seed base rather than discarded.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+      campaign_detail: "<!--include:Image.Velvia-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\nServer farms.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
   it("finalize_setup drops fork selections that name unknown forks or options", async () => {
     const input = {
       ...FINALIZE_INPUT,

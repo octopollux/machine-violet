@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "BodyCam"
+rating: "?"
+description: "Police body-worn camera still: low first-person chest POV, fisheye, harsh LED into grainy dark, REC indicator, time OSD"
+tags: [surveillance, lo-fi, tense, muted, action, first-person]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a police-style body-worn camera — a chest-mounted point-of-view shot from a wide-angle action cam, looking forward and slightly up at the subject as the wearer moves. WIDE fisheye lens with barrel distortion; the framing is low, close and first-person, with a little of the wearer's own arm or shoulder intruding at one edge. Low-light night capture: harsh, blown-out illumination from the wearer's own LED lamp on the near subject falling fast into grainy dark; washed desaturated colour, heavy sensor noise, motion blur and rolling-shutter skew from walking, compression softness — a cheap, real, low-quality body-cam feed, not a clean cinematic shot. Burn the camera's OSD into the frame: a "REC" indicator with a red dot in one corner, and a blocky white monospace 24-hour clock TIME in HH:MM:SS in another — show a time only, never a calendar date. Tense, confrontational, immediate.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Surveillance-cluster member (with [NightVisionCam](./NightVisionCam.mvstyle), [ThermalCam](./ThermalCam.mvstyle), [ThermalGrain](./ThermalGrain.mvstyle), [BackupCam](./BackupCam.mvstyle), [StreetCam](./StreetCam.mvstyle), [TrafficCam](./TrafficCam.mvstyle), [DashCam](./DashCam.mvstyle), [DroneCam](./DroneCam.mvstyle), [LobbyCam](./LobbyCam.mvstyle)) — the FIRST-PERSON / confrontational lens. LOAD-BEARING LEVERS: (1) the chest-mounted POINT-OF-VIEW framing (low, close, wide, the wearer's own arm/shoulder intruding at the edge) is the distinctive bodycam tell and demanding structural work; (2) grounding-by-degradation (cf. [TrafficCam](./TrafficCam.mvstyle)) — the cheap low-light feed, harsh LED-into-grainy-dark, motion blur and rolling-shutter skew read as real footage and sink the tic; (3) the harsh near-light falling fast to dark is the black-gives-rest lever. Caption = the burned-in OSD: a "REC ●" indicator + a time-only HH:MM:SS clock (the [NightVisionCam](./NightVisionCam.mvstyle) codified OSD; time only, never a date). Reference held: Xera recognizable, hand half-raised — a strong confrontational urban-paranoia beat (the camera advancing on the subject). Validated landscape. Keep the first-person chest-POV framing, the cheap low-light degradation, and the REC + time-only OSD.
+
+# Example
+
+![BodyCam](../ImageStyleExample/BodyCam.example.png)

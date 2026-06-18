@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Kodachrome"
+rating: "?"
+description: "Kodachrome archival slide film: luminous warm reds and earth tones, high microcontrast, fine grain, golden cast"
+tags: [film-stock, photoreal, warm, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. ICONIC FILM-STOCK family (sibling of [Velvia](./Velvia.mvstyle)) — KODACHROME, the warm archival slide (the "National Geographic" look): luminous warm reds + earth tones, high microcontrast, fine grain, a warm golden cast — the WARM-archival counterpart to Velvia's cool-saturated punch. PHOTOREALISM LEVER (user finding, remember this): asking for a named FILM STOCK is an extremely effective way to invoke SERIOUS PHOTOREALISM (the stock IS the look). Reveal on a colour-rich scene. Caption = clean photographic font. Validated on the clearing; "super impressive, big keep" (user). Keep the warm golden archival cast.
+
+# Example
+
+![Kodachrome](../ImageStyleExample/Kodachrome.example.png)

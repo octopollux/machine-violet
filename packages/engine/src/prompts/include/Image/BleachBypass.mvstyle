@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "BleachBypass"
+rating: "?"
+description: "Gritty bleach-bypass war/thriller frame: desaturated near-monochrome, crushed blacks, metallic sheen, heavy grain"
+tags: [motion-picture, stylized, muted, grim, gritty]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a gritty modern war or thriller film processed with BLEACH BYPASS (silver retention) — NOT a clean render. Bleach-bypass signature: heavily DESATURATED, near-monochrome colour with just traces of muted hue, very high contrast, crushed inky blacks and harsh blown highlights, a gritty metallic silvery sheen, and heavy grain. Strict process discipline to keep it clean and uncluttered: a SHALLOW DEPTH OF FIELD with the figure sharp and the cluttered background falling into soft blur and deep crushed BLACK, plus atmospheric HAZE and drifting smoke swallowing the background detail — so the dense surroundings dissolve into simple dark shapes and atmosphere rather than crammed texture. Grim, hard, cold, cinematic, built from big simple value masses. Close with a small caption in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family — BLEACH BYPASS (silver retention): heavily desaturated near-monochrome, very high contrast, crushed blacks, blown highlights, gritty metallic sheen, heavy grain — the visceral war / thriller look. DE-TIC BAKED IN (user): the first cut crammed the busy corridor; the fix = the cinematic DE-TIC toolkit — shallow DoF + atmospheric HAZE / smoke + deep-black-rest + big simple VALUE MASSES dissolve the dense background into atmosphere instead of crammed texture (the [HeroShooter](./HeroShooter.mvstyle) DoF+volumetric and [PaperbackCover](./PaperbackCover.mvstyle) value-mass levers, applied to a film grade). KEEP those clauses — they're load-bearing anti-tic, not flavour. Caption overlaid. Validated on the corridor (v2); a keeper (user). Keep the desaturated high-contrast silver-retention look + the DoF / haze / black / value-mass de-tic.
+
+# Example
+
+![BleachBypass](../ImageStyleExample/BleachBypass.example.png)

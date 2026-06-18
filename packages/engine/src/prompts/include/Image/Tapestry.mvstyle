@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Tapestry"
+rating: "?"
+description: "Photo of a real medieval wool tapestry on a black ground: bold flat stitched figures, visible weave, dyed-wool palette"
+tags: [textile, period, limited-palette, epic, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`A photograph of a real medieval narrative wool hanging — a long embroidered and woven tapestry in the Romanesque tradition, like an ancient stitched chronicle, photographed flat under soft raking light, worked on a deep BLACK ground. THIS IS A PHOTOGRAPH OF A REAL PHYSICAL TEXTILE, not an illustration or painting: the entire image is made of coloured wool worked into cloth, so EVERYTHING — figures, ground and sky alike — is built from visible threads and stitches. Strict process discipline: render bold, flat, stylised figures in the naive medieval manner — strong simple outlines stitched in dark wool, flat areas of colour filled with rows of laid-and-couched woollen stitches that follow the form, set against a solid deep-black wool ground that fills the whole background, left plain and unworked around the figures so the black field dominates. A limited dyed-wool palette of a few earthy historical colours only — terracotta red, ochre and buff yellow, sage and blue-green, slate blue, cream and ivory — slightly faded and uneven, glowing warm against the black, no other hues. Show the real textile: the weave and individual wool stitches clearly visible, the black ground cloth's own weave showing, a slightly rumpled cloth surface with soft shadows in the folds, fraying and small losses at the edges, the muted matte sheen of old wool. Flat, bold, stitched, ancient, dramatic against the black. Run a decorative woven border along top and bottom, and work the caption into the upper border as a line of stitched Romanesque capital lettering, like a tapestry titulus.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A photograph of a real medieval narrative wool tapestry / embroidered hanging (Romanesque / Bayeux register, described generically), on a BLACK ground. THE CRAFT-MEDIUM-PHOTO THESIS, VALIDATED: where leaded stained glass FAILED (parked — too in-distribution, the model painted a stained-glass-flavoured illustration and the figure stayed painterly), Tapestry succeeded because (1) the medium is OUT-of-distribution, (2) it is framed as "a PHOTOGRAPH of a real physical textile", not "a tapestry-style illustration" — the material-photo lever (cf. [NinetiesComic](./NinetiesComic.mvstyle) "scan of a printed page", and the parked stained-glass photo attempt), and (3) the WEAVE is a hard structural lever that reduces the WHOLE frame — figure included — to wool stitches, so nothing can stay painterly. Bold flat naive figures + a limited dyed-wool palette keep it anti-cram. BLACK GROUND (user choice): the figures pop dramatically AND it composites seamlessly into the dark TUI terminal (no bright rectangle) — keep the ground a real woven black cloth, not flat digital black. Caption = a stitched titulus in the woven upper border (the Bayeux mechanism). Best LANDSCAPE for gameplay. The same craft-medium-photo approach should make a [Mosaic](./Mosaic.mvstyle) sibling sing. Keep "a photograph of a real physical textile", the visible weave/stitches on a black ground, the bold flat figures + limited wool palette, and the titulus caption.
+
+# Example
+
+![Tapestry](../ImageStyleExample/Tapestry.example.png)

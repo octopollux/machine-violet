@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Sovcolor"
+rating: "?"
+description: "Sovcolor Eastern-bloc stock: cool muted sickly desaturated greens and anaemic blues, flat grey institutional melancholy"
+tags: [film-stock, period, muted, cool, grim, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame shot on SOVCOLOR / Eastern-bloc colour film stock — the mid-century Soviet colour process. The signature: a cool, muted, slightly sickly palette with desaturated greens, anaemic blues, and a faint cyan-green or jaundiced cast; low contrast and a flat, grey, institutional quality; subdued, washed-out, melancholy colour; visible grain; and the austere, overcast, period Eastern-European atmosphere. Cool, muted, austere, institutional, melancholy. Close with a small caption in a plain period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family — SOVCOLOR / Eastern-bloc stock: cool, muted, slightly sickly palette (desaturated greens, anaemic blues, jaundiced cast), flat grey institutional quality, austere melancholy — the COLD-WAR-INTRIGUE stock. SCENE AFFINITY: pops on grim institutional / urban scenes; on the sunny clearing (where validated) the cold-war tell reads gently. Caption = title only (no process name). A keeper (user). Keep the cool sickly institutional palette.
+
+# Example
+
+![Sovcolor](../ImageStyleExample/Sovcolor.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Woodcut"
+rating: "?"
+description: "Bold black-and-white woodcut broadsheet: solid black masses, coarse gouge-hatching, off-register inking, carved block caption"
+tags: [printmaking, graphic, black-and-white, grim, wide-vista]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a bold black-and-white woodcut print in the tradition of an old plague broadsheet or danse-macabre pamphlet — black ink printed from a hand-carved woodblock onto rough off-white paper. THE CARVING IS THE CONSTRAINT: every mark is gouged into the block with a blade, so there is no fine or smooth detail anywhere — the image is built only from bold flat black shapes, the bare white paper where the wood was cut away, and coarse parallel gouge-lines for shadow and form. Strict process discipline: design in stark high contrast — bold masses of solid black against the bare white of the cut-away block; render shadow and texture only as vigorous, slightly crude parallel gouge-hatching and cross-hatching cut by hand, never as smooth tone; keep forms simple, graphic and a little primitive, with strong confident outlines. Show the character of the medium: slightly uneven cut lines, occasional chip marks and broken lines, faint wood grain, uneven hand-inking and a touch of off-register impression on the rough paper. Ancient, stark, ominous. Close with a caption as a line of crude carved or letterpress block lettering beneath the image, like the text under a broadsheet woodcut.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A bold black-and-white folk-horror woodcut / wood-engraving broadsheet (plague-broadsheet / danse-macabre register) with a carved block-lettering caption — the catalog's stark high-contrast heavy-black register. LOAD-BEARING LEVER: "THE CARVING IS THE CONSTRAINT — every mark is gouged with a blade, so no fine smooth detail; only bold black shapes, bare cut-away white, and coarse gouge-hatching." This is the material-constraint family (cf. [PulpInk](./PulpInk.mvstyle) cheap reproduction, [NinetiesComic](./NinetiesComic.mvstyle) CMYK screen, the [Adventure90s](./Adventure90s.mvstyle) Amiga palette limit): the medium forbids the cram. WORDING QUIRK (the [PenAndInk](./PenAndInk.mvstyle) family): the prompt asks for a CRUDE, SPARSE woodcut with large bare-white areas, but the model renders a DENSE, fine, masterful wood-ENGRAVING instead — that density is the validated, gorgeous result and it is coherent engraved hatching (a legitimate medium), NOT the bored-model tic, so keep it. It is as close as the catalog got to the genuinely-sparse heavy-black look [InkNoir](./InkNoir.mvstyle) reached for (denser than asked, but tic-free). HORROR: bold high-contrast menace plus a rhyming / aphoristic broadsheet caption carries the dread. Validated folk-horror on a fallow-the-drift moor, rendered LANDSCAPE (scene snapshots want wide for gameplay — don't bank these portrait). Keep the carving-as-constraint framing, the bold high-contrast B&W, and the broadsheet block-lettering caption.
+
+# Example
+
+![Woodcut](../ImageStyleExample/Woodcut.example.png)

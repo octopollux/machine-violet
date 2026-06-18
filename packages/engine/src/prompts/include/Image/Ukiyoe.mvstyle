@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Ukiyoe"
+rating: "?"
+description: "Photo of an antique ukiyo-e woodblock print: flat colour blocks, black key-line, bokashi, woodgrain, mis-registration"
+tags: [printmaking, period, limited-palette, dreamy, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`A photograph of a real antique Japanese woodblock print (ukiyo-e tradition), a dramatic NIGHT scene on a deep black ground, the actual printed sheet of washi paper photographed flat. THIS IS A PHOTOGRAPH OF A REAL PHYSICAL WOODBLOCK PRINT, not a digital illustration: hand-printed from carved wooden blocks in water-based inks on handmade mulberry paper. Strict process discipline: the whole background — sky and distant ground — is printed in DENSE DEEP BLACK and dark indigo ink, a solid black night field with soft bokashi grading, so the black dominates and the lit figure and foreground stand out against it. Build the image from FLAT areas of unmodulated colour, each from its own carved block, with a confident hand-cut black KEY-BLOCK outline around every form; NO smooth photographic shading — only flat colour, bold outlines, and bokashi gradients. A limited registered palette against the black — indigo, a little soft red and ochre, sage, grey, and the cream paper showing only in the lit forms — slightly faded. Show the real PRINT and PAPER: faint woodgrain in the flat ink areas, the washi fibre and deckle edge, a slight mis-registration off the black key-line, the matte water-ink surface, gentle age-toning and a little foxing. Bold, flat, graphic, nocturnal, elegant. Close with the caption inside a small rectangular title cartouche in one corner — a short line of clean lettering — with a couple of small red seal-stamps, like a print's artist and publisher seals.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A photograph of a real antique Japanese woodblock print (ukiyo-e tradition), a black-ground NIGHT scene. Craft-medium-photo cousin of [Tapestry](./Tapestry.mvstyle) / [Mosaic](./Mosaic.mvstyle), but the RISKIER bet: woodblock prints are fairly IN-DISTRIBUTION (like the parked stained glass), so the model wants to give a slick "ukiyo-e-style" digital illustration. What forced a real PRINT instead: framing it as "a PHOTOGRAPH of a real antique printed sheet" + the physical-print artifacts a digital fake never has — faint WOODGRAIN printing through the flat colour areas, washi fibre + deckle edge, slight MIS-REGISTRATION off the key-line, foxing / age-toning. Structural lever: flat colour blocks (each from its own carved block) + a bold black key-line + bokashi gradients + a limited registered palette. BLACK GROUND = a NIGHT scene (user's call): the background printed in dense black/indigo ink (still real woodblock ink on washi, NOT flat digital black) so it composites into the dark TUI and reads dramatic. KEEP-AS-IS the user's framing: the figure renders a touch RICHER than a pure-flat museum print — that slight "inauthenticity" makes it MORE serviceable as an MV illustration style (we want usable illustration, not reproductions), so don't flatten it away. Caption = a title cartouche + small red seal-stamps. Best LANDSCAPE for gameplay. Keep the photo-of-a-real-print framing, the physical-print artifacts (woodgrain / washi / mis-registration), the flat colour blocks + key-line + bokashi, the black night ground, and the cartouche caption.
+
+# Example
+
+![Ukiyoe](../ImageStyleExample/Ukiyoe.example.png)

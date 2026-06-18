@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Chiaroscuro"
+rating: "?"
+description: "Single-source low-key chiaroscuro: deep black swallowing the frame, one hard amber pool on the subject, operatic dread"
+tags: [motion-picture, stylized, warm, dread, intimate, interior-friendly]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame lit with extreme low-key CHIAROSCURO from a single source — the boldly UNDEREXPOSED, top-lit cinematography technique. The signature: deep, dominant BLACK shadow swallowing most of the frame; a single hard pool of warm amber light from above falling on the subject, the eyes and lower face often dropping into shadow; very high contrast; rich warm low-key colour; and an intense, operatic, dread-laden mood. Dark, sculpted, amber, dramatic. Close with a small caption in an elegant font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — single-source low-key CHIAROSCURO (boldly underexposed, top-lit; the Gordon-Willis technique, no name): deep dominant BLACK swallowing the frame, one hard amber pool on the subject, very high contrast, operatic dread. The deep black is also the black-gives-rest lever (composites into the dark TUI) AND an anti-cram. A premium dramatic register. SCENE AFFINITY: dark / interior dramatic moments. Caption = elegant font. Validated on the corridor; an instant bank (user). Keep the deep-black single-source amber lighting.
+
+# Example
+
+![Chiaroscuro](../ImageStyleExample/Chiaroscuro.example.png)

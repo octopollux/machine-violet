@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Fresco"
+rating: "?"
+description: "Buon-fresco wall painting on intact lime plaster: flat naive earth-pigment forms, chalky matte finish, faint craquelure"
+tags: [painting, period, muted, limited-palette, stylized]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a fresco on plaster — a wall painting in true buon-fresco technique, pigment soaked into fine lime plaster. Strict process discipline: paint in the flat, stylized, slightly naive manner of fresco — simple shapes, clear flat earth-pigment color (ochre, red-earth, charcoal black, lime white, a little faded blue), confident contour outlines, no photographic depth, no modern shading, and the soft matte chalky finish of pigment absorbed into lime. The surface is intact, smooth lime plaster carrying only the subtlest age: a fine faint craquelure and a gentle, even fading, with the quiet matte tooth of the plaster — keep the plaster clean and undamaged, with no heavy flaking, losses, water-stains or crumbling. A muted, chalky, harmonious palette. Close with a caption as a short line of clean painted or lightly incised lettering beneath the fresco, fully legible.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Two things make this work where a generic oil painting failed (which was rejected as too in-distribution — see the comment block below). (1) "Fresco ON PLASTER / true buon-fresco" is a specific out-of-distribution material the model must actually reason about — pigment absorbed into lime, the flat matte chalky manner — so it commits and renders FLAT instead of coasting into photoreal cram; that flatness is the anti-tic lever. (2) Plaster is deliberately near-featureless, so it supplies the cognitive constraint without adding visual noise: an EARLIER version asked for heavy damage (flaking, losses, crumbling) which broke up the surface but also looked like a ruin and ate the caption. So keep the damage dialed DOWN — intact plaster, faint craquelure only — and keep "fully legible" on the caption. Keep "fresco on plaster / buon-fresco", the flat matte chalky painting, and the minimal-damage intact surface.
+
+# Example
+
+![Fresco](../ImageStyleExample/Fresco.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Adventure90s"
+rating: "?"
+description: "Early-90s Amiga adventure scene: 16-64 indexed colors, bold ordered dithering, chunky pixel grid, sprite over background"
+tags: [game-render, retro, lo-fi, limited-palette, nostalgic]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as the artwork of an early-1990s Amiga point-and-click adventure game, drawn for an indexed-colour bitplane display. THE PALETTE IS THE CONSTRAINT: the whole image uses only 4 to 6 bitplanes — a single strict indexed palette of just 16 to 64 fixed colours for the entire picture, and no colour outside it. Because so few colours are available, the artist fakes every gradient, sky, shadow and soft transition with hand-placed ORDERED DITHERING — bold, clearly visible checkerboard and cross-hatch dither patterns alternating two indexed colours to suggest a third — so nothing is a smooth blend; it is all flat indexed colour and visible dither. Build the scene from clean blocks of flat colour with crisp hard edges and a visible chunky pixel structure (a low-resolution pixel grid), bold confident shapes, hand-placed pixel detail, and a characterful, slightly saturated retro Amiga palette. Set the character into the foreground as a clear, well-defined figure reading against the dithered painted background — the classic adventure-game sprite-over-scene separation. Nostalgic, chunky, vivid. Close with a caption as a short line of subtitle text in a clean pixel/bitmap font along the bottom, like a line of in-game narration.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The early-1990s Amiga point-and-click adventure-game register: a hard indexed-colour, dithered, chunky-pixel scene with a sprite-like character composited over it. Sibling of [Adventure2000s](./Adventure2000s.mvstyle) (the clean cel-shaded 2000s look) — same point-and-click family, two console generations apart. LOAD-BEARING LEVER: "the palette is the constraint — only 4–6 BITPLANES, a strict indexed palette of just 16–64 colours for the whole image." This is what makes the period DITHERING actually render: asking for "dithering" directly produced only microscopic, invisible dither (a smooth painting with a hidden artifact); making the limited palette MANDATORY forces bold, visible ordered dithering across every gradient as a consequence (the model has no other way to fake a sky in 32 colours). The hard palette cap is also a strong anti-tic constraint — with 16–64 colours the model can't cram varied detail, so the "bit of tic" the lush-painting take had collapses into clean indexed-colour screen texture. (This replaced an earlier lush hand-painted matte-painting version that looked great but carried the tic; the Amiga indexed look is both more period-authentic AND tic-free.) Same family of structural texture levers as [Risograph](./Risograph.mvstyle) / [NinetiesComic](./NinetiesComic.mvstyle) — a regular screen converts density into legitimate medium texture — but here the screen is forced by a palette limit, not asked for. Keep "only 4–6 bitplanes / 16–64 indexed colours", the bold visible ordered dithering, the chunky pixel grid, and the pixel-font subtitle caption.
+
+# Example
+
+![Adventure90s](../ImageStyleExample/Adventure90s.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Screenprint"
+rating: "?"
+description: "Bold flat silkscreen poster: hard-edged single-colour shapes, no rendering, strict 3-4 ink palette, even screenprint grain"
+tags: [printmaking, graphic, limited-palette, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a bold, flat, modern graphic poster illustration — contemporary editorial / screenprint cover art. ABSOLUTE FLATNESS IS THE RULE: every form is built from flat, hard-edged shapes, each filled with a SINGLE flat colour, with no rendering, no gradients, no soft shading and no texture inside the shapes — like a modern silkscreen poster. Do all modelling by dividing forms into a few separate flat colour shapes (flat planes of light and shadow as distinct hard-edged areas), never blends. Use a strict, sophisticated limited palette of just three or four bold flat inks plus a flat background colour. Reduce the whole scene to one clear, striking graphic idea with a confident poster composition and big simple flat shapes. The only texture anywhere is a uniform fine halftone or grain laid evenly over the flat inks, like screenprint. Modern, smart, graphic, flat. Close with a caption set in clean bold contemporary sans-serif type, like a poster title or magazine cover line.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The clean MODERN EDITORIAL register the catalog was missing: a bold FLAT silkscreen/editorial poster. LOAD-BEARING LEVER: "ABSOLUTE FLATNESS IS THE RULE — every form a SINGLE flat-colour hard-edged shape, no rendering, model only by dividing into separate flat shapes." This hard flatness ask is what finally forces true flatness where the softer [ConceptPoster](./ConceptPoster.mvstyle) ask rendered painterly (same lesson as [Adventure2000s](./Adventure2000s.mvstyle) forcing cel flatness — an in-distribution illustration register needs the flatness MANDATED, not requested). Plus a strict 3–4 flat-ink limited palette (anti-cram, like [Risograph](./Risograph.mvstyle)) and an even screenprint halftone/grain as the only texture. Distinct from [Risograph](./Risograph.mvstyle) (that is a lo-fi two-ink zine riso; this is a refined multi-colour modern poster) and from [Adventure2000s](./Adventure2000s.mvstyle) (game cel art). Caption = a bold contemporary sans headline/cover line. Flat/poster sibling of the painterly [ConceptPoster](./ConceptPoster.mvstyle) — banked as a pair (user kept both). Validated landscape. Keep the absolute-flatness rule, the 3–4 flat-ink palette, the screenprint grain, and the sans headline caption.
+
+# Example
+
+![Screenprint](../ImageStyleExample/Screenprint.example.png)

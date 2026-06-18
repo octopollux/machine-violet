@@ -110,7 +110,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "DM-only detail for a FULLY CUSTOM campaign (no seeded world). For seeded worlds leave this out — the DM detail is assembled in code from the seed's base premise plus your fork_selections, so you don't pass it. Omit if the campaign is custom with no special DM notes.", nullable: true },
+      campaign_detail: { type: "string", description: "DM-only detail. For a FULLY CUSTOM campaign (no seeded world) this is the entire DM detail. For a seeded world, the seed's own detail is assembled in code from your fork_selections; anything you pass here is APPENDED to it — use this only to record a specific setup-time DM directive you were asked to add (e.g. a chosen visual-style include). Omit if there is nothing to add.", nullable: true },
       world_slug: { type: "string", description: "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.", nullable: true },
       fork_selections: {
         type: "object",
@@ -822,13 +822,19 @@ export function createSetupConversation(
     }
 
     const rawDetail = input.campaign_detail;
+    // Trim the agent's detail: when it is appended to a seeded campaign's
+    // assembled base, a leading-whitespace/newline `<!--include:...-->` would
+    // expand to an INDENTED <TAG>, which applyLayeredOverrides (column-0 only)
+    // would miss — silently dropping the intended override. Trimming keeps the
+    // appended block flush-left so the override is seen.
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
-      ? rawDetail : null;
+      ? rawDetail.trim() : null;
 
-    // For a seeded campaign, CODE owns the DM detail: assemble it from the
-    // seed's fork-invariant base plus the *selected* fork branches, so the DM
-    // sees one collapsed variant and the unchosen branches never reach its
-    // context. Precedence: an explicit world_slug always assembles from the
+    // For a seeded campaign, code assembles the DM-detail FLOOR from the seed's
+    // fork-invariant base plus the *selected* fork branches, so the DM sees one
+    // collapsed variant and the unchosen branches never reach its context; the
+    // setup agent may then APPEND its own campaign_detail on top (see below).
+    // Precedence: an explicit world_slug always assembles from the
     // seed; otherwise (only when the agent supplied no detail) we fall back to
     // a campaign-name-derived slug for back-compat with agents that forget the
     // slug. An agent-supplied detail with no slug = a fully custom campaign.
@@ -848,8 +854,11 @@ export function createSetupConversation(
           }
           if (Object.keys(valid).length) forkSelections = valid;
         }
+        // Append any agent-supplied detail (held in `campaignDetail`) AFTER the
+        // seed base, so a setup-time choice (e.g. a chosen visual-style include)
+        // overrides a seed default for colliding <Tag> blocks at DM-prompt time.
         const assembled = assembleCampaignDetail(world.detail, forks, forkSelections);
-        if (assembled) campaignDetail = assembled;
+        campaignDetail = [assembled, campaignDetail].filter(Boolean).join("\n\n") || null;
       }
     }
 

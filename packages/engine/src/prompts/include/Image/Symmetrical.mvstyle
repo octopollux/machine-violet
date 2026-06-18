@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Symmetrical"
+rating: "?"
+description: "Rigorously symmetrical planimetric frame: dead-centered subject, mirror-balanced pastel set, flat front-on camera, deadpan"
+tags: [motion-picture, stylized, limited-palette, whimsical, scene-coupled]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, compose the SUBJECT centered and front-on in a balanced, symmetrical setting. Then render in this visual style:
+
+# Style
+
+`Rendered as a frame from a film with a rigorously SYMMETRICAL, planimetric visual technique — NOT a naturalistic shot. The technique's signature: a perfectly centered subject and a precisely symmetrical, mirror-balanced frame; a flat, front-on PLANIMETRIC camera placed exactly perpendicular to the back wall (no diagonal perspective); a deliberate, curated, harmonious PASTEL colour palette; meticulous orderly set design with everything squared-up and centered; even, flat, controlled lighting; and a deadpan, dollhouse-precise, storybook formality. Tidy, symmetric, pastel, deliberate. Close with a small centered caption in a clean typographic font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED (no auteur name, by design — describe the HOW not the WHO, [[feedback_no_artist_imitation]]). The rigorously SYMMETRICAL / PLANIMETRIC technique: dead-centered subject, mirror-balanced frame, flat front-on camera (perpendicular to the wall, no diagonal), a curated PASTEL palette, even flat lighting, deadpan formality. The technique alone nails the look without naming anyone. Very distinct from everything else in the catalog. SCENE-COUPLED: composes best when the brief centres the subject in a symmetrical setting (steering in the DM-facing intro). Caption = centered clean type. Validated; an instant bank (user). Keep the symmetry + planimetric flatness + pastel palette.
+
+# Example
+
+![Symmetrical](../ImageStyleExample/Symmetrical.example.png)

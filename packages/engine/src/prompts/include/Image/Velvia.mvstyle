@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Velvia"
+rating: "?"
+description: "Fujichrome Velvia slide film: intense saturation, glowing greens and punchy reds, high contrast, fine grain, chrome glow"
+tags: [film-stock, photoreal, high-saturation, cool, outdoor-revealing, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph shot on Fujichrome Velvia — the iconic ultra-saturated colour slide (transparency) film. Velvia's unmistakable signature: INTENSE, vivid colour saturation, especially deep glowing GREENS and rich punchy reds; high contrast with deep shadows and bright highlights; a cool-leaning colour balance; extremely fine grain and razor-sharp clarity; and the luminous, almost hyper-real "chrome" glow of a backlit slide. A landscape-photographer's dream stock — bold, saturated, crisp, vivid. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. First of an ICONIC FILM-STOCK family (user vein) — Fujichrome VELVIA, the ultra-saturated colour slide film (the "intense greens" stock the user named). Signature: INTENSE saturation (glowing greens + punchy reds), high contrast, fine grain, the hyper-real backlit-chrome glow. A pure photographic-MEDIUM register (the stock IS the look) — applies to any scene, but revealed best on colour-rich / outdoor scenes (proof film stocks on a colour-rich scene; the dark corridor hides the colour signature). Film-stock product names are technical MEDIA descriptors, fine to bake in (cf. [[feedback_no_artist_imitation]] = artists / named works only, not photographic stocks). Caption = clean photographic font. Validated on a golden-hour alien clearing; "Holy shit, yes, no notes" (user). Keep the intense saturation + chrome glow.
+
+# Example
+
+![Velvia](../ImageStyleExample/Velvia.example.png)

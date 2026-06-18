@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "RetroPSX"
+rating: "?"
+description: "Late-90s PlayStation-era 3D render with low-poly jitter, warping affine textures, dithering, and thick draw-distance fog"
+tags: [game-render, retro, lo-fi, nostalgic, gritty]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an in-game screenshot from a late-1990s and early-2000s PlayStation-era 3D game — a gritty low-fidelity retro real-time render. Low-polygon models with jittery wobbling vertices, low-resolution warping affine-mapped textures, visible texture seams and aliasing, chunky pixelation, ordered dithering in the gradients, thick atmospheric draw-distance fog swallowing the background, and a low-res CRT-ish look. Nostalgic, janky, atmospheric early-3D. Close with a caption overlaid in a tasteful pixel or period font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. An expansion of the GAME-RENDER family ([Image](./Image.mvstyle)) — the gritty, janky PS1 / PS2-era retro 3D register. The STRUCTURAL retro format (low-poly jitter, low-res warping affine textures, ordered dithering, thick draw-distance FOG swallowing the background) is what separates it cleanly AND is anti-tic: the fog + low fidelity dissolve the background so the model can't cram (same family as the [PracticalMiniature](./PracticalMiniature.mvstyle) haze-fills-the-negatives lever, here as draw-distance fog). Distinct from the clean faceted [LowPoly](./LowPoly.mvstyle) — this is gritty, textured, nostalgic jank. Charming, atmospheric, retro / horror-friendly (it even gave itself a JRPG dialogue caption). Validated on the Xera dusk scene; a keeper (user). Keep the low-fi jitter + warping textures + dithering + draw-distance fog, and the pixel/period caption.
+
+# Example
+
+![RetroPSX](../ImageStyleExample/RetroPSX.example.png)

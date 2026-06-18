@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "ThermalCam"
+rating: "?"
+description: "Clean false-colour thermal/FLIR still in ironbow palette: heat as soft graded blobs, cold to black, thermal HUD readout"
+tags: [surveillance, stylized, high-saturation, clinical, tense]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a real thermal infrared (FLIR-type) imaging camera. The image is a false-colour HEAT MAP in the classic ironbow palette: living bodies and warm machinery glow hot in white, yellow, orange and red, while everything cool — walls, floor, air, the unheated background — falls away into deep purple and cold black. THE MEDIUM RESOLVES ONLY HEAT, NOT DETAIL: there is no fine texture, no sharp edge and no surface pattern anywhere, only soft, smoothly graded blobs of temperature with bleeding, slightly blurred edges and a low-resolution thermal-sensor look, with faint fixed-pattern sensor noise laid over it. Cold surfaces read as featureless dark; the hot subject is the only bright thing in the frame. Fixed camera, angled down from a high corner. Overlay the camera's thermal HUD as a thin white monospace readout: a small central crosshair reticle with a spot-temperature figure beside it, a vertical temperature scale bar along one edge, and in a top corner a short camera-and-zone identifier above a 24-hour clock TIME in HH:MM:SS — show a time only, never a calendar date. Cold, clinical, inhuman.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Second member of the MODERN-MEDIA SURVEILLANCE cluster (with [NightVisionCam](./NightVisionCam.mvstyle)): a clean false-colour thermal / FLIR imaging still in the ironbow palette. LOAD-BEARING LEVER (structural, strong): THERMAL RESOLVES ONLY HEAT, NOT DETAIL — the medium physically cannot show fine texture or sharp edges, only smoothly graded heat-blobs, so the tic has nothing to cram (the model renders a figure as an anonymous heat-blob with NO facial detail). A consequence worth knowing: thermal STRUCTURALLY ERASES LIKENESS — it is for ambiguous menace (who/what is that warm shape), NOT character beats; don't reach for it when a PC's face needs to read. Second lever: cold surfaces fall to dark, the [TrinitronCRT](./TrinitronCRT.mvstyle) / [LandCamera](./LandCamera.mvstyle) "deep black gives rest for free" lever (cold = dark = nothing to cram), which also composites into the dark TUI (cold purple/black edges). The thermal HUD IS the caption: crosshair reticle + spot-temperature readout + vertical temperature scale bar + camera/zone ID over the time-only HH:MM:SS clock (the [NightVisionCam](./NightVisionCam.mvstyle) codified OSD — time only, never a date; VERIFIED holding on both thermal renders). Reads as a clean in-engine game FLIR — the user's note, and since MV is a game that is correct, not a flaw. Degraded analog sibling: [ThermalGrain](./ThermalGrain.mvstyle). Validated landscape (gameplay wants wide). Keep the heat-not-detail lever, the cold-to-black, and the thermal-HUD time-only caption.
+
+# Example
+
+![ThermalCam](../ImageStyleExample/ThermalCam.example.png)

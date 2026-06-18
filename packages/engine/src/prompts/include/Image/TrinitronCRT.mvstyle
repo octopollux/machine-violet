@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "TrinitronCRT"
+rating: "?"
+description: "Scene off a late-90s Trinitron CRT: fine scanlines, RGB phosphor stripes, bloom, deep black, glass curvature"
+tags: [analog-video, lo-fi, retro, color, nostalgic]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Displayed on a late-1990s Sony Trinitron CRT monitor and photographed off the curved glass: a real scene shown as glowing phosphor emerging from deep CRT black. Strict process discipline: lay a precise, regular structure of fine horizontal scanlines across the entire image, over a vertical aperture-grille phosphor-stripe pattern of tight red-green-blue vertical triads, so every lit area is built from glowing phosphor cells. Bright areas bloom and halate softly; the CRT black level is deep, so shadows fall to true black and only phosphor-lit forms are visible. Add subtle RGB convergence fringing toward the edges, faint chromatic misalignment, the two signature thin horizontal Trinitron damper wires crossing the screen, gentle screen curvature, and a soft glass sheen with a faint room reflection. Slight interlace shimmer and analog video softness — no crisp digital edges. Close with an on-screen caption burned into the video signal like a broadcast lower-third or camcorder OSD: a short line of glowing text in a plain video font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Two load-bearing clauses do the anti-tic work here, and BOTH are positive process facts about a CRT, never negations: (1) the deep CRT black level — shadows fall to true black and only phosphor-lit forms are visible — gives the frame genuine rest for free (no "leave empty" instruction); (2) the fine, regular scanline + aperture-grille phosphor structure is exacting work that unifies every lit surface into one coherent screen instead of reflexive detail. Keep the black level, the fine scanline/phosphor structure, and the off-the-glass framing (curvature, bloom, damper wires).
+
+# Example
+
+![TrinitronCRT](../ImageStyleExample/TrinitronCRT.example.png)
