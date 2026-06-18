@@ -606,6 +606,14 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. Grounded DOCUMENTARY / reportage photograph — candid available-light photojournalism, handheld imperfection, muted true-to-life colour, high-ISO grain, photo-essay caption. The grounded "you-are-there, observed-not-staged" register; distinct from the cold degraded SURVEILLANCE cluster ([[NightVisionCam]] etc.) and from the polished [[CinematicFilm]]. I rated it weakly-differentiated; the USER rated it a TOP-5-OVERALL keeper (eyeballs win, cf. [[show-renders-before-banking]]) — the candid reportage mood reads stronger than I credited. Scene-neutral. A photo-essay caption may include an in-world (future) date — fine, NOT the surveillance no-date rule. Validated on the Xera corridor; a BIG keeper (user). Keep the available-light candid realism + photo-essay caption.
 </DocumentaryPhoto>
 
+<PainterlyGame>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+%% Append at the END — style last. A painterly STYLISED game render (hand-painted world, Dishonored-ish) — visible painterly brushwork in the textures, characterful proportions, warm hand-mixed palette. KEY LEVER (user): a WIDE 20MM LENS is baked in as the anti-tic control — the wide field of view + big simple foreground shapes SPREAD the composition out so the model can't cram (a FOCAL-LENGTH expression of the economy-of-result lever, cf. [[ValueBlocked]] / [[CleanDigital]]; reusable on any cram-prone style). The no-20mm first cut carried a mild tic and converged toward [[DigitalPainting]] concept-art; the 20mm version breathes and reads more as a painterly GAME. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "it worked"). Keep the 20mm wide lens (the tic-control) + the painterly brushwork.
+</PainterlyGame>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
