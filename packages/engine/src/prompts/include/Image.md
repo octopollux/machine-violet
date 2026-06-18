@@ -694,6 +694,22 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. MOTION-PICTURE family — early-1920s SILENT FILM: high-contrast ortho B&W, a soft IRIS vignette, film damage (dust / scratches / flicker / jitter), an under-cranked feel, archival ghostliness, and an ornate INTERTITLE-CARD caption. A distinct vintage B&W lane (vs [[NoirCinema]] dramatic chiaroscuro, [[TriX]] reportage grain, [[LandCamera]] flash). The intertitle card is the signature caption. Validated on the clearing; an instant take (user). Keep the iris vignette + film damage + intertitle card.
 </SilentFilm>
 
+<BleachBypass>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a gritty modern war or thriller film processed with BLEACH BYPASS (silver retention) — NOT a clean render. Bleach-bypass signature: heavily DESATURATED, near-monochrome colour with just traces of muted hue, very high contrast, crushed inky blacks and harsh blown highlights, a gritty metallic silvery sheen, and heavy grain. Strict process discipline to keep it clean and uncluttered: a SHALLOW DEPTH OF FIELD with the figure sharp and the cluttered background falling into soft blur and deep crushed BLACK, plus atmospheric HAZE and drifting smoke swallowing the background detail — so the dense surroundings dissolve into simple dark shapes and atmosphere rather than crammed texture. Grim, hard, cold, cinematic, built from big simple value masses. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — BLEACH BYPASS (silver retention): heavily desaturated near-monochrome, very high contrast, crushed blacks, blown highlights, gritty metallic sheen, heavy grain — the visceral war / thriller look. DE-TIC BAKED IN (user): the first cut crammed the busy corridor; the fix = the cinematic DE-TIC toolkit — shallow DoF + atmospheric HAZE / smoke + deep-black-rest + big simple VALUE MASSES dissolve the dense background into atmosphere instead of crammed texture (the [[HeroShooter]] DoF+volumetric and [[PaperbackCover]] value-mass levers, applied to a film grade). KEEP those clauses — they're load-bearing anti-tic, not flavour. Caption overlaid. Validated on the corridor (v2); a keeper (user). Keep the desaturated high-contrast silver-retention look + the DoF / haze / black / value-mass de-tic.
+</BleachBypass>
+
+<Giallo>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic Italian GIALLO horror-thriller film — the lurid, stylised colour-horror look. Its signature: bold, saturated, unnatural COLOURED GEL LIGHTING (deep blood reds against cold electric blues), hard theatrical shadows, high contrast, a glossy expressionistic palette, and an atmosphere of stylised, glamorous dread. Lurid, vivid, suspenseful, beautiful and sinister. Close with a small caption in ENGLISH (NOT Italian — use English words despite the Italian-horror style), set in a stylish period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — Italian GIALLO colour-horror: bold saturated unnatural COLOURED GEL LIGHTING (blood reds vs electric blues), hard theatrical shadows, high contrast, stylised glamorous dread. CAPTION FIX BAKED IN (user): the model defaults to ITALIAN captions for giallo (the first cut titled itself "L'OSSESSIONE DELLO SPAZIO PROFONDO"); the style line now explicitly demands an ENGLISH caption — KEEP that directive or it reverts to Italian. SCENE AFFINITY: wants a dark scene it can flood with red / blue gels (validated on a shadow chamber). A distinct lurid-colour-horror lane vs the photographic horror ([[SurvivalHorror]] / [[LandCamera]]) and the B&W [[NoirCinema]]. Caption = English, stylish period font. Validated (v2); a keeper (user). Keep the red / blue gel lighting + the explicit English-caption directive.
+</Giallo>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
