@@ -662,6 +662,38 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. FILM-STOCK family — CINESTILL 800T, the tungsten-balanced NIGHT cinema film: cyan shadows + teal midtones + amber highlights + the trademark soft red-orange HALATION GLOW around bright lights. PROOF-SCENE matters: rendered on the NIGHT CORRIDOR (not the daylight clearing) so the halation-around-lights signature shows — a night / artificial-light scene is its native habitat. USER NOTE: it reads "a little weak — doesn't quite look like FILM, basically a really high-quality UNSTYLED render" — kept anyway (a clean cinematic night look). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the corridor; a keeper (user). Keep the tungsten balance + red halation.
 </CineStill>
 
+<Technicolor>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic three-strip TECHNICOLOR motion picture — the glorious, glossy Golden-Age-of-Hollywood colour process. Technicolor's signature: intensely vivid, glowing, saturated colour with bold pure primaries (rich reds, deep blues, vivid greens), a glossy luminous quality, creamy glamour lighting, high production-value sheen, and a slightly heightened, hyper-real Technicolor glow. Lush, vivid, spectacular, timeless. Close with a small caption in an elegant period film-title font.`
+
+%% Append at the END — style last. ICONIC MOTION-PICTURE family (a sibling vein to the [[Velvia]] film-stock family — eras / processes / genres, NOT director signatures, cf. [[feedback_no_artist_imitation]]). THREE-STRIP TECHNICOLOR — the glossy Golden-Age glow: vivid saturated pure primaries, glamour lighting, hyper-real sheen. Like the film stocks, naming a real motion-picture PROCESS strongly invokes that look. Reveal on a colour-rich scene. Caption = elegant period film-title font. Validated on the clearing; an instant take (user). Keep the vivid saturated Technicolor glow.
+</Technicolor>
+
+<TealOrange>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a glossy modern blockbuster film with the signature TEAL-AND-ORANGE Hollywood colour grade. Its signature: cool TEAL and cyan pushed into the shadows and backgrounds, warm ORANGE skin tones and highlights, a polished high-contrast digital-cinema sheen, shallow depth of field, anamorphic framing, lens flares, and a slick, expensive, contemporary popcorn-movie look. Glossy, punchy, cinematic. Close with a small caption in a tasteful font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — the modern blockbuster TEAL-AND-ORANGE grade: cool teal shadows, warm orange skin / highlights, glossy high-contrast digital-cinema sheen, anamorphic + flares. NOTE: the closest of the motion-picture set to the existing modern polished cinematic look ([[CinematicFilm]] / the modern game renders), but the teal / orange split is a distinct, recognisable GRADE. Caption overlaid. Validated on the corridor; an instant take (user). Keep the teal-shadow / orange-skin grade.
+</TealOrange>
+
+<SpaghettiWestern>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from a classic SPAGHETTI WESTERN motion picture — the sun-scorched Italian-western look. Its signature: a hot, dusty, sun-bleached palette of ochre, amber, tan and sweat; harsh overhead desert sun and squint-inducing glare; an extreme TELEPHOTO compression flattening the distance; deep weathered close-up texture on skin and grit; heat-shimmer; a lurid saturated golden warmth; and a tense, operatic, dust-and-leather mood. Gritty, parched, iconic. Close with a small caption in a rugged period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — the SPAGHETTI-WESTERN look: sun-bleached ochre / amber / tan palette, harsh sun glare, extreme TELEPHOTO compression, weathered close-up grit, heat-shimmer, operatic dust-and-leather mood. SCENE AFFINITY: shines on OUTDOOR / arid / sunlit scenes (validated on a noon desert) — the sun-baked light is part of the genre signature, so it fits sunny exteriors best (less so a dark interior). Caption = rugged period font. Validated on a desert; an instant take + user favourite. Keep the sun-baked palette + telephoto grit.
+</SpaghettiWestern>
+
+<SilentFilm>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+%% Append at the END — style last. MOTION-PICTURE family — early-1920s SILENT FILM: high-contrast ortho B&W, a soft IRIS vignette, film damage (dust / scratches / flicker / jitter), an under-cranked feel, archival ghostliness, and an ornate INTERTITLE-CARD caption. A distinct vintage B&W lane (vs [[NoirCinema]] dramatic chiaroscuro, [[TriX]] reportage grain, [[LandCamera]] flash). The intertitle card is the signature caption. Validated on the clearing; an instant take (user). Keep the iris vignette + film damage + intertitle card.
+</SilentFilm>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
