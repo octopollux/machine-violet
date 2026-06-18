@@ -614,6 +614,14 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. A painterly STYLISED game render (hand-painted world, Dishonored-ish) — visible painterly brushwork in the textures, characterful proportions, warm hand-mixed palette. KEY LEVER (user): a WIDE 20MM LENS is baked in as the anti-tic control — the wide field of view + big simple foreground shapes SPREAD the composition out so the model can't cram (a FOCAL-LENGTH expression of the economy-of-result lever, cf. [[ValueBlocked]] / [[CleanDigital]]; reusable on any cram-prone style). The no-20mm first cut carried a mild tic and converged toward [[DigitalPainting]] concept-art; the 20mm version breathes and reads more as a painterly GAME. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "it worked"). Keep the 20mm wide lens (the tic-control) + the painterly brushwork.
 </PainterlyGame>
 
+<Velvia>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Fujichrome Velvia — the iconic ultra-saturated colour slide (transparency) film. Velvia's unmistakable signature: INTENSE, vivid colour saturation, especially deep glowing GREENS and rich punchy reds; high contrast with deep shadows and bright highlights; a cool-leaning colour balance; extremely fine grain and razor-sharp clarity; and the luminous, almost hyper-real "chrome" glow of a backlit slide. A landscape-photographer's dream stock — bold, saturated, crisp, vivid. Close with a small caption in a clean photographic font.`
+
+%% Append at the END — style last. First of an ICONIC FILM-STOCK family (user vein) — Fujichrome VELVIA, the ultra-saturated colour slide film (the "intense greens" stock the user named). Signature: INTENSE saturation (glowing greens + punchy reds), high contrast, fine grain, the hyper-real backlit-chrome glow. A pure photographic-MEDIUM register (the stock IS the look) — applies to any scene, but revealed best on colour-rich / outdoor scenes (proof film stocks on a colour-rich scene; the dark corridor hides the colour signature). Film-stock product names are technical MEDIA descriptors, fine to bake in (cf. [[feedback_no_artist_imitation]] = artists / named works only, not photographic stocks). Caption = clean photographic font. Validated on a golden-hour alien clearing; "Holy shit, yes, no notes" (user). Keep the intense saturation + chrome glow.
+</Velvia>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
