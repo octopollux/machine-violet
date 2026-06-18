@@ -622,6 +622,46 @@ When composing prompts for `generate_image`, render the image in this visual sty
 %% Append at the END — style last. First of an ICONIC FILM-STOCK family (user vein) — Fujichrome VELVIA, the ultra-saturated colour slide film (the "intense greens" stock the user named). Signature: INTENSE saturation (glowing greens + punchy reds), high contrast, fine grain, the hyper-real backlit-chrome glow. A pure photographic-MEDIUM register (the stock IS the look) — applies to any scene, but revealed best on colour-rich / outdoor scenes (proof film stocks on a colour-rich scene; the dark corridor hides the colour signature). Film-stock product names are technical MEDIA descriptors, fine to bake in (cf. [[feedback_no_artist_imitation]] = artists / named works only, not photographic stocks). Caption = clean photographic font. Validated on a golden-hour alien clearing; "Holy shit, yes, no notes" (user). Keep the intense saturation + chrome glow.
 </Velvia>
 
+<Kodachrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font.`
+
+%% Append at the END — style last. ICONIC FILM-STOCK family (sibling of [[Velvia]]) — KODACHROME, the warm archival slide (the "National Geographic" look): luminous warm reds + earth tones, high microcontrast, fine grain, a warm golden cast — the WARM-archival counterpart to Velvia's cool-saturated punch. PHOTOREALISM LEVER (user finding, remember this): asking for a named FILM STOCK is an extremely effective way to invoke SERIOUS PHOTOREALISM (the stock IS the look). Reveal on a colour-rich scene. Caption = clean photographic font. Validated on the clearing; "super impressive, big keep" (user). Keep the warm golden archival cast.
+</Kodachrome>
+
+<Portra>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font.`
+
+%% Append at the END — style last. FILM-STOCK family ([[Velvia]] / [[Kodachrome]]) — PORTRA 400, the SOFT colour-negative portrait film: gentle natural skin tones, LOW contrast, creamy highlights, warm pastel palette, muted-pleasing saturation. The soft / flattering register vs the punchy slides. Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user, kept the whole set). Keep the soft low-contrast pastel skin-tone look.
+</Portra>
+
+<TriX>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a black-and-white photograph shot on Kodak Tri-X 400 — the classic photojournalism and street film. Tri-X's signature: gritty, distinctive visible GRAIN, a rich tonal range with deep blacks and bright highlights, punchy contrast, a raw documentary feel, and hand-developed character. The timeless look of 35mm reportage black-and-white. Close with a small caption in a plain documentary font.`
+
+%% Append at the END — style last. FILM-STOCK family — KODAK TRI-X 400, the classic B&W reportage / street film: gritty visible GRAIN, rich tonal range, punchy contrast, documentary feel. Distinct B&W lane from [[NoirCinema]] (dramatic chiaroscuro) and [[LandCamera]] (harsh flash) — Tri-X = naturalistic documentary B&W (the B&W cousin of [[DocumentaryPhoto]]). Photorealism lever (see [[Kodachrome]]). Caption = plain documentary font. Validated on the clearing; a keeper (user). Keep the gritty grain + documentary tonality.
+</TriX>
+
+<Ektachrome>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on Kodak Ektachrome E100 — the clean, accurate colour slide film. Ektachrome's signature: crisp, clean, neutral-to-COOL colour rendition, accurate natural saturation (not over-saturated), clean bright BLUES, fine grain, sharp clarity, and a slightly cool, modern, true-to-life slide look — the cooler, more restrained counterpart to Velvia. Close with a small caption in a clean photographic font.`
+
+%% Append at the END — style last. FILM-STOCK family — KODAK EKTACHROME E100, the clean / accurate COOL slide: neutral-to-cool rendition, accurate (not over-saturated) colour, clean bright blues, sharp. The restrained / cool counterpart to [[Velvia]]'s saturation. NOTE: the LEAST-differentiated of the slides (accurate colour sits near a neutral render, and Velvia owns "saturated slide") — but the user kept the whole set ("every single one is fantastic"). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the clearing; a keeper (user). Keep the cool, clean, accurate slide rendition.
+</Ektachrome>
+
+<CineStill>
+When composing prompts for `generate_image`, render the image in this visual style:
+
+`Rendered as a photograph shot on CineStill 800T — the tungsten-balanced cinema colour film famous for its night look. CineStill's signature: a cool tungsten colour balance with cyan-leaning shadows and teal midtones, warm amber highlights, and — the unmistakable trademark — a soft red-orange HALATION GLOW blooming around every bright light source, where the bright halos bleed a warm red ring. Cinematic, moody, nocturnal, with fine grain. Close with a small caption in a clean photographic font.`
+
+%% Append at the END — style last. FILM-STOCK family — CINESTILL 800T, the tungsten-balanced NIGHT cinema film: cyan shadows + teal midtones + amber highlights + the trademark soft red-orange HALATION GLOW around bright lights. PROOF-SCENE matters: rendered on the NIGHT CORRIDOR (not the daylight clearing) so the halation-around-lights signature shows — a night / artificial-light scene is its native habitat. USER NOTE: it reads "a little weak — doesn't quite look like FILM, basically a really high-quality UNSTYLED render" — kept anyway (a clean cinematic night look). Photorealism lever (see [[Kodachrome]]). Caption = clean photographic font. Validated on the corridor; a keeper (user). Keep the tungsten balance + red halation.
+</CineStill>
+
 <!--
   Named variants go here as additional top-level sections, e.g.
 
