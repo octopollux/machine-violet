@@ -822,8 +822,13 @@ export function createSetupConversation(
     }
 
     const rawDetail = input.campaign_detail;
+    // Trim the agent's detail: when it is appended to a seeded campaign's
+    // assembled base, a leading-whitespace/newline `<!--include:...-->` would
+    // expand to an INDENTED <TAG>, which applyLayeredOverrides (column-0 only)
+    // would miss — silently dropping the intended override. Trimming keeps the
+    // appended block flush-left so the override is seen.
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
-      ? rawDetail : null;
+      ? rawDetail.trim() : null;
 
     // For a seeded campaign, code assembles the DM-detail FLOOR from the seed's
     // fork-invariant base plus the *selected* fork branches, so the DM sees one

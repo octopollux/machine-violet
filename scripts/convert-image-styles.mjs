@@ -2,8 +2,10 @@
 // .mvstyle files in OKF layout (YAML frontmatter + markdown body).
 //
 // The style line is a VALIDATED image prompt — it is transcribed VERBATIM from
-// Image.md, never paraphrased. Direction and Notes are likewise verbatim. The
-// only authored fields are `description` and `tags`, supplied by
+// Image.md, never paraphrased. Direction and Notes carry their content over
+// unchanged too, with only surrounding blank lines trimmed and (for Notes) the
+// leading `%%` maintainer marker stripped. The only authored fields are
+// `description` and `tags`, supplied by
 // scripts/image-style-meta.json (keyed by tag); a style missing from that map
 // is emitted with `description: TODO` / `tags: []` so the file shape is stable.
 //
