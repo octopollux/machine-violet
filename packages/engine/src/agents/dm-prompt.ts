@@ -60,17 +60,23 @@ export function buildDMPrefix(
 ): CachedPrefixResult {
   const model = modelId ?? getModel("large");
 
-  // Three prompt layers, in cascading-override priority order
-  // (lowest → highest): main DM (dm-identity + dm-directives) → campaign
-  // seed (campaign_detail) → DM personality (prompt_fragment + detail).
+  // FIVE override slots, in cascading-override priority order (lowest →
+  // highest): dm-identity → dm-directives → campaign_detail → personality
+  // prompt_fragment → personality detail. (Conceptually three sources — main
+  // DM = identity + directives, campaign seed = campaign_detail, DM personality
+  // = fragment + detail — but applyLayeredOverrides treats them as five
+  // distinct slots, and precedence is slot-by-slot.) The campaign_detail slot
+  // itself holds the seed's assembled detail FOLLOWED BY any setup-agent-
+  // appended detail, so a colliding <TAG> the agent appended beats the seed's,
+  // which beats the base — by design (the setup agent may clobber seed data).
   //
-  // Each layer's text may contain `<!--include:Tag.Variant-->` directives
-  // and top-level `<TAG>...</TAG>` blocks. Includes are resolved per layer
-  // (loadPrompt already does this for the file-based layers; the inline
-  // strings go through processIncludes here). Then applyLayeredOverrides
-  // walks all five slots in order — when the same tag appears in more than
-  // one slot, only the last occurrence survives, so a personality's
-  // `<NPCS>` block trumps a seed's, which in turn trumps the main DM's.
+  // Each slot's text may contain `<!--include:Tag.Variant-->` directives and
+  // top-level `<TAG>...</TAG>` blocks. Includes are resolved per slot
+  // (loadPrompt already does this for the file-based slots; the inline strings
+  // go through processIncludes here). Then applyLayeredOverrides walks all five
+  // slots in order — when the same tag appears in more than one, only the last
+  // occurrence survives, so a personality's `<NPCS>` block trumps a seed's,
+  // which in turn trumps the main DM's.
   const dmIdentity = loadPrompt("dm-identity", model);
   const dmDirectives = loadPrompt("dm-directives", model);
   const campaignDetail = processIncludes(config.campaign_detail ?? "");

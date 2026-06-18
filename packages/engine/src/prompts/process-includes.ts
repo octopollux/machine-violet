@@ -39,15 +39,17 @@ import { assetDir } from "../utils/paths.js";
  *
  * Once includes are resolved, the prompt contains top-level XML blocks
  * (some written inline, some produced by includes). When the same tag
- * appears in multiple prompt LAYERS — main DM prompt, campaign seed prompt,
- * DM personality template prompt — the latest layer wins. Earlier
- * occurrences are removed entirely, and the latest layer's block stays in
- * place.
+ * appears in more than one slot of an ordered layer list, the latest slot
+ * wins; earlier occurrences are removed entirely and the latest slot's block
+ * stays in place. `buildDMPrefix` passes FIVE slots, lowest → highest:
+ * dm-identity → dm-directives → campaign_detail → personality prompt_fragment
+ * → personality detail.
  *
- * This lets a DM personality redefine the `<NPCS>` block (or any other
- * entity) that the main DM prompt established, without editing the main
- * prompt file. Resolution is done at the buildDMPrefix layer; this module
- * just exposes the merge primitive.
+ * This lets a DM personality redefine the `<NPCS>` block (or any other entity)
+ * that the main DM prompt established, without editing the main prompt file —
+ * and it lets the setup agent's appended `campaign_detail` override a seed's
+ * block. Resolution is done at the buildDMPrefix layer; this module just
+ * exposes the merge primitive.
  */
 
 const VARIANT_RE = /^<([A-Za-z][\w]*)>([\s\S]*?)<\/\1>/gm;
