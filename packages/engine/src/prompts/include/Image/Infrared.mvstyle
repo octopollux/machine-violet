@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Infrared"
+rating: "?"
+description: "Colour infrared Aerochrome film: foliage rendered surreal reds and pinks, cyan skies, dreamlike false colour, halation glow"
+tags: [photographic, stylized, high-saturation, dreamy, outdoor-revealing, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph on colour INFRARED (Aerochrome) film — the surreal false-colour infrared technique. The signature: green foliage and plant life rendered in vivid surreal REDS, PINKS and magentas (infrared-reflective chlorophyll); skies and water going deep cyan-blue; an eerie, dreamlike, otherworldly false-colour palette; high contrast; a soft halation glow; and fine grain. Surreal, psychedelic, dreamlike, alien. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. Film family, TECHNIQUE-SPECIFIED — colour INFRARED (Aerochrome): foliage → surreal REDS / PINKS / magentas, cyan skies, dreamlike false-colour, halation glow. Spectacularly ALIEN — ideal for off-world flora (the user's pick of the batch). SCENE AFFINITY: vegetation-rich / outdoor scenes (foliage is what goes red). Caption overlaid. Validated on the clearing; an instant bank (user). Keep the false-colour red-foliage signature.
+
+# Example
+
+![Infrared](../ImageStyleExample/Infrared.example.png)

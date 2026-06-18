@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "TrafficCam"
+rating: "?"
+description: "Ugly low-quality DOT traffic-cam grab: heavy JPEG blocks, muddy desaturated colour, flat night road, location and time OSD"
+tags: [surveillance, lo-fi, muted, grim, wide-vista, outdoor-revealing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single grabbed still from a real roadside traffic camera at 2 AM — a cheap, low-resolution DOT/traffic-monitoring camera mounted high on a gantry or pole, looking steeply down over a wide, nearly empty multi-lane road. THE FEED IS GENUINELY LOW-QUALITY, and that is the whole point: low resolution, HEAVY JPEG compression with visible blocky 8x8 artefacts and ringing, washed-out muddy desaturated colour with a faint green low-light cast, crushed shadows and blown-out blooming around the overhead lamps, smeared motion, soft cheap optics, and banding in the gradients — it should look like an ugly, utilitarian, REAL traffic-cam frame grab, NOT a clean cinematic render. Flat, functional, head-on framing of the lanes with no artful composition. The road is deserted at this hour, lit harshly by overhead sodium and LED lamps, long hard shadows, the asphalt faintly wet. Burn a blocky low-resolution on-screen display into a corner in a plain monospace traffic-system font: a route/road LOCATION code and a running 24-hour clock TIME in HH:MM:SS — show a time only, never a calendar date. Bleak, banal, deserted, faintly ominous.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Sixth member of the MODERN-MEDIA SURVEILLANCE cluster (with [NightVisionCam](./NightVisionCam.mvstyle), [ThermalCam](./ThermalCam.mvstyle), [ThermalGrain](./ThermalGrain.mvstyle), [BackupCam](./BackupCam.mvstyle), [StreetCam](./StreetCam.mvstyle)) — the GROUNDED counterpart to [StreetCam](./StreetCam.mvstyle). THE GROUNDING THESIS (validated here, worth reusing beyond surveillance): what makes a footage still read as REAL rather than a clean "video-game still" is the LOW QUALITY, not the framing. [StreetCam](./StreetCam.mvstyle) and this share a high-pole night-road vantage, but pushing hard on cheap-JPEG degradation flips it from cinematic to a genuine DOT traffic-cam grab. LOAD-BEARING LEVER: the cheap-JPEG / low-res degradation (low resolution, heavy blocky compression + ringing, washed muddy desaturated colour, blown highlights, banding, flat utilitarian framing) IS both the medium-constraint (cf. [PulpInk](./PulpInk.mvstyle)'s cheap reproduction) AND the tic-sink — ugly low quality physically can't carry reflexive fine detail. REALISM DIVIDEND: the low quality DISSOLVES the figure's likeness (you can't ID anyone off a traffic cam), so like [ThermalCam](./ThermalCam.mvstyle) this is an ANONYMOUS-MENACE lens (different mechanism — degradation, not heat-blur), not a character-beat one; Xera read only as a small ambiguous figure, which is correct. Caption = the OSD: a route/LOCATION code + a corner time-only HH:MM:SS clock ([NightVisionCam](./NightVisionCam.mvstyle) codified OSD; held: "02:00:47", no date). The wet empty intersection leaves lots of rest. Validated landscape. Keep the cheap-JPEG / low-res grounding degradation, the flat utilitarian framing, and the location + time-only OSD.
+
+# Example
+
+![TrafficCam](../ImageStyleExample/TrafficCam.example.png)

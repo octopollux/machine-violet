@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "SurvivalHorror"
+rating: "?"
+description: "Low-key flash photo, harsh on-camera flash falling to crushed black, grain and burned-in data strip — reads as AAA horror photo mode"
+tags: [photographic, lo-fi, black-and-white, dread, horror, any-scene]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a low-key black-and-white silver-gelatin flash photograph — a real grainy film frame, full-bleed to the edges with no border or white frame of any kind. Strict process discipline: expose it low-key and underlit, lit only by a single harsh on-camera flash. The flash blasts the nearest subject into hard, slightly blown highlights and then falls off fast into deep, depthless black, so most of the frame is pure shadow with detail crushed away — let the darkness swallow everything the flash does not directly hit. Render it in cold, near-monochrome silver-gelatin tones with visible photographic film grain, a harsh sharp flash-lit focus that falls to blur in the dark, heavy corner vignetting, and the chemical character of pushed black-and-white film: coarse grain, a milky lift in the deepest blacks, faint scratches and dust. Snapshot framing, a little crooked and accidental, as if grabbed in a hurry. Bleak, clinical, dreadful. Close with a caption as a small machine-printed data strip burned into the lower edge of the frame — a stark timestamp and a terse location or camera code — like surveillance or evidence footage.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The catalog's AAA survival-horror game still, shot in PHOTO MODE — the horror counterpart to the default [Image](./Image.mvstyle) style (a GPU-rendered MMO in photo mode), and the full-frame sibling of [LandCamera](./LandCamera.mvstyle) (the vintage found-instant-photo read of the same look). The style line asks for a low-key silver-halide flash PHOTOGRAPH, which is exactly the grainy, low-key, harsh-flash, crushed-black look modern AAA horror games emulate — so the output reads as an in-engine horror-game still rather than a literal old photo (the in-distribution convergence is the point, not a quirk). No instant-film border, ANY aspect (validated landscape). It differs from [LandCamera](./LandCamera.mvstyle) in only two ways: full-bleed (no white border, not locked to square) and the caption rides a burned-in DATA STRIP (timestamp + location/camera code, e.g. "THE CENOTAPH | CAM-X7A") instead of handwriting on a border — the clinical designation still does the dread. Same load-bearing levers: the harsh flash falling to deep black leaves most of the frame pure shadow (the [TrinitronCRT](./TrinitronCRT.mvstyle) / [InkNoir](./InkNoir.mvstyle) "black gives rest for free" lever as flash exposure — kills the tic AND carries the dread of what the flash misses), and the silver-gelatin grain / emulsion is the material tic-sink. Horror by RESTRAINT — keep the wrong thing mostly swallowed by the black. Reach for this one when you want a normal scene aspect; reach for [LandCamera](./LandCamera.mvstyle) for the intimate found-instant-photo framing. Keep the harsh-flash-into-black exposure, the full-bleed grain, the restraint, and the burned-in data-strip caption.
+
+# Example
+
+![SurvivalHorror](../ImageStyleExample/SurvivalHorror.example.png)

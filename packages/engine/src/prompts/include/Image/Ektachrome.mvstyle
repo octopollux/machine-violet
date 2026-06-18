@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Ektachrome"
+rating: "?"
+description: "Kodak Ektachrome E100 slide film: clean neutral-to-cool rendition, accurate saturation, bright blues, sharp clarity"
+tags: [film-stock, photoreal, cool, clinical, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph shot on Kodak Ektachrome E100 — the clean, accurate colour slide film. Ektachrome's signature: crisp, clean, neutral-to-COOL colour rendition, accurate natural saturation (not over-saturated), clean bright BLUES, fine grain, sharp clarity, and a slightly cool, modern, true-to-life slide look — the cooler, more restrained counterpart to Velvia. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. FILM-STOCK family — KODAK EKTACHROME E100, the clean / accurate COOL slide: neutral-to-cool rendition, accurate (not over-saturated) colour, clean bright blues, sharp. The restrained / cool counterpart to [Velvia](./Velvia.mvstyle)'s saturation. NOTE: the LEAST-differentiated of the slides (accurate colour sits near a neutral render, and Velvia owns "saturated slide") — but the user kept the whole set ("every single one is fantastic"). Photorealism lever (see [Kodachrome](./Kodachrome.mvstyle)). Caption = clean photographic font. Validated on the clearing; a keeper (user). Keep the cool, clean, accurate slide rendition.
+
+# Example
+
+![Ektachrome](../ImageStyleExample/Ektachrome.example.png)

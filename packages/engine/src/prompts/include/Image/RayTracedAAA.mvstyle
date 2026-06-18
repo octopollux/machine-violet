@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "RayTracedAAA"
+rating: "?"
+description: "2019 flagship AAA game render: full PBR, hybrid ray-traced reflections and GI, TAA, volumetrics, photogrammetry detail"
+tags: [game-render, photoreal, cool, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an authentic in-game screenshot from a 2019-era cutting-edge AAA game engine — a near-photoreal modern real-time render in photo mode (no HUD). State-of-the-art rendering: full physically-based materials, real-time HYBRID RAY TRACING for reflections, soft contact-hardening shadows and global illumination, a high-resolution temporally anti-aliased image, volumetric fog and god-rays, photogrammetry-grade surface detail, screen-space reflections, subtle film grain and a refined filmic colour grade. Extremely high geometry and texture detail, a long draw distance, and cinematic depth of field. The look of a flagship 2019 game at maximum settings — crisp, atmospheric, photoreal. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. Game-render ERA LADDER, the 2019 / current-gen TOP rung (full PBR, hybrid RAY TRACING, TAA, volumetrics, photogrammetry detail). This is the model's DEFAULT in-game look — crisp, photoreal, modern — so it converges with [DeferredDX11](./DeferredDX11.mvstyle) and with [DX9Interior](./DX9Interior.mvstyle) / [WesternRPG](./WesternRPG.mvstyle). The cleanest "modern flagship game" anchor of the ladder. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "very nice").
+
+# Example
+
+![RayTracedAAA](../ImageStyleExample/RayTracedAAA.example.png)

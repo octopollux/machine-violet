@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Watercolor"
+rating: "?"
+description: "Loose luminous watercolour on cotton-rag paper with granulating transparent washes, wet blooms, and reserved-white highlights"
+tags: [painting, painterly, limited-palette, dreamy, outdoor-revealing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a rich, loose WATERCOLOUR illustration painted on heavy 100% cotton-rag watercolour paper (cold-pressed) — luminous transparent washes on a real fibrous rag sheet. Strict process discipline: build the image from layered transparent washes, wet-into-wet blooms and wet-on-dry edges; let the pigment GRANULATE and pool into the fibrous TOOTH of the heavy cotton-rag paper, the paper's subtle fibre and grain showing through the washes everywhere, with a faint cockling of the wet sheet, and the bare paper reserved for highlights (no white paint). Keep it loose and economical — a clear focal subject carries the more worked detail, while the background dissolves into soft, simple, atmospheric washes with lost edges; let the paper texture, not rendered detail, carry the surface. A harmonious limited palette. Fresh, fluid, atmospheric, hand-painted on real rag paper. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A rich, loose WATERCOLOUR illustration on heavy 100% COTTON-RAG paper — distinct from the cozy cross-hatch [Storybook](./Storybook.mvstyle) and the airy white-page [NurseryWatercolor](./NurseryWatercolor.mvstyle). The tic is MITIGATED (not eliminated) by the cotton-rag TEXTURE-TARGET lever (user idea): the heavy rag paper's fibrous tooth + wash granulation soak up the model's detail-drive, so the background dissolves into looser atmospheric washes instead of scene-cram (the [SilverAgeAirbrush](./SilverAgeAirbrush.mvstyle) / [GildedVellum](./GildedVellum.mvstyle) "let the material carry the fine detail" lever). The figure still retains some detail — the accepted portrait-prior tradeoff (see [Charcoal](./Charcoal.mvstyle)). "Let the paper, not rendered detail, carry the surface" + the reserved-white highlights are load-bearing. Caption = clean type. Validated on the Xera dusk scene. Keep the cotton-rag paper, the loose wash economy, and the reserved white.
+
+# Example
+
+![Watercolor](../ImageStyleExample/Watercolor.example.png)

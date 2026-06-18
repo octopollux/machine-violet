@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "NoirCinema"
+rating: "?"
+description: "Black-and-white film-noir still: hard-key chiaroscuro, inky blacks, slatted light and smoke, grain, low dramatic angle"
+tags: [motion-picture, photoreal, black-and-white, noir, tense]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a black-and-white still frame from a classic film-noir motion picture, shot on high-contrast 35mm — NOT a game render and NOT a modern photo. Dramatic chiaroscuro cinematography: a single hard key light carving the subject out of deep, inky black, bold geometric shadow shapes thrown across the scene, slatted light and drifting haze or smoke catching the beam, a glistening highlight on wet surfaces. Rich monochrome with crushed blacks and luminous highlights, fine photochemical film grain, soft highlight roll-off, and a low, dramatic camera angle. Moody, tense, expressionist, timeless. Close with a small caption in an elegant period film-title font within a subtle letterbox bar.`
+
+# Notes
+
+Append at the END — style last. B&W FILM-NOIR cinema still — dramatic chiaroscuro, a single hard key carving the subject from inky black, smoke/haze, film grain, low dramatic angle, letterbox + film-title caption. A true MOVIE frame: distinct from the ink-illustration [InkNoir](./InkNoir.mvstyle) and the harsh-flash snapshot [LandCamera](./LandCamera.mvstyle); the B&W sibling of [CinematicFilm](./CinematicFilm.mvstyle). The black-gives-rest lever (deep blacks) also composites into the dark TUI. High narrative value for tense / dramatic beats. Validated on the Xera corridor (user found the grinning Xera hilariously incongruent but kept it — the portrait-prior expression, cf. [Charcoal](./Charcoal.mvstyle)); a keeper. Keep the chiaroscuro + monochrome + letterbox title.
+
+# Example
+
+![NoirCinema](../ImageStyleExample/NoirCinema.example.png)

@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "HeroShooter"
+rating: "?"
+description: "Bright stylised hero-shooter photo-mode render with chunky PBR, shallow depth of field, and strong volumetric lighting"
+tags: [game-render, stylized, high-saturation, epic, action]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an in-game shot from a bright, stylised modern multiplayer hero-shooter, in photo mode (no HUD) — a clean, appealing, chunky stylised 3D game render. Bold readable shapes, slightly exaggerated heroic proportions, smooth stylised physically-based materials with a clean colourful palette, punchy saturated lighting. Strict process discipline to keep it clean: a SHALLOW DEPTH OF FIELD with the focal character crisp and the background falling into soft bokeh blur, and strong VOLUMETRIC LIGHTING — god-rays, atmospheric haze and light shafts filling the air — so the background reads as soft light and atmosphere rather than crammed detail; rim light and bloom on the hero. Bright, energetic, broadly appealing stylised game art. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([Image](./Image.mvstyle) / [WesternRPG](./WesternRPG.mvstyle) / [RetroPSX](./RetroPSX.mvstyle)) — the bright, clean, STYLISED multiplayer hero-shooter register. The high-fidelity 3D game renders CONVERGE (polished 3D Xera-on-a-vista) and carry the tic; the fix here (user) is DoF + VOLUMETRIC LIGHTING — a shallow depth of field plus god-rays / haze / light-shafts ORGANISE the background into soft light and atmosphere instead of crammed detail (the [PracticalMiniature](./PracticalMiniature.mvstyle) DoF-and-haze lever, applied to game renders) — it tamed the tic while keeping the hero-shooter punch. Bright, energetic, broadly appealing. Caption overlaid. Validated on the Xera dusk scene; a keeper (user). Keep the DoF + volumetric lighting (the anti-tic), the bright stylised PBR, and the overlaid caption.
+
+# Example
+
+![HeroShooter](../ImageStyleExample/HeroShooter.example.png)

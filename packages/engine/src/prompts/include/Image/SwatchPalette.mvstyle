@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "SwatchPalette"
+rating: "?"
+description: "Clean digital illustration built from a strict coordinated colour-swatch set reused across big flat shapes"
+tags: [illustration, graphic, limited-palette, any-scene]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean modern digital illustration, painted from a strict COORDINATED COLOUR-SWATCH palette. Strict process discipline: define a small set of harmonious named swatches (a handful of colours only) and build the ENTIRE image by reusing those same swatches everywhere; block the image in as big simple shapes of flat swatch colour first, establish the value read, then refine, holding the swatch discipline so the whole picture stays unified and economical. Large flat colour shapes, minimal detail reserved for the focal point. Modern, clean, graphic, harmonious. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Tic-controlled digital-illustration workhorse, family of [CleanDigital](./CleanDigital.mvstyle). The lever is PALETTE economy: a strict COORDINATED limited colour-swatch set reused across the whole image, plus big-shape blocking — the swatch discipline unifies and calms the picture (the [Risograph](./Risograph.mvstyle) limited-ink lever, expressed digitally). Moderate-to-strong tic suppression, with a notably harmonious, graphic colour read. Caption = tasteful clean type.
+
+# Example
+
+![SwatchPalette](../ImageStyleExample/SwatchPalette.example.png)

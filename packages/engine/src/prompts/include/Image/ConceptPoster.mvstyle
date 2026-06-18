@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "ConceptPoster"
+rating: "?"
+description: "Cinematic concept-poster key art: a single striking graphic idea in a restrained palette, richly painterly, clean caption"
+tags: [illustration, painterly, muted, epic, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a contemporary editorial illustration — the kind of smart, stylised spot art that runs with a magazine feature or op-ed. Strict process discipline: build the whole image from flat, confident shapes filled with FLAT colour from a restrained, sophisticated limited palette of a few harmonious hues only — bold, slightly muted, considered colours, no photographic rendering, no smooth gradients, no rendered surface detail. Simplify every form to its essentials with clean geometric stylisation and a strong graphic composition; do all modelling as a few flat shapes of light and shadow, never blends. Lay a subtle, even texture over the flat colour — a fine soft grain or a light halftone/screenprint tooth — so the flat areas read as printed, not digital. Reduce the scene to a single clear, confident graphic idea, intentionally composed. Modern, intelligent, clean. Close with a caption set in clean contemporary sans-serif type, like an article's title or kicker.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A NON-surveillance register: a moody, muted CINEMATIC CONCEPT-POSTER / key-art look — one striking conceptual image with a single clear graphic idea and a clean sans caption. WORDING QUIRK, kept on purpose (the [PenAndInk](./PenAndInk.mvstyle) / [InkNoir](./InkNoir.mvstyle) family): this prompt ASKS for flat editorial illustration (flat shapes, flat colour, no rendering), but `gpt-image-2` resists the flatness and renders a richly PAINTERLY cinematic poster instead — editorial-with-rendering is the in-distribution pull. That painterly key-art result IS this variant's register, and it is the validated prompt behind the sample, so don't "fix" it. For the RELIABLY-FLAT modern editorial look, use the sibling [Screenprint](./Screenprint.mvstyle), which forces true flatness with a much harder "absolute flatness" lever (the same lesson as [Adventure2000s](./Adventure2000s.mvstyle)). What carries the look here regardless: the restrained sophisticated limited palette + the single-clear-graphic-idea composition + the sans caption. Banked as a pair with [Screenprint](./Screenprint.mvstyle) (user kept both). Keep the limited palette, the single graphic idea, and the sans caption.
+
+# Example
+
+![ConceptPoster](../ImageStyleExample/ConceptPoster.example.png)

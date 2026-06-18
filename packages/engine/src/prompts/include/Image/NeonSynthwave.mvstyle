@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "NeonSynthwave"
+rating: "?"
+description: "Retro-future synthwave/cyberpunk look with saturated neon hues glowing against deep near-black and big silhouette shapes"
+tags: [illustration, graphic, retro, high-saturation, tense]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a bold retro-future NEON digital illustration — a synthwave and cyberpunk look. A dark scene cut through with glowing neon light: a strict limited palette of a few saturated neon hues (hot magenta, cyan, electric purple) glowing against deep near-black, big simple silhouette shapes, clean glowing edges and gradients, light bloom and haze. Strict economy: design as a few big value shapes with a strong silhouette read, detail spent only on the focal subject, the rest in deep calm dark. Moody, electric, stylish. Close with a small tasteful caption in a clean modern or retro-digital font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style — bold retro-future synthwave / cyberpunk NEON. LOAD-BEARING: a few saturated neon hues glowing against DEEP NEAR-BLACK plus big simple silhouette shapes — the deep-black + big-shape economy both kills the tic (most of the frame is calm dark, nothing to cram) AND composites beautifully into the dark TUI with no bright rectangle (the [TrinitronCRT](./TrinitronCRT.mvstyle) / [Scratchboard](./Scratchboard.mvstyle) "black gives rest for free" lever, here as a neon mood). A distinct, moody, electric register. Caption = tasteful clean or retro-digital type. Validated on the Xera dusk scene; an instant keeper (user).
+
+# Example
+
+![NeonSynthwave](../ImageStyleExample/NeonSynthwave.example.png)

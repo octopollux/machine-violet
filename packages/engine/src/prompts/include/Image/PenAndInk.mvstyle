@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "PenAndInk"
+rating: "?"
+description: "Detailed black-and-white pen-and-ink crosshatched vignette plate from a deluxe illustrated edition, framed and captioned"
+tags: [printmaking, graphic, black-and-white, period]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a black-and-white pen-and-ink line illustration of the kind printed in cheap 1980s abridged-classic and illustrated-novel editions — a single small framed vignette, drawn fast and economically by a working illustrator on a budget and a deadline. Strict process discipline: economy of line is the whole craft. Describe the scene with confident, clean ink contour lines and only sparing parallel hatching, reserved for the few deepest shadows and the modeling of one or two focal forms, with a little stippling at most. Because the job was cheap and fast, the illustrator rendered only the essentials and left the rest as generous bare white paper. No grey tones, no smooth shading, no photographic detail — just black ink line on white. Printed plainly in black on cream pulp paper, with the faintly coarse, slightly over-inked, lightly mis-registered look of cheap offset, and a thin ruled keyline frame around the vignette. Close with a caption beneath the frame: a short line of plain serif type, like a quoted line of text captioning the illustration.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. WORDING QUIRK, kept on purpose: this prompt asks for "economy of line" and bare paper, but gpt-image-2 renders a DETAILED, fully-crosshatched pen-and-ink plate anyway — pen-and-ink illustration is in-distribution as maximal crosshatch and the economy ask does not override it. That dense, refined look IS this variant's intended register (a deluxe illustrated-edition plate), and the wording is the exact validated prompt behind the sample image, so don't "fix" it. For the SPARSE, bold, cheap-edition look, use the sibling [PulpInk](./PulpInk.mvstyle), which forces simplicity by making the cheap reproduction physically destroy fine detail. Keep the framed vignette and the quoted-line caption.
+
+# Example
+
+![PenAndInk](../ImageStyleExample/PenAndInk.example.png)

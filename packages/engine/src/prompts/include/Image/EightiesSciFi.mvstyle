@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "EightiesSciFi"
+rating: "?"
+description: "1980s sci-fi action frame: anamorphic flares, atmospheric haze, hard backlight, glowing neon practicals, 35mm grain"
+tags: [motion-picture, retro, cool, tense, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a 1980s science-fiction action film, using that era's practical cinematography techniques — NOT a modern render. The signature: ANAMORPHIC widescreen with horizontal lens flares; thick atmospheric HAZE and smoke filling the air; hard, dramatic BACKLIGHT and rim-light carving the figure out of the dark; glowing coloured NEON and practical light sources; a moody blue-and-amber or neon-noir palette; visible 35mm Kodak film grain; and motion-control, miniature-and-practical-effects solidity. Smoky, backlit, neon, atmospheric, analog. Close with a small caption in a bold period sci-fi font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — 1980s SCI-FI ACTION practical cinematography: ANAMORPHIC flares, atmospheric HAZE / smoke, hard BACKLIGHT / rim, glowing NEON practicals, 35mm grain, motion-control / practical solidity. Analog, smoky, backlit (the hard backlight + haze is also an anti-cram lever — it dissolves the background). AAA-tier. Caption = bold period sci-fi font. Validated on a smoky neon corridor; an instant bank (user). Keep the anamorphic + haze + hard backlight + neon.
+
+# Example
+
+![EightiesSciFi](../ImageStyleExample/EightiesSciFi.example.png)

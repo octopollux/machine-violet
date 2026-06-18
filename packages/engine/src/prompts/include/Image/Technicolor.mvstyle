@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Technicolor"
+rating: "?"
+description: "Three-strip Technicolor motion picture: vivid saturated pure primaries, glamour lighting, hyper-real glossy glow"
+tags: [motion-picture, film-stock, high-saturation, glamorous, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a classic three-strip TECHNICOLOR motion picture — the glorious, glossy Golden-Age-of-Hollywood colour process. Technicolor's signature: intensely vivid, glowing, saturated colour with bold pure primaries (rich reds, deep blues, vivid greens), a glossy luminous quality, creamy glamour lighting, high production-value sheen, and a slightly heightened, hyper-real Technicolor glow. Lush, vivid, spectacular, timeless. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+# Notes
+
+Append at the END — style last. ICONIC MOTION-PICTURE family (a sibling vein to the [Velvia](./Velvia.mvstyle) film-stock family — eras / processes / genres, NOT director signatures, cf. [[feedback_no_artist_imitation]]). THREE-STRIP TECHNICOLOR — the glossy Golden-Age glow: vivid saturated pure primaries, glamour lighting, hyper-real sheen. Like the film stocks, naming a real motion-picture PROCESS strongly invokes that look. Reveal on a colour-rich scene. Caption = elegant period film-title font. Validated on the clearing; an instant take (user). Keep the vivid saturated Technicolor glow.
+
+# Example
+
+![Technicolor](../ImageStyleExample/Technicolor.example.png)

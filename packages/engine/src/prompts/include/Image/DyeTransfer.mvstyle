@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "DyeTransfer"
+rating: "?"
+description: "Dye-transfer imbibition Technicolor print: lush velvety ultra-saturated colour, dense blacks, near-grainless, glamorous"
+tags: [film-stock, vintage, high-saturation, glamorous, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a print made by the DYE-TRANSFER (imbibition Technicolor) process — the lush, archival, ultra-rich colour-print technique. The signature: deep, saturated, velvety colour with gorgeous dense blacks and luminous highlights; rich, smooth, glowing dye-saturated reds, greens and blues; an extremely fine, almost grainless texture; superb tonal separation; and a sumptuous, glamorous, glowing classic-Hollywood-print quality. Lush, velvety, saturated, glamorous. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the print process or technique name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family — DYE-TRANSFER (imbibition Technicolor print): lush, velvety, ultra-rich saturated colour, dense blacks, near-grainless, glamorous — the glamorous end of jazz-era early colour. Caption = title only (no process name). Validated on the clearing; a keeper (user). Keep the rich velvety dye saturation.
+
+# Example
+
+![DyeTransfer](../ImageStyleExample/DyeTransfer.example.png)

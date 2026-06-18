@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "ModernIllustration"
+rating: "?"
+description: "Clean friendly contemporary illustration: soft cel-like shading, warm limited palette, calm background, subtle paper grain"
+tags: [illustration, stylized, warm, cozy, any-scene]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean, friendly contemporary digital illustration — the warm, approachable look of modern book covers and editorial art. Build forms from clean confident shapes with soft cel-like shading (a few smooth tonal steps, not heavy rendering), a warm harmonious limited palette, and gentle appealing stylisation. Light, even, attractive lighting; a clear focal subject with a calmer, simpler background; a subtle soft grain or paper texture over the colour so it reads handcrafted, not sterile. Modern, clean, inviting, versatile. Close with a small tasteful caption in clean contemporary type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. General-purpose illustration workhorse, sibling of [DigitalPainting](./DigitalPainting.mvstyle) — see that anchor note for the family / tic / convergence story. The "soft cel-like shading, not heavy rendering" ask was largely overridden (the render-pull): this rendered a hair CRISPER / CLEANER than the atmospheric [DigitalPainting](./DigitalPainting.mvstyle) but otherwise nearly identical. Banked anyway (user's call) as the crisp-clean option of the painted default. Carries the forgivable tic. Caption = tasteful clean type.
+
+# Example
+
+![ModernIllustration](../ImageStyleExample/ModernIllustration.example.png)

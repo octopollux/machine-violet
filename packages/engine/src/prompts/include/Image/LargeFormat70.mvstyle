@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "LargeFormat70"
+rating: "?"
+description: "Large-format 65/70mm epic frame: extraordinary clarity, deep front-to-back focus, near-grainless tonality, monumental scale"
+tags: [motion-picture, photoreal, muted, epic, wide-vista, establishing, caption-title-only]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — large-format 65/70MM tech: extraordinary CLARITY, DEEP focus front-to-back, near-grainless tonality, vast monumental scale. A superb ESTABLISHING-VISTA register — the deep-focus clarity is its own anti-tic (all crisp but organised by the grand vista, the resolution analogue of [[MattePainting]]'s aerial dissolve). AAA-tier; pairs with [[MattePainting]] for grand establishing shots. Caption = elegant period film-title font. Validated on an epic vista; an instant bank (user). Keep the deep-focus clarity + epic scale.
+
+# Example
+
+![LargeFormat70](../ImageStyleExample/LargeFormat70.example.png)

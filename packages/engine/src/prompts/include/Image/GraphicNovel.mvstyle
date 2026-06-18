@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "GraphicNovel"
+rating: "?"
+description: "Painted European bande-dessinée graphic-novel look with ink contours over rich atmospheric painted colour"
+tags: [comic, painterly, color, muted, establishing]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a modern painted graphic-novel illustration — confident ink line work under rich painted colour, in the tradition of a high-end European bande-dessinee album. Clean varied ink contour lines holding fully painted, atmospheric colour with soft modelling and a harmonious limited palette; a clear focal hierarchy with the figure crisply inked and rendered and the background looser and more atmospheric. Cinematic lighting, mature and polished. Close with a small tasteful caption in clean type, like an album plate.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. General-purpose illustration workhorse, family member with [DigitalPainting](./DigitalPainting.mvstyle). The "confident ink line work" ask was OVERRIDDEN — it rendered painterly and converged with [DigitalPainting](./DigitalPainting.mvstyle) / [ModernIllustration](./ModernIllustration.mvstyle) (the render-pull beat the ink ask, same family as the [InkComicColor](./InkComicColor.mvstyle) wording quirk). Banked anyway (user's call). For a genuinely INK-LINE graphic-novel look you would need a material lever (visible ink + CMYK + paper, like [NinetiesComic](./NinetiesComic.mvstyle)) — a material-constraint candidate. Carries the forgivable tic. Caption = tasteful album-plate type.
+
+# Example
+
+![GraphicNovel](../ImageStyleExample/GraphicNovel.example.png)

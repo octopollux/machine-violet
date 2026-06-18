@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "Charcoal"
+rating: "?"
+description: "Dramatic charcoal and graphite drawing on toned paper with smudged value masses and bright eraser-lifted highlights"
+tags: [painting, painterly, monochrome, dread, intimate]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a dramatic CHARCOAL and graphite drawing on toned paper — expressive black charcoal, smudged tone, and bright eraser-lifted highlights. Strict process discipline: build the image in broad smudged value masses of charcoal with a strong tonal read, confident gestural strokes for the focal forms, soft blended mid-tones, and crisp lifted highlights where the light hits; keep the background loose, smoky and simple, fading into the toned paper. A few bold dark accents anchor it. Monochrome, moody, gestural, hand-drawn. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A dramatic CHARCOAL / graphite drawing on toned paper — a moody, expressive, dread-adjacent monochrome register. Anti-tic lever: broad smudged VALUE MASSES + a loose smoky background fading into the toned paper = economy (the [PaperbackCover](./PaperbackCover.mvstyle) / [ValueBlocked](./ValueBlocked.mvstyle) big-value-mass family, in charcoal). KNOWN TRADEOFF (user observed, accepted as "fine"): the always-on Xera PORTRAIT REFERENCE sets a strong rendered-style prior on the FIGURE, so against a heavily-stylised style like this the character renders a touch OFF-style (semi-rendered) while the background takes the charcoal fully — a general tension between a rendered portrait reference and a strongly-stylised look. Worth knowing, not a blocker. Caption = clean type. Validated on the Xera dusk scene. Keep the smudged value masses and the loose smoky background.
+
+# Example
+
+![Charcoal](../ImageStyleExample/Charcoal.example.png)

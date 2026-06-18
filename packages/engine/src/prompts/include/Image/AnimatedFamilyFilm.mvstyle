@@ -1,0 +1,24 @@
+---
+type: visual-style
+title: "AnimatedFamilyFilm"
+rating: "?"
+description: "Late-80s/90s hand-drawn animation cel: flat ink-and-paint figures over lush gouache multiplane painted backgrounds"
+tags: [animation, stylized, warm, whimsical, color]
+made-for-model: gpt-image-2
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a high-budget pre-CGI hand-drawn animated family feature of the late 1980s to 1990s: traditional ink-and-paint cels over painted backgrounds. Strict process discipline: render the characters and foreground objects as hand-inked cels — clean, confident black ink outlines filled with FLAT cel paint, and shading done only as a few hard-edged flat shadow and highlight shapes (cel shading), never smooth photographic gradients or rendered surface detail. Behind them, a lush hand-painted background in soft gouache — atmospheric and deep, with visible painterly brushwork and warm cinematic light — clearly a separate painted layer from the crisp cels, with multiplane depth and a slight focus falloff on the background. A warm, harmonious feature-film palette and expressive storybook lighting, with gentle rim light and glow on the key forms. The whole frame carries the soft warm grain of film. Close with a caption like a title card: a short line of elegant hand-lettered type integrated into the frame.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The anti-tic lever is intrinsic to the medium: cels are FLAT (clean ink lines, flat paint, hard-edged cel shading, no rendered surface detail), so the characters and foreground can't carry cram; the demanding craft outlet is the lush hand-painted background and the multiplane cel/background separation. Keep the flat cel treatment, the painted-background-as-separate-layer, and the hard-edged (not gradient) shading. Names no studio or artist on purpose — it evokes the era generically; keep it that way (see docs/seed-authoring.md on no artist imitation).
+
+# Example
+
+![AnimatedFamilyFilm](../ImageStyleExample/AnimatedFamilyFilm.example.png)
