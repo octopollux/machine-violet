@@ -237,7 +237,9 @@ Author **one style at a time**, eyeballed by a human before banking.
      backtick **style line verbatim**, and a `# Notes` section recording *which
      lever does the work, why it works, and what must not be trimmed* (the
      successor to the old `%%` note — `# Notes` never reaches the DM). Link
-     related styles with `[Other](./Other.mvstyle)`.
+     related styles with `[Other](./Other.mvstyle)`. (A `tokens:` frontmatter
+     key — the emitted `# Direction`+`# Style` weight — is **auto-stamped** by
+     `npm run tokens` at pre-push; don't hand-author it. See format-spec §10.9.)
    - Copy the **approved** render to `ImageStyleExample/<Tag>.example.png` and
      reference it from the `# Example` section.
    - Add the variant to the list in [image-generation.md](image-generation.md)

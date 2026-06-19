@@ -218,4 +218,14 @@ export interface WorldFile {
 
   /** Calendar state (world time, no alarms). */
   calendar?: WorldCalendar;
+
+  /**
+   * Derived bookkeeping — estimated `o200k_base` token counts of this seed's
+   * content, stamped by `npm run tokens` (refreshed at pre-push;
+   * `scripts/content-tokens.ts`). NOT hand-authored and NOT read by the engine;
+   * it exists so a seed's weight is legible at a glance. `detail` is the
+   * per-turn DM-context cost, `setup_detail`/`forks` the other channels, and
+   * `total` sums every string in the file.
+   */
+  _tokens?: { detail: number; setup_detail: number; forks: number; total: number };
 }
