@@ -59,7 +59,8 @@ vi.mock("../../config/personality-loader.js", async (importOriginal) => {
   };
 });
 
-import { createSetupConversation, renderWorldForAgent } from "./setup-conversation.js";
+import { createSetupConversation, renderWorldForAgent, composeChargenPortraitPrompt } from "./setup-conversation.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
@@ -1142,5 +1143,33 @@ describe("createSetupConversation", () => {
     // No valid selection → base only, and nothing stored.
     expect(result.finalized!.campaignDetail).toBe("Base premise.");
     expect(result.finalized!.forkSelections).toBeUndefined();
+  });
+});
+
+describe("composeChargenPortraitPrompt", () => {
+  // A stand-in for what the setup agent writes: the character + the three-view call.
+  const CHAR = "Mira, a weary station heir in a worn jacket; three views front, front-left, rear-right.";
+
+  it("orders character -> style line -> black-background framing (framing LAST)", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    const styleLine = resolveImageStyleLine("NoirCinema")!;
+    expect(prompt).toContain(CHAR);
+    expect(prompt).toContain(styleLine);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+    // The ordering IS the fix: character first, style line next, framing last —
+    // so the framing wins the background composition over a scene-coupled style.
+    expect(prompt.indexOf(styleLine)).toBeGreaterThan(prompt.indexOf(CHAR));
+    expect(prompt.indexOf("REFERENCE SHEET")).toBeGreaterThan(prompt.indexOf(styleLine));
+  });
+
+  it("falls back to the CinematicFilm default when no style is given", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, undefined);
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+  });
+
+  it("falls back to the default when the seed names an unknown style", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoSuchStyle");
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
   });
 });
