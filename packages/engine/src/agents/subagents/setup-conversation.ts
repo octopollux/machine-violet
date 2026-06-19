@@ -13,6 +13,7 @@ import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { processIncludes } from "../../prompts/process-includes.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -298,16 +299,14 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
     "The image is shown to the player automatically. After showing each draft, ask the player whether it looks right or " +
     "what to adjust, then call this again with an updated prompt if needed. " +
     "When the player confirms, call `set_portrait` with that draft's filename to keep it. " +
-    "ALWAYS render setup reference sheets in the style: **simple digital art, plain black background, even neutral " +
-    "lighting, the same character identical across all three views**. Do not match the campaign's visual style during " +
-    "chargen — the neutral black-background sheet is the canonical character-card look, and it stays consistent across " +
-    "worlds. Describe the character once (build, clothing, footwear, mood, expression), then call for the three " +
-    "side-by-side views and end with \"Character reference sheet — three views (front, front-left three-quarter, " +
-    "rear-right three-quarter), simple digital art, plain black background.\" Save campaign-styled imagery for in-game " +
-    "scenes. " +
-    "You don't choose render effort or aspect here — the engine always renders the chargen sheet at a fixed " +
+    "Write the prompt as the CHARACTER and the THREE VIEWS only: describe the character once (build, clothing, " +
+    "footwear, mood, expression), then call for the three side-by-side angles (front, front-left three-quarter, " +
+    "rear-right three-quarter) sharing one consistent background. Do NOT specify an art medium, lighting style, or " +
+    "background colour — the engine automatically renders the sheet in the campaign's visual style, so the character " +
+    "card matches the look the DM will condition in-game art on. " +
+    "You don't choose render effort or aspect here either — the engine always renders the chargen sheet at a fixed " +
     "standard quality (fast enough to iterate, the ceiling a character sheet needs) and landscape framing (the three " +
-    "views need the width). Just write the prompt.",
+    "views need the width). Just write the character.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -346,6 +345,13 @@ const SET_PORTRAIT_TOOL: NormalizedTool = {
 
 const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL, ROLL_DICE_TOOL];
 const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
+
+/**
+ * Placeholder fallback style for the chargen reference sheet when the chosen
+ * seed declares no `image_style` (or the campaign is fully custom). Per the
+ * visual-style MVP wiring — `CinematicFilm` until per-seed defaults are graded.
+ */
+const DEFAULT_PORTRAIT_STYLE = "CinematicFilm";
 
 // --- System prompt ---
 
@@ -420,7 +426,7 @@ function buildSystemPrompt(
       "",
       "### Character reference sheet (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, all on one plain black background in simple digital art with even, neutral lighting. Keep it campaign-agnostic — NOT the campaign's art style — because this sheet becomes the canonical reference the DM conditions in-game art on, and the extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose. (The engine renders it at a fixed standard quality and landscape framing automatically — you just write the prompt.)",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, sharing one consistent background. The extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose, since this sheet becomes the canonical reference the DM conditions in-game art on. Don't specify an art medium, lighting, or background colour yourself — the engine renders the sheet in the campaign's visual style automatically, so the character card matches the look the DM will use in play. (It also pins a fixed standard quality and landscape framing — you just write the character.)",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
@@ -621,6 +627,15 @@ export function createSetupConversation(
   };
 
   let finalized: SetupResult | undefined;
+  /**
+   * The world most recently fetched via `load_world`. Tracked so the chargen
+   * portrait can be rendered in that seed's `image_style` (the player loads the
+   * world they're interested in before chargen, so by portrait time this is the
+   * campaign's seed). Undefined for fully custom campaigns → CinematicFilm
+   * fallback. A heuristic, not authoritative: if the player loads several seeds
+   * and reconsiders after the portrait, the last-loaded one wins.
+   */
+  let lastLoadedWorld: WorldFile | undefined;
   // Pending state when present_choices is called — stores tool_use_id so we can send the result back
   let pendingToolUseId: string | null = null;
   // Tool results for tools that ran alongside present_choices (e.g. load_world).
@@ -691,6 +706,16 @@ export function createSetupConversation(
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
+    // Render the reference sheet in the campaign's visual style: the chosen
+    // seed's `image_style`, or the CinematicFilm placeholder when the seed
+    // declares none (or the campaign is fully custom). The agent writes the
+    // character + three-view framing; the engine stamps the style directive
+    // LAST — gpt-image-2 adheres best with style guidance at the end — so the
+    // character card matches the look the DM conditions in-game art on. If the
+    // seed names an unknown style, fall back to the default rather than failing.
+    const styleName = lastLoadedWorld?.image_style?.trim() || DEFAULT_PORTRAIT_STYLE;
+    const styleLine = resolveImageStyleLine(styleName) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
+    const styledPrompt = styleLine ? `${promptText}\n\n${styleLine}` : promptText;
     try {
       // Chargen has exactly one canonical render config — a standard-effort,
       // landscape multi-angle reference sheet — so we pin both here rather than
@@ -700,7 +725,7 @@ export function createSetupConversation(
       // stray `showcase` would block chargen on a slow maximum-fidelity render.
       // That's why the tool no longer exposes either knob.
       const result = await provider.generateImage({
-        prompt: promptText,
+        prompt: styledPrompt,
         effort: "standard",
         aspect: "landscape",
         intent: "character_portrait",
@@ -858,7 +883,20 @@ export function createSetupConversation(
         // seed base, so a setup-time choice (e.g. a chosen visual-style include)
         // overrides a seed default for colliding <Tag> blocks at DM-prompt time.
         const assembled = assembleCampaignDetail(world.detail, forks, forkSelections);
-        campaignDetail = [assembled, campaignDetail].filter(Boolean).join("\n\n") || null;
+        // The seed's visual style reaches the DM as an Image include in
+        // campaign_detail — resolved at DM-prompt time into an <Image> block that
+        // overrides the bare default (the campaign_detail slot outranks
+        // dm-directives). Validated against a real .mvstyle (resolveImageStyleLine
+        // returns null for a bad stem / missing file) so a malformed seed value
+        // can't brick every DM turn with an unresolved-include throw — a bogus
+        // style just leaves the campaign on the default look. Placed BEFORE the
+        // agent's append so a style the setup agent records still wins the
+        // <Image> collision (last occurrence in-slot).
+        const rawStyle = world.image_style?.trim() ?? "";
+        const styleInclude = rawStyle && resolveImageStyleLine(rawStyle)
+          ? `<!--include:Image.${rawStyle}-->`
+          : null;
+        campaignDetail = [assembled, styleInclude, campaignDetail].filter(Boolean).join("\n\n") || null;
       }
     }
 
@@ -993,6 +1031,8 @@ export function createSetupConversation(
       if (call.name === "load_world") {
         const slug = (call.input as { slug?: string }).slug ?? "";
         const world = loadWorldBySlug(slug, userWorldsDir);
+        // Remember the seed so the chargen portrait can adopt its visual style.
+        if (world) lastLoadedWorld = world;
         const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
         return { content, isError: false };
       }

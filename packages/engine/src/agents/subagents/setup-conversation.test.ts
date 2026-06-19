@@ -13,6 +13,14 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "scoped-seed") {
         return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
       }
+      if (slug === "styled-seed") {
+        // Carries a real .mvstyle stem (Velvia.mvstyle exists on disk) so the
+        // finalize image-include guard resolves it.
+        return { name: "Styled Seed", summary: "A seed with a visual style.", genres: ["fantasy"], detail: "Base premise.", image_style: "Velvia" };
+      }
+      if (slug === "bad-style-seed") {
+        return { name: "Bad Style Seed", summary: "A seed naming a nonexistent style.", genres: ["fantasy"], detail: "Base premise.", image_style: "NoSuchStyle" };
+      }
       if (slug === "forked-seed") {
         return {
           name: "Forked Seed", summary: "A seed with forks.", genres: ["fantasy"],
@@ -1051,6 +1059,69 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.campaignDetail).toBe(
       "Base premise.\n\nServer farms.\n\n<!--include:Image.Velvia-->",
     );
+  });
+
+  it("finalize_setup appends the seed's image_style as an Image include", async () => {
+    // A seed declaring image_style gets `<!--include:Image.<style>-->` appended
+    // to campaign_detail (after the assembled base), so the DM renders in-game
+    // art in that style. Resolved at DM-prompt time into an <Image> block.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
+  it("finalize_setup orders the seed style include BEFORE the agent's appended detail", async () => {
+    // The seed's style is the campaign default; an agent-supplied include comes
+    // after it, so a setup-time <Image> choice still wins the in-slot collision.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+      campaign_detail: "<!--include:Image.NoirCinema-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->\n\n<!--include:Image.NoirCinema-->",
+    );
+  });
+
+  it("finalize_setup skips the include when the seed names a nonexistent style", async () => {
+    // Defense-in-depth: a bogus image_style must not emit an include that would
+    // throw on every DM turn — it's dropped, leaving the default look.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Bad Style",
+      world_slug: "bad-style-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
   });
 
   it("finalize_setup drops fork selections that name unknown forks or options", async () => {

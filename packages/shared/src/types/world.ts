@@ -136,6 +136,18 @@ export interface WorldFile {
   mood?: string;
   /** Difficulty (e.g., "hard", "easy"). */
   difficulty?: string;
+  /**
+   * Visual style for this seed's generated images — the stem of a `.mvstyle`
+   * variant in `prompts/include/Image/` (e.g. `"NoirCinema"`, `"CinematicFilm"`).
+   * Drives two things at setup: (1) the setup agent renders the player's
+   * character reference sheet in this style (`CinematicFilm` is the fallback
+   * when unset), and (2) finalize appends `<!--include:Image.<style>-->` to the
+   * campaign's `campaign_detail`, so the DM renders all in-game art in it too —
+   * overriding the bare `<Image>` default via the campaign_detail override slot.
+   * Omit to leave the campaign on the default game-render look. A human-graded,
+   * one-style-per-seed pairing; the setup agent may still override it.
+   */
+  image_style?: string;
   /** Intended campaign length. When set, the setup agent uses this instead of
    *  asking the player about scope. Useful for seeds with a clear length (e.g.
    *  a one-shot premise, or a long-form intrigue that doesn't fit short arcs). */
