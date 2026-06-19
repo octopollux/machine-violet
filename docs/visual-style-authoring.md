@@ -16,9 +16,13 @@ no-artist-imitation rule, which applies to every style line here).
   A seed selects one with `<!--include:Image.Tag-->`, which the directory-backed
   loader resolves to `Image/Tag.mvstyle` and emits as an `<Image>` block — only
   the DM-facing `# Direction` + `# Style` reach the DM (frontmatter, `# Notes`,
-  `# Example` never do). Dotless `<!--include:Image-->` is the default
-  (`Image/Image.mvstyle`), the campaign-wide art direction; a variant overrides
-  it via the `processIncludes` cascade. The catalog index + tag vocabulary live
+  `# Example` never do). The campaign-wide default
+  art direction — wired into `dm-directives.md` — is
+  `<!--include:Image.CinematicFilm-->` (a placeholder default until per-seed
+  styles are graded); a seed's `image_style` overrides it via the
+  `processIncludes` cascade. (Dotless `<!--include:Image-->` still resolves to
+  `Image/Image.mvstyle`, the catalog's game-render entry — a selectable style,
+  just no longer the wired default.) The catalog index + tag vocabulary live
   in `Image/index.md` and `Image/TAGS.md`.
 - **The gallery** — `packages/engine/src/prompts/include/ImageStyleExample/<Tag>.example.png`,
   one worked sample per variant, 1:1 with the variants. An **authoring aid only**;
