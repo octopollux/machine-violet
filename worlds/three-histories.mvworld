@@ -8,6 +8,7 @@
     "sci-fi",
     "modern"
   ],
+  "image_style": "GraphicNovel",
   "mood": "Melancholy",
   "difficulty": "Balanced",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",

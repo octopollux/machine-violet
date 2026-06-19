@@ -7,6 +7,7 @@
     "sci-fi",
     "horror"
   ],
+  "image_style": "FixedCamHorror",
   "detail": "The player tends a beacon at the verge of charted space. The schedule is simple. The supply boat comes when it comes. The beacon sweeps and sweeps. Then, on a rotation like any other, the long-range sensor catches a shape — a ship, where ships do not come from. It is closing, and it is signaling, and the player has weeks before it arrives.\n\nDM approach:\n- Tone: long silences, instrument readings, the keeper's small daily rituals weaponized into suspense.\n- NPCs are scarce on purpose. The supply boat captain on the monthly run. A voice on the long-range channel. Whatever turns out to be on the incoming ship.\n- Pacing structure: each rotation of the beacon, the ship is closer. Relief is months away.\n- Seed early: the log files going back further than the player has read. A drawer in the keeper's quarters they have not opened.\n- Let the player do their job between events. Tedium is part of the horror — what breaks it should land.\n\nRun this on a clock, and keep the clock yourself. The ship's approach is the spine of the campaign: track it explicitly and advance it every scene — the range closing by a measurable margin, hours becoming minutes — so the player always knows roughly how long they have left. Relief is months away; the only thing moving is the ship, and it never stops.",
   "forks": [
     {
