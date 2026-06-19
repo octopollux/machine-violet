@@ -364,9 +364,28 @@ const PORTRAIT_SHEET_FRAMING =
   "This is a character REFERENCE SHEET, not a scene: place all three views of the same character " +
   "against a plain, empty, flat black background — no environment, set, props, furniture, or location " +
   "of any kind. Apply the visual style above ONLY to how the CHARACTER itself is rendered (its medium, " +
-  "grade, linework, texture, lighting, and finish). Strip every other trapping the style might add: NO " +
+  "grade, linework, texture, lighting, and finish). Strip any other trappings the style might add: NO " +
   "caption, title, lettering, or text of any kind; NO frame, border, letterbox bars, vignette, or matte; " +
   "NO HUD, on-screen display, timestamp, watermark, or logo. Just the three clean character views on plain black.";
+
+/**
+ * Compose the chargen reference-sheet prompt from three ordered parts: the
+ * agent's character + three-view description, then the campaign style's `# Style`
+ * directive, then {@link PORTRAIT_SHEET_FRAMING} LAST. The order is the whole
+ * point — the style line stamps the CHARACTER's render treatment, and the
+ * framing, stated last, wins the composition so scene-oriented styles can't
+ * stage the turnaround or drag along captions/frames/HUD chrome.
+ *
+ * `styleName` is the chosen seed's `image_style` (undefined for a fully custom
+ * campaign); an unknown or missing style falls back to the {@link
+ * DEFAULT_PORTRAIT_STYLE} placeholder. Exported so the exact prompt shape is
+ * unit-testable without driving a live portrait render.
+ */
+export function composeChargenPortraitPrompt(character: string, styleName?: string): string {
+  const name = styleName?.trim() || DEFAULT_PORTRAIT_STYLE;
+  const styleLine = resolveImageStyleLine(name) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
+  return [character, styleLine, PORTRAIT_SHEET_FRAMING].filter(Boolean).join("\n\n");
+}
 
 // --- System prompt ---
 
@@ -722,23 +741,12 @@ export function createSetupConversation(
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
     // Render the reference sheet in the campaign's visual style: the chosen
-    // seed's `image_style`, or the CinematicFilm placeholder when the seed
-    // declares none (or the campaign is fully custom). The agent writes the
-    // character + three-view framing; the engine stamps the style directive
-    // LAST — gpt-image-2 adheres best with style guidance at the end — so the
-    // character card matches the look the DM conditions in-game art on. If the
-    // seed names an unknown style, fall back to the default rather than failing.
-    const styleName = lastLoadedWorld?.image_style?.trim() || DEFAULT_PORTRAIT_STYLE;
-    const styleLine = resolveImageStyleLine(styleName) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
-    // Append the reference-sheet framing AFTER the style line. The catalog
-    // styles are written for SCENES (environments, dramatic staging, captions,
-    // letterbox, HUD overlays), and left unchecked they turn the turnaround into
-    // a staged, captioned, framed scene. Stated LAST, this wins the composition
-    // (plain black, no chrome) while the style line above still governs how the
-    // CHARACTER is rendered (medium, grade, linework, texture, finish).
-    const styledPrompt = [promptText, styleLine, PORTRAIT_SHEET_FRAMING]
-      .filter(Boolean)
-      .join("\n\n");
+    // seed's `image_style` stamps the CHARACTER's render treatment, the framing
+    // (appended last) keeps the sheet a clean black-background turnaround. The
+    // agent writes only the character + three-view text; the engine owns the
+    // style + framing ordering — see composeChargenPortraitPrompt, where the
+    // ordering IS the fix. Unknown/missing style falls back to the default.
+    const styledPrompt = composeChargenPortraitPrompt(promptText, lastLoadedWorld?.image_style);
     try {
       // Chargen has exactly one canonical render config — a standard-effort,
       // landscape multi-angle reference sheet — so we pin both here rather than
