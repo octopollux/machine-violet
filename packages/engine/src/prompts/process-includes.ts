@@ -106,10 +106,15 @@ function loadMvstyleDir(dirPath: string): IncludeFile {
     if (!file.endsWith(".mvstyle")) continue;
     const tag = file.slice(0, -".mvstyle".length);
     const { sections } = parseOkf(readFileSync(join(dirPath, file), "utf-8"));
-    const dmBody = [sections.get("Direction"), sections.get("Style")]
-      .filter((s): s is string => Boolean(s))
-      .join("\n\n");
-    if (dmBody) variants.set(tag, dmBody);
+    const direction = sections.get("Direction");
+    const style = sections.get("Style");
+    // Both DM-facing sections are required — a partial file would silently ship
+    // a broken style directive, so fail fast naming the offending file.
+    if (!direction || !style) {
+      const missing = [!direction && "# Direction", !style && "# Style"].filter(Boolean).join(" + ");
+      throw new Error(`Malformed .mvstyle (missing ${missing}): ${join(dirPath, file)}`);
+    }
+    variants.set(tag, `${direction}\n\n${style}`);
   }
   return { variants, isFlat: false, flatBody: "" };
 }

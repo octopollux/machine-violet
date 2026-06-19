@@ -12,6 +12,11 @@ describe("parseOkf", () => {
     expect(frontmatter["made-for-model"]).toBe("gpt-image-2");
   });
 
+  it("strips quotes from flow-array elements", () => {
+    const { frontmatter } = parseOkf(`---\ntags: ["a", 'b', c]\n---\n\n# Style\n\nx`);
+    expect(frontmatter.tags).toEqual(["a", "b", "c"]);
+  });
+
   it("splits the body into `# Heading` sections, trimmed, in file order", () => {
     const { sections } = parseOkf(
       `---\ntype: x\n---\n\n# Direction\n\nfirst para\n\n# Style\n\n\`the style line\`\n\n# Notes\n\nmaintainer note`,

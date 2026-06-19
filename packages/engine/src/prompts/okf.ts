@@ -31,14 +31,15 @@ export function parseOkf(content: string): OkfDocument {
   const fm = /^---\n([\s\S]*?)\n---\n?/.exec(normalized);
   if (fm) {
     body = normalized.slice(fm[0].length);
+    const unquote = (s: string) => s.trim().replace(/^["']|["']$/g, "");
     for (const line of fm[1].split("\n")) {
       const m = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
       if (!m) continue;
       const raw = m[2].trim();
       frontmatter[m[1]] =
         raw.startsWith("[") && raw.endsWith("]")
-          ? raw.slice(1, -1).split(",").map((s) => s.trim()).filter(Boolean)
-          : raw.replace(/^["']|["']$/g, "");
+          ? raw.slice(1, -1).split(",").map(unquote).filter(Boolean)
+          : unquote(raw);
     }
   }
 
