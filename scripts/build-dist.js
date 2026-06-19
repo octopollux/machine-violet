@@ -217,7 +217,7 @@ rmSync(join(DIST, "bundle.js"), { force: true });
 const assets = [
   // `exclude` drops a subtree from the copy (returning false for a directory
   // skips its whole contents). ImageStyleExample/ holds full-res worked sample
-  // images for each Image.md style variant — an authoring aid for assigning
+  // images for each `.mvstyle` style variant — an authoring aid for assigning
   // styles to seeds, never read at runtime — so it must NOT ship in the SEA.
   { src: "packages/engine/src/prompts", dest: "prompts", exclude: /[\\/]ImageStyleExample(?:[\\/]|$)/ },
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
