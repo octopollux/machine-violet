@@ -143,9 +143,10 @@ export interface WorldFile {
    * character reference sheet in this style (`CinematicFilm` is the fallback
    * when unset), and (2) finalize appends `<!--include:Image.<style>-->` to the
    * campaign's `campaign_detail`, so the DM renders all in-game art in it too —
-   * overriding the bare `<Image>` default via the campaign_detail override slot.
-   * Omit to leave the campaign on the default game-render look. A human-graded,
-   * one-style-per-seed pairing; the setup agent may still override it.
+   * overriding the campaign-wide default `<Image>` via the campaign_detail
+   * override slot. Omit to leave the campaign on that default (`CinematicFilm`).
+   * A human-graded, one-style-per-seed pairing; the setup agent may still
+   * override it.
    */
   image_style?: string;
   /** Intended campaign length. When set, the setup agent uses this instead of
