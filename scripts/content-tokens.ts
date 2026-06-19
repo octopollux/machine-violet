@@ -61,12 +61,21 @@ interface Row {
   next: string | null;
 }
 
-/** Re-serialize a JSON content file with a fresh `_tokens` object, preserving EOL. */
+/**
+ * Re-serialize a JSON content file with a fresh `_tokens` object, preserving EOL.
+ *
+ * This canonicalizes formatting to `JSON.stringify(_, null, 2)`. The repo's
+ * content files are already in exactly that shape (2-space pretty-print, EOL
+ * preserved here), so in practice the diff is just the appended stamp — and once
+ * stamped, every file is in canonical form, making subsequent stamps stable. A
+ * file hand-authored with non-canonical formatting (e.g. inline objects) would
+ * be normalized on its first stamp; that's a one-time tidy, not silent churn.
+ */
 function stampJson(raw: string, tokens: Record<string, number>): string {
   const eol = detectEol(raw);
   const obj = JSON.parse(raw) as Record<string, unknown>;
   delete obj._tokens;
-  obj._tokens = tokens; // appended last → predictable, minimal diff
+  obj._tokens = tokens; // appended last → predictable placement
   let out = JSON.stringify(obj, null, 2);
   if (eol === "\r\n") out = out.replace(/\n/g, "\r\n");
   return out + eol;
@@ -137,8 +146,13 @@ function collectStyles(): Row[] {
   return walk(dir, ".mvstyle").map((path) => {
     const raw = readFileSync(path, "utf8");
     const { sections } = parseOkf(raw);
-    // Only Direction + Style reach the image model; Notes/Example are authoring-only.
-    const emitted = count(sections.get("Direction")) + count(sections.get("Style"));
+    // Count exactly what the engine emits — `${Direction}\n\n${Style}` (see
+    // loadMvstyleDir in process-includes.ts). Counting the joined string (not the
+    // two parts summed) captures the separator and any boundary-token effects.
+    // Notes/Example are authoring-only and never reach the image model.
+    const direction = sections.get("Direction") ?? "";
+    const style = sections.get("Style") ?? "";
+    const emitted = count(direction && style ? `${direction}\n\n${style}` : `${direction}${style}`);
     const next = stampStyle(raw, emitted);
     return { file: relative(repoRoot, path), primary: emitted, parts: { tokens: emitted }, next: next === raw ? null : next };
   });
