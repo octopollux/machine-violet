@@ -5,6 +5,7 @@ rating: "?"
 description: "Clean false-colour thermal/FLIR still in ironbow palette: heat as soft graded blobs, cold to black, thermal HUD readout"
 tags: [surveillance, stylized, high-saturation, clinical, tense]
 made-for-model: gpt-image-2
+tokens: 264
 ---
 
 # Direction
