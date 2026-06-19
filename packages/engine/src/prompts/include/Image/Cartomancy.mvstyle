@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Cartomancy"
+rating: "?"
+description: "Cartomancy campaign look: ArtNouveau decorative illustration by default, Symmetrical planimetric look for wide shots of the table and the players above"
+tags: [illustration, period, stylized, limited-palette, whimsical]
+made-for-model: gpt-image-2
+tokens: 460
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most images use the **default** decorative look below. For **wide shots of the table above** — the great hands and the NPCs playing the cards — compose the frame centered, front-on and symmetrical, and use the **planimetric** look.
+
+# Style
+
+Default (most images) — `Rendered as a decorative ART NOUVEAU illustration in the turn-of-the-century poster tradition — flowing organic line work and flat decorative colour, executed in PERIOD-ACCURATE materials. Strict process discipline: draw the forms with confident, elegant, sinuous outlines of even weight; fill them with FLAT areas of muted period pigment — a restrained turn-of-the-century palette of sage and olive green, dusty mauve and rose, ochre, soft peacock blue and ivory, with no garish modern hues — and ornamental stylised patterns in the hair, drapery and foliage. Lavish real burnished GOLD LEAF on the decorative elements: the ornamental border, a halo behind the figure, sky accents and key patterns, raised and tooled, catching the light with a soft metallic sheen and a faint crackle. Compose with a strong decorative flat design and an ornamental gilt border framing the image; a clear focal figure, the background simplified into flat decorative shapes and pattern. Elegant, ornate, flat, gilded, decorative. Close with a small tasteful caption in elegant lettering set into a gilt cartouche or the border.`
+
+Wide shots of the table / the players above (compose centered, front-on, symmetrical) — `Rendered as a frame from a film with a rigorously SYMMETRICAL, planimetric visual technique — NOT a naturalistic shot. The technique's signature: a perfectly centered subject and a precisely symmetrical, mirror-balanced frame; a flat, front-on PLANIMETRIC camera placed exactly perpendicular to the back wall (no diagonal perspective); a deliberate, curated, harmonious PASTEL colour palette; meticulous orderly set design with everything squared-up and centered; even, flat, controlled lighting; and a deadpan, dollhouse-precise, storybook formality. Tidy, symmetric, pastel, deliberate. Close with a small centered caption in a clean typographic font.`
+
+# Notes
+
+Campaign composite for the **cartomancy** seed (currently disabled — wired ahead for re-enable) — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [ArtNouveau](./ArtNouveau.mvstyle) (decorative gilt-bordered poster illustration — the cards-as-art register). TABLE/PLAYERS = [Symmetrical](./Symmetrical.mvstyle) (rigorously symmetrical planimetric look for the deadpan meta-game-from-above shots). [Symmetrical](./Symmetrical.mvstyle) is SCENE-COUPLED, so its compose-centered/front-on/symmetrical steering is carried positively in the `# Direction` (its own `# Direction` isn't emitted by a composite). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![ArtNouveau](../ImageStyleExample/ArtNouveau.example.png)
+
+![Symmetrical](../ImageStyleExample/Symmetrical.example.png)

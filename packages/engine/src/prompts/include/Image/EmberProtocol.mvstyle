@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Ember Protocol"
+rating: "?"
+description: "Ember Protocol campaign look: FixedCamHorror by default, EightiesSciFi for exploration and action scenes"
+tags: [game-render, motion-picture, horror, retro, tense]
+made-for-model: gpt-image-2
+tokens: 332
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** fixed-camera horror look — compose for a single static, high or canted dramatic angle, the character a small, vulnerable figure dwarfed by the environment. **Exploration and action** scenes use the 1980s sci-fi look.
+
+# Style
+
+Default (most scenes) — `Rendered as an in-game screenshot from a classic fixed-camera survival-horror video game — a single dramatic STATIC camera angle (a high, canted, cinematic vantage the player does not control), composing the scene for maximum tension and vulnerability, with the character a small figure within a richly detailed, almost pre-rendered-looking environment, dwarfed by the framing. Cinematic, ominous staging; high contrast with crushed blacks; modern game fidelity with a deliberately old-school fixed-cam horror composition. Close with a caption overlaid in a tasteful font.`
+
+Exploration / action — `Rendered as a frame from a 1980s science-fiction action film, using that era's practical cinematography techniques — NOT a modern render. The signature: ANAMORPHIC widescreen with horizontal lens flares; thick atmospheric HAZE and smoke filling the air; hard, dramatic BACKLIGHT and rim-light carving the figure out of the dark; glowing coloured NEON and practical light sources; a moody blue-and-amber or neon-noir palette; visible 35mm Kodak film grain; and motion-control, miniature-and-practical-effects solidity. Smoky, backlit, neon, atmospheric, analog. Close with a small caption in a bold period sci-fi font.`
+
+# Notes
+
+Campaign composite for the **ember-protocol** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [FixedCamHorror](./FixedCamHorror.mvstyle) (fixed-camera survival-horror; SCENE-COUPLED, so its static-dramatic-angle / character-dwarfed steering is carried positively in the `# Direction`). EXPLORATION/ACTION = [EightiesSciFi](./EightiesSciFi.mvstyle) (anamorphic-flare, haze, hard-backlit neon 80s sci-fi). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![FixedCamHorror](../ImageStyleExample/FixedCamHorror.example.png)
+
+![EightiesSciFi](../ImageStyleExample/EightiesSciFi.example.png)

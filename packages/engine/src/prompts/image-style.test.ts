@@ -17,6 +17,23 @@ describe("resolveImageStyleLine (real .mvstyle files on disk)", () => {
     expect(line).not.toContain("When composing prompts");
   });
 
+  it("resolves a campaign composite to its DEFAULT look only, not the whole menu", () => {
+    // AThroneOfSalt is a composite: Default = ValueBlocked, situational =
+    // LargeFormat70 ("wow" scenery). The portrait/gate must get a SINGLE
+    // directive — the default — never the labeled menu or the situational line.
+    const line = resolveImageStyleLine("AThroneOfSalt");
+    expect(line).toBeTruthy();
+    // It's the default (ValueBlocked) directive, in isolation…
+    expect(line).toContain("value");
+    // …with none of the composite's menu scaffolding leaking through:
+    expect(line).not.toMatch(/`/); // no stray backtick fences
+    expect(line).not.toContain("Default"); // no entry labels
+    expect(line).not.toContain("LargeFormat70");
+    expect(line).not.toMatch(/large format|70mm/i); // not the situational variant
+    // A single directive is one paragraph — the menu would carry blank-line gaps.
+    expect(line).not.toContain("\n\n");
+  });
+
   it("returns null for an unknown style", () => {
     expect(resolveImageStyleLine("NoSuchStyle")).toBeNull();
   });

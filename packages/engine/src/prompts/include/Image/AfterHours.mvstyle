@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "After Hours"
+rating: "?"
+description: "After Hours campaign look: PainterlyGame hand-painted render for most scenes, NoirCinema B&W chiaroscuro for rare dramatic cuts"
+tags: [game-render, painterly, warm, noir, tense]
+made-for-model: gpt-image-2
+tokens: 390
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** painterly look below; reserve the **noir** look for rare dramatic cuts — a body in a booth, a tense confrontation.
+
+# Style
+
+Default (most scenes) — `Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+Noir, rare dramatic cuts only — `Rendered as a black-and-white still frame from a classic film-noir motion picture, shot on high-contrast 35mm — NOT a game render and NOT a modern photo. Dramatic chiaroscuro cinematography: a single hard key light carving the subject out of deep, inky black, bold geometric shadow shapes thrown across the scene, slatted light and drifting haze or smoke catching the beam, a glistening highlight on wet surfaces. Rich monochrome with crushed blacks and luminous highlights, fine photochemical film grain, soft highlight roll-off, and a low, dramatic camera angle. Moody, tense, expressionist, timeless. Close with a small caption in an elegant period film-title font within a subtle letterbox bar.`
+
+# Notes
+
+Campaign composite for the **after-hours** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [PainterlyGame](./PainterlyGame.mvstyle) (hand-painted stylised game render on a 20mm wide lens). NOIR = [NoirCinema](./NoirCinema.mvstyle) (B&W chiaroscuro film-noir frame, for rare dramatic cuts). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![PainterlyGame](../ImageStyleExample/PainterlyGame.example.png)
+
+![NoirCinema](../ImageStyleExample/NoirCinema.example.png)

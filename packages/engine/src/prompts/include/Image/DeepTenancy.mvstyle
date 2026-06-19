@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Deep Tenancy"
+rating: "?"
+description: "Deep Tenancy campaign look: DX9Interior game render by default, ConceptPoster key art for a big reveal stinger"
+tags: [game-render, illustration, painterly, muted, epic]
+made-for-model: gpt-image-2
+tokens: 513
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** DX9 game-render look below. A **big reveal stinger** — a key dramatic beat — uses the concept-poster key-art look.
+
+# Style
+
+Default (most scenes) — `Rendered as an authentic in-game screenshot from a 2004-era DirectX 9 AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period rendering tech is the whole point and is what keeps it honest: DirectX 9 / Shader Model 2.0 per-pixel lighting, with HARD-EDGED DYNAMIC SHADOWS cast by stencil shadow volumes — sharp, crisp shadow shapes thrown from the strong light sources in the scene, with no soft penumbra. Bump and normal-mapped surfaces catch tight specular highlights; textures seen at a grazing angle stay sharp into the distance thanks to ANISOTROPIC FILTERING; DXT-compressed textures show their characteristic mild blocking; crisp clean polygon edges from multisample anti-aliasing. Moderate polygon counts with honestly faceted geometry, a restrained early-HDR bloom off the brightest lights, slightly crushed near-black shadows, and a mild filmic colour grade. The era's asset economy is the discipline: honest game-asset budgeting, a limited set of repeated tiling textures, clean simple shapes. Atmospheric, nostalgic, technically confident for its year. Close with a caption overlaid in a tasteful font.`
+
+Big reveal stinger — `Rendered as a contemporary editorial illustration — the kind of smart, stylised spot art that runs with a magazine feature or op-ed. Strict process discipline: build the whole image from flat, confident shapes filled with FLAT colour from a restrained, sophisticated limited palette of a few harmonious hues only — bold, slightly muted, considered colours, no photographic rendering, no smooth gradients, no rendered surface detail. Simplify every form to its essentials with clean geometric stylisation and a strong graphic composition; do all modelling as a few flat shapes of light and shadow, never blends. Lay a subtle, even texture over the flat colour — a fine soft grain or a light halftone/screenprint tooth — so the flat areas read as printed, not digital. Reduce the scene to a single clear, confident graphic idea, intentionally composed. Modern, intelligent, clean. Close with a caption set in clean contemporary sans-serif type, like an article's title or kicker.`
+
+# Notes
+
+Campaign composite for the **deep-tenancy** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [DX9Interior](./DX9Interior.mvstyle) (2004-era DX9 game render, scene-neutral by design — reads strongest indoors). STINGER = [ConceptPoster](./ConceptPoster.mvstyle) (cinematic concept-poster key art for a big reveal beat; renders richly painterly, the validated quirk). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![DX9Interior](../ImageStyleExample/DX9Interior.example.png)
+
+![ConceptPoster](../ImageStyleExample/ConceptPoster.example.png)
