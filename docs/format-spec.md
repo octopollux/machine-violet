@@ -862,6 +862,7 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "mood": "gritty",
   "difficulty": "hard",
   "campaign_scope": "open-ended",        // Optional. Bakes campaign length into the seed; setup agent skips the length question.
+  "image_style": "NoirCinema",           // Optional. A .mvstyle stem (prompts/include/Image/). Styles the chargen portrait + in-game art (§10.8).
   "dm_personality": { "name": "...", "prompt_fragment": "..." },
   "calendar_display_format": "fantasy",
 
@@ -986,6 +987,15 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 | **Player** | player-fork option `name`/`description`, `suboptions` | the setup agent presents them via `present_choices` | player |
 
 `setup_detail` is the **setup-agent-only** channel. The setup agent acts on it (e.g. presents a scope/pacing variant) but it is **never assembled into `campaign_detail`** — the exclusion is by omission (`assembleCampaignDetail` only reads `detail` + selected option `detail`), so it is structurally impossible for it to reach the DM. This is the home for content that is neither DM-facing nor directly player-facing: scope/rhythm presentation (e.g. `<!--include:Pacing.EndlessCampaigns-->`), the opening-scene opt-out (`<!--include:OpeningScene.DMHandled-->` — the agent declares no opening and the DM opens instead), chargen hints, alternate hooks the agent should weigh. **Setup-only includes (notably the `Pacing.*` scope blocks) belong here, not in `detail`** — in `detail` they would expand into the DM's context and make it re-ask the scope question on turn 1.
+
+### 10.8 Visual style (`image_style`)
+
+`image_style` names one visual style for the seed — the **stem of a `.mvstyle` variant** in [`packages/engine/src/prompts/include/Image/`](../packages/engine/src/prompts/include/Image/) (e.g. `"NoirCinema"`, `"CinematicFilm"`, `"StreetCam"`). It is a single, human-graded, one-style-per-seed pairing (see [docs/visual-style-authoring.md](visual-style-authoring.md)). It drives two things, both at setup:
+
+1. **The chargen portrait.** The setup agent's character reference sheet is rendered in this style (the engine stamps the resolved `# Style` directive onto the portrait prompt). When a seed declares no `image_style` — or the campaign is fully custom — the fallback is `CinematicFilm` (a placeholder until per-seed defaults are graded).
+2. **In-game art.** At finalize, `<!--include:Image.<style>-->` is appended to the campaign's `campaign_detail`. At DM-prompt time it resolves into an `<Image>` block that **overrides the bare `<Image>` default** — the `campaign_detail` override slot outranks the `dm-directives` slot where the default lives. A setup-agent-appended `<Image>` (a setup-time style choice) is placed *after* the seed's, so it still wins the in-slot collision.
+
+The value is validated against a real `.mvstyle` at finalize (`resolveImageStyleLine`): a bogus stem or missing file emits **no** include rather than bricking every DM turn with an unresolved-include throw — the campaign just stays on the default look. The setup agent may also override the seed's style (clobbering seed data is a feature — §10.6).
 
 ---
 

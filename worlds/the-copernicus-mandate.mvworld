@@ -7,6 +7,7 @@
     "sci-fi",
     "comedy"
   ],
+  "image_style": "DocumentaryPhoto",
   "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
   "detail": "The letter arrived through a radio telescope in West Virginia at 3:47 a.m. on a Tuesday. It was addressed to humanity, generally. It used the word Whereas. It was signed by a partnership of three names humans cannot pronounce. The Earth has ninety days to respond. The Earth does not have a lawyer.\n\nDM approach:\n- Tone: legal procedural with the camera occasionally panning up to the sky. Underplay the alienness. Lean into the paperwork.\n- NPCs derive from the variant: the curator who has to defend the plaque (1), the original radio broadcaster's heirs and the music industry (2), the team of historians trying to date the patent infringement (3).\n- Pacing: filings have deadlines in Earth weeks. Depositions happen by appointment. First in-person contact is in ninety days.\n- Seed early: one filing in legalese the UN is still translating. The discovery the aliens have been quietly observing Earth's contract law and respect it.\n\nPacing: Ninety days to first contact. The deadlines are in the inbox. The wall in the situation room has a calendar with red dates. Each scene is a filing, a deposition, or a press leak.",
   "forks": [

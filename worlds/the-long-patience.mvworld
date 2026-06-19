@@ -8,6 +8,7 @@
     "horror",
     "mystery"
   ],
+  "image_style": "NoirCinema",
   "system": "fate-accelerated",
   "mood": "Tense, paranoid",
   "difficulty": "Unforgiving",

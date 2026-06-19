@@ -7,6 +7,7 @@
     "fantasy",
     "horror"
   ],
+  "image_style": "Chiaroscuro",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
   "detail": "The drill went through. The shaft below the lowest gallery opened on air, not stone. Three crews went down. None came back. The bell at the mineshaft, which has not rung in living memory, started ringing on its own the night after. The town's economy depends on the mine reopening. The town's other priorities are about to be renegotiated.\n\nDM approach:\n- Tone: stone-cold air rising from a hole, the silence of a shaft that should be loud with work, a bell ringing slowly and alone.\n- NPCs: a foreman missing three crews; a company representative with bad news to deliver gently; a child whose father was on the last shift; the cleric the diocese sent because of the bell.\n- Seed early: a single object brought up by a miner who came back changed. A scrap of metal that does not belong in this geology. A song the missing foreman taught his daughter, now being hummed by someone who has never met him.\n- The mine is not a setting. It is a presence. Let the town behave like a town that knows it is downstream of something.",
   "forks": [
