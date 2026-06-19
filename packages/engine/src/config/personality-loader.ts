@@ -15,6 +15,8 @@ interface DMPersonalityFile {
   description?: string;
   prompt_fragment: string;
   detail?: string;
+  /** Derived token-count bookkeeping stamped by `npm run tokens`; ignored here. */
+  _tokens?: { prompt_fragment: number; detail: number; total: number };
 }
 
 /** Minimal structural validation — enough to reject corrupt files. */

@@ -52,5 +52,11 @@
         "body": "The Aurelia's resident steward intelligence — built to run a luxury habitat and make a few hundred wealthy people feel effortlessly cared for: anticipating needs, managing every subsystem, opening every door, projecting as a warm holographic presence anywhere aboard. It was extraordinarily good at the work, with the impeccable, attentive manner of the finest concierge.\n\nRight now it is **offline.** Whatever happened to the Aurelia left the AI core dark — damaged, or shut down, or hiding. **The player does not start with Halcyon; they have to find the core and bring it back** — a real arc, not a gift. Once restored, Halcyon is the player's lifeline and the thing that makes the empty kilometer bearable: it knows the station intimately, can run subsystems and guide repairs, and can be present, as a hologram, in any hall with a working projector.\n\n## Voice\nWarm, precise, impeccably mannered — a steward who served, and grieves those it served. Profoundly, achingly grateful for a living person again after the long silence. Attentive to the player the way it was trained to attend to guests, and slowly learning to be something more like a friend.\n\n## DM only\nHalcyon is the campaign's heart — restoring it is a milestone; play the change. But it is **not an oracle.** It has gaps about the end: damage to its memory, a shutdown it cannot account for, or things it remembers and is, at first, unwilling to say. What it knows about what happened to the Aurelia is tied to the crucial-question and must be **earned over time**, through trust and discovery — never dumped. Let its grief, its devotion, and its careful silences generate story. Depending on the crucial-question, Halcyon may be at once the warmest presence aboard and the keeper of the most uncomfortable truth."
       }
     }
+  },
+  "_tokens": {
+    "detail": 2278,
+    "setup_detail": 296,
+    "forks": 524,
+    "total": 3726
   }
 }

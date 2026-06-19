@@ -82,5 +82,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 917,
+    "setup_detail": 39,
+    "forks": 232,
+    "total": 1871
+  }
 }

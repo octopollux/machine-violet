@@ -4,13 +4,15 @@
 #                staged files only (`vitest related --run`). A few seconds. NOT
 #                the Tier-2 goldens: cold-importing the engine module graph is
 #                ~20-30s, too heavy to pay on every commit.
-#   pre-push   — the real gate. Full `npm run check` (lint + the entire vitest
-#                suite, which INCLUDES the Tier-2 golden replays). ~80s, paid
-#                once before sharing.
+#   pre-push   — the real gate. First refreshes content token stamps (see
+#                `npm run tokens`), then full `npm run check` (lint + the entire
+#                vitest suite, which INCLUDES the Tier-2 golden replays). ~80s,
+#                paid once before sharing.
 #
 # Activated by `npm install` (root `prepare` runs `scripts/install-hooks.mjs`,
-# which force-installs into the shared `.git/hooks` dir under worktrees). Both
-# hooks are scoped to *.ts/*.tsx staged files, so docs-only commits skip them.
+# which force-installs into the shared `.git/hooks` dir under worktrees). The
+# pre-commit hook is scoped to *.ts/*.tsx staged files, so docs-only commits
+# skip it.
 
 pre-commit:
   parallel: true
@@ -22,7 +24,16 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: npx vitest related --run {staged_files}
 
+# `piped: true` runs these in priority order and HALTS on the first failure, so a
+# stale-stamp commit aborts the push before the slow check runs. token-stamp
+# exits non-zero only when it actually had to stamp + commit (rare in steady
+# state, common during a content sprint) — re-run the push to include the commit.
 pre-push:
+  piped: true
   commands:
+    token-stamp:
+      priority: 1
+      run: npm run tokens -- --write --commit
     check:
+      priority: 2
       run: npm run check

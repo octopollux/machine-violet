@@ -191,5 +191,11 @@
     "current": 1170,
     "epoch": "The night of the Salt Wedding",
     "display_format": "fantasy"
+  },
+  "_tokens": {
+    "detail": 218,
+    "setup_detail": 0,
+    "forks": 184,
+    "total": 1627
   }
 }

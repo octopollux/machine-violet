@@ -5,6 +5,7 @@ rating: "?"
 description: "Bright stylised hero-shooter photo-mode render with chunky PBR, shallow depth of field, and strong volumetric lighting"
 tags: [game-render, stylized, high-saturation, epic, action]
 made-for-model: gpt-image-2
+tokens: 179
 ---
 
 # Direction

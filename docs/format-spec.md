@@ -909,6 +909,9 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
     "current": 14400,
     "epoch": "The founding of Valdris",
     "display_format": "fantasy"
+  },
+  "_tokens": {                           // Derived. Stamped by `npm run tokens` (refreshed at pre-push). Not hand-authored; not read by the engine. See §10.9.
+    "detail": 2278, "setup_detail": 296, "forks": 524, "total": 3726
   }
 }
 ```
@@ -996,6 +999,18 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 2. **In-game art.** At finalize, `<!--include:Image.<style>-->` is appended to the campaign's `campaign_detail`. At DM-prompt time it resolves into an `<Image>` block that **overrides the bare `<Image>` default** — the `campaign_detail` override slot outranks the `dm-directives` slot where the default lives. A setup-agent-appended `<Image>` (a setup-time style choice) is placed *after* the seed's, so it still wins the in-slot collision.
 
 The value is validated against a real `.mvstyle` at finalize (`resolveImageStyleLine`): a bogus stem or missing file emits **no** include rather than bricking every DM turn with an unresolved-include throw — the campaign just stays on the default look. The setup agent may also override the seed's style (clobbering seed data is a feature — §10.6).
+
+### 10.9 Token stamps (`_tokens` / `tokens:`)
+
+Prompt-content files carry a **derived, at-a-glance estimate** of their own token weight, stamped by `npm run tokens` ([`scripts/content-tokens.ts`](../scripts/content-tokens.ts)):
+
+- `.mvworld` → a `_tokens` object: `{ detail, setup_detail, forks, total }`. `detail` is the per-turn DM-context cost (the channel that rides in the cached prefix every turn); `total` sums every string in the file.
+- `.mvdm` → a `_tokens` object: `{ prompt_fragment, detail, total }`.
+- `.mvstyle` → a scalar `tokens:` in frontmatter: the **emitted** weight (`# Direction` + `# Style` only; `# Notes`/`# Example` are authoring-only and don't reach the image model).
+
+The count is an **estimate** — OpenAI's `o200k_base` encoding (GPT-4o/5) via `js-tiktoken`: local, deterministic, offline. The DM may run on Claude or GPT and tokenizers differ by ~10–15%, but the encoding is fixed, so counts are consistent and rank seed weight reliably. The field is **derived bookkeeping**: hand-editing it is pointless (it's overwritten), and the engine never reads it. Counts come from the content fields only (the stamp itself is excluded), so stamping is idempotent.
+
+`npm run tokens` prints a sorted report and touches nothing; `--write` stamps the files. The **pre-push** hook runs `--write --commit`: if any stamp was stale it commits just the stamped files and aborts the push (re-run it to include the commit), so what lands on a branch always has current stamps. In steady state it's a no-op; during a content sprint it fires often.
 
 ---
 

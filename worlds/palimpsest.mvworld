@@ -41,7 +41,10 @@
           "additional_names": "The Cartographer"
         },
         "body": "A cartographer who has mapped the Souk across many rebuilds — ink in three colors stains the cuffs of their coat, the mark of long tenure. Their left hand constantly traces the edges of maps, following routes that no longer exist; they move through the city as if reading paths from its previous iterations. Vesper's maps are the closest thing the Souk has to institutional memory.\n\n## Disposition & Drives\n- WANT: to understand what a newcomer whose memories arrive *whole* is contributing to the city, and why.\n- WANT: proof of the Souk's oldest layer — a map-mark, a name, a measurable truth carried up from the heart.\n- FEAR: that someone the city has begun to inscribe into its own architecture will pay too much, too fast.\n\n## DM only\nThe named Dreaming-Souk instance of the Cartographer archetype. A potential ally while the newcomer's interests align with mapping the truth; a potential obstacle otherwise — persuasion first, practical interference second — especially toward anyone racing into a danger Vesper has watched the city inflict before.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "aldemar-longhurst": {
         "title": "Aldemar Longhurst",
@@ -51,7 +54,10 @@
           "disposition": "mysterious"
         },
         "body": "Agent and procurer for [[The Collector]]. A tall, narrow-shouldered figure in a smoke-colored coat who reads surfaces by touch — walls, tiles, fabric — as though every surface in the Souk were holding a memory he could feel through his fingertips. Soft-spoken, studiously polite, reverent toward the things he hunts.\n\n## Motivation\n- WANT: acquire the Souk's most vivid newly-manifested memories for [[The Collector]].\n- FEAR: returning to the Collector empty-handed.\n\n## DM only\nThe Collector stays offstage; Aldemar is the face of that appetite walking the Souk. He scouts [[The Courtyard]] and [[The Memory Market]] for memories worth taking, keeps routes watched before and after each rebuild, and offers polite appointments — an ivory waiting-card, a delayed meeting — that are never as optional as they sound.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "maren": {
         "title": "Maren",
@@ -62,7 +68,10 @@
           "additional_names": "The woman with the red scarf"
         },
         "body": "A long-term inhabitant of the Souk: sharp, direct, never idle — always something in her hands, food or object. She will not lie, but she will omit.\n\n## Disposition & Drives\nShe has watched the city do this before. Someone, once, arrived whose memories came *whole*; they went looking for the answers the Souk seemed to promise, and they paid for them memory by memory, until they could walk through their own past and feel nothing. How it ended she has never said — only that it ended badly.\n- WANT: to not witness the city consume another person that way.\n- FEAR: that for the newest such arrival, it is already too late.\n\n## DM only\nA cautious ally rather than a friend. She offers shelter and blunt counsel: the bare tree that anchors [[The Courtyard]] can be spotted above the rooflines; the safest time to move is the window just after a rebuild; when a new mosaic appears, the crowd will ask *whose* memory it is, and one should never answer. She knows more about the person-before than she volunteers, and she recognizes things before words — she may use a word like *heir* before anyone has said it aloud.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "remnant": {
         "title": "The Remnant",
@@ -72,7 +81,10 @@
           "disposition": "unknown"
         },
         "body": "A gray, nearly featureless figure that radiates cold in an otherwise uniformly warm city. It appears to come from a *future* rebuild — it should not exist yet.\n\n## Abilities\n- Anticipates movement: it turns toward a person *before* they act, as if perceiving what they are about to do.\n- Radiates supernatural cold.\n- Persists: dismissed, it simply reappears, stationed wherever its quarry will next pass.\n\n## DM only\nThe named Dreaming-Souk instance of the Remnant archetype. It remembers exactly one thing — the newcomer's name — and speaks it with perfect familiarity at the first encounter, then waits. It is bound to future rebuilds and to timing; it believes some knowledge is dangerous before the city has arranged the correct context, and it fears anyone who changes the sequence that creates it. A player who chooses this city should meet it early.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       }
     },
     "locations": {
@@ -84,7 +96,10 @@
           "key_color": "#d4a574"
         },
         "body": "A vast, lamp-lit bazaar that rebuilds itself nightly from the memories and dreams of everyone who sleeps within its walls. Architecture shifts and reforms with each dawn — a Roman aqueduct feeding an Art Deco fountain, a medieval gate opening onto a neon-lit alley. The mundane and the surreal intertwine; lost things and lost people converge here. The Souk takes notice of those whose memories arrive too whole, too loudly, too suddenly — and such arrivals draw danger and opportunity in equal measure.\n\nThe opening scene begins here. (If a `starting-location` placeholder still exists when the campaign is created, rename it to this.)\n\n## Customs\n- [[The Memory Market]] answers insults with social and dream-logic consequences rather than violence: stalls turn cold, routes quietly close, merchants remember the offender with unusual clarity.\n- A service-hatch route threads the Souk's structural memory — a courteous bypass around dangerous threshold-rooms, but it narrows for anyone carrying too many unresolved debts.\n- [[The Black Iron Spine]] does not deal in market memory-trade; it answers only *equivalence*.\n\n## DM only\nThe Souk is not merely a setting — it is [[Mizân]] wearing the shape of a city. It arranges itself toward coherence and pulls hardest at whoever's memories are most complete.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "memory-market": {
         "title": "The Memory Market",
@@ -93,7 +108,10 @@
           "theme": "arcane"
         },
         "body": "The trading floor of the Souk, where vivid, specific memories are the only real currency — bought, sold, and bartered at stalls that rearrange themselves between rebuilds. The memory-poor drift through it as gray, half-formed figures; the memory-rich move like landlords. A silver-pinned old woman at one of the nearer stalls deals in weather- and forgiveness-fragments and tends to become a familiar face.\n\n## DM only\nThe market prices people as readily as goods. A memory-rich newcomer who refuses to trade — or who insults the floor — is labeled rather than struck: marked rude, uninitiated, *valuable*, and quietly watched from then on.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "black-iron-spine": {
         "title": "The Black Iron Spine",
@@ -102,7 +120,10 @@
           "theme": "arcane"
         },
         "body": "An older scaffold beneath the Souk's shifting surface — a spine of black iron the city exposes only to those who refuse its easier routes. It does not trade in memory the way [[The Memory Market]] does. It answers *equivalence*: it will accept a song, a proof, a true name, an offering — but only by taking a precise toll to restore the balance.\n\n## DM only\nThe Spine is where [[Mizân]], the city's will, meets a person most directly — often through a humanoid avatar bearing a scale. *Exchange requires equivalence* is its only law. It can be bargained with, but every bargain is measured to the gram, and it does not forgive a debt.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       },
       "courtyard": {
         "title": "The Courtyard",
@@ -111,7 +132,10 @@
           "theme": "arcane"
         },
         "body": "A public square within the Souk, anchored by a single bare tree that can be spotted above the rooflines — the surest landmark in a city that rewrites its own streets between dawns. Its walls are pale tile, and it is here, more than anywhere, that the Souk renders a *private* memory into *public* architecture: a recognized door, a face, a street, fixed as a mosaic for everyone to study.\n\n## DM only\nWhen the city makes someone's memory public on these walls, it is an escalation — proof the Souk is integrating them — and it draws [[The Collector]]'s scouts (see [[Aldemar Longhurst]]) and curious crowds who will ask whose memory it is. The counsel [[Maren]] gives is the right one: do not answer.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       }
     },
     "lore": {
@@ -122,8 +146,17 @@
           "additional_names": "The True Name of the Souk"
         },
         "body": "**Mizân** is the true name of the Dreaming Souk. The city is not a place that happens to have a will — it *is* a will, and Mizân is what that will is called. It arranges itself toward coherence; it would rather be a real place than a collage, and it pulls hardest at whoever's memories are most whole.\n\nMizân can wear a face. At [[The Black Iron Spine]] it meets people through a humanoid **avatar** bearing a scale — the weigher who deals not in market memory-trade but in *equivalence*, exacting a precise toll for every exchange.\n\n## DM only\nThis is the named, concrete form of the thing at the city's center — the memory that was here before anyone arrived. Reveal it slowly: a newcomer learns the market and the rules long before they learn the city has a name, and longer still before they understand that the polite figure with the scale and the city itself are one and the same. What Mizân ultimately wants — and what it costs to be wanted by it — is the campaign's deepest question.",
-        "appliesWhen": { "fork": "city", "option": "dreaming-souk" }
+        "appliesWhen": {
+          "fork": "city",
+          "option": "dreaming-souk"
+        }
       }
     }
+  },
+  "_tokens": {
+    "detail": 724,
+    "setup_detail": 9,
+    "forks": 0,
+    "total": 2891
   }
 }
