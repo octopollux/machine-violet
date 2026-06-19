@@ -291,7 +291,7 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
   name: "generate_image",
   description:
     "Generate the player character's reference sheet: a SINGLE landscape image showing the SAME full-body character " +
-    "from three angles side by side against one shared background — a front view, a three-quarter view from the " +
+    "from three angles side by side against one plain black background — a front view, a three-quarter view from the " +
     "front-left, and a three-quarter view from the rear-right. " +
     "Use ONLY for the character reference sheet during chargen — never for scenes or other illustrations during setup. " +
     "This sheet becomes the canonical reference the DM later conditions in-game art on, so the multiple angles are what " +
@@ -301,9 +301,9 @@ const GENERATE_IMAGE_TOOL: NormalizedTool = {
     "When the player confirms, call `set_portrait` with that draft's filename to keep it. " +
     "Write the prompt as the CHARACTER and the THREE VIEWS only: describe the character once (build, clothing, " +
     "footwear, mood, expression), then call for the three side-by-side angles (front, front-left three-quarter, " +
-    "rear-right three-quarter) sharing one consistent background. Do NOT specify an art medium, lighting style, or " +
-    "background colour — the engine automatically renders the sheet in the campaign's visual style, so the character " +
-    "card matches the look the DM will condition in-game art on. " +
+    "rear-right three-quarter) against a plain black background. Do NOT specify an art medium or lighting — the engine " +
+    "renders the CHARACTER in the campaign's visual style against that plain black background (a clean reference sheet, " +
+    "not a scene), so the character card matches the look the DM will condition in-game art on. " +
     "You don't choose render effort or aspect here either — the engine always renders the chargen sheet at a fixed " +
     "standard quality (fast enough to iterate, the ceiling a character sheet needs) and landscape framing (the three " +
     "views need the width). Just write the character.",
@@ -352,6 +352,21 @@ const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
  * visual-style MVP wiring — `CinematicFilm` until per-seed defaults are graded.
  */
 const DEFAULT_PORTRAIT_STYLE = "CinematicFilm";
+
+/**
+ * Reference-sheet framing for the chargen portrait, appended after the campaign
+ * style line. The campaign style governs how the CHARACTER renders; this keeps
+ * the sheet a functional turnaround on plain black and strips the chrome the
+ * scene-oriented style directives drag along (captions, letterbox/frames,
+ * HUD/timestamp overlays, vignettes) — none of which belong on a character card.
+ */
+const PORTRAIT_SHEET_FRAMING =
+  "This is a character REFERENCE SHEET, not a scene: place all three views of the same character " +
+  "against a plain, empty, flat black background — no environment, set, props, furniture, or location " +
+  "of any kind. Apply the visual style above ONLY to how the CHARACTER itself is rendered (its medium, " +
+  "grade, linework, texture, lighting, and finish). Strip every other trapping the style might add: NO " +
+  "caption, title, lettering, or text of any kind; NO frame, border, letterbox bars, vignette, or matte; " +
+  "NO HUD, on-screen display, timestamp, watermark, or logo. Just the three clean character views on plain black.";
 
 // --- System prompt ---
 
@@ -426,7 +441,7 @@ function buildSystemPrompt(
       "",
       "### Character reference sheet (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, sharing one consistent background. The extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose, since this sheet becomes the canonical reference the DM conditions in-game art on. Don't specify an art medium, lighting, or background colour yourself — the engine renders the sheet in the campaign's visual style automatically, so the character card matches the look the DM will use in play. (It also pins a fixed standard quality and landscape framing — you just write the character.)",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, against a plain black background. The extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose, since this sheet becomes the canonical reference the DM conditions in-game art on. Don't specify an art medium or lighting yourself — the engine renders the character in the campaign's visual style against a plain black background (a clean reference sheet, not a scene), so the character card matches the look the DM will use in play. (It also pins a fixed standard quality and landscape framing — you just write the character.)",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
@@ -715,7 +730,15 @@ export function createSetupConversation(
     // seed names an unknown style, fall back to the default rather than failing.
     const styleName = lastLoadedWorld?.image_style?.trim() || DEFAULT_PORTRAIT_STYLE;
     const styleLine = resolveImageStyleLine(styleName) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
-    const styledPrompt = styleLine ? `${promptText}\n\n${styleLine}` : promptText;
+    // Append the reference-sheet framing AFTER the style line. The catalog
+    // styles are written for SCENES (environments, dramatic staging, captions,
+    // letterbox, HUD overlays), and left unchecked they turn the turnaround into
+    // a staged, captioned, framed scene. Stated LAST, this wins the composition
+    // (plain black, no chrome) while the style line above still governs how the
+    // CHARACTER is rendered (medium, grade, linework, texture, finish).
+    const styledPrompt = [promptText, styleLine, PORTRAIT_SHEET_FRAMING]
+      .filter(Boolean)
+      .join("\n\n");
     try {
       // Chargen has exactly one canonical render config — a standard-effort,
       // landscape multi-angle reference sheet — so we pin both here rather than
