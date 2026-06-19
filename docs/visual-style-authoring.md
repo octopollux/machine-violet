@@ -1,4 +1,4 @@
-# Authoring visual styles (the `Image.md` style catalog)
+# Authoring visual styles (the `.mvstyle` style catalog)
 
 How to grow the `generate_image` visual-style catalog — the anti-tic levers, the
 render-and-eyeball loop, and the banking checklist. Read this before adding or
@@ -10,12 +10,16 @@ no-artist-imitation rule, which applies to every style line here).
 
 ## What this is and where it lives
 
-- **The catalog** — `packages/engine/src/prompts/include/Image.md`. Each style is
-  a top-level `<Tag>` section. A seed selects one with
-  `<!--include:Image.Tag-->`, which renders an `<Image>` block (the outer tag is
-  always the file stem; the variant only picks which section is emitted). The
-  default `<Image>` block is the campaign-wide art direction; a variant overrides
-  it.
+- **The catalog** — `packages/engine/src/prompts/include/Image/`, one `.mvstyle`
+  file per style (OKF: YAML frontmatter + `# Direction` / `# Style` / `# Notes` /
+  `# Example` sections; parser is [`okf.ts`](../packages/engine/src/prompts/okf.ts)).
+  A seed selects one with `<!--include:Image.Tag-->`, which the directory-backed
+  loader resolves to `Image/Tag.mvstyle` and emits as an `<Image>` block — only
+  the DM-facing `# Direction` + `# Style` reach the DM (frontmatter, `# Notes`,
+  `# Example` never do). Dotless `<!--include:Image-->` is the default
+  (`Image/Image.mvstyle`), the campaign-wide art direction; a variant overrides
+  it via the `processIncludes` cascade. The catalog index + tag vocabulary live
+  in `Image/index.md` and `Image/TAGS.md`.
 - **The gallery** — `packages/engine/src/prompts/include/ImageStyleExample/<Tag>.example.png`,
   one worked sample per variant, 1:1 with the variants. An **authoring aid only**;
   `build-dist.js` excludes the directory from the compiled binary. (Touch
@@ -223,17 +227,23 @@ Author **one style at a time**, eyeballed by a human before banking.
 4. **Iterate** on the user's eye until they approve.
 
 5. **Bank it** (only after approval):
-   - Add a `<Tag>` section to `Image.md`: the DM-facing intro line, the backtick
-     **style line verbatim**, and a load-bearing `%%` maintainer note recording
-     *which lever does the work, why it works, and what must not be trimmed*. Link
-     related variants with `[[Tag]]`.
-   - Copy the **approved** render to `ImageStyleExample/<Tag>.example.png`.
-   - Add the variant to the list in [image-generation.md](image-generation.md).
+   - Add an `Image/<Tag>.mvstyle` file: frontmatter (`type: visual-style`,
+     `title`, `rating`, `description`, `tags`, `made-for-model`), then a
+     `# Direction` line (the DM-facing intro), a `# Style` section with the
+     backtick **style line verbatim**, and a `# Notes` section recording *which
+     lever does the work, why it works, and what must not be trimmed* (the
+     successor to the old `%%` note — `# Notes` never reaches the DM). Link
+     related styles with `[Other](./Other.mvstyle)`.
+   - Copy the **approved** render to `ImageStyleExample/<Tag>.example.png` and
+     reference it from the `# Example` section.
+   - Add the variant to the list in [image-generation.md](image-generation.md)
+     and the row in `Image/index.md`.
 
-6. **Verify and commit.** Confirm `Image.md` still parses (`parseIncludeFile` from
-   `process-includes.ts` — a throwaway `node --import tsx/esm` script that prints
-   `variants.size` and checks the new tag is present). Commit. **Push and open a
-   PR only when the user asks.**
+6. **Verify and commit.** Confirm the loader resolves it —
+   `processIncludes("<!--include:Image.<Tag>-->")` (from `process-includes.ts`)
+   emits the `<Image>` block with your Direction + Style and no `# Notes`. The
+   OKF parser is `parseOkf` in `prompts/okf.ts`. Commit. **Push and open a PR
+   only when the user asks.**
 
 This catalog is offline content — no API, network, or golden tapes are involved,
 so there is no replay/record step. Never hand-edit a rendered sample; re-render

@@ -2,7 +2,7 @@
 /**
  * Image-style sampling probe.
  *
- * Idea-work scratchpad for growing the `Image.md` style catalog. Renders ONE
+ * Idea-work scratchpad for growing the `.mvstyle` style catalog. Renders ONE
  * fixed scene (the opening establishing shot of "Ghosts of Station Proxima")
  * through a `--style` directive supplied on the command line, the same way the
  * DM does: scene/subject description first, then the style line appended

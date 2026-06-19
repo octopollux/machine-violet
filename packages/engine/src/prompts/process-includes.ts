@@ -1,6 +1,7 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { assetDir } from "../utils/paths.js";
+import { parseOkf } from "./okf.js";
 
 /**
  * Include preprocessor + cascading entity override.
@@ -90,17 +91,51 @@ export function parseIncludeFile(content: string): IncludeFile {
   return { variants, isFlat: false, flatBody: "" };
 }
 
+/**
+ * Directory-backed include: a `<Tag>/` folder of `.mvstyle` (OKF) files, one
+ * per variant. Builds the same {@link IncludeFile} shape `parseIncludeFile`
+ * produces, so `processIncludes` resolves `Tag.Variant` → `<Tag>/Variant.mvstyle`
+ * and dotless `Tag` → `<Tag>/<Tag>.mvstyle` unchanged. Only the DM-facing
+ * `# Direction` + `# Style` sections are emitted — frontmatter, `# Notes`, and
+ * `# Example` are authoring/selection metadata and never reach the DM (the
+ * structured successor to `stripComments` dropping `%%`).
+ */
+function loadMvstyleDir(dirPath: string): IncludeFile {
+  const variants = new Map<string, string>();
+  for (const file of readdirSync(dirPath).sort()) {
+    if (!file.endsWith(".mvstyle")) continue;
+    const tag = file.slice(0, -".mvstyle".length);
+    const { sections } = parseOkf(readFileSync(join(dirPath, file), "utf-8"));
+    const direction = sections.get("Direction");
+    const style = sections.get("Style");
+    // Both DM-facing sections are required — a partial file would silently ship
+    // a broken style directive, so fail fast naming the offending file.
+    if (!direction || !style) {
+      const missing = [!direction && "# Direction", !style && "# Style"].filter(Boolean).join(" + ");
+      throw new Error(`Malformed .mvstyle (missing ${missing}): ${join(dirPath, file)}`);
+    }
+    variants.set(tag, `${direction}\n\n${style}`);
+  }
+  return { variants, isFlat: false, flatBody: "" };
+}
+
 const fileCache = new Map<string, IncludeFile>();
 
 function loadIncludeFileFromDisk(name: string): IncludeFile {
   const cached = fileCache.get(name);
   if (cached) return cached;
-  const path = join(assetDir("prompts"), "include", `${name}.md`);
-  if (!existsSync(path)) {
-    throw new Error(`Include file not found: prompts/include/${name}.md`);
+  const baseDir = join(assetDir("prompts"), "include");
+  const dirPath = join(baseDir, name);
+  let parsed: IncludeFile;
+  if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {
+    parsed = loadMvstyleDir(dirPath);
+  } else {
+    const filePath = join(baseDir, `${name}.md`);
+    if (!existsSync(filePath)) {
+      throw new Error(`Include file not found: prompts/include/${name}.md`);
+    }
+    parsed = parseIncludeFile(readFileSync(filePath, "utf-8"));
   }
-  const raw = readFileSync(path, "utf-8");
-  const parsed = parseIncludeFile(raw);
   fileCache.set(name, parsed);
   return parsed;
 }

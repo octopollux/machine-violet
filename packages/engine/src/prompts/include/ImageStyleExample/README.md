@@ -1,6 +1,6 @@
 # Image style examples
 
-One worked sample render per `Image.md` style variant, so style-to-seed
+One worked sample render per `.mvstyle` style variant, so style-to-seed
 assignment is a *look*, not a guess. When wiring a seed to an art direction
 (`<!--include:Image.VariantName-->`), open the matching example here to see what
 that style actually produces.
@@ -8,8 +8,8 @@ that style actually produces.
 ## Convention
 
 - One file per variant, named **`<VariantTag>.example.png`**, where
-  `<VariantTag>` is the section tag in [`../Image.md`](../Image.md) (e.g.
-  `Risograph.example.png` ↔ the `<Risograph>` section, selected via
+  `<VariantTag>` is the style file in [`../Image/`](../Image/) (e.g.
+  `Risograph.example.png` ↔ `Image/Risograph.mvstyle`, selected via
   `Image.Risograph`).
 - Full resolution on purpose — the whole point is to judge fine detail and the
   "bored-model" tic at native size.
