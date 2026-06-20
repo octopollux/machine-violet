@@ -22,11 +22,41 @@ $ErrorActionPreference = "Stop"
 $setup = Get-ChildItem -Path $ArtifactDir -Filter "MachineViolet-*-Setup.exe" -Recurse | Select-Object -First 1
 if (-not $setup) { throw "No MachineViolet-*-Setup.exe found in $ArtifactDir" }
 
+# Velopack writes a completion marker to this log; we anchor on it below rather
+# than on a fixed sleep. Baseline the existing match count first so a re-run on a
+# non-clean machine (where a prior "completed" line lingers) waits for OUR
+# install's marker, not a stale one.
+$velopackLog = Join-Path $env:LOCALAPPDATA "velopack\velopack.log"
+$completeMarker = "Installation completed successfully!"
+$baselineHits = 0
+if (Test-Path $velopackLog) {
+  $baselineHits = (Select-String -Path $velopackLog -SimpleMatch $completeMarker -ErrorAction SilentlyContinue | Measure-Object).Count
+}
+
 Write-Host "Installing $($setup.Name) ..."
 & $setup.FullName --silent
-# Velopack may auto-launch the app post-install; settle, then stop any instance
-# so it can't hold the install dir or hang the runner.
-Start-Sleep -Seconds 10
+
+# `Setup.exe --silent` RETURNS BEFORE its background install finishes (post-install
+# hook + a "kill every running app instance" sweep). A fixed sleep races that work:
+# on a slow runner the sleep elapses, we launch the replay's own app instance, and
+# Velopack's completion sweep kills it -> the harness's next fetch dies with
+# "fetch failed" (nightly run 27864214122). Anchor on the real completion marker
+# in the Velopack log instead.
+$deadline = (Get-Date).AddSeconds(180)
+$installed = $false
+while ((Get-Date) -lt $deadline) {
+  if (Test-Path $velopackLog) {
+    $hits = (Select-String -Path $velopackLog -SimpleMatch $completeMarker -ErrorAction SilentlyContinue | Measure-Object).Count
+    if ($hits -gt $baselineHits) { $installed = $true; break }
+  }
+  Start-Sleep -Milliseconds 500
+}
+if (-not $installed) { throw "Velopack install did not report '$completeMarker' within 180s" }
+
+# Velopack auto-launches the app as part of the post-install hook; with the install
+# now fully settled, stop any lingering instance so it can't hold the install dir
+# or hang the runner before we replay against the installed binary.
+Start-Sleep -Seconds 2
 Get-Process MachineViolet -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 $installRoot = Join-Path $env:LOCALAPPDATA "MachineViolet"
