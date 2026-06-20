@@ -1162,6 +1162,13 @@ describe("composeChargenPortraitPrompt", () => {
     expect(prompt.indexOf("REFERENCE SHEET")).toBeGreaterThan(prompt.indexOf(styleLine));
   });
 
+  it("instructs the model to keep one-sided features on the SAME side across all three views", () => {
+    // Guards the cross-angle consistency fix: an ambiguous lateral feature (a
+    // robot arm, an eyepatch) must not drift to a different side per angle.
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    expect(prompt).toMatch(/SAME side of the body in all three views/);
+  });
+
   it("falls back to the CinematicFilm default when no style is given", () => {
     const prompt = composeChargenPortraitPrompt(CHAR, undefined);
     expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
