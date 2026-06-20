@@ -8,7 +8,7 @@
     "sci-fi",
     "modern"
   ],
-  "image_style": "GraphicNovel",
+  "image_style": "CelMultiplane",
   "mood": "Melancholy",
   "difficulty": "Balanced",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
@@ -115,6 +115,6 @@
     "detail": 975,
     "setup_detail": 9,
     "forks": 612,
-    "total": 2558
+    "total": 2560
   }
 }

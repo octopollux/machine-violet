@@ -7,7 +7,7 @@
     "fantasy",
     "mystery"
   ],
-  "image_style": "CandlelitNatural",
+  "image_style": "TheSaltWedding",
   "campaign_scope": "few-sessions",
   "mood": "Tense, salt-and-candlelight",
   "difficulty": "Balanced",
@@ -196,6 +196,6 @@
     "detail": 218,
     "setup_detail": 0,
     "forks": 184,
-    "total": 1627
+    "total": 1626
   }
 }

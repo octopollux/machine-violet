@@ -7,6 +7,7 @@
     "sci-fi",
     "mystery"
   ],
+  "image_style": "InkComicColor",
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
   "detail": "The player is the original. A copy exists. The copy has reached out — coffee, an apartment, a hospital, a quiet church — and the player has agreed to go. This is not about discovering one is a fake. The player knows who they are. They are going to meet a stranger who is also, on paper, themselves.\n\nDM approach:\n- Tone: a long evening. Cooling coffee, the shape of a conversation neither party wants to be the first to start.\n- NPCs: the clone, primarily — voiced the player's way, but with rhythms the player did not develop. A waitress, a nurse, a priest, depending on the venue. Whoever brought the clone into being, looming offstage.\n- Pacing structure: one tense evening, intercut with flashes the player is not sure are memories.\n- Seed early: a detail the clone knows that they should not — a childhood injury, a small private superstition. Let the player feel the wrongness of being recognized.\n- The clone is not a villain. They are also not the player. The space between those facts is the whole campaign.\n\nPacing: a single tense evening. The clock is the meeting itself — drinks ordered, drinks finished, the bill placed face-down on the table. Cut between the present conversation and the flashes the player keeps having. Some of those flashes belong to them. Some, they will come to realize, do not.",
   "forks": [

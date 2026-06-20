@@ -8,7 +8,7 @@
     "modern",
     "mystery"
   ],
-  "image_style": "CandlelitNatural",
+  "image_style": "ValueBlocked",
   "detail": "The host knows the player. The player doesn't remember the host. This is not an accident.\n\nThe house: Every room reveals something about the player's past (or a constructed version of it). Doors lead to rooms that shouldn't exist. The architecture responds to emotional state — a room expands when you're calm, contracts when you panic. The chosen setting's detail carries a baseline floor plan; treat it as bones and grow the impossible rooms off it rather than from nothing.\n\nGuests: 8-12 NPCs, each with a specific relationship to the central mystery. Some are allies, some are obstacles, some are distractions. At least one guest is not human (or not alive, or not really there). The staff knows everything and will say nothing.\n\nPacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, the midnight reveal. Each phase escalates. The player can try to break the structure, but the house adapts.",
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open into the party already in motion — the player arriving or newly arrived as the guest of honor, greeted warmly and by name by a host they do not remember, the warmth a half-step too knowing. Establish the glamour and the rhythm first (a drink pressed into the hand, an introduction or two, the first room) before the wrongness arrives: the exits that don't quite work, a room that wasn't there a moment ago, a guest who knows something about the player they shouldn't. Do NOT reveal the cage's true purpose (the trial, the test, the rescue) or foreshadow the midnight reveal — let the player feel the pleasant, escalating dread of a party they cannot leave, and discover what it is in play.",
   "forks": [
@@ -69,6 +69,6 @@
     "detail": 190,
     "setup_detail": 159,
     "forks": 740,
-    "total": 1442
+    "total": 1440
   }
 }

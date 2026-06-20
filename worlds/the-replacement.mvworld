@@ -10,7 +10,7 @@
     "fantasy",
     "sci-fi"
   ],
-  "image_style": "NoirCinema",
+  "image_style": "DigitalPainting",
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open on the discovery itself — the player coming home (apartment, house, quarters, whatever) to a locked door that should be theirs, or a key that works and someone already inside wearing their face and living their life. Play the confusion before the horror: the wrongness arriving first as a mistake or a misunderstanding, before it becomes undeniable. Do NOT reveal which of them is real, or what the replacement actually is — let both of those land in play.",
   "detail": "The player comes home — apartment, house, quarters, whatever — and someone is already there. Same face, same name, same keys. The friends recognize them. The job expects them. The life fits them. And by every visible measure, they're doing it better: kinder, sharper, more present. The player is standing outside their own life, watching it improve without them.\n\n\"Better at it\" — this is the knife. The replacement isn't just present, they're an improvement. They remember birthdays. They listen. They got the promotion. The player's friends are happier. This is the existential horror: not that someone stole your life, but that your life is better without you in it. The DM should make this specific and painful — not abstract, but concrete moments the player witnesses. The replacement did the thing the player always meant to do.\n\nDM approach:\n- The first scene should be the discovery: coming home, key doesn't work (or does — and someone else is inside). Play the confusion before the horror.\n- Give the player allies who believe them, but make those allies uncertain. \"I believe you, but...\" is more unsettling than outright rejection.\n- The replacement should not be a villain by default. They should often be sympathetic, confused, and — if confronted — afraid. A replacement who begs not to be erased is harder to deal with than one who fights. (The Wearer is the deliberate exception — see its detail.)\n- If the player IS the fake (crucial question), seed inconsistencies from the start. Don't lie to the player, but let them misinterpret. A detail that seems like a continuity error is actually a clue.\n- The chosen replacement-type (the player's fork) carries that version's driving situation, antagonist, and objective in its detail — the player discovers these in play; you deploy them.\n\nPacing: Start with the locked door. The first act is displacement — the player loses access to their life piece by piece and has to operate outside it. The second act is investigation — what is the replacement, how did this happen, who's responsible? The third act is the confrontation — face to face with the replacement — and the reveal of which one is real.",
   "forks": [
@@ -71,6 +71,6 @@
     "detail": 446,
     "setup_detail": 105,
     "forks": 1008,
-    "total": 2025
+    "total": 2024
   }
 }
