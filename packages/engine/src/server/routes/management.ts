@@ -532,6 +532,16 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
   });
 
+  // Per-campaign in-flight archive guard. Two concurrent archives of the same
+  // campaign race each other: both compute the same destination zip path (it
+  // doesn't exist yet for either), both write to it, and one's source deletion
+  // races the other's walk/read-back — yielding a corrupt or "contents mismatch
+  // on disk" archive. A double-fire from the UI (no input block) is the common
+  // trigger. Reject the duplicate rather than queueing it: one archive is one
+  // intentional action. The `isBusy` check above only covers active *sessions*,
+  // not a second archive of an idle campaign.
+  const archivesInProgress = new Set<string>();
+
   /** Archive a campaign to zip. */
   server.post("/campaigns/:id/archive", {
     schema: {
@@ -544,14 +554,23 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       return reply.status(409).send({ error: "Cannot archive while a session is active." });
     }
 
-    const campaignPath = join(campaignsDir(), (request.params as { id: string }).id);
-    const io = createArchiveFileIO();
-    const result = await archiveCampaign(campaignPath, campaignsDir(), io);
-
-    if (!result.ok) {
-      return reply.status(500).send({ error: result.error ?? "Archive failed." });
+    const id = (request.params as { id: string }).id;
+    if (archivesInProgress.has(id)) {
+      return reply.status(409).send({ error: "Archive already in progress for this campaign." });
     }
-    return { ok: true, zipPath: result.zipPath };
+    archivesInProgress.add(id);
+    try {
+      const campaignPath = join(campaignsDir(), id);
+      const io = createArchiveFileIO();
+      const result = await archiveCampaign(campaignPath, campaignsDir(), io);
+
+      if (!result.ok) {
+        return reply.status(500).send({ error: result.error ?? "Archive failed." });
+      }
+      return { ok: true, zipPath: result.zipPath };
+    } finally {
+      archivesInProgress.delete(id);
+    }
   });
 
   /** Permanently delete a campaign. */

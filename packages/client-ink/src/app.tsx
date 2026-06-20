@@ -140,6 +140,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     saveClientSettings({ showVerbose, dmTurnLengthPctDefault }).catch(() => { /* best-effort */ });
   }, [showVerbose, dmTurnLengthPctDefault]);
   const [archiveStatus, setArchiveStatus] = useState("");
+  // Campaign ids with an archive POST in flight. Drives the inline "Archiving…"
+  // indicator and blocks a second trigger for the same campaign (a double-fire
+  // used to race the server and corrupt the zip). The server enforces the same
+  // guard; this is the reactive UI half.
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -502,12 +507,25 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           });
         }}
         onResumeCampaign={(entry) => startCampaign(entry.id ?? entry.name)}
+        archivingIds={archivingIds}
         onArchiveCampaign={(entry) => {
           const id = entry.id ?? entry.name;
+          // Ignore a duplicate trigger while this campaign's archive is in
+          // flight — the source folder isn't deleted until the first POST
+          // succeeds, so the entry is still selectable until then.
+          if (archivingIds.has(id)) return;
+          setArchivingIds((prev) => new Set(prev).add(id));
           apiClientRef.current.archiveCampaign(id).then(() => {
             refreshCampaigns();
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
+          }).finally(() => {
+            setArchivingIds((prev) => {
+              if (!prev.has(id)) return prev;
+              const next = new Set(prev);
+              next.delete(id);
+              return next;
+            });
           });
         }}
         onDeleteCampaign={(entry) => {
