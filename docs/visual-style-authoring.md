@@ -177,7 +177,7 @@ seed. The surveillance cluster (`NightVisionCam`, `ThermalCam`, `ThermalGrain`,
   flair (a legend, a prophecy, a relic, a vision). Don't judge an elaborate style
   by "would you run a whole campaign in it."
 
-*(Wiring styles onto seeds is deferred — no seed currently selects a variant.)*
+*(Styles are wired end-to-end: every bundled seed sets an `image_style` — often a per-seed **composite** that bundles a default look plus situational variants into one include — which drives both the chargen portrait and in-game art. See format-spec §10.8.)*
 
 ## Practical constraints
 
