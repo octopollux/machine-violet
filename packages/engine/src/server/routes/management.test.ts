@@ -10,18 +10,21 @@ import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 interface ArchiveResult { ok: boolean; zipPath?: string; error?: string }
 
 // Created via vi.hoisted so they exist before vi.mock's factory (hoisted to the
-// top of the module) references them.
-const { archiveCampaignMock, pending } = vi.hoisted(() => {
+// top of the module) references them. Both archive and restore are replaced with
+// controllable deferreds so a concurrent overlap is deterministic.
+const { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore } = vi.hoisted(() => {
   const pending: ((v: ArchiveResult) => void)[] = [];
   const archiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pending.push(res); }));
-  return { archiveCampaignMock, pending };
+  const pendingRestore: ((v: ArchiveResult) => void)[] = [];
+  const unarchiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pendingRestore.push(res); }));
+  return { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore };
 });
 
 vi.mock("../../config/campaign-archive.js", () => ({
   archiveCampaign: archiveCampaignMock,
   deleteCampaign: vi.fn(),
   listArchivedCampaigns: vi.fn(),
-  unarchiveCampaign: vi.fn(),
+  unarchiveCampaign: unarchiveCampaignMock,
   getCampaignDeleteInfo: vi.fn(),
   // The route gets its ArchiveFileIO from ../fileio.js, which re-exports this
   // from the mocked module — stub it so the call doesn't throw (the mocked
@@ -120,5 +123,66 @@ describe("POST /campaigns/:id/archive — concurrency guard", () => {
     expect(res.statusCode).toBe(409);
     expect(res.json().error).toMatch(/session is active/i);
     expect(archiveCampaignMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /campaigns/archived/:name/restore — concurrency guard", () => {
+  let app: FastifyInstance;
+
+  const restoreReq = (zipPath: string) => ({
+    method: "POST" as const,
+    url: "/campaigns/archived/Test/restore",
+    payload: { zipPath },
+  });
+
+  beforeEach(() => {
+    unarchiveCampaignMock.mockClear();
+    pendingRestore.length = 0;
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it("rejects a second concurrent restore of the same archive with 409", async () => {
+    app = await buildApp();
+
+    const a = app.inject(restoreReq("/arch/Test.zip"));
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(1));
+
+    const b = await app.inject(restoreReq("/arch/Test.zip"));
+    expect(b.statusCode).toBe(409);
+    expect(b.json().error).toMatch(/already in progress/i);
+    expect(unarchiveCampaignMock).toHaveBeenCalledTimes(1);
+
+    pendingRestore[0]({ ok: true });
+    expect((await a).statusCode).toBe(200);
+  });
+
+  it("locks per archive — a different zip restores concurrently", async () => {
+    app = await buildApp();
+
+    const a = app.inject(restoreReq("/arch/One.zip"));
+    const b = app.inject(restoreReq("/arch/Two.zip"));
+    // Distinct zip paths → both pass the guard and run in parallel.
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(2));
+    pendingRestore[0]({ ok: true });
+    pendingRestore[1]({ ok: true });
+    expect((await a).statusCode).toBe(200);
+    expect((await b).statusCode).toBe(200);
+  });
+
+  it("releases the lock so the same archive can be restored again", async () => {
+    app = await buildApp();
+
+    const a = app.inject(restoreReq("/arch/Test.zip"));
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(1));
+    pendingRestore[0]({ ok: true });
+    expect((await a).statusCode).toBe(200);
+
+    const c = app.inject(restoreReq("/arch/Test.zip"));
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(2));
+    pendingRestore[1]({ ok: true });
+    expect((await c).statusCode).toBe(200);
   });
 });

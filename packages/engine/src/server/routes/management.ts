@@ -607,25 +607,42 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return { archives };
   });
 
+  // Per-archive in-flight restore guard — the symmetric twin of the archive
+  // lock. Restore stays on the archived-campaigns screen with no input block, so
+  // a mashed Enter is even easier than the archive double-fire: two concurrent
+  // restores of the same zip race the unique-dir loop (TOCTOU between the
+  // `exists` check and `mkdir`) and can collide on one dir or spawn duplicate
+  // `-2`/`-3` slots. Keyed by the resolved zip path; reject the duplicate.
+  const restoresInProgress = new Set<string>();
+
   /** Restore an archived campaign. Body includes zipPath from the list response. */
   server.post("/campaigns/archived/:name/restore", {
     schema: {
       tags: ["Management"],
       params: NameParams,
       body: RestoreRequest,
-      response: { 200: OkResponse, 500: ErrorResponse },
+      response: { 200: OkResponse, 409: ErrorResponse, 500: ErrorResponse },
     },
   }, async (request, reply) => {
     // Prefer explicit zipPath from body; fall back to reconstructing from name
     const zipPath = (request.body as { zipPath?: string })?.zipPath
       ?? join(campaignsDir(), "archivedcampaigns", `${(request.params as { name: string }).name}.zip`);
-    const io = createArchiveFileIO();
-    const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
 
-    if (!result.ok) {
-      return reply.status(500).send({ error: result.error ?? "Restore failed." });
+    if (restoresInProgress.has(zipPath)) {
+      return reply.status(409).send({ error: "Restore already in progress for this archive." });
     }
-    return { ok: true };
+    restoresInProgress.add(zipPath);
+    try {
+      const io = createArchiveFileIO();
+      const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
+
+      if (!result.ok) {
+        return reply.status(500).send({ error: result.error ?? "Restore failed." });
+      }
+      return { ok: true };
+    } finally {
+      restoresInProgress.delete(zipPath);
+    }
   });
 
   // -----------------------------------------------------------------------

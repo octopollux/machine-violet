@@ -149,6 +149,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // mirrors it purely to drive the reactive "Archiving…" UI.
   const archivingIdsRef = useRef<Set<string>>(new Set());
   const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
+  // Same pattern for restore (keyed by zip path): the archived-campaigns screen
+  // doesn't move on Enter, so a mashed Enter would otherwise fire N concurrent
+  // restores of one archive. Ref = synchronous source of truth; state mirrors it
+  // to drive the reactive "Restoring…" UI.
+  const restoringPathsRef = useRef<Set<string>>(new Set());
+  const [restoringPaths, setRestoringPaths] = useState<Set<string>>(() => new Set());
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -635,7 +641,13 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         theme={theme}
         archives={archivedCampaigns}
         statusMessage={archiveStatus}
+        restoringPaths={restoringPaths}
         onUnarchive={(entry) => {
+          // Synchronous guard off the ref — a mashed Enter can't fire a second
+          // restore of the same archive before the state commits.
+          if (restoringPathsRef.current.has(entry.zipPath)) return;
+          restoringPathsRef.current.add(entry.zipPath);
+          setRestoringPaths(new Set(restoringPathsRef.current));
           apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
             setArchiveStatus(`Restored "${entry.name}"`);
             refreshCampaigns();
@@ -643,6 +655,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
             apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
+          }).finally(() => {
+            restoringPathsRef.current.delete(entry.zipPath);
+            setRestoringPaths(new Set(restoringPathsRef.current));
           });
         }}
         onBack={() => { setArchiveStatus(""); setPhase("settings"); }}
