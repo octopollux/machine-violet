@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Bloom"
+rating: "?"
+description: "The Bloom campaign look: DocumentaryPhoto grounded reportage by default, CrossProcess toxic shifted film for outdoor scenes"
+tags: [photographic, photoreal, stylized, high-saturation, gritty]
+made-for-model: gpt-image-2
+tokens: 344
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** grounded documentary-photo look below. **Outdoor** scenes use the cross-processed film look — its toxic, shifted colour marks the world outside as wrong.
+
+# Style
+
+Default (most scenes) — `Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+Outdoors — `Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film process name in the caption.`
+
+# Notes
+
+Campaign composite for the **the-bloom** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [DocumentaryPhoto](./DocumentaryPhoto.mvstyle) (grounded reportage photography — the campaign-wide workhorse). OUTDOORS = [CrossProcess](./CrossProcess.mvstyle) (cross-processed film; its toxic shifted colour is the "something's wrong here" register, marking the outdoor world as off). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![DocumentaryPhoto](../ImageStyleExample/DocumentaryPhoto.example.png)
+
+![CrossProcess](../ImageStyleExample/CrossProcess.example.png)

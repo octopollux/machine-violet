@@ -7,7 +7,7 @@
     "comedy",
     "sci-fi"
   ],
-  "image_style": "Symmetrical",
+  "image_style": "DarkAirbrush",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
   "detail": "The player has done something to the universe. They aren't sure what. The symptoms are getting worse. They have called the support number printed on the underside of a star, and now they are in a queue. The agent has a script. The script does not include an option for what is wrong with the player.\n\nDM approach:\n- Tone: corporate-support kafka. Always polite. Always cite the policy. The horror is procedural.\n- NPCs derive from the variant: the cheerful Tier-1 agent reading a script (any), a supervisor named JEFFREY who is sympathetic and powerless, and the off-the-record engineer (Tier 7) who is helping illegally.\n- Pacing: each \"fix\" generates a new ticket and a new tier. Tier 7 is the rogue engineer sending encrypted help via the hold music.\n- Seed early: one minor reality glitch that the agent classifies as user error. The reference number that grows.\n\nThe journey (agency, not just suffering): This is kafkaesque in TONE — unfailingly polite, procedural, the policy cited at every turn — but NOT in outcome. Unlike the real thing, the player is not a victim being ground to dust; they have real levers, and the system can be beaten. The campaign is the fight to get reality fixed, and it runs on two approaches the player can mix:\n- Work the system: climb the tiers on purpose, escalate deliberately, demand the refund, invoke the arbitration clause, file the exactly-right ticket, get a supervisor (JEFFREY) to bend, win a fee waiver, take Tier 7's off-the-record help. Every blank 'no' has an exception buried in the policy if the player reads far enough and pushes hard enough — the bureaucracy's own rules are the weapon.\n- Desperate action against the jobsworths: jump the queue, break protocol, trick or corner the blank-faced agents, and turn the player's own broken reality into leverage (file the ticket before the problem using the causality break; make an obstructive office stop existing; reach Tier 7 by force). Risky and improvised, and sometimes the only door left.\nResolution is reachable. The player CAN win — the warranty honored, the refund paid, the ruling in their favor, reality restored. It is hard, earned, and never clean (the last fix still spawns one final absurd condition), but it is real. Track progress as movement toward a resolution — a ruling, a restoration, a settlement — not as escalating misery, and hand the player wins along the way (a tier cleared, a fee waived, JEFFREY slipping them the right form, Tier 7 decrypting the next step). The grind has a far end, and the player can reach it.\n\nPacing: Each fix spawns a new ticket. The player can track escalation by the ticket-reference suffix and by which floor of the call center they are mentally on. Tier 7 is reachable. The encryption is the player's responsibility.",
   "forks": [
@@ -86,6 +86,6 @@
     "detail": 611,
     "setup_detail": 9,
     "forks": 386,
-    "total": 1655
+    "total": 1656
   }
 }

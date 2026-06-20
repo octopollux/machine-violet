@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Sky Below"
+rating: "?"
+description: "Sky Below campaign look: RayTracedAAA modern flagship-game render by default, LargeFormat70 65/70mm epic clarity when looking outside"
+tags: [game-render, photoreal, epic, wide-vista, establishing]
+made-for-model: gpt-image-2
+tokens: 365
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** modern flagship-game render look below. When **looking outside** — a view out to the wider world — use the large-format 65/70mm epic look for its deep-focus clarity and grand scale.
+
+# Style
+
+Default (most scenes) — `Rendered as an authentic in-game screenshot from a 2019-era cutting-edge AAA game engine — a near-photoreal modern real-time render in photo mode (no HUD). State-of-the-art rendering: full physically-based materials, real-time HYBRID RAY TRACING for reflections, soft contact-hardening shadows and global illumination, a high-resolution temporally anti-aliased image, volumetric fog and god-rays, photogrammetry-grade surface detail, screen-space reflections, subtle film grain and a refined filmic colour grade. Extremely high geometry and texture detail, a long draw distance, and cinematic depth of field. The look of a flagship 2019 game at maximum settings — crisp, atmospheric, photoreal. Close with a caption overlaid in a tasteful font.`
+
+Looking outside — `Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+# Notes
+
+Campaign composite for the **sky-below** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [RayTracedAAA](./RayTracedAAA.mvstyle) (2019-era flagship real-time game render — the campaign-wide workhorse). LOOKING OUTSIDE = [LargeFormat70](./LargeFormat70.mvstyle) (65/70mm deep-focus epic clarity; the grand-scale reveal when the view opens out to the wider world). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![RayTracedAAA](../ImageStyleExample/RayTracedAAA.example.png)
+
+![LargeFormat70](../ImageStyleExample/LargeFormat70.example.png)

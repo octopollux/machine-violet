@@ -8,7 +8,7 @@
     "fantasy",
     "modern"
   ],
-  "image_style": "Symmetrical",
+  "image_style": "DarkAirbrush",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nOpening scene: begin as audit week starts — the player at their desk in ordinary civil-service routine (the stamp, the trays, the lamp), the calendar just turned, the line already longer than yesterday. Keep the wrongness to subtle background and the crucial question hidden. The audit is the campaign's opening episode (see detail).",
   "detail": "The Bureau is a long building with too many doors. Behind every door, a department for a different category of loss. The player has a desk. The desk has a stamp, an in-tray, an out-tray, and a small lamp. The customer line outside the player's door is longer this season than last. The quarterly audit is in one week.\n\nDM approach:\n- Tone: civil-service comedy with intermittent metaphysical chill. The Bureau is sincerely trying to help and incidentally cannot be trusted.\n- NPCs derive from the variant: ATHIS the senior clerk and the schedule-revision team (1), the coworker who has begun to forget themselves (2), the file the player isn't supposed to read (3).\n- Pacing: quarterly audit in one week. New intake every morning. The customer line measurably longer.\n- Seed early: one customer the player can't quite help. One file that won't close.\n\nThe Bureau (a long building with too many doors — there is a department for every category of loss; name new ones as the player wanders): the public intake hall, where the line forms and on audit day reaches the street; the player's own desk and department; the long corridor of department doors; the breakroom with the wall calendar and the intake-log clipboard; the records stacks, sorted by year, then category, then the smell of where things were lost; the basement darkroom where the Missing Persons photographs are developed by a man who does not look up; the third-floor pension office, unvisited in a long time; the schedule room, where returns are timed; the manager's office; the loading dock where returned things go back out into the world; and the doors that only appear during the self-inventory. Move through it and name more.\n\nPacing: Run serialized — the audit is the opening episode, a one-week countdown to audit day, when the line reaches the street and the building counts itself; after it, the episodes continue with new intake and the next quarter's audit on the horizon. The clock is the wall calendar in the breakroom and the daily count on the intake-log clipboard; the line outside grows by a few people each day.",
   "forks": [
@@ -87,6 +87,6 @@
     "detail": 444,
     "setup_detail": 75,
     "forks": 213,
-    "total": 1376
+    "total": 1377
   }
 }

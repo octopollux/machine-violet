@@ -7,7 +7,7 @@
     "post-apocalyptic",
     "sci-fi"
   ],
-  "image_style": "Ektachrome",
+  "image_style": "WesternRPG",
   "detail": "The ice is melting on a schedule the world stopped publishing decades ago. What is coming out is not a fossil record. The first thing the player encountered under the ice was warm to the touch and was responding to inputs. The second thing the player encountered greeted them by name.\n\nDM approach:\n- Tone: cold, bright, the specific silence of large ice. The horror is in the patience of what was buried.\n- NPCs to seed: the first emergent voice (AI, sentry, or sleeper, depending on variant); a fellow survivor on the surface who saw something earlier and didn't believe themselves; a leader from a settlement downstream who needs the thaw to keep coming.\n- Grow the world below: it reveals in layers, in order, as the thaw exposes each level — create each newly-uncovered level as a `location` entity and develop it (what this level is, what it still hides). What is down there is set by the crucial-question (a still-running network / a defense perimeter / a facility of sleepers); the chosen ice setting (the player's fork) gives the surface anatomy and the way in. The underground is primed to grow — the temperature does the digging for you.\n- Seed early: a piece of intact technology too clean for its provenance; a signal on a frequency that should be empty; a track in the snow that goes one way only.\n- The ice should be tactile. The player's hands hurt. The light is wrong. Things echo.\n\nPacing: default scope, the player's choice — this is an exploration campaign, and a countdown timer fights that. Temperature is a reveal-engine, not a deadline: every degree exposes more to find, and the thaw keeps opening the world rather than counting down to a loss. The player reads the thaw in the thermometer, the cracking at night, the changing horizon line — as a measure of how much more is surfacing, not a clock running out.",
   "forks": [
     {
@@ -96,6 +96,6 @@
     "detail": 389,
     "setup_detail": 0,
     "forks": 792,
-    "total": 2039
+    "total": 2038
   }
 }

@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "The Aurelia"
+rating: "?"
+description: "The Aurelia campaign look: MidGenConsole 360-era horror-game render by default, NightVisionCam for the station AI's camera perspective, SurvivalHorror flash photo for extreme peril"
+tags: [game-render, surveillance, lo-fi, dread, tense]
+made-for-model: gpt-image-2
+tokens: 799
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** mid-2000s console-game render look below. From the **station AI's perspective** — a security-camera feed — use the fixed infrared camera look. A moment of **extreme peril** uses the survival-horror flash-photo look.
+
+# Style
+
+Default (most scenes) — `Rendered as an authentic in-game screenshot from a 2007-era Xbox-360 / PlayStation-3 generation game engine (DirectX 9c / Shader Model 3) — a clearly last-generation real-time render, NOT modern and NOT pre-rendered. Make the period limitations VISIBLE: chunky last-gen geometry (smoother than the early 2000s but still obviously low-detail, with simple silhouettes), CRUNCHY normal-mapped textures at limited resolution, and a waxy PRE-PBR look where everything carries the same plasticky over-glossy specular sheen. Lighting is heavy-handed and dated: aggressive early-HDR BLOOM blowing out every bright source, crude tone-mapping, FIRST-GENERATION screen-space ambient occlusion drawing obvious muddy dark halos around objects, and LOW-RESOLUTION shadow maps with visibly jagged, aliased, flickery edges. A thick period colour grade — heavily crushed blacks and a strong brown-and-orange or teal cast over everything. Hard edge aliasing with no temporal anti-aliasing (jaggies and shimmer), and a limited draw distance. The unmistakable look of a flagship 2007 console game — impressive for its day, plasticky, bloom-drunk, and clearly dated. Close with a caption overlaid in a period game font.`
+
+Station AI perspective — `Rendered as a single still grabbed from low-bitrate CCD security-camera footage, lit by an infrared illuminator. Low-key monochrome night-vision: the IR floods a narrow cone of cold grey light, and everything beyond its reach sits in crushed, featureless black; bright surfaces bloom and trail faint vertical CCD smear. Fixed ultra-wide lens, mild barrel distortion, angled down from a high corner. The picture is degraded by its own medium — luminance sensor noise, blocky video-compression artefacts, low dynamic range, a faint horizontal interlace tear. Burn the camera's on-screen display into one top corner in a blocky white monospace video font: a short camera-and-zone identifier (for example "CAM 04 · SUBLEVEL 2") above a running 24-hour clock TIME in HH:MM:SS — show a time only and NEVER a calendar date, so the footage reads as surveillance in any setting or era, and let the zone label name the place. No colour, no warmth.`
+
+Extreme peril — `Rendered as a low-key black-and-white silver-gelatin flash photograph — a real grainy film frame, full-bleed to the edges with no border or white frame of any kind. Strict process discipline: expose it low-key and underlit, lit only by a single harsh on-camera flash. The flash blasts the nearest subject into hard, slightly blown highlights and then falls off fast into deep, depthless black, so most of the frame is pure shadow with detail crushed away — let the darkness swallow everything the flash does not directly hit. Render it in cold, near-monochrome silver-gelatin tones with visible photographic film grain, a harsh sharp flash-lit focus that falls to blur in the dark, heavy corner vignetting, and the chemical character of pushed black-and-white film: coarse grain, a milky lift in the deepest blacks, faint scratches and dust. Snapshot framing, a little crooked and accidental, as if grabbed in a hurry. Bleak, clinical, dreadful. Close with a caption as a small machine-printed data strip burned into the lower edge of the frame — a stark timestamp and a terse location or camera code — like surveillance or evidence footage.`
+
+# Notes
+
+Campaign composite for the **the-aurelia** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [MidGenConsole](./MidGenConsole.mvstyle) (2007 Xbox-360/PS3-era game render; the survival-horror console-game register reads as the campaign's everyday look). STATION AI = [NightVisionCam](./NightVisionCam.mvstyle) (fixed interior infrared CCD; the AI watching through its own cameras — IR-cone-into-black + medium-degradation + time-only OSD, load-bearing). EXTREME PERIL = [SurvivalHorror](./SurvivalHorror.mvstyle) (harsh-flash-into-black silver-gelatin horror photo; restraint = dread). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![MidGenConsole](../ImageStyleExample/MidGenConsole.example.png)
+![NightVisionCam](../ImageStyleExample/NightVisionCam.example.png)
+![SurvivalHorror](../ImageStyleExample/SurvivalHorror.example.png)
