@@ -73,6 +73,32 @@ describe("ArchivedCampaignsPhase", () => {
     expect(onUnarchive).not.toHaveBeenCalled();
   });
 
+  it("shows 'Restoring…' for an archive whose restore is in flight", () => {
+    const archives: ArchivedCampaignEntry[] = [
+      { name: "My Campaign", zipPath: "/a.zip", archivedDate: "2026-03-20T00:00:00.000Z" },
+    ];
+    const { lastFrame } = render(
+      <ArchivedCampaignsPhase {...defaultProps({ archives, restoringPaths: new Set(["/a.zip"]) })} />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("Restoring");
+    // The "Archived <date>" suffix is swapped out while restoring.
+    expect(frame).not.toContain("Archived Mar");
+  });
+
+  it("blocks a second restore trigger while one is in flight", () => {
+    const onUnarchive = vi.fn();
+    const archives: ArchivedCampaignEntry[] = [
+      { name: "My Campaign", zipPath: "/a.zip", archivedDate: "2026-03-20T00:00:00.000Z" },
+    ];
+    const { stdin } = render(
+      <ArchivedCampaignsPhase {...defaultProps({ archives, onUnarchive, restoringPaths: new Set(["/a.zip"]) })} />,
+    );
+    stdin.write("\r");
+    stdin.write("\r");
+    expect(onUnarchive).not.toHaveBeenCalled();
+  });
+
   it("does not crash on arrow keys with empty list", () => {
     const { stdin } = render(<ArchivedCampaignsPhase {...defaultProps()} />);
     // Should not throw

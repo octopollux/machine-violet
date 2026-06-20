@@ -1,8 +1,17 @@
 /**
  * Zip/unzip utility for campaign archival, sharing, and import.
  *
- * Uses `fflate` (pure JS, zero dependencies) for synchronous zip operations.
- * Designed for sub-megabyte payloads — no streaming needed.
+ * Uses `fflate` (pure JS, zero dependencies) for synchronous, fully in-memory
+ * zip operations: the whole payload is held in memory, and archival also
+ * round-trips it (zip → unzip → read-back) to verify, so peak usage is a few
+ * multiples of the campaign size. That was negligible when campaigns were
+ * sub-megabyte, but a long campaign can now reach tens of MB once it
+ * accumulates full-resolution portrait PNGs and their `portrait-history/`
+ * (see `agents/dm-portraits.ts`) — so the old "sub-megabyte, no streaming"
+ * assumption no longer holds. It's still fine at present scale, and archival
+ * only runs with no active session (`isBusy` gate), so the synchronous CPU
+ * cost never stalls a live turn; if campaigns grow much larger, move to
+ * fflate's async/worker variants (`zip`/`unzip`).
  *
  * - `zipFiles(files)` packs a filename→content map into a zip buffer.
  * - `unzipFiles(data)` unpacks a zip buffer into a filename→content map.
