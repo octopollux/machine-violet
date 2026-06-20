@@ -286,6 +286,82 @@ describe("MainMenuPhase", () => {
     const matches = frame.match(/Requires a valid API key/g) ?? [];
     expect(matches.length).toBe(1);
   });
+
+  describe("archive in-flight guard", () => {
+    const DOWN = "[B";
+    const RIGHT = "[C";
+
+    async function expandList(
+      props: MainMenuPhaseProps,
+    ): Promise<ReturnType<typeof render>> {
+      const r = render(<MainMenuPhase {...props} />);
+      const frame = () => r.lastFrame() ?? "";
+      const selected = () => frame().split("\n").find((l) => l.includes("◆")) ?? "";
+      await vi.waitFor(() => {
+        if (selected().includes("New Campaign")) r.stdin.write(DOWN);
+        expect(selected()).toContain("Continue Campaign");
+      });
+      await vi.waitFor(() => {
+        if (!frame().includes("Test Campaign")) r.stdin.write("\r"); // expand
+        expect(frame()).toContain("Test Campaign");
+      });
+      return r;
+    }
+
+    it("renders 'Archiving…' and hides the action buttons for an in-flight campaign", async () => {
+      const props = defaultProps({
+        campaigns: [{ name: "Test Campaign", path: "/t" }],
+        archivingIds: new Set(["Test Campaign"]),
+      });
+      const { lastFrame } = await expandList(props);
+      const frame = lastFrame() ?? "";
+      expect(frame).toContain("Archiving");
+      // The actionable buttons are replaced while the archive is in flight.
+      expect(frame).not.toContain("Delete");
+    });
+
+    it("blocks resume/re-archive on a campaign whose archive is in flight", async () => {
+      const onArchiveCampaign = vi.fn();
+      const onResumeCampaign = vi.fn();
+      const props = defaultProps({
+        campaigns: [{ name: "Test Campaign", path: "/t" }],
+        archivingIds: new Set(["Test Campaign"]),
+        onArchiveCampaign,
+        onResumeCampaign,
+      });
+      const { stdin } = await expandList(props);
+      // Hammer Enter across columns — every action on an in-flight entry is inert.
+      for (let i = 0; i < 3; i++) {
+        stdin.write("\r");
+        stdin.write(RIGHT);
+        await new Promise((res) => setTimeout(res, 10));
+      }
+      expect(onArchiveCampaign).not.toHaveBeenCalled();
+      expect(onResumeCampaign).not.toHaveBeenCalled();
+    });
+
+    it("triggers archive and keeps the list expanded for reactive feedback", async () => {
+      const onArchiveCampaign = vi.fn();
+      const props = defaultProps({
+        campaigns: [{ name: "Test Campaign", path: "/t" }],
+        onArchiveCampaign,
+      });
+      const r = await expandList(props);
+      const frame = () => r.lastFrame() ?? "";
+      await vi.waitFor(() => {
+        if (!frame().includes("[Archive]")) r.stdin.write(RIGHT); // to Archive column
+        expect(frame()).toContain("[Archive]");
+      });
+      await vi.waitFor(() => {
+        if (!onArchiveCampaign.mock.calls.length) r.stdin.write("\r");
+        expect(onArchiveCampaign).toHaveBeenCalled();
+      });
+      // Unlike resume, archiving does NOT collapse the list — the entry stays
+      // visible so the parent can swap in the "Archiving…" state and then drop
+      // it on refresh.
+      expect(frame()).toContain("Test Campaign");
+    });
+  });
 });
 
 describe("wrapByWord", () => {

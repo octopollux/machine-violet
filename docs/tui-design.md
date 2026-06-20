@@ -540,6 +540,14 @@ The modal owns its own countdown timer: a `setInterval` that ticks once per seco
 
 **Code:** `packages/client-ink/src/tui/modals/ApiErrorModal.tsx`, wired in `packages/client-ink/src/phases/PlayingPhase.tsx`. For the retry backoff schedule and error-kind labels, see [error-recovery.md — API Failures](error-recovery.md#api-failures).
 
+### Archiving a campaign
+
+Triggered from the main menu's campaign sub-list by pressing Enter on the Archive column. Unlike resume (which collapses the list) the sub-list **stays expanded**: the triggered row swaps its `Archive`/`Delete` buttons for an inline `Archiving…` label, and the entry drops out of the list on its own when the archive completes and the parent refreshes `campaigns`.
+
+While an archive is in flight, **all actions on that entry are blocked** (resume, re-archive, delete) — the archive deletes the campaign's source folder on success, so acting on it mid-flight would race. This guard is two-layered: the client ignores repeat triggers for an in-flight id (`archivingIds` prop, threaded from `app.tsx`), and the server rejects a concurrent `POST /manage/campaigns/:id/archive` for the same campaign with **409 Conflict** ("Archive already in progress"). The server guard is the authoritative one — two overlapping archives compute the same destination zip path and race each other's source deletion, corrupting the archive ("contents mismatch on disk"). A double-fire from an unguarded UI was the original trigger.
+
+**Code:** `onArchiveCampaign` / `archivingIds` in `packages/client-ink/src/app.tsx` and `packages/client-ink/src/phases/MainMenuPhase.tsx`; the `archivesInProgress` lock in `packages/engine/src/server/routes/management.ts`.
+
 ### Delete Campaign Modal
 
 A confirmation modal shown over the full-screen main-menu frame before a campaign is permanently removed. Triggered from the main menu's campaign sub-list when the player presses Enter on the Delete column.
