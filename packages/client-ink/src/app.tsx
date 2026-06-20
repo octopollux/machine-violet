@@ -140,10 +140,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     saveClientSettings({ showVerbose, dmTurnLengthPctDefault }).catch(() => { /* best-effort */ });
   }, [showVerbose, dmTurnLengthPctDefault]);
   const [archiveStatus, setArchiveStatus] = useState("");
-  // Campaign ids with an archive POST in flight. Drives the inline "Archiving…"
-  // indicator and blocks a second trigger for the same campaign (a double-fire
-  // used to race the server and corrupt the zip). The server enforces the same
-  // guard; this is the reactive UI half.
+  // Campaign ids with an archive POST in flight. Blocks a second trigger for the
+  // same campaign (a double-fire used to race the server and corrupt the zip;
+  // the server enforces the same guard, but defeating it here would still flash
+  // a spurious 409 and let the loser's .finally() clear the indicator mid-archive).
+  // The REF is the authoritative source of truth: it's mutated synchronously, so
+  // two Enter presses in one render batch can't both pass the guard. `archivingIds`
+  // mirrors it purely to drive the reactive "Archiving…" UI.
+  const archivingIdsRef = useRef<Set<string>>(new Set());
   const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -513,19 +517,18 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           // Ignore a duplicate trigger while this campaign's archive is in
           // flight — the source folder isn't deleted until the first POST
           // succeeds, so the entry is still selectable until then.
-          if (archivingIds.has(id)) return;
-          setArchivingIds((prev) => new Set(prev).add(id));
+          // Synchronous guard off the ref — immune to React's deferred state
+          // commit, so a rapid repeat Enter can't slip a second POST through.
+          if (archivingIdsRef.current.has(id)) return;
+          archivingIdsRef.current.add(id);
+          setArchivingIds(new Set(archivingIdsRef.current));
           apiClientRef.current.archiveCampaign(id).then(() => {
             refreshCampaigns();
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
           }).finally(() => {
-            setArchivingIds((prev) => {
-              if (!prev.has(id)) return prev;
-              const next = new Set(prev);
-              next.delete(id);
-              return next;
-            });
+            archivingIdsRef.current.delete(id);
+            setArchivingIds(new Set(archivingIdsRef.current));
           });
         }}
         onDeleteCampaign={(entry) => {
