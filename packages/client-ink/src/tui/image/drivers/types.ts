@@ -3,9 +3,11 @@
  *
  * Two families:
  *  - blit (sixel, iTerm2): dumb pixel payload at the cursor, no native crop,
- *    clobbered by Ink's per-frame redraw. `encodeBand` is expensive
+ *    clobbered whenever Ink rewrites the image's rows. `encodeBand` is expensive
  *    (re-encode the cropped band) so the component debounces + caches it; the
- *    cached payload is re-blitted every frame inside the sync-output block.
+ *    cached payload is re-blitted inside the sync-output block whenever the image
+ *    changes or Ink's redraw clobbered it — but the painter is idempotent and
+ *    skips the re-blit when nothing changed (see InlineImage.tsx).
  *  - placement (kitty): transmit-once by image ID, native source-rect crop,
  *    flicker-free cheap re-place. `encodeBand` is cheap (a placement escape).
  *

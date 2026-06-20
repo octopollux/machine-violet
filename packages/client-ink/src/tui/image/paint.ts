@@ -56,3 +56,26 @@ export function composePaint(
   out += "\x1b8"; // restore cursor
   return out;
 }
+
+/**
+ * A cheap identity string for what the painter would blit this frame: the
+ * on-screen box, the source-band offset (which pixels), the app height (the
+ * cursor-up math), and the raster generation. Two frames with an equal
+ * signature paint identical pixels at the identical place — so under
+ * incremental rendering, where Ink leaves the image's unchanged (blank) slot
+ * rows untouched, the second frame's re-blit is wasted work and can be skipped.
+ *
+ * Returns `null` when nothing is shown; hide/show and occlusion transitions
+ * therefore always repaint (a null↔non-null change is never "unchanged"). The
+ * string deliberately carries no payload bytes, so computing and comparing it
+ * is O(1) regardless of image size.
+ */
+export function paintSignature(
+  box: PaintBox | null,
+  srcTopRows: number,
+  appHeight: number,
+  rasterEpoch: number,
+): string | null {
+  if (!box) return null;
+  return `${box.row},${box.col},${box.rows},${box.cols},${srcTopRows},${appHeight},${rasterEpoch}`;
+}

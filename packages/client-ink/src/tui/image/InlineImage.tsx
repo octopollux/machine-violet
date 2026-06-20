@@ -29,6 +29,15 @@
  *    reuses the cached payload when it hasn't (a static image never re-encodes).
  *    A future expensive encoder would need a debounce reintroduced in the
  *    painter (re-blit the stale band until the encode settles);
+ *  - the painter is also idempotent across frames: it compares a cheap
+ *    signature (footprint + source band + raster generation) against the frame
+ *    it last blitted and emits NOTHING when they match. With incremental
+ *    rendering on (start-client.ts), an unrelated re-render — the once-a-second
+ *    activity counter, a tool glyph landing — leaves the image's blank slot rows
+ *    untouched, so re-pushing the (up to MB-sized) sixel/iTerm2 payload every
+ *    such frame would be pure waste. The skip is GATED on incremental rendering:
+ *    the standard full-redraw renderer clobbers the image every frame, so there
+ *    the painter must re-blit unconditionally or the image would vanish;
  *  - modal occlusion is all-or-nothing: if an opaque modal's row-span overlaps
  *    the band at all, the painter hides the whole image and restores it when the
  *    modal closes. The hide/show is edge-triggered via useOcclusionChange (a
@@ -50,8 +59,8 @@ import type { GraphicsCapabilities } from "./capabilities.js";
 import { pickProtocol, sixelPaletteSize } from "./capabilities.js";
 import { selectDriver } from "./drivers/index.js";
 import type { PreparedImage } from "./drivers/types.js";
-import { registerPainter } from "./painterRegistry.js";
-import { composePaint, type PaintBox } from "./paint.js";
+import { registerPainter, isIncrementalRendering } from "./painterRegistry.js";
+import { composePaint, paintSignature, type PaintBox } from "./paint.js";
 import { visibleBand, bandPixels, fitImage, isOccluded } from "./geometry.js";
 import { useOcclusionSpans, useOcclusionChange } from "./occlusion.js";
 
@@ -115,6 +124,14 @@ export function InlineImage({
   const posRef = useRef<{ slotTop: number; slotLeft: number; appHeight: number } | null>(null);
   const cachedRef = useRef<CachedBand | null>(null);
   const prevPaintedRef = useRef<PaintBox | null>(null);
+  // Signature of the frame the painter last actually blitted, and a generation
+  // counter bumped on every fresh decode. Together they let the painter skip a
+  // re-blit when nothing about the image changed (see the painter below). The
+  // epoch is what distinguishes "same geometry, new pixels" (a re-decode after a
+  // footprint reflow) from a true no-op — without it the painter would keep the
+  // stale raster on screen.
+  const prevSigRef = useRef<string | null>(null);
+  const rasterEpochRef = useRef(0);
   const viewportRef = useRef({ top: viewportTop, rows: viewportRows });
   viewportRef.current = { top: viewportTop, rows: viewportRows };
   const occlusionRef = useRef(getOcclusionSpans);
@@ -226,6 +243,7 @@ export function InlineImage({
         const img = driver.prepare(data, widthPx, heightPx, (s) => stdout.write(s), paletteSize, cell);
         preparedRef.current = { img, cols, rows };
         cachedRef.current = null;        // force a fresh encode on the next paint
+        rasterEpochRef.current++;        // new pixels: invalidate the painter's skip signature
         requestRepaint();                // off the render path → ask for a paint; the painter encodes + blits
       } catch {
         // Missing/unreadable file: render nothing inline (export still has it).
@@ -255,37 +273,58 @@ export function InlineImage({
       if (!pos || !prep) {
         const clear = prev ? (prep?.img.clear?.() ?? "") : "";
         prevPaintedRef.current = null;
+        prevSigRef.current = null;
         return clear + composePaint("", null, prev, pos?.appHeight ?? 0, occluders);
       }
-      // Clip the footprint to the viewport at the fresh row.
+      // Clip the footprint to the viewport at the fresh row, then apply modal
+      // occlusion. Both are cheap arithmetic — no pixels are touched yet, so the
+      // skip check below can run before any (re-)encode or payload string-build.
       const vp = viewportRef.current;
       const band = visibleBand(pos.slotTop, prep.rows, vp.top, vp.rows);
-      let shown: PaintBox | null = null;
+      let shown: PaintBox | null = band
+        ? { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols }
+        : null;
+      // All-or-nothing modal occlusion: if any open modal's row-span overlaps the
+      // band, hide the whole image (useOcclusionChange repaints on that edge).
+      if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) shown = null;
+
+      // Idempotent re-blit. Under incremental rendering Ink rewrites only the
+      // lines whose text changed; the image's slot rows are blank and don't
+      // change on an unrelated re-render (the 1Hz elapsed counter, a tool glyph
+      // landing), so the pixels are still on screen and re-emitting the whole
+      // payload would be wasted bytes. When the footprint, source band, and
+      // raster all match the frame we last painted, skip. Gated on
+      // isIncrementalRendering(): the standard renderer fully erases + redraws
+      // every frame, so there a skip would make the image vanish — it must
+      // re-blit unconditionally. (start-client.ts keeps the two in lock-step.)
+      const sig = paintSignature(shown, band ? band.srcTopRows : 0, pos.appHeight, rasterEpochRef.current);
+      if (isIncrementalRendering() && sig !== null && prev !== null && sig === prevSigRef.current) {
+        return "";
+      }
+
+      // A repaint is due — (re)build the band payload: cache hit for an
+      // unchanged band; re-encode after a scroll/clip change or a fresh decode.
+      // All current drivers are cheap (~1-8ms/band from a cached raster), so
+      // this is real-time. A future expensive encoder would need a debounce
+      // reintroduced here (re-blit the stale band meanwhile).
       let payload = "";
-      if (band) {
+      if (shown && band) {
         const cached = cachedRef.current;
         if (cached && cached.srcTopRows === band.srcTopRows && cached.visRows === band.visRows) {
-          payload = cached.payload; // band identity unchanged (static image) → reuse, no re-encode
+          payload = cached.payload;
         } else {
-          // Band changed (scrolled / clipped differently): re-encode now. All
-          // current drivers are cheap (~1-8ms/band from a cached raster), so
-          // this is real-time. A future expensive encoder would need a debounce
-          // reintroduced here (re-blit the stale band meanwhile).
           const { topPx, bandPx } = bandPixels(band.srcTopRows, band.visRows, cell.height);
           payload = prep.img.encodeBand(topPx, bandPx);
           cachedRef.current = { payload, srcTopRows: band.srcTopRows, visRows: band.visRows };
         }
-        shown = { row: band.visTop, col: pos.slotLeft, rows: band.visRows, cols: prep.cols };
       }
-      // All-or-nothing modal occlusion: if any open modal's row-span overlaps the
-      // band, hide the whole image (useOcclusionChange repaints on that edge).
-      if (shown && isOccluded({ top: shown.row, rows: shown.rows }, occluders)) { shown = null; payload = ""; }
       // Placement protocols (kitty) leave a persistent placement a covering modal
       // won't overwrite — on the shown→hidden edge, explicitly delete it.
       const clear = prev && !shown ? (prep.img.clear?.() ?? "") : "";
       // Pass occluders so vacated-row erase never blanks a row a modal owns.
       const out = clear + composePaint(payload, shown, prev, pos.appHeight, occluders);
       prevPaintedRef.current = shown;
+      prevSigRef.current = sig;
       return out;
     });
     return () => {
