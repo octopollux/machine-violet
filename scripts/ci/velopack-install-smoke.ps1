@@ -51,13 +51,19 @@ while ((Get-Date) -lt $deadline) {
   }
   Start-Sleep -Milliseconds 500
 }
-if (-not $installed) { throw "Velopack install did not report '$completeMarker' within 180s" }
+if (-not $installed) { throw "Velopack install did not report '$completeMarker' within 180s (log: $velopackLog)" }
 
 # Velopack auto-launches the app as part of the post-install hook; with the install
 # now fully settled, stop any lingering instance so it can't hold the install dir
-# or hang the runner before we replay against the installed binary.
-Start-Sleep -Seconds 2
-Get-Process MachineViolet -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# or hang the runner before we replay against the installed binary. Poll-and-kill
+# until none remain (bounded) rather than sleeping a fixed amount and hoping.
+$killDeadline = (Get-Date).AddSeconds(30)
+while ((Get-Date) -lt $killDeadline) {
+  $procs = Get-Process MachineViolet -ErrorAction SilentlyContinue
+  if (-not $procs) { break }
+  $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Milliseconds 250
+}
 
 $installRoot = Join-Path $env:LOCALAPPDATA "MachineViolet"
 $bin = Join-Path $installRoot "current\MachineViolet.exe"
