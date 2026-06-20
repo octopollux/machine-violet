@@ -119,7 +119,12 @@ omit it (default `sign=true`) from `release`/`main` to also exercise signing.
 
 **Velopack install smoke** ([`scripts/ci/velopack-install-smoke.ps1`](../scripts/ci/velopack-install-smoke.ps1)):
 installs `Setup.exe` → replays against the *installed* binary → uninstalls,
-catching install-layout/manifest bugs the portable replay can't. It is
+catching install-layout/manifest bugs the portable replay can't. `Setup.exe
+--silent` returns *before* its background install (post-install hook + a
+"kill every running app instance" sweep) finishes, so the script waits for the
+`Installation completed successfully!` marker in `velopack.log` before launching
+the replay — never a fixed sleep, which races a slow runner and lets Velopack's
+completion sweep kill the replay's own app instance. It is
 **impractical to run locally** (it performs a real machine install → uninstall
 and is Windows-only — signing is optional via the `sign` input, so a signed
 `Setup.exe` is no longer the blocker), so it was validated end-to-end on a clean
