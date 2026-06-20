@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Hollowdeep"
+rating: "?"
+description: "Hollowdeep campaign look: PainterlyGame hand-painted game render by default, FixedCamHorror fixed-camera survival-horror framing for scary scenes"
+tags: [game-render, painterly, stylized, horror, dread]
+made-for-model: gpt-image-2
+tokens: 375
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** painterly game-render look below. A **scary** scene uses the fixed-camera survival-horror look — compose it for a single static, high or canted dramatic camera angle, the character a small, vulnerable figure dwarfed by the environment and framed for tension.
+
+# Style
+
+Default (most scenes) — `Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+Scary scenes — `Rendered as an in-game screenshot from a classic fixed-camera survival-horror video game — a single dramatic STATIC camera angle (a high, canted, cinematic vantage the player does not control), composing the scene for maximum tension and vulnerability, with the character a small figure within a richly detailed, almost pre-rendered-looking environment, dwarfed by the framing. Cinematic, ominous staging; high contrast with crushed blacks; modern game fidelity with a deliberately old-school fixed-cam horror composition. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Campaign composite for the **hollowdeep** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [PainterlyGame](./PainterlyGame.mvstyle) (hand-painted stylised game render on a 20mm wide lens — the campaign-wide workhorse). SCARY = [FixedCamHorror](./FixedCamHorror.mvstyle) (fixed-camera survival-horror; SCENE-COUPLED, so its static-dramatic-angle / character-dwarfed steering is carried positively in the `# Direction`). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![PainterlyGame](../ImageStyleExample/PainterlyGame.example.png)
+
+![FixedCamHorror](../ImageStyleExample/FixedCamHorror.example.png)

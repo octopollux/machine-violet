@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Library Card"
+rating: "?"
+description: "Library Card campaign look: AnimeIllustration polished anime art by default, CrossProcess toxic shifted film for unreal places and weirdness"
+tags: [illustration, stylized, color, high-saturation, warm]
+made-for-model: gpt-image-2
+tokens: 310
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** polished anime-illustration look below. **Unreal places and moments of weirdness** use the cross-processed film look — its toxic, off-kilter colour signals that something is wrong.
+
+# Style
+
+Default (most scenes) — `Rendered as a polished modern anime illustration — clean Japanese-animation-style art with crisp confident line work and soft cel-and-painted colour. Clean lineart, flat cel shading with a few soft gradient accents, expressive appealing stylised character design, a bright harmonious palette, and a softly painted atmospheric background with gentle depth behind the crisp foreground figure. Warm cinematic anime lighting with gentle bloom and rim light. Polished, expressive, broadly appealing. Close with a small tasteful caption in clean type.`
+
+Unreal places / weirdness — `Rendered as a frame from film that has been CROSS-PROCESSED — developed in the wrong chemistry (slide film in C-41, or negative in E-6) — NOT a clean render. The technique's signature: wildly shifted, unnatural colour with a strong cyan-green cast in the shadows and yellow-green or acid highlights; heavily boosted contrast with crushed blacks and blown highlights; oversaturated, skewed skin tones; and a grungy, lurid, unpredictable analog look. Punchy, toxic, off-kilter, stylish. Close with a small caption in a tasteful font — a scene or place title only; do NOT print the film process name in the caption.`
+
+# Notes
+
+Campaign composite for the **library-card** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [AnimeIllustration](./AnimeIllustration.mvstyle) (polished modern anime illustration — the campaign-wide workhorse). UNREAL/WEIRD = [CrossProcess](./CrossProcess.mvstyle) (cross-processed film; its toxic shifted colour is the catalog's "something's wrong here" register, exactly suited to unreal places). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![AnimeIllustration](../ImageStyleExample/AnimeIllustration.example.png)
+
+![CrossProcess](../ImageStyleExample/CrossProcess.example.png)

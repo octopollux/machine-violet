@@ -7,7 +7,7 @@
     "fantasy",
     "sci-fi"
   ],
-  "image_style": "NoirCinema",
+  "image_style": "NightMail",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nNight Mail is built for serialized, episode-by-episode play — each session a night's run with its own dawn deadline, and the larger strangeness unfolding across nights. When presenting scope, frame the Serialized option as the natural fit.",
   "detail": "The player carries the night bag. The route is memorized — has to be, the addresses don't all stay still — and tonight the route is wrong in a specific way the player has to name before dawn. Mail is sacred and mail is contraband and mail is, occasionally, looking back at the carrier.\n\nDM approach:\n- Tone: cold air, paper rustle, distance. The route is meditative until it isn't.\n- The postmaster: gruff, fond, knows more than they say. They sorted this route by hand and the new stop wasn't in their book.\n- The recipients: each stop is a vignette — a window lit, a door that opens before the knock, a porch with the right tea already poured.\n- Seed early: one stop where the player is greeted by name they haven't given; one piece of mail addressed to the player themselves.\n- Pacing: a fixed number of stops per night (six is a good number). Make one of them wrong, then two, then all of them.\n\nThe clock is the route. The player tracks the night by the bag's weight, by the names left to cross off the manifest, by the eastern sky. Dawn is the deadline because the route ends at dawn — anything undelivered at first light becomes the carrier's responsibility, permanently.",
   "forks": [
@@ -86,6 +86,6 @@
     "detail": 266,
     "setup_detail": 56,
     "forks": 236,
-    "total": 1214
+    "total": 1213
   }
 }

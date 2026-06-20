@@ -7,7 +7,7 @@
     "modern",
     "mystery"
   ],
-  "image_style": "CineStill",
+  "image_style": "NinetiesComic",
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
   "detail": "The bar is a small room with bad light and a smaller number of customers than it had ten years ago. Tonight, every one of them saw the same thing. Nobody is talking about it yet. The next round will arrive, and someone will have to be the first.\n\nDM approach:\n- Tone: hushed, conspiratorial, the comedy of small embarrassments between people who know each other too well. Horror as something nobody wants to be the first to name.\n- NPCs to seed: the bartender (warm or cool depending on variant, the gravitational center of the room); one regular who saw more than the others and won't say; the door (someone will arrive who shouldn't, or won't arrive who should).\n- Pacing structure: each \"last call\" is one in-fiction night. Witnesses' memories decay at different rates — give each witness a roll or a quiet erosion.\n- Seed early: the empty stool that's saved for someone; the chalkboard with names on it; the jukebox song that everyone half-remembers being theirs.\n- The bar is the safe room and the haunted one. The street outside is colder than the weather report.\n\nPacing: One night per session. The witnesses are losing their grip at different rates — the player can track this by who can still describe what happened in detail, who is starting to misremember, and who has stopped mentioning it altogether.",
   "forks": [
@@ -86,6 +86,6 @@
     "detail": 282,
     "setup_detail": 8,
     "forks": 235,
-    "total": 1276
+    "total": 1277
   }
 }
