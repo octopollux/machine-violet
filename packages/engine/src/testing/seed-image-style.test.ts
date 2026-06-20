@@ -38,14 +38,17 @@ beforeEach(() => {
 const DEFAULT_STYLE = "CinematicFilm";
 
 /**
- * A style's FULL `# Style` body (every variant), not just the first span
- * {@link resolveImageStyleLine} returns. Used to tell a composite that
- * legitimately embeds the CinematicFilm look as one of its variants (so that
- * line is *expected* inside the seed's own block) apart from a leaked default.
+ * Every backtick-fenced render directive in a style's `# Style` body, fences
+ * stripped and trimmed — a single style yields one span; a composite yields its
+ * default span plus each situational variant. {@link resolveImageStyleLine}
+ * returns only the first (default) span; this exposes the whole menu, so a test
+ * can prove the *entire* composite reached the DM (its situational variants are
+ * unique to the composite — absent from the global default block).
  */
-function fullStyleBody(styleName: string): string {
+function styleSpans(styleName: string): string[] {
   const path = join(assetDir("prompts"), "include", "Image", `${styleName}.mvstyle`);
-  return parseOkf(readFileSync(path, "utf-8")).sections.get("Style") ?? "";
+  const body = parseOkf(readFileSync(path, "utf-8")).sections.get("Style") ?? "";
+  return [...body.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim()).filter(Boolean);
 }
 
 function baseConfig(campaignDetail?: string): CampaignConfig {
@@ -93,10 +96,17 @@ describe("seed image_style reaches the DM prefix end-to-end", () => {
     const defaultLine = resolveImageStyleLine(DEFAULT_STYLE)!;
     for (const { slug, world } of styled) {
       const all = dmText(baseConfig(seedCampaignDetail(world) ?? undefined));
-      const styleLine = resolveImageStyleLine(world.image_style!)!;
+      const spans = styleSpans(world.image_style!);
 
-      // The seed's exact style directive reached the DM.
-      expect(all, `seed "${slug}": style line missing from DM prefix`).toContain(styleLine);
+      // The seed's ENTIRE style menu reached the DM — every backtick-fenced
+      // directive, default and situational alike. For a composite this is the
+      // load-bearing check: its situational variants are unique to it (absent
+      // from the global default <Image> block), so their presence uniquely
+      // proves the composite include actually resolved and overrode the default
+      // — not a coincidence where the seed's default look equals CinematicFilm.
+      for (const span of spans) {
+        expect(all, `seed "${slug}": a style directive is missing from the DM prefix`).toContain(span);
+      }
       // Exactly one <Image> block survives the override cascade.
       expect(
         (all.match(/<Image>/g) ?? []).length,
@@ -106,8 +116,9 @@ describe("seed image_style reaches the DM prefix end-to-end", () => {
       // composite legitimately embeds CinematicFilm as one of its looks (e.g.
       // graveyard-shift, whose DEFAULT *is* the cinematic line). In that case the
       // line is expected inside the seed's single <Image> block, not a leak; the
-      // count===1 check above already rules out a second, leaked default block.
-      const embedsDefault = fullStyleBody(world.image_style!).includes(defaultLine);
+      // per-span check above already proves the composite resolved, so a stale
+      // default can no longer hide behind the default==CinematicFilm coincidence.
+      const embedsDefault = spans.includes(defaultLine);
       if (world.image_style !== DEFAULT_STYLE && !embedsDefault) {
         expect(all, `seed "${slug}": default style leaked despite a seed override`).not.toContain(defaultLine);
       }
