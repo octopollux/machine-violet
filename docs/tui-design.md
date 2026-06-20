@@ -550,6 +550,8 @@ While an archive is in flight, **all actions on that entry are blocked** (resume
 
 **Restore (the symmetric twin).** Restoring an archive from the Archived Campaigns list (Enter on an entry, ArchivedCampaignsPhase) carries the same two-layer guard, keyed by **zip path** instead of campaign id. The selected row shows an inline `Restoring…` and ignores repeat Enter while in flight (`restoringPaths` prop from `app.tsx`); the server rejects a concurrent `POST /manage/campaigns/archived/:name/restore` for the same zip with **409 Conflict** ("Restore already in progress"), via the `restoresInProgress` lock. Restore is actually the *more* double-fire-prone of the two — the screen doesn't move on Enter — and a duplicate restore races the unique-slot loop (TOCTOU between the `exists` check and `mkdir`), colliding on one dir or spawning duplicate `-2`/`-3` slots. Restore is non-destructive (it never deletes the archive or an existing campaign), so the stakes are lower than archive, but the guard keeps the behavior clean.
 
+The restore route resolves its target **strictly inside `archiveDir()`** (the canonical `archivedcampaigns/` dir — a *sibling* of the campaigns dir, not a child): the client echoes back a `zipPath` from the list endpoint, but the server trusts only its filename component, so a crafted body or `:name` can't traverse out (`..`) or turn the endpoint into an arbitrary-zip reader. A target whose basename isn't a `.zip` is rejected with **400**.
+
 ### Delete Campaign Modal
 
 A confirmation modal shown over the full-screen main-menu frame before a campaign is permanently removed. Triggered from the main menu's campaign sub-list when the player presses Enter on the Delete column.

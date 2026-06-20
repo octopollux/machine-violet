@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
+import { norm } from "../../utils/paths.js";
 
 // The archive route's concurrency guard is the unit under test: a second
 // archive of the SAME campaign while the first is in flight must be rejected
@@ -20,17 +21,17 @@ const { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore } = 
   return { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore };
 });
 
-vi.mock("../../config/campaign-archive.js", () => ({
-  archiveCampaign: archiveCampaignMock,
-  deleteCampaign: vi.fn(),
-  listArchivedCampaigns: vi.fn(),
-  unarchiveCampaign: unarchiveCampaignMock,
-  getCampaignDeleteInfo: vi.fn(),
-  // The route gets its ArchiveFileIO from ../fileio.js, which re-exports this
-  // from the mocked module — stub it so the call doesn't throw (the mocked
-  // archiveCampaign ignores the io anyway).
-  createArchiveFileIO: vi.fn(() => ({})),
-}));
+// Keep the real module (the route relies on the real `archiveDir` for path
+// resolution, and `createArchiveFileIO` re-exported via ../fileio.js); override
+// only the two long-running ops with controllable deferreds.
+vi.mock("../../config/campaign-archive.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../config/campaign-archive.js")>();
+  return {
+    ...actual,
+    archiveCampaign: archiveCampaignMock,
+    unarchiveCampaign: unarchiveCampaignMock,
+  };
+});
 
 import { managementRoutes } from "./management.js";
 
@@ -184,5 +185,43 @@ describe("POST /campaigns/archived/:name/restore — concurrency guard", () => {
     await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(2));
     pendingRestore[1]({ ok: true });
     expect((await c).statusCode).toBe(200);
+  });
+
+  // campaignsDir is "/tmp/campaigns" → archives live in the SIBLING
+  // "/tmp/archivedcampaigns", never the child "/tmp/campaigns/archivedcampaigns".
+  const firstZipArg = () => norm(unarchiveCampaignMock.mock.calls[0][0] as string);
+
+  it("restore-by-name resolves into the sibling archive dir, not a child", async () => {
+    app = await buildApp();
+
+    // No zipPath in the body → reconstruct from the :name param.
+    const a = app.inject({ method: "POST", url: "/campaigns/archived/Test/restore", payload: {} });
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(1));
+    expect(firstZipArg()).toBe(norm("/tmp/archivedcampaigns/Test.zip"));
+    // The old bug pointed at the child dir.
+    expect(firstZipArg()).not.toContain("campaigns/archivedcampaigns");
+    pendingRestore[0]({ ok: true });
+    expect((await a).statusCode).toBe(200);
+  });
+
+  it("confines an out-of-dir zipPath to the archive dir (no arbitrary read)", async () => {
+    app = await buildApp();
+
+    const a = app.inject(restoreReq("/etc/evil.zip"));
+    await vi.waitFor(() => expect(unarchiveCampaignMock).toHaveBeenCalledTimes(1));
+    // Only the basename survives; the restore can't escape the archive dir.
+    expect(firstZipArg()).toBe(norm("/tmp/archivedcampaigns/evil.zip"));
+    expect(firstZipArg()).not.toContain("/etc/");
+    pendingRestore[0]({ ok: true });
+    expect((await a).statusCode).toBe(200);
+  });
+
+  it("rejects a target whose basename isn't a .zip with 400", async () => {
+    app = await buildApp();
+
+    const res = await app.inject(restoreReq("/etc/passwd"));
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/invalid archive/i);
+    expect(unarchiveCampaignMock).not.toHaveBeenCalled();
   });
 });
