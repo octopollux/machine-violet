@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "DX9Interior"
-rating: "?"
+rating: "D"
 description: "2004 DirectX 9 game screenshot: hard stencil-volume shadows, normal-mapped speculars, DXT blocking, early-HDR bloom"
 tags: [game-render, stylized, interior-friendly, nostalgic]
 made-for-model: gpt-image-2

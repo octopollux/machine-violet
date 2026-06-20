@@ -177,7 +177,7 @@ seed. The surveillance cluster (`NightVisionCam`, `ThermalCam`, `ThermalGrain`,
   flair (a legend, a prophecy, a relic, a vision). Don't judge an elaborate style
   by "would you run a whole campaign in it."
 
-*(Wiring styles onto seeds is deferred — no seed currently selects a variant.)*
+*(Styles are wired end-to-end: every bundled seed sets an `image_style` — often a per-seed **composite** that bundles a default look plus situational variants into one include — which drives both the chargen portrait and in-game art. See format-spec §10.8.)*
 
 ## Practical constraints
 
@@ -240,6 +240,13 @@ Author **one style at a time**, eyeballed by a human before banking.
      related styles with `[Other](./Other.mvstyle)`. (A `tokens:` frontmatter
      key — the emitted `# Direction`+`# Style` weight — is **auto-stamped** by
      `npm run tokens` at pre-push; don't hand-author it. See format-spec §10.9.)
+   - The `rating` is a coarse quality tier — `S` > `A` > `B` > `C` > `D`, with
+     `"?"` meaning *ungraded*. The bundled catalog's current ratings are a
+     **provisional usage-frequency proxy**, not an eyeball grade: each style is
+     ranked by how many seeds reached for it across the campaign↔style taste pass
+     (S = 5 seeds, A = 4, B = 3, C = 2, D = 1). Catalog styles no seed used, and
+     the per-seed composites, are left `"?"`. Re-grade by eye when you have
+     renders in front of you — the same "show renders before banking" rule.
    - Copy the **approved** render to `ImageStyleExample/<Tag>.example.png` and
      reference it from the `# Example` section.
    - Add the variant to the list in [image-generation.md](image-generation.md)

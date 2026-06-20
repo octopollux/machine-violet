@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "LowPoly"
-rating: "?"
+rating: "D"
 description: "Stylised low-poly 3D render with flat-shaded polygon facets, crisp edges, and a coordinated limited swatch palette"
 tags: [game-render, stylized, limited-palette, cool, any-scene]
 made-for-model: gpt-image-2

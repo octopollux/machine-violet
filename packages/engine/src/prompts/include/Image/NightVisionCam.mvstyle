@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "NightVisionCam"
-rating: "?"
+rating: "C"
 description: "Low-key infrared CCD security-camera still: IR cone into crushed black, sensor noise, fixed high-corner wide, time-only OSD"
 tags: [surveillance, lo-fi, monochrome, tense, interior-friendly]
 made-for-model: gpt-image-2

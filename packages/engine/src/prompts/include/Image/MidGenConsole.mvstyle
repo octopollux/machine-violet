@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "MidGenConsole"
-rating: "?"
+rating: "D"
 description: "2007 Xbox-360/PS3 game render: waxy pre-PBR speculars, bloom-drunk HDR, crude SSAO halos, brown/teal grade, jaggies"
 tags: [game-render, retro, muted, nostalgic]
 made-for-model: gpt-image-2

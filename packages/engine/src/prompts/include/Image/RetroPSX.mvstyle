@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "RetroPSX"
-rating: "?"
+rating: "D"
 description: "Late-90s PlayStation-era 3D render with low-poly jitter, warping affine textures, dithering, and thick draw-distance fog"
 tags: [game-render, retro, lo-fi, nostalgic, gritty]
 made-for-model: gpt-image-2
