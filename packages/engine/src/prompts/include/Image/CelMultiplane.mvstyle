@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "CelMultiplane"
-rating: "?"
+rating: "D"
 description: "Cel-shaded animated frame built as stacked flat transparent cel planes with depth from layering and atmospheric haze"
 tags: [animation, stylized, color, dreamy, establishing]
 made-for-model: gpt-image-2

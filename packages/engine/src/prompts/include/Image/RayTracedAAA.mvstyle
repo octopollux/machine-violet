@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "RayTracedAAA"
-rating: "?"
+rating: "D"
 description: "2019 flagship AAA game render: full PBR, hybrid ray-traced reflections and GI, TAA, volumetrics, photogrammetry detail"
 tags: [game-render, photoreal, cool, establishing]
 made-for-model: gpt-image-2

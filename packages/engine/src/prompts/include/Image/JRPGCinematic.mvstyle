@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "JRPGCinematic"
-rating: "?"
+rating: "C"
 description: "Epic anime-flavoured JRPG cutscene render with cinematic depth of field, volumetric god-rays, and atmospheric distance"
 tags: [game-render, stylized, high-saturation, epic, establishing]
 made-for-model: gpt-image-2

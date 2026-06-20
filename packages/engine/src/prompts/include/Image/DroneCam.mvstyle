@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "DroneCam"
-rating: "?"
+rating: "B"
 description: "Military UAV aerial surveillance still: steep top-down night-vision feed, small tracked subject, grainy mono, targeting HUD"
 tags: [surveillance, lo-fi, monochrome, clinical, wide-vista]
 made-for-model: gpt-image-2

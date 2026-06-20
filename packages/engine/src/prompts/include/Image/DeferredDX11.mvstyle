@@ -1,7 +1,7 @@
 ---
 type: visual-style
 title: "DeferredDX11"
-rating: "?"
+rating: "D"
 description: "2011 DirectX 11 game render: deferred shading, overdone SSAO, FXAA smear, pre-PBR gloss, teal-and-orange grade"
 tags: [game-render, stylized, muted, nostalgic]
 made-for-model: gpt-image-2
