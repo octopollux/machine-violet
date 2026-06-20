@@ -21,6 +21,31 @@ export type Painter = () => string;
 
 const painters = new Map<string, Painter>();
 
+/**
+ * Whether Ink renders incrementally (rewriting only the lines whose text
+ * changed) rather than fully erasing + redrawing every frame.
+ *
+ * This gates the inline-image painter's steady-state skip: with incremental
+ * rendering on, an unrelated re-render (e.g. the once-a-second activity
+ * counter) leaves the image's unchanged slot rows alone, so the painter can
+ * emit nothing instead of re-blitting its whole payload. Under the STANDARD
+ * renderer every frame clobbers those rows, so the painter must re-blit
+ * unconditionally — skipping there would make the image vanish.
+ *
+ * Default `false` (the conservative, always-correct behavior). start-client.ts
+ * sets it to match the `incrementalRendering` option it passes to `render()`,
+ * keeping the two in lock-step — see the painter in InlineImage.tsx.
+ */
+let incrementalRendering = false;
+
+export function setIncrementalRendering(on: boolean): void {
+  incrementalRendering = on;
+}
+
+export function isIncrementalRendering(): boolean {
+  return incrementalRendering;
+}
+
 /** Register a painter; returns an unregister function. Re-registering a key replaces it. */
 export function registerPainter(key: string, paint: Painter): () => void {
   painters.set(key, paint);

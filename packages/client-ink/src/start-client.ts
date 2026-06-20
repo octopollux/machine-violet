@@ -19,7 +19,7 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
-import { compositePainters } from "./tui/image/painterRegistry.js";
+import { compositePainters, setIncrementalRendering } from "./tui/image/painterRegistry.js";
 import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
@@ -126,7 +126,16 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // so alt-screen escape codes don't leak into redirected output, pipes, or
   // CI logs.
   const alternateScreen = !mockStdin && Boolean(process.stdout.isTTY) && Boolean(activeStdin.isTTY);
-  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen };
+  // Incremental rendering: Ink rewrites only the lines whose text changed
+  // instead of erasing + redrawing the whole frame. This is what lets the
+  // inline-image painter skip re-blitting on unrelated re-renders (the
+  // once-a-second activity counter, an accumulating tool glyph): those frames
+  // no longer clobber the image's unchanged slot rows, so its (up to MB-sized
+  // sixel/iTerm2) payload isn't re-pushed to the terminal every tick. The
+  // painter's skip is GATED on this being on — keep the two in lock-step.
+  const incrementalRendering = true;
+  setIncrementalRendering(incrementalRendering);
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen, incrementalRendering };
   if (mockStdin) {
     renderOpts.stdin = mockStdin;
     // Force Ink interactive mode in headless agent mode. Without this, Ink's
