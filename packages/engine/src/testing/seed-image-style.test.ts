@@ -15,12 +15,16 @@
  * caught. Robust to re-grading: it reads each seed's current `image_style` rather
  * than pinning specific seed→style pairs.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach } from "vitest";
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { loadAllWorlds } from "../config/world-loader.js";
 import { normalizeForks, assembleCampaignDetail } from "../config/world-forks.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 import { resolveImageStyleLine } from "../prompts/image-style.js";
+import { parseOkf } from "../prompts/okf.js";
+import { assetDir } from "../utils/paths.js";
 import { buildDMPrefix } from "../agents/dm-prompt.js";
 import { resetPromptCache } from "../prompts/load-prompt.js";
 import { loadModelConfig } from "../config/models.js";
@@ -32,6 +36,17 @@ beforeEach(() => {
 
 /** The placeholder default wired into dm-directives.md + the portrait fallback. */
 const DEFAULT_STYLE = "CinematicFilm";
+
+/**
+ * A style's FULL `# Style` body (every variant), not just the first span
+ * {@link resolveImageStyleLine} returns. Used to tell a composite that
+ * legitimately embeds the CinematicFilm look as one of its variants (so that
+ * line is *expected* inside the seed's own block) apart from a leaked default.
+ */
+function fullStyleBody(styleName: string): string {
+  const path = join(assetDir("prompts"), "include", "Image", `${styleName}.mvstyle`);
+  return parseOkf(readFileSync(path, "utf-8")).sections.get("Style") ?? "";
+}
 
 function baseConfig(campaignDetail?: string): CampaignConfig {
   return {
@@ -87,8 +102,13 @@ describe("seed image_style reaches the DM prefix end-to-end", () => {
         (all.match(/<Image>/g) ?? []).length,
         `seed "${slug}": expected exactly one <Image> block`,
       ).toBe(1);
-      // The default is gone unless the seed deliberately picked it.
-      if (world.image_style !== DEFAULT_STYLE) {
+      // The default is gone unless the seed deliberately picked it — or its
+      // composite legitimately embeds CinematicFilm as one of its looks (e.g.
+      // graveyard-shift, whose DEFAULT *is* the cinematic line). In that case the
+      // line is expected inside the seed's single <Image> block, not a leak; the
+      // count===1 check above already rules out a second, leaked default block.
+      const embedsDefault = fullStyleBody(world.image_style!).includes(defaultLine);
+      if (world.image_style !== DEFAULT_STYLE && !embedsDefault) {
         expect(all, `seed "${slug}": default style leaked despite a seed override`).not.toContain(defaultLine);
       }
     }

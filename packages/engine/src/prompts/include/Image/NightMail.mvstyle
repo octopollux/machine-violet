@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Night Mail"
+rating: "?"
+description: "Night Mail campaign look: DayForNight cool artificial-night grade by default, PracticalMiniature pre-CGI model-stage look for indoor scenes"
+tags: [motion-picture, stylized, cool, retro, muted]
+made-for-model: gpt-image-2
+tokens: 389
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** day-for-night look below. **Indoor** scenes use the practical-miniature model-stage look.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+Indoors — `Photographed as a practical motion-control miniature model from a pre-CGI late-1970s science-fiction film, shot on a large physical model with an anamorphic lens. Strict process discipline: the subject is a real built object — matte-painted model surfaces with restrained weathering, panel lines or sculpted texture, and a few sharp greebles concentrated ONLY on the focal section; broad areas of the surface stay clean, simple, and unmodulated. Light it with one hard key from a single direction, deep falloff into black; let smoke, haze, and atmospheric depth fill the negative space instead of detail. Shallow depth of field — only the focal subject is crisp, everything else softens. Fine 35mm film grain, gentle anamorphic flare and bloom on the single brightest light, slight gate weave. Keep large passages of the frame dark and near-empty — resist filling them. Close with a film-still caption: a single line of subtitle text in a clean lower-third, as if burned into the print.`
+
+# Notes
+
+Campaign composite for the **night-mail** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [DayForNight](./DayForNight.mvstyle) (cool-blue artificial-night grade carrying the daylight tells — the campaign-wide workhorse). INDOORS = [PracticalMiniature](./PracticalMiniature.mvstyle) (pre-CGI motion-control model-stage look; its economy directives — one hard key, smoke filling negative space, large dark passages — are load-bearing anti-greeble, kept verbatim). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![DayForNight](../ImageStyleExample/DayForNight.example.png)
+
+![PracticalMiniature](../ImageStyleExample/PracticalMiniature.example.png)

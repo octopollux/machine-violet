@@ -1,0 +1,36 @@
+---
+type: visual-style
+title: "Route 0"
+rating: "?"
+description: "Route 0 campaign look: DocumentaryPhoto reportage by default, LargeFormat70 for dramatic scenery, PracticalMiniature for vehicle interiors, DayForNight for outdoor night"
+tags: [photographic, motion-picture, photoreal, muted, epic]
+made-for-model: gpt-image-2
+tokens: 711
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** grounded documentary-photo look below. A **dramatic scenery shot** uses the large-format 65/70mm epic look. A **vehicle interior** uses the practical-miniature model-stage look. An **outdoor night** scene uses the day-for-night look.
+
+# Style
+
+Default (most scenes) — `Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+Dramatic shots / scenery — `Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+Vehicle interior — `Photographed as a practical motion-control miniature model from a pre-CGI late-1970s science-fiction film, shot on a large physical model with an anamorphic lens. Strict process discipline: the subject is a real built object — matte-painted model surfaces with restrained weathering, panel lines or sculpted texture, and a few sharp greebles concentrated ONLY on the focal section; broad areas of the surface stay clean, simple, and unmodulated. Light it with one hard key from a single direction, deep falloff into black; let smoke, haze, and atmospheric depth fill the negative space instead of detail. Shallow depth of field — only the focal subject is crisp, everything else softens. Fine 35mm film grain, gentle anamorphic flare and bloom on the single brightest light, slight gate weave. Keep large passages of the frame dark and near-empty — resist filling them. Close with a film-still caption: a single line of subtitle text in a clean lower-third, as if burned into the print.`
+
+Outdoors, night — `Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+# Notes
+
+Campaign composite for the **route-0** seed — four already-validated catalog styles bundled into one include (no new render). DEFAULT = [DocumentaryPhoto](./DocumentaryPhoto.mvstyle) (grounded reportage photography — the campaign-wide workhorse). SCENERY = [LargeFormat70](./LargeFormat70.mvstyle) (65/70mm deep-focus epic clarity for a dramatic vista). VEHICLE INTERIOR = [PracticalMiniature](./PracticalMiniature.mvstyle) (pre-CGI model-stage look; its economy directives are load-bearing anti-greeble, kept verbatim). OUTDOOR NIGHT = [DayForNight](./DayForNight.mvstyle) (cool-blue artificial-night grade). All four `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from four banked styles — see their worked samples:
+
+![DocumentaryPhoto](../ImageStyleExample/DocumentaryPhoto.example.png)
+![LargeFormat70](../ImageStyleExample/LargeFormat70.example.png)
+![PracticalMiniature](../ImageStyleExample/PracticalMiniature.example.png)
+![DayForNight](../ImageStyleExample/DayForNight.example.png)

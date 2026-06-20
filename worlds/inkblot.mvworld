@@ -8,7 +8,7 @@
     "horror",
     "modern"
   ],
-  "image_style": "NoirCinema",
+  "image_style": "Ukiyoe",
   "setup_detail": "<!--include:Pacing.TimedCampaigns-->\n\nOpening scene: ground it in the player's chosen way in and the ordinary moment that draws them toward this show — not in front of the painting. Opening with the player facing the changing canvas is too direct a start; let the work, and what it is doing, reveal itself in play.",
   "detail": "The painting hung the same way for the opening and for the first morning of the show. The second morning the brushstroke on the left margin was longer. The third morning there was a window in the background that hadn't been there. Today there is a figure in the corner of the canvas standing in approximately the spot the player is standing in the room, and the gallery owner has stopped sleeping, and the security camera footage shows the canvas still all night and shows the painting different at dawn.\n\nDM approach:\n- Tone: turpentine, white walls, the particular silence of an empty gallery at five p.m.\n- The gallery owner: poised, articulate, a little gray under the eyes. Has invested in the show. Cannot afford to take it down. Knows more than they're saying.\n- The artist (dead before the campaign): traceable through their studio, their letters, the people who loved them. The estate executor has the keys to the studio and the key opens a drawer the executor has not opened.\n- Seed early: a detail in the painting that matches something only the player has seen; a previous owner of a piece from the same series who died unexpectedly.\n- Pacing: each change is more specific than the last. Today the painting contains the gallery floor. Tomorrow it will contain the player.\n\nThe clock is the canvas. Photograph it each morning. Compare. The player can count the new strokes. When the new strokes resolve into a face the player recognizes — their own, the owner's, somebody from outside the gallery — the clock has run.",
   "forks": [
@@ -87,6 +87,6 @@
     "detail": 313,
     "setup_detail": 67,
     "forks": 227,
-    "total": 1296
+    "total": 1297
   }
 }
