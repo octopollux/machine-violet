@@ -41,6 +41,15 @@ describe("classifyCodexFailure", () => {
     expect(classifyCodexFailure("tool definition rejected")).toBe("tools_schema_mismatch");
   });
 
+  it("classifies rate-limit / quota / credit phrasings as rate_limited", () => {
+    expect(classifyCodexFailure("Rate limit reached. Try again later.")).toBe("rate_limited");
+    expect(classifyCodexFailure("HTTP 429: Too Many Requests")).toBe("rate_limited");
+    expect(classifyCodexFailure("You've reached your usage limit for gpt-5.5")).toBe("rate_limited");
+    expect(classifyCodexFailure("insufficient quota")).toBe("rate_limited");
+    expect(classifyCodexFailure("You are out of credits")).toBe("rate_limited");
+    expect(classifyCodexFailure("Your credit balance is too low")).toBe("rate_limited");
+  });
+
   it("falls back to unknown for anything else", () => {
     expect(classifyCodexFailure("some weird error")).toBe("unknown");
     expect(classifyCodexFailure("")).toBe("unknown");
@@ -60,14 +69,26 @@ describe("CodexTurnFailedError.kind", () => {
 });
 
 describe("classifyServerError", () => {
-  it("routes every known CodexFailureKind to session-fatal-recoverable (#529)", () => {
-    // All four kinds map to the same UX bucket today. Pin them so a future
-    // PR that splits the routing doesn't silently misroute one.
+  it("routes the fix-it CodexFailureKinds to session-fatal-recoverable (#529)", () => {
+    // auth_expired / model_not_found / tools_schema_mismatch / unknown all map
+    // to the drop-to-menu bucket (the player fixes something, then retries).
+    // rate_limited is the deliberate exception — see the retryable test above.
     const err = new CodexTurnFailedError(
       "Your refresh token was already used.",
       "t1",
     );
+    expect(err.kind).toBe("auth_expired");
     expect(classifyServerError(err)).toBe("session-fatal-recoverable");
+  });
+
+  it("routes a rate_limited codex failure to retryable, not session-fatal", () => {
+    // Quota exhaustion is normal/transient on the ChatGPT provider — it must
+    // keep the session alive (retry overlay), not drop the player to the menu.
+    const err = new CodexTurnFailedError("Rate limit reached. Resets in 42 minutes.", "t_rl");
+    expect(err.kind).toBe("rate_limited");
+    expect(classifyServerError(err)).toBe("retryable");
+    // Class+kind win even when the caller's default is the stricter bucket.
+    expect(classifyServerError(err, "session-fatal-recoverable")).toBe("retryable");
   });
 
   it("defaults unknown error classes to retryable (Copilot review)", () => {

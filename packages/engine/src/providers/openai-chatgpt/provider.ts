@@ -971,19 +971,37 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // Turn completion future — resolves on `turn/completed` notification
     // FOR THIS THREAD ONLY (see thread-filter rationale above).
     let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
-    const completion = new Promise<TurnCompletedNotification>((resolve) => {
+    let completionReject: ((e: Error) => void) | null = null;
+    const completion = new Promise<TurnCompletedNotification>((resolve, reject) => {
       completionResolve = resolve;
+      completionReject = reject;
     });
+    const settleCompletion = (): void => {
+      completionResolve = null;
+      completionReject = null;
+    };
     const unsubCompleted = client.onNotification<TurnCompletedNotification>(
       "turn/completed",
       (p) => {
         if (!forThisThread(p)) return;
-        if (completionResolve) {
-          completionResolve(p);
-          completionResolve = null;
-        }
+        completionResolve?.(p);
+        settleCompletion();
       },
     );
+    // If the codex subprocess dies *after* `turn/start` has returned, the
+    // pending-call rejection in rpc.ts — which only covers in-flight `call()`s
+    // — never touches this promise, so `turn/completed` can't arrive and
+    // `await completion` below would hang forever, freezing the game with no
+    // recovery. Reject the instant the subprocess exits so a mid-turn codex
+    // death surfaces as a turn error instead of an unkillable hang. (This is
+    // one of the two ways a codex turn can wedge — subprocess gone. The other,
+    // subprocess alive but stalled, e.g. codex backing off on a 429, is not
+    // covered here.)
+    const onSubprocessExit = (info: { code: number | null; signal: string | null }): void => {
+      completionReject?.(new Error(`codex app-server exited mid-turn (code=${info.code} signal=${info.signal})`));
+      settleCompletion();
+    };
+    client.once("exit", onSubprocessExit);
 
     try {
       // Empty `lastUserText` means we're resuming from history alone
@@ -1073,6 +1091,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
       unsubTokenUsage();
       unsubToolCall();
       unsubCompleted();
+      client.off("exit", onSubprocessExit);
     }
   }
 }
@@ -1730,7 +1749,7 @@ export { CodexRpcError } from "./rpc.js";
  *    router; better to surface the real codex message and let the player
  *    decide than to claim it's recoverable when it isn't.
  */
-export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schema_mismatch" | "unknown";
+export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schema_mismatch" | "rate_limited" | "unknown";
 
 /**
  * Classify a raw codex error message into a {@link CodexFailureKind}.
@@ -1745,6 +1764,28 @@ export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schem
  */
 export function classifyCodexFailure(message: string): CodexFailureKind {
   const m = message.toLowerCase();
+  // Rate limit / quota / credits exhausted. On the ChatGPT (codex) provider
+  // this is a NORMAL, expected, transient condition — the player has hit their
+  // plan's rolling window or run their credit balance to zero — so it must
+  // surface as a clean, recoverable message, never a dead-end. Checked first
+  // because the phrasings ("usage limit reached", "429", "out of credits") are
+  // distinct from the auth/model/tools cases below and we never want a quota
+  // failure misread as one of those. NOTE: codex often does NOT fail the turn
+  // on quota — it backs off and retries internally — so this classifier is the
+  // belt to the suspenders of the caller's turn-stall handling, not the only
+  // line of defense.
+  if (
+    /rate[\s_-]?limit/.test(m)
+    || /\b429\b/.test(m)
+    || /too\s*many\s*requests/.test(m)
+    || /usage\s*limit/.test(m)
+    || /\bquota\b/.test(m)
+    || /(out\s*of|insufficient|no)\s*credit/.test(m)
+    || /credit\s*balance/.test(m)
+    || /reached\s+your\s+(usage\s+)?limit/.test(m)
+  ) {
+    return "rate_limited";
+  }
   // Auth: the canonical case from issue #529 is a refresh-token rejection
   // ("Your access token could not be refreshed because your refresh token
   // was already used. Please log out and sign in again."). Also catch the

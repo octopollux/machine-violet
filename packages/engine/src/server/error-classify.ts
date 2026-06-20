@@ -60,6 +60,14 @@ export function classifyServerError(
 
 function categoryForCodexKind(kind: CodexFailureKind): ErrorCategory {
   switch (kind) {
+    case "rate_limited":
+      // Quota exhaustion is a NORMAL, transient condition on the ChatGPT
+      // provider — the window resets, or credits are topped up — so it must
+      // not look like a fault the player has to fix. "retryable" surfaces the
+      // recoverable retry overlay and keeps the in-flight session alive, so a
+      // mid-game turn that hits the limit can simply be re-sent once the
+      // window resets, with no loss of session state.
+      return "retryable";
     case "auth_expired":
     case "model_not_found":
     case "tools_schema_mismatch":
