@@ -19,7 +19,7 @@
  * the player can't escape without a relaunch.
  */
 import type { ErrorCategory, ServerEvent } from "@machine-violet/shared";
-import { CodexTurnFailedError, ChatGptAuthError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
 
 /**
  * Decide which WS error category a thrown error belongs in.
@@ -54,6 +54,14 @@ export function classifyServerError(
     // The player must re-auth in Connections; the session can't continue,
     // but the process is fine — drop to menu rather than retry (issue #558).
     return "session-fatal-recoverable";
+  }
+  if (err instanceof CodexTurnStalledError) {
+    // The stall watchdog gave up on a wedged turn (codex silent past the
+    // timeout — usually an internal 429 backoff). The turn is re-sendable once
+    // the limit clears, so keep the session alive with a retry overlay rather
+    // than dropping to menu. (Explicit even though it equals the retryable
+    // default, so a future default change can't silently reroute it.)
+    return "retryable";
   }
   return defaultCategory;
 }

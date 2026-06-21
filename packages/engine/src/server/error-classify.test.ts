@@ -13,7 +13,7 @@ import {
   performSessionFatalTeardown,
   userMessageFor,
 } from "./error-classify.js";
-import { CodexTurnFailedError, ChatGptAuthError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
 
 describe("classifyCodexFailure", () => {
   it("classifies the canonical refresh-token failure (#529) as auth_expired", () => {
@@ -106,6 +106,17 @@ describe("classifyServerError", () => {
   it("survives non-Error throws (default: retryable)", () => {
     expect(classifyServerError("a string")).toBe("retryable");
     expect(classifyServerError(null)).toBe("retryable");
+  });
+
+  it("routes CodexTurnStalledError to retryable (wedged-turn watchdog)", () => {
+    // A turn the stall watchdog gave up on (codex silent past the timeout —
+    // usually an internal 429 backoff) is re-sendable; keep the session alive.
+    const err = new CodexTurnStalledError(120_000, "thread_1");
+    expect(classifyServerError(err)).toBe("retryable");
+    // Class wins even when the caller's default is the stricter bucket.
+    expect(classifyServerError(err, "session-fatal-recoverable")).toBe("retryable");
+    // Message is user-facing and mentions the rate-limit possibility.
+    expect(userMessageFor(err)).toMatch(/rate-limited|stopped responding/i);
   });
 
   it("routes ChatGptAuthError to session-fatal-recoverable (#558)", () => {
