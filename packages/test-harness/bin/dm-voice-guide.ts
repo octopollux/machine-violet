@@ -37,7 +37,7 @@
  *   $env:OPENAI_API_KEY = [Environment]::GetEnvironmentVariable('OPENAI_API_KEY','User')
  *   node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts [slug|all]
  *
- * `slug` defaults to `the-crossroads`. `all` runs the full corpus and writes
+ * `slug` defaults to `the-naturalist`. `all` runs the full corpus and writes
  * `voice-guides/dm-voice-guides.csv`. Concurrency: env VOICE_GUIDE_CONCURRENCY
  * (default 6).
  */
@@ -436,7 +436,7 @@ async function main(): Promise<void> {
   if (arg === "all") {
     await runBatch();
   } else {
-    await runSingle(arg ?? "the-crossroads");
+    await runSingle(arg ?? "the-naturalist");
   }
 }
 
