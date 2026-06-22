@@ -933,7 +933,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     //      retrying for minutes, emitting no deltas, items, reasoning, tool
     //      calls, or completion. The watchdog below catches that.
     // The watchdog re-arms on ANY codex notification for this thread (that's
-    // `noteActivity()` on each handler) and is PAUSED for the full duration of
+    // `watchdog.note()` on each handler) and is PAUSED for the full duration of
     // every MV tool dispatch — an image render legitimately runs minutes and a
     // subagent tens of seconds, during which codex is correctly idle awaiting
     // our tool_result, so counting that as a stall would kill healthy turns. A
@@ -1036,6 +1036,16 @@ export class OpenAIChatGptProvider implements LLMProvider {
       completionResolve = resolve;
       completionReject = reject;
     });
+    // `completion` can be REJECTED before control reaches `await completion`
+    // below: the onSubprocessExit handler (registered just under) fires if
+    // codex dies while `turn/start` is still in-flight, and that `call()` will
+    // reject first, throwing us straight to `finally` without ever awaiting
+    // `completion`. A rejected promise with no handler trips Node's
+    // unhandled-rejection path. Attach a no-op rejection handler so it's always
+    // considered handled; the real awaiter below still observes the rejection
+    // (a promise can carry many handlers), and on the normal path this never
+    // fires because `completion` resolves.
+    void completion.catch(() => { /* observed by the awaiter below; this only marks it handled */ });
     const unsubCompleted = client.onNotification<TurnCompletedNotification>(
       "turn/completed",
       (p) => {

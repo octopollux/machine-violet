@@ -524,8 +524,10 @@ export class SessionManager {
     // subprocess `exit`, which releases those handles; awaiting it here closes
     // the overlap window. (Was fire-and-forget since #538, which added the
     // dispose to stop accumulating processes but never waited for it before the
-    // respawn.) dispose() catches per-provider errors internally and is bounded
-    // by rpc.stop()'s SIGTERM→SIGKILL grace, so this cannot hang or reject.
+    // respawn.) dispose() catches per-provider errors internally so the await
+    // won't reject, and rpc.stop() escalates SIGTERM→SIGKILL after 2s so in
+    // practice it settles promptly — it still awaits the process `exit` event,
+    // so the bound is "SIGKILL then exit," not a hard timeout.
     await oldSetup?.dispose();
 
     // Start the newly created campaign
