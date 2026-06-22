@@ -1,0 +1,80 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Far Marches",
+  "summary": "The last town before the wilds, and the job board is always full.",
+  "genres": [
+    "fantasy",
+    "adventure"
+  ],
+  "image_style": "PaperbackCover",
+  "mood": "Rugged and warm — frontier danger out the gate, the comfort of a town that knows your name",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nOpening scene: open IN the town, grounded in the player's chosen way-in (their fork), at a moment that puts work in front of them — arriving footsore at the gate with coin to earn, or already a known face reading the morning's new postings on the board. Establish the town as alive and lived-in and the wilds as close and dangerous, and end the opening on a concrete job or hook the player can take. Do NOT reveal the bigger threat stirring in the wilds (the crucial-question) — start with small, local, honest work; the larger shape surfaces over many jobs.",
+  "detail": "## The Far Marches — the last town before the wild\nThe Marches are the edge of the settled world: one walled frontier town, and beyond its gate a hundred miles of wilds — monster-haunted, weather-bitten, and pocked with the ruins of older things that fell long ago. The town lives off the wilds and off the people brave or desperate enough to go into them: adventurers, trappers, prospectors, relic-hunters. Work is posted on the board at the guild hall, and the work never runs out. This is a home base with your name on a tab, and a hundred miles of trouble out the gate.\n\n## The loop (the engine of the campaign)\nTake a job off the board, go out into the wilds, do the dangerous thing — clear the haunt, delve the ruin, escort the wagon, recover the lost — and come back to spend the coin, mend, and build a name. Jobs come and go; the town stays and remembers. As the player's reputation grows, bigger work opens up, and a bigger shape begins to move behind the small jobs (the crucial-question). The pleasure is the loop: risk out there, comfort and consequence back home.\n\n## The town and the wilds (location skeleton — grow more as the player moves)\nThe town (the home base):\n- **the guild hall & the job board** — the engine; where work is posted, parties form, and pay is collected.\n- **the tavern & its rooms** — the social heart; rumor, recruits, a warm bed, the regulars who know your face.\n- **the temple or shrine** — healing, and the one who patches you up and scolds you for the risks.\n- **the smithy & the market** — gear, repairs, and what your hard-won coin actually buys.\n- **the trade post & the moneylender** — supplies, debts, and the fence who values the odd things you drag back.\n- **the warden's keep & the militia** — the law such as it is, and who posts the dangerous, well-paid jobs.\n- **the palisade gate** — the hard line between safe and not.\n- **the outskirts & the farms** — where the wilds press closest, and trouble arrives first.\nThe wilds (out the gate):\n- **the wilds-edge & the road** — the near country; the starter trouble and the first easy jobs.\n- **the nearest ruin or barrow** — the doorstep dungeon, and lately it has started killing people.\n- **the deep wilds** — the dangerous interior; the bigger ruins, the worse things, the better pay.\n- **the old roads & founding-ruins** — relics of a fallen elder world that built here first (and ties to the crucial-question).\n- **the monster-haunts, the abandoned holdings, the things that should have stayed buried** — the destinations a job leads to.\n\n## DM approach\n- **Run the job board.** Always keep two or three hooks posted, of varying danger and pay; let the player choose, refuse, or haggle. The board is the heartbeat — when one job closes, a new one goes up.\n- **The town is a living home base.** Recurring NPCs who remember the player, react to their growing legend, hire them, help them, resent them, or fall for them. Build found-family among the regulars.\n- **Escalate by reputation, not a clock.** Small, local jobs early; bigger work and the deeper threat surface as the player digs in and makes a name. The wilds reward boldness and punish carelessness, honestly.\n- **Adventurous and warm, not grim.** Real danger in the wilds, real comfort in town. This is build-a-legend, not grimdark misery — setbacks and losses happen, but the through-line is the satisfaction of the work and the place.\n- **The crucial-question is the slow shape.** Behind the week-to-week jobs, something bigger is stirring in the wilds. Keep it hidden; let it surface through the jobs, the ruins, and what the player finds out there.\n\n## The town cast (found-family; some romanceable)\nSeed a couple of recurring regulars from the start and grow the cast as the player puts down roots:\n- **the guild captain** — gruff, fair, knows everyone's business and every job's catch; the player's main line to work and a steady presence. Romanceable: respect earned in the field, warming into more.\n- **the temple healer** — patches the player back together, scolds them for the risks, keeps the town's small mercies running; the town's heart. Romanceable: worry-and-warmth.\nAdd more as ties form — a rival adventurer who needles and respects them, a tavern-keeper who banks their secrets, a prospector with half a map. Romance is available but never forced; the hooks are named, the people are drawn to be wanted, and any bond grows at the player's pace.\n\nPacing: open-ended and serialized (see setup) — the job board is the rhythm, the town persists, arcs come and go. A campaign runs as long as the player keeps taking work.",
+  "forks": [
+    {
+      "id": "whats-stirring",
+      "label": "What is stirring in the wilds",
+      "chooser": "agent",
+      "prompt": "Roll or choose — the bigger shape moving behind the week-to-week jobs. Do NOT reveal early; let it surface through the jobs, the ruins, and what the player finds out there.",
+      "options": [
+        {
+          "id": "the-waking",
+          "name": "The Waking",
+          "description": "Something ancient is waking under the wilds — and the jobs are unknowingly disturbing it.",
+          "detail": "THE WAKING — An ancient thing sleeps under the Marches — a buried power, an old evil, a sealed god — and it is stirring. The jobs the player takes are unknowingly feeding it, waking it, or racing it: every ruin delved and seal broken nudges it closer. The open sandbox slowly reveals itself as a countdown the player helped start, and the town's whole reason for being — the ruins, the relics, the work — turns out to sit on top of the thing that will end it. Late game: face what all that digging woke."
+        },
+        {
+          "id": "the-tide",
+          "name": "The Tide",
+          "description": "The frontier is about to be overrun, and the town doesn't know it's the front line.",
+          "detail": "THE TIDE — Out in the deep wilds, something is massing — a horde, a migration, a war-band, a monster-tide — and it is coming for the settled world, with the town squarely in its path. The town does not yet know it is about to become the front line. The jobs accumulate evidence the player can read (refugees, fled game, scouts who do not return), and the campaign tilts from earning coin to a harder question: hold the town, evacuate it, or rally the whole frontier to meet the tide. The sandbox becomes a siege."
+        },
+        {
+          "id": "the-buried-truth",
+          "name": "The Buried Truth",
+          "description": "There is something in the founding-ruins better left buried — and the work is leading the player to it.",
+          "detail": "THE BURIED TRUTH — Deep in the elder founding-ruins is a find that should stay lost: a relic that corrupts whoever holds it, a truth that unmakes the town's founding story, a treasure that draws something far worse than bandits. The jobs are a slow trail of breadcrumbs leading the player toward a discovery they will wish they had never made — and toward the choice of what to do once they know. The town was built on this, literally or otherwise, and the digging was always going to reach it."
+        }
+      ]
+    },
+    {
+      "id": "your-place-in-the-marches",
+      "label": "Who you are in the Marches",
+      "chooser": "player",
+      "prompt": "The player picks who they are at the edge of the map — their lens on the town and the work. Each option's detail is the DM's angle: what they know, who they know, and why they're taking jobs.",
+      "options": [
+        {
+          "id": "the-newcomer",
+          "name": "The Newcomer",
+          "description": "Fresh off the road with a blade and a need for coin. The Marches are as new to you as to anyone just arrived.",
+          "detail": "THE NEWCOMER — the clean audience surrogate. Arrived footsore and broke, learning the town, the board, and the wilds as the player does. No history here and no contacts yet, everything a first impression — which makes every regular a relationship to build and every job a chance to prove themselves. Their way in is simple need: coin, a start, a name nobody knows yet."
+        },
+        {
+          "id": "the-local",
+          "name": "The Local",
+          "description": "Born in the Marches. You know the town, the near-wilds, and which jobs get people killed.",
+          "detail": "THE LOCAL — the insider lens. Grew up here; knows the town's people and feuds and the near-wilds in their bones, and took up the work for a reason (a family debt, a farm lost to the wilds, plain restlessness). Starts with contacts and local knowledge — and the complication that everyone already has an opinion about them. Their way in is home: this is their town, and the trouble out the gate is personal."
+        },
+        {
+          "id": "the-veteran",
+          "name": "The Veteran",
+          "description": "An old hand with a name already, a few scars, and maybe unfinished business out in the deep wilds.",
+          "detail": "THE VETERAN — starts respected and complicated. A known quantity with a reputation already earned, scars to show for it, and very possibly unfinished business in the deep wilds (a job that went wrong, a party that did not come back, a debt). The town defers to them and watches them both. Their way in is the work they cannot quite walk away from — and whatever they left out there."
+        },
+        {
+          "id": "the-seeker",
+          "name": "The Seeker",
+          "description": "You came to the Marches for one specific thing out in the wilds. The jobs are how you pay your way to it.",
+          "detail": "THE SEEKER — driven, with the work as a means to an end. Came to the Marches FOR something in the wilds: a person lost out there, a ruin they must reach, a debt to settle, an answer buried in the founding-ruins. The jobs fund them and inch them toward it. Their way in is the goal — and the slow discovery that the thing they came for may be tangled up in whatever is stirring out there."
+        }
+      ]
+    }
+  ],
+  "_tokens": {
+    "detail": 1092,
+    "setup_detail": 132,
+    "forks": 704,
+    "total": 2296
+  }
+}
