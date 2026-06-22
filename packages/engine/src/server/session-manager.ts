@@ -499,21 +499,36 @@ export class SessionManager {
     // reconnect after the new session is ready.
     this.broadcast({ type: "session:transition", data: { campaignId, campaignName: campaignName ?? campaignId } });
 
-    // Dispose the setup-session's tier providers before nulling the
-    // reference — otherwise an openai-chatgpt setup tier leaves its
-    // codex subprocess running for the rest of the process lifetime.
+    // Detach the setup session before nulling the reference; we dispose its
+    // tier providers below, after the bookkeeping but before the respawn.
     const oldSetup = this.setupSession;
     this.setupSession = null;
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
-    void oldSetup?.dispose();
     this.clearIdleTimer();
     this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
 
     logEvent("session:end", { reason: "setup_transition", campaignId });
+
+    // Fully tear down the setup session's codex subprocess BEFORE spawning the
+    // game session's. The two are distinct subprocesses (each tier resolution
+    // builds its own provider cache) but share one CODEX_HOME (~/.codex), and
+    // with it a single SQLite state runtime and a single-use OAuth refresh
+    // token. Letting them overlap races both: the new codex can crash on
+    // startup initializing the shared SQLite state ("disk I/O error"), or lose
+    // an OAuth refresh and 401 with "refresh token has already been used" —
+    // either way a hard failure exactly at handoff. dispose() awaits the
+    // subprocess `exit`, which releases those handles; awaiting it here closes
+    // the overlap window. (Was fire-and-forget since #538, which added the
+    // dispose to stop accumulating processes but never waited for it before the
+    // respawn.) dispose() catches per-provider errors internally so the await
+    // won't reject, and rpc.stop() escalates SIGTERM→SIGKILL after 2s so in
+    // practice it settles promptly — it still awaits the process `exit` event,
+    // so the bound is "SIGKILL then exit," not a hard timeout.
+    await oldSetup?.dispose();
 
     // Start the newly created campaign
     await this.startSession(campaignId);
