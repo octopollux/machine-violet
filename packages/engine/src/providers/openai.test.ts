@@ -1,4 +1,4 @@
-import { createOpenAIProvider } from "./openai.js";
+import { createOpenAIProvider, parseOpenAIRateLimits, rateLimitsToUsageStatus } from "./openai.js";
 import type { ChatParams, NormalizedMessage } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,17 @@ vi.mock("openai", () => {
   };
   const mockImages = {
     generate: vi.fn(),
+    edit: vi.fn(),
   };
+  // toFile is a named export the provider uses to turn reference bytes into an
+  // Uploadable for images.edit. Return a lightweight stand-in carrying the name
+  // + mime so tests can assert what was uploaded.
+  const mockToFile = vi.fn(async (data: unknown, name: string, opts?: { type?: string }) => ({
+    __file: true,
+    name,
+    type: opts?.type,
+    data,
+  }));
 
   class MockOpenAI {
     responses = mockResponses;
@@ -142,15 +152,17 @@ vi.mock("openai", () => {
 
   return {
     default: MockOpenAI,
+    toFile: mockToFile,
     __mockResponses: mockResponses,
     __mockCompletions: mockCompletions,
     __mockImages: mockImages,
+    __mockToFile: mockToFile,
   };
 });
 
 // Get the mock handles
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { __mockResponses: mockResponses, __mockCompletions: mockCompletions, __mockImages: mockImages } = await import("openai") as any;
+const { __mockResponses: mockResponses, __mockCompletions: mockCompletions, __mockImages: mockImages, __mockToFile: mockToFile } = await import("openai") as any;
 
 describe("Responses API integration", () => {
   beforeEach(() => {
@@ -1216,15 +1228,212 @@ describe("OpenAI provider.generateImage", () => {
     });
   });
 
-  it("throws when the API returns no image data", async () => {
+  it("throws when the API returns no image data (after exhausting retries)", async () => {
     mockImages.generate.mockResolvedValue({ data: [] });
 
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
     await expect(provider.generateImage!({ prompt: "x" })).rejects.toThrow(/no image data/i);
+    // Bounded retry: 3 attempts, all empty.
+    expect(mockImages.generate).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a transient empty render and succeeds on a later attempt", async () => {
+    mockImages.generate
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ b64_json: "LATER" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.generateImage!({ prompt: "x", effort: "draft", aspect: "square" });
+
+    expect(result.base64).toBe("LATER");
+    expect(mockImages.generate).toHaveBeenCalledTimes(2);
+    // The transient-empty path never touches the edit endpoint.
+    expect(mockImages.edit).not.toHaveBeenCalled();
+  });
+
+  it("conditions on reference portraits via images.edit (image-to-image)", async () => {
+    mockImages.edit.mockResolvedValue({ data: [{ b64_json: "EDITED" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    const result = await provider.generateImage!({
+      prompt: "Xera draws her blade, snarling",
+      effort: "quality",
+      aspect: "landscape",
+      referenceImages: [{ base64: "UE5H", mimeType: "image/png", label: "Xera" }],
+    });
+
+    expect(result.base64).toBe("EDITED");
+    // Reference path uses edit, NOT generate.
+    expect(mockImages.generate).not.toHaveBeenCalled();
+    // base64 → Uploadable via toFile.
+    expect(mockToFile).toHaveBeenCalledTimes(1);
+    const editArgs = mockImages.edit.mock.calls[0][0];
+    expect(editArgs.model).toBe("gpt-image-2");
+    expect(editArgs.image).toHaveLength(1);
+    expect(editArgs.quality).toBe("high");
+    expect(editArgs.size).toBe("1536x1024");
+    // The shared reference directive is appended to the edit prompt so the
+    // render takes identity from the reference but expression from the prompt.
+    expect(editArgs.prompt).toContain("Xera draws her blade, snarling");
+    expect(editArgs.prompt).toMatch(/established appearance of Xera/i);
+    expect(editArgs.prompt).toMatch(/match that character's facial features/i);
+    expect(editArgs.prompt).toMatch(/take the emotion from the description/i);
+  });
+
+  it("sends one uploadable per named reference and pluralizes the directive", async () => {
+    mockImages.edit.mockResolvedValue({ data: [{ b64_json: "EDITED" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({
+      prompt: "the party regroups",
+      referenceImages: [
+        { base64: "AAAA", mimeType: "image/png", label: "Xera" },
+        { base64: "BBBB", mimeType: "image/webp", label: "Vera" },
+      ],
+    });
+
+    const editArgs = mockImages.edit.mock.calls[0][0];
+    expect(editArgs.image).toHaveLength(2);
+    expect(editArgs.prompt).toMatch(/established appearance of Xera and Vera/i);
+    expect(editArgs.prompt).toMatch(/match their facial features/i);
   });
 
   it("omits generateImage on the Chat Completions fallback (custom providers)", () => {
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
     expect(provider.generateImage).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate-limit usage tracking
+// ---------------------------------------------------------------------------
+
+function headersWith(entries: Record<string, string>): Headers {
+  const h = new Headers();
+  for (const [k, v] of Object.entries(entries)) h.set(k, v);
+  return h;
+}
+
+/** Make responses.create() return the SDK's withResponse() shape with the given headers. */
+function mockResponsesWithHeaders(headers: Headers): void {
+  mockResponses.create.mockReturnValue({
+    withResponse: () => Promise.resolve({ data: fakeResponse(), response: { headers } }),
+  });
+}
+
+describe("parseOpenAIRateLimits", () => {
+  it("returns null when no rate-limit headers are present", () => {
+    expect(parseOpenAIRateLimits(new Headers())).toBeNull();
+  });
+
+  it("parses the four x-ratelimit headers", () => {
+    const h = headersWith({
+      "x-ratelimit-remaining-requests": "10",
+      "x-ratelimit-limit-requests": "20",
+      "x-ratelimit-remaining-tokens": "100",
+      "x-ratelimit-limit-tokens": "200",
+    });
+    expect(parseOpenAIRateLimits(h)).toEqual({
+      requestsRemaining: 10, requestsLimit: 20, tokensRemaining: 100, tokensLimit: 200,
+    });
+  });
+
+  it("fills a partial header set with zeros", () => {
+    const h = headersWith({
+      "x-ratelimit-remaining-tokens": "100",
+      "x-ratelimit-limit-tokens": "200",
+    });
+    expect(parseOpenAIRateLimits(h)).toEqual({
+      requestsRemaining: 0, requestsLimit: 0, tokensRemaining: 100, tokensLimit: 200,
+    });
+  });
+});
+
+describe("rateLimitsToUsageStatus", () => {
+  it("builds two percentage segments tagged as poll-style request-header usage", () => {
+    const status = rateLimitsToUsageStatus(
+      { requestsRemaining: 5, requestsLimit: 10, tokensRemaining: 250, tokensLimit: 1000 }, 1234,
+    );
+    expect(status).not.toBeNull();
+    expect(status!.snapshotAt).toBe(1234);
+    expect(status!.segments).toHaveLength(2);
+    expect(status!.segments[0]).toMatchObject({
+      id: "requests", kind: "percentage", usedPercent: 50, status: "ok",
+      source: "request-header", liveUpdates: false,
+    });
+    expect(status!.segments[1]).toMatchObject({ id: "tokens", usedPercent: 75, status: "ok" });
+  });
+
+  it("escalates segment status past the warning/critical thresholds", () => {
+    const status = rateLimitsToUsageStatus(
+      { requestsRemaining: 2, requestsLimit: 100, tokensRemaining: 0, tokensLimit: 0 }, 0,
+    );
+    // 98% used → critical; the absent token limit is skipped.
+    expect(status!.segments).toHaveLength(1);
+    expect(status!.segments[0]).toMatchObject({ id: "requests", status: "critical" });
+  });
+
+  it("skips a segment whose limit is zero/absent", () => {
+    const status = rateLimitsToUsageStatus(
+      { requestsRemaining: 0, requestsLimit: 0, tokensRemaining: 100, tokensLimit: 200 }, 0,
+    );
+    expect(status!.segments.map((s) => s.id)).toEqual(["tokens"]);
+  });
+
+  it("returns null when neither limit is renderable", () => {
+    expect(rateLimitsToUsageStatus(
+      { requestsRemaining: 0, requestsLimit: 0, tokensRemaining: 0, tokensLimit: 0 }, 0,
+    )).toBeNull();
+  });
+});
+
+describe("OpenAI provider.getUsageStatus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("is null before any request lands rate-limit headers", () => {
+    const provider = createOpenAIProvider({ apiKey: "k", providerId: "openai-apikey" });
+    expect(provider.getUsageStatus?.()).toBeNull();
+  });
+
+  it("captures x-ratelimit headers from a non-streaming response", async () => {
+    mockResponsesWithHeaders(headersWith({
+      "x-ratelimit-limit-requests": "100",
+      "x-ratelimit-remaining-requests": "75",
+      "x-ratelimit-limit-tokens": "1000",
+      "x-ratelimit-remaining-tokens": "500",
+    }));
+
+    const provider = createOpenAIProvider({ apiKey: "k", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams());
+
+    const usage = provider.getUsageStatus?.();
+    expect(usage).not.toBeNull();
+    expect(usage!.segments.find((s) => s.id === "requests")!.usedPercent).toBe(25);
+    expect(usage!.segments.find((s) => s.id === "tokens")!.usedPercent).toBe(50);
+  });
+
+  it("leaves the prior snapshot intact when a later response has no rate-limit headers", async () => {
+    const provider = createOpenAIProvider({ apiKey: "k", providerId: "openai-apikey" });
+
+    mockResponses.create.mockReturnValueOnce({
+      withResponse: () => Promise.resolve({
+        data: fakeResponse(),
+        response: { headers: headersWith({
+          "x-ratelimit-limit-requests": "100",
+          "x-ratelimit-remaining-requests": "90",
+        }) },
+      }),
+    });
+    await provider.chat(baseChatParams());
+
+    mockResponses.create.mockReturnValueOnce({
+      withResponse: () => Promise.resolve({ data: fakeResponse(), response: { headers: new Headers() } }),
+    });
+    await provider.chat(baseChatParams());
+
+    // Still the 10%-used snapshot from the first call.
+    expect(provider.getUsageStatus?.()!.segments.find((s) => s.id === "requests")!.usedPercent).toBe(10);
   });
 });

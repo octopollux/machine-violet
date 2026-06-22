@@ -15,9 +15,10 @@
  * as a JSON string (vs Anthropic's parsed object), different streaming
  * events, reasoning tokens, and automatic prompt caching.
  */
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import type { Response as OAIResponse } from "openai/resources/responses/responses.js";
 import type { Reasoning, ReasoningEffort } from "openai/resources/shared.js";
+import type { UsageStatus, UsageSegment, UsageSegmentStatus } from "@machine-violet/shared";
 import type {
   LLMProvider, ChatParams, ChatResult, HealthCheckResult,
   NormalizedMessage, NormalizedToolCall,
@@ -26,6 +27,7 @@ import type {
   ImageEffort, ImageAspect,
 } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
+import { buildReferenceDirective } from "./image-reference-directive.js";
 import { supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
 
@@ -66,6 +68,18 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
 
   const providerId = opts.providerId ?? "openai-apikey";
 
+  /**
+   * Most-recent rate-limit snapshot, parsed from the `x-ratelimit-*` response
+   * headers on each non-streaming chat call (see {@link captureRateLimits}).
+   * Surfaced via getUsageStatus() so the Connections UI can show remaining
+   * request/token headroom. Null until the first response carrying the headers
+   * lands. The streaming `responses.stream()` helper doesn't expose the HTTP
+   * response, so the snapshot refreshes off non-streaming calls (health check +
+   * subagent chat()), not the DM's streamed turn — mirrors anthropic's poll-style
+   * capture (`liveUpdates: false`), hence no `subscribeUsage`.
+   */
+  const rateLimitState: RateLimitState = { limits: null, capturedAt: 0 };
+
   return {
     providerId,
     getCapabilities: (model) => ({
@@ -74,9 +88,13 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
       // no `image_generation` tool, regardless of model.
       imageGeneration: useResponsesAPI(providerId) && supportsImageGeneration(model),
     }),
-    chat: (params) => openaiChat(client, providerId, params, false),
-    stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta),
+    chat: (params) => openaiChat(client, providerId, params, false, undefined, rateLimitState),
+    stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta, rateLimitState),
     healthCheck: (model) => openaiHealthCheck(client, providerId, model),
+    getUsageStatus: () =>
+      rateLimitState.limits
+        ? rateLimitsToUsageStatus(rateLimitState.limits, rateLimitState.capturedAt)
+        : null,
     // Only the Responses API path supports image generation; the Chat
     // Completions fallback (custom OpenAI-compatible endpoints) has no
     // Images API equivalent, so leave generateImage undefined there.
@@ -108,6 +126,15 @@ const ASPECT_TO_SIZE: Record<ImageAspect, "1024x1024" | "1024x1536" | "1536x1024
   landscape: "1536x1024",
 };
 
+/**
+ * Bounded attempts on a *transient* empty render — a 200 that carries no image
+ * bytes. This mirrors the codex path's single-retry on its `ImageGenNoDataError`
+ * (a fresh attempt usually lands). It does NOT cover thrown errors: the SDK
+ * already retries transient network / 5xx, so a throw out of the API call is
+ * treated as terminal.
+ */
+const MAX_IMAGE_ATTEMPTS = 3;
+
 async function openaiGenerateImage(
   client: OpenAI,
   req: GenerateImageRequest,
@@ -116,6 +143,7 @@ async function openaiGenerateImage(
   const aspect = req.aspect ?? "square";
   const quality = EFFORT_TO_QUALITY[effort];
   const size = ASPECT_TO_SIZE[aspect];
+  const references = req.referenceImages ?? [];
 
   // Diagnostic breadcrumb. The harness asserts on these.
   logEvent("image_gen:request", {
@@ -124,66 +152,103 @@ async function openaiGenerateImage(
     quality,
     size,
     intent: req.intent ?? "player_request",
+    ...(references.length > 0 ? { referenceCount: references.length } : {}),
     promptPreview: req.prompt.slice(0, 120),
   });
 
-  // We must pass `model` — OpenAI's images.generate 400s with "Missing
-  // required parameter: 'model'" when omitted (the documented defaulting
-  // only kicks in for the older dall-e-2/3 path, which doesn't accept
-  // low/medium/high quality).
+  // Image-to-image conditioning. When the DM names characters whose established
+  // look the render must match (`update_portrait`, or `generate_image` with
+  // `reference_characters`), their portraits arrive as `referenceImages`.
+  // gpt-image-2's `images.edit` endpoint conditions the render on the attached
+  // images — the same role the reference `image` input items play on the codex
+  // path. We append the shared reference directive so the edit takes identity
+  // from the reference but pose/expression/setting from the description (a
+  // portrait carries one neutral expression — see buildReferenceDirective).
+  // No references → a plain text-to-image `images.generate`.
+  const labels = references.map((r) => r.label).filter((l): l is string => !!l);
+  const prompt = req.prompt + buildReferenceDirective(labels);
+  const referenceFiles = references.length > 0
+    ? await Promise.all(
+        references.map((r, i) =>
+          toFile(Buffer.from(r.base64, "base64"), `reference-${i}.png`, { type: r.mimeType }),
+        ),
+      )
+    : null;
+
+  // We must pass `model` — OpenAI's images endpoints 400 with "Missing
+  // required parameter: 'model'" when omitted (the documented defaulting only
+  // kicks in for the older dall-e-2/3 path, which doesn't accept low/medium/high
+  // quality).
   //
-  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 /
-  // 1.5 at the same quality tiers — same call surface, sharper output,
-  // better prompt adherence. Launched 2026-04-21; SDK support added in
-  // openai@6.37. Rolling pointer rather than the dated snapshot
-  // (`gpt-image-2-2026-04-21`) so we ride future quality bumps without
-  // a code change.
-  let response: Awaited<ReturnType<typeof client.images.generate>>;
-  try {
-    response = await client.images.generate({
-      model: "gpt-image-2",
-      prompt: req.prompt,
-      quality,
-      size,
-      output_format: "png",
-      n: 1,
-    });
-  } catch (e) {
-    // Without this breadcrumb, a thrown error is invisible — the harness sees
-    // image_gen:request fire but no terminal event, then the upstream
-    // dispatcher's catch turns the throw into a tool_result with is_error
-    // and the model continues. Surface the actual error.
-    const message = e instanceof Error ? e.message : String(e);
-    const status = (e as { status?: number } | null)?.status;
-    logEvent("image_gen:error", {
-      effort,
-      aspect,
-      message: message.slice(0, 400),
-      ...(typeof status === "number" ? { status } : {}),
-    });
-    throw e;
+  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 / 1.5 at
+  // the same quality tiers — same call surface, sharper output, better prompt
+  // adherence. Launched 2026-04-21; SDK support added in openai@6.37. Rolling
+  // pointer rather than the dated snapshot (`gpt-image-2-2026-04-21`) so we ride
+  // future quality bumps without a code change.
+  for (let attempt = 1; ; attempt++) {
+    let response: Awaited<ReturnType<typeof client.images.generate>>;
+    try {
+      response = referenceFiles
+        ? await client.images.edit({
+            model: "gpt-image-2",
+            image: referenceFiles,
+            prompt,
+            quality,
+            size,
+            output_format: "png",
+            n: 1,
+          })
+        : await client.images.generate({
+            model: "gpt-image-2",
+            prompt,
+            quality,
+            size,
+            output_format: "png",
+            n: 1,
+          });
+    } catch (e) {
+      // Without this breadcrumb, a thrown error is invisible — the harness sees
+      // image_gen:request fire but no terminal event, then the upstream
+      // dispatcher's catch turns the throw into a tool_result with is_error
+      // and the model continues. Surface the actual error. Terminal — the SDK
+      // already retried transient network/5xx, so don't loop on a throw.
+      const message = e instanceof Error ? e.message : String(e);
+      const status = (e as { status?: number } | null)?.status;
+      logEvent("image_gen:error", {
+        effort,
+        aspect,
+        message: message.slice(0, 400),
+        ...(typeof status === "number" ? { status } : {}),
+      });
+      throw e;
+    }
+
+    const item = response.data?.[0];
+    if (item?.b64_json) {
+      logEvent("image_gen:response", {
+        effort,
+        aspect,
+        base64Length: item.b64_json.length,
+        ...(item.revised_prompt ? { revisedPromptPreview: item.revised_prompt.slice(0, 120) } : {}),
+      });
+      return {
+        base64: item.b64_json,
+        mimeType: "image/png",
+        ...(item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {}),
+        effortUsed: effort,
+        aspectUsed: aspect,
+      };
+    }
+
+    // A 200 with no image bytes is the transient case codex retries too. Bounded
+    // so a persistently-empty backend can't loop forever; the final miss throws
+    // for the dispatcher to turn into an is_error tool_result the DM degrades from.
+    logEvent("image_gen:no_data", { effort, aspect, attempt });
+    if (attempt >= MAX_IMAGE_ATTEMPTS) {
+      throw new Error("OpenAI images returned no image data");
+    }
+    logEvent("image_gen:retry", { effort, aspect, attempt, maxAttempts: MAX_IMAGE_ATTEMPTS });
   }
-
-  const item = response.data?.[0];
-  if (!item?.b64_json) {
-    logEvent("image_gen:no_data", { effort, aspect });
-    throw new Error("OpenAI images.generate returned no image data");
-  }
-
-  logEvent("image_gen:response", {
-    effort,
-    aspect,
-    base64Length: item.b64_json.length,
-    ...(item.revised_prompt ? { revisedPromptPreview: item.revised_prompt.slice(0, 120) } : {}),
-  });
-
-  return {
-    base64: item.b64_json,
-    mimeType: "image/png",
-    ...(item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {}),
-    effortUsed: effort,
-    aspectUsed: aspect,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -196,11 +261,12 @@ async function openaiChat(
   params: ChatParams,
   streaming: boolean,
   onDelta?: (text: string) => void,
+  rateLimitState?: RateLimitState,
 ): Promise<ChatResult> {
   if (useResponsesAPI(providerId)) {
-    return responsesChat(client, params, streaming, onDelta);
+    return responsesChat(client, params, streaming, onDelta, rateLimitState);
   }
-  return completionsChat(client, params, streaming, onDelta);
+  return completionsChat(client, params, streaming, onDelta, rateLimitState);
 }
 
 // =========================================================================
@@ -216,6 +282,7 @@ async function responsesChat(
   params: ChatParams,
   streaming: boolean,
   onDelta?: (text: string) => void,
+  rateLimitState?: RateLimitState,
 ): Promise<ChatResult> {
   const apiParams = toResponsesParams(params);
 
@@ -223,10 +290,10 @@ async function responsesChat(
     return responsesStream(client, apiParams, onDelta);
   }
 
-  const response = await client.responses.create({
-    ...apiParams,
-    stream: false,
-  });
+  const response = await awaitWithRateLimits(
+    client.responses.create({ ...apiParams, stream: false }),
+    rateLimitState,
+  );
 
   return fromResponsesResponse(response);
 }
@@ -693,6 +760,7 @@ async function completionsChat(
   params: ChatParams,
   streaming: boolean,
   onDelta?: (text: string) => void,
+  rateLimitState?: RateLimitState,
 ): Promise<ChatResult> {
   const apiParams = toOpenAIParams(params);
 
@@ -700,10 +768,10 @@ async function completionsChat(
     return completionsStream(client, apiParams, onDelta);
   }
 
-  const response = await client.chat.completions.create({
-    ...apiParams,
-    stream: false,
-  });
+  const response = await awaitWithRateLimits(
+    client.chat.completions.create({ ...apiParams, stream: false }),
+    rateLimitState,
+  );
 
   return fromOpenAIResponse(response);
 }
@@ -1007,4 +1075,156 @@ async function openaiHealthCheck(client: OpenAI, providerId: string, model?: str
     }
     return { status: "error", message: e instanceof Error ? e.message : String(e) };
   }
+}
+
+// =========================================================================
+// Rate-limit usage tracking
+// =========================================================================
+//
+// Mirrors the anthropic provider's `anthropic-ratelimit-*` handling: parse the
+// per-response rate-limit headers, keep the latest snapshot, and render it via
+// getUsageStatus() through the same generic UsageStatus shape + thresholds the
+// Connections UI uses for every provider. NOTE: OpenAI's API key exposes only
+// *rate* limits (requests/tokens per minute), not a plan-usage window like the
+// ChatGPT/codex path — so the signal is "headroom on the current minute", the
+// most the API key gives us.
+
+/** Parsed `x-ratelimit-*` snapshot. */
+interface OpenAIRateLimits {
+  requestsRemaining: number;
+  requestsLimit: number;
+  tokensRemaining: number;
+  tokensLimit: number;
+}
+
+/** Mutable provider-scoped holder for the latest snapshot + when it landed. */
+interface RateLimitState {
+  limits: OpenAIRateLimits | null;
+  /** Epoch ms when `limits` was observed (used as the UsageStatus snapshotAt). */
+  capturedAt: number;
+}
+
+// Thresholds mirror the openai-chatgpt + anthropic providers so every provider's
+// usage segments colour on one scale.
+const RATE_LIMIT_WARNING_THRESHOLD = 80;
+const RATE_LIMIT_CRITICAL_THRESHOLD = 95;
+
+function rateLimitSegmentStatus(usedPercent: number): UsageSegmentStatus {
+  if (usedPercent >= 100) return "exceeded";
+  if (usedPercent >= RATE_LIMIT_CRITICAL_THRESHOLD) return "critical";
+  if (usedPercent >= RATE_LIMIT_WARNING_THRESHOLD) return "warning";
+  return "ok";
+}
+
+/**
+ * Parse the four `x-ratelimit-*` rate-limit headers into a snapshot, or null
+ * when none are present (OpenRouter / custom endpoints may omit them, and a
+ * mocked client may set none). A partial set fills missing values with 0, which
+ * a later 0-limit guard suppresses rather than rendering as a bogus 0%. Accepts
+ * any `{ get }` so a fetch `Headers` and a test stub both work. Exported for tests.
+ */
+export function parseOpenAIRateLimits(
+  headers: { get(name: string): string | null },
+): OpenAIRateLimits | null {
+  const reqRemaining = headers.get("x-ratelimit-remaining-requests");
+  const reqLimit = headers.get("x-ratelimit-limit-requests");
+  const tokRemaining = headers.get("x-ratelimit-remaining-tokens");
+  const tokLimit = headers.get("x-ratelimit-limit-tokens");
+  if (reqRemaining == null && reqLimit == null && tokRemaining == null && tokLimit == null) {
+    return null;
+  }
+  return {
+    requestsRemaining: Number(reqRemaining ?? 0),
+    requestsLimit: Number(reqLimit ?? 0),
+    tokensRemaining: Number(tokRemaining ?? 0),
+    tokensLimit: Number(tokLimit ?? 0),
+  };
+}
+
+/**
+ * A `remaining`/`limit` pair is renderable only with a finite positive limit
+ * and a finite remaining — guards against a partial/garbage header set producing
+ * a misleading 0% / NaN segment.
+ */
+function isRenderableLimit(remaining: number, limit: number): boolean {
+  return Number.isFinite(limit) && limit > 0 && Number.isFinite(remaining);
+}
+
+function hasRenderableLimits(l: OpenAIRateLimits): boolean {
+  return isRenderableLimit(l.requestsRemaining, l.requestsLimit)
+    || isRenderableLimit(l.tokensRemaining, l.tokensLimit);
+}
+
+/**
+ * Store the parsed snapshot when a response carries *usable* rate-limit headers.
+ * A header-less or malformed response leaves the prior snapshot intact, so a
+ * stray response can't blank the UI (or overwrite a good snapshot with junk)
+ * between turns.
+ */
+function captureRateLimits(
+  headers: { get(name: string): string | null } | null | undefined,
+  state: RateLimitState,
+): void {
+  if (!headers) return;
+  const parsed = parseOpenAIRateLimits(headers);
+  if (parsed && hasRenderableLimits(parsed)) {
+    state.limits = parsed;
+    state.capturedAt = Date.now();
+  }
+}
+
+/**
+ * Build the generic {@link UsageStatus} from a snapshot: up to two `percentage`
+ * segments (requests, tokens). A segment without a finite positive limit + finite
+ * remaining is skipped rather than rendered as a misleading 0% / NaN; if neither
+ * is usable the result is null so the UI shows no usage line. `liveUpdates: false`
+ * — captured per non-streaming response (poll-style), not pushed. Exported for tests.
+ */
+export function rateLimitsToUsageStatus(
+  limits: OpenAIRateLimits,
+  snapshotAtMs: number,
+): UsageStatus | null {
+  const segments: UsageSegment[] = [];
+  const addSegment = (id: string, label: string, remaining: number, limit: number): void => {
+    if (!isRenderableLimit(remaining, limit)) return;
+    const used = Math.max(0, limit - remaining);
+    const usedPercent = Math.max(0, Math.min(100, (used / limit) * 100));
+    segments.push({
+      id,
+      label,
+      kind: "percentage",
+      usedPercent,
+      status: rateLimitSegmentStatus(usedPercent),
+      detail: `${Math.max(0, remaining).toLocaleString()} of ${limit.toLocaleString()} remaining`,
+      // Captured per-response (poll-style), not pushed — so the UI knows not to
+      // expect live updates between its refreshes.
+      liveUpdates: false,
+      source: "request-header",
+    });
+  };
+  addSegment("requests", "Requests", limits.requestsRemaining, limits.requestsLimit);
+  addSegment("tokens", "Tokens", limits.tokensRemaining, limits.tokensLimit);
+  if (segments.length === 0) return null;
+  return { segments, snapshotAt: snapshotAtMs, fresh: true };
+}
+
+/**
+ * Await an OpenAI APIPromise and opportunistically capture rate-limit headers
+ * off its raw HTTP response. The real SDK `APIPromise` exposes `.withResponse()`;
+ * test mocks that resolve a plain object don't — in which case we just await the
+ * value and skip capture. Only the non-streaming chat paths use this: the
+ * streaming `responses.stream()` helper doesn't surface the HTTP response.
+ */
+async function awaitWithRateLimits<T>(
+  call: PromiseLike<T> & {
+    withResponse?: () => Promise<{ data: T; response: { headers: { get(name: string): string | null } } }>;
+  },
+  state: RateLimitState | undefined,
+): Promise<T> {
+  if (state && typeof call.withResponse === "function") {
+    const { data, response } = await call.withResponse();
+    captureRateLimits(response.headers, state);
+    return data;
+  }
+  return await call;
 }
