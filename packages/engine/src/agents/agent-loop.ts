@@ -195,7 +195,7 @@ async function runAgentLoopInternal(
         properties: {
           prompt: {
             type: "string",
-            description: "Vivid description of the image to render, including any in-image caption text.",
+            description: "Vivid description of the image to render, including any in-image caption text. For every character in frame, state their facial expression and body language for this moment (teeth bared in a snarl, eyes wide with terror, a weary half-smile) — a portrait reference carries only one neutral expression, so the scene's emotion has to be named explicitly or it won't appear.",
           },
           effort: {
             type: "string",
@@ -215,7 +215,7 @@ async function runAgentLoopInternal(
           reference_characters: {
             type: "array",
             items: { type: "string" },
-            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
+            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. The portrait fixes identity, build, and outfit — NOT expression or pose, so always describe the character's facial expression for this moment in `prompt`, or the render inherits the portrait's neutral expression. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
           },
         },
         required: ["prompt", "effort", "aspect"],
