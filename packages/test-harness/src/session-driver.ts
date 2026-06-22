@@ -40,6 +40,7 @@ import { join, dirname } from "node:path";
 
 import { buildLaunchEnv, pickEphemeralPort, LAUNCHER_NODE_ARGS } from "./launch-env.js";
 import { choiceLabel, type ClientStateSnapshot, type ActiveChoices } from "./client-state.js";
+import type { RecordedInput, FullStackGolden } from "./golden.js";
 
 // ---------------------------------------------------------------------------
 // Session file
@@ -69,6 +70,12 @@ interface SessionFile {
   lastCampaignId: string | null;
   /** Tape scenario name if this session is recording (MV_TAPE_MODE=record), else null. */
   recording: string | null;
+  /**
+   * Ordered player input ops captured while recording (key/say/pick), written
+   * into the golden envelope by `saveTape` so a replay is self-driving. Only
+   * populated when `recording` is set.
+   */
+  inputs?: RecordedInput[];
 }
 
 function readSession(): SessionFile | null {
@@ -343,6 +350,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     lastTurnSeq: null,
     lastCampaignId: null,
     recording: opts.record ?? null,
+    inputs: opts.record ? [] : undefined,
   };
 
   // Wait for the sidecar to answer.
@@ -453,6 +461,7 @@ export async function say(text: string): Promise<void> {
     await submit();
     ok = await inputAccepted(s, baseline, 4000);
   }
+  if (ok && s.recording) (s.inputs ??= []).push({ kind: "say", text });
   writeSession(s);
 
   if (ok) {
@@ -470,6 +479,7 @@ export async function say(text: string): Promise<void> {
 export async function key(name: string): Promise<void> {
   const s = requireSession();
   await postKey(s, name);
+  if (s.recording) { (s.inputs ??= []).push({ kind: "key", name }); writeSession(s); }
   process.stdout.write(`✔ key: ${name}\n`);
 }
 
@@ -526,6 +536,7 @@ export async function pick(query: string): Promise<void> {
     await submit();
     ok = await inputAccepted(s, baseline, 4000);
   }
+  if (ok && s.recording) (s.inputs ??= []).push({ kind: "pick", index, label: labels[index] });
   writeSession(s);
 
   if (ok) {
@@ -685,9 +696,11 @@ export async function status(): Promise<void> {
 
 /**
  * Pull the session tape recorded so far (via the engine's dev-only `GET /tape`)
- * and write it to `outPath` as a golden `{ scenario, tape, expectedNarrative }`,
- * where `expectedNarrative` is the DM/non-player narrative captured this session
- * — the deterministic replay target. The session must have been started with
+ * and write it to `outPath` as a {@link FullStackGolden}
+ * `{ scenario, tape, expectedNarrative, inputs }`, where `expectedNarrative` is
+ * the DM/non-player narrative captured this session (the deterministic replay
+ * target) and `inputs` is the ordered key/say/pick sequence that drove it (so
+ * the replay is self-driving). The session must have been started with
  * `mvplay record <scenario>`; pull the tape BEFORE `mvplay stop`, since teardown
  * force-kills the engine and its in-memory tape with it.
  */
@@ -714,21 +727,28 @@ export async function saveTape(outPath: string): Promise<void> {
     );
   }
 
-  // Capture the narrative produced this session as the replay assertion target.
+  // Capture the DM narration as the replay assertion target. Only `dm` lines:
+  // they're the player-facing narrative and are reproduced verbatim from the
+  // tape on replay. Deliberately excludes `dev` breadcrumbs (scribe/theme
+  // logs carry environment-specific absolute paths and are dev-only) and
+  // `player` echoes (the replay re-issues inputs, but say-retries can double
+  // the echoed text). `spacer`/`separator` are structural noise.
   let expectedNarrative: string[] = [];
   try {
     const snap = await getState(s);
     expectedNarrative = snap.narrativeLines
-      .filter((l) => l.kind !== "player")
+      .filter((l) => l.kind === "dm")
       .map((l) => l.text);
   } catch { /* tape alone is still useful */ }
 
-  const golden = { scenario: s.recording, tape, expectedNarrative };
+  const inputs = s.inputs ?? [];
+  const golden: FullStackGolden = { scenario: s.recording, tape, expectedNarrative, inputs };
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(golden, null, 2) + "\n");
   process.stdout.write(
     `✔ saved golden "${s.recording}" → ${outPath}\n` +
-    `  (${expectedNarrative.length} narrative lines captured; review the diff before committing)\n`,
+    `  (${expectedNarrative.length} narrative lines, ${inputs.length} input ops captured; ` +
+    `review the diff before committing)\n`,
   );
 }
 

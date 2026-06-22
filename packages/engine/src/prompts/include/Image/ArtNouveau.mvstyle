@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "ArtNouveau"
+rating: "D"
+description: "Decorative Art Nouveau poster with sinuous linework, flat period pigments, ornament, and burnished gold-leaf borders"
+tags: [illustration, period, muted, romantic, portrait]
+made-for-model: gpt-image-2
+tokens: 244
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a decorative ART NOUVEAU illustration in the turn-of-the-century poster tradition — flowing organic line work and flat decorative colour, executed in PERIOD-ACCURATE materials. Strict process discipline: draw the forms with confident, elegant, sinuous outlines of even weight; fill them with FLAT areas of muted period pigment — a restrained turn-of-the-century palette of sage and olive green, dusty mauve and rose, ochre, soft peacock blue and ivory, with no garish modern hues — and ornamental stylised patterns in the hair, drapery and foliage. Lavish real burnished GOLD LEAF on the decorative elements: the ornamental border, a halo behind the figure, sky accents and key patterns, raised and tooled, catching the light with a soft metallic sheen and a faint crackle. Compose with a strong decorative flat design and an ornamental gilt border framing the image; a clear focal figure, the background simplified into flat decorative shapes and pattern. Elegant, ornate, flat, gilded, decorative. Close with a small tasteful caption in elegant lettering set into a gilt cartouche or the border.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A decorative ART NOUVEAU illustration (turn-of-the-century poster tradition) with PERIOD-ACCURATE pigments + burnished GOLD LEAF — the user's enhancement, a clear win over the plain first cut. THREE anti-tic levers, all positive: (1) the ORNAMENT IS THE CONTROLLED DETAIL — the model's detail-drive pours into INTENTIONAL stylised pattern (the border, hair, drapery, foliage) instead of reflexive scene-cram (the density-as-feature lever, cf. [Blockbook](./Blockbook.mvstyle) / [Risograph](./Risograph.mvstyle): when the model WILL cram, give it intentional ornament to cram into); (2) GOLD LEAF = big flat lustrous restful areas (the [GildedVellum](./GildedVellum.mvstyle) gold-as-rest lever); (3) FLAT decorative colour + a muted PERIOD limited palette = economy. The tradition/era is described GENERICALLY (Art Nouveau / turn-of-the-century poster) — name no artist (the genre evokes a famous poster artist; convey the tradition, not the artist — see docs/seed-authoring.md on no artist imitation). Caption = elegant lettering in a gilt cartouche or the ornamental border. A beautiful, ornate, romantic / mythic register. Validated on the Xera dusk scene. Keep the sinuous linework, the flat period pigments, the gold leaf, and the ornamental gilt border + cartouche caption.
+
+# Example
+
+![ArtNouveau](../ImageStyleExample/ArtNouveau.example.png)

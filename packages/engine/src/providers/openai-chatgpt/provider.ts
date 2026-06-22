@@ -40,6 +40,7 @@ import { readFile, readdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { CodexRpcClient } from "./rpc.js";
+import { StallWatchdog } from "./stall-watchdog.js";
 import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
@@ -215,6 +216,25 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.startPromise = null;
     await rpc.stop();
   }
+
+  /**
+   * How long a regular (non-image) codex turn may go COMPLETELY silent — no
+   * deltas, items, reasoning, tool calls, or `turn/completed` — before the
+   * per-turn stall watchdog gives up and rejects with {@link
+   * CodexTurnStalledError}. Generous on purpose: a healthy turn streams
+   * reasoning-summary deltas within seconds (we request `summary: "detailed"`),
+   * and the watchdog is PAUSED for the whole of any MV tool dispatch (image
+   * render, subagent), so this only ever measures codex itself going dark while
+   * it owes us a turn. The dominant trigger is codex backing off internally on
+   * a persistent rate-limit (429) and never returning — codex is built to run
+   * unattended and won't surface that as a failure, so without this the turn
+   * hangs until the rate window resets (potentially ~an hour), freezing the
+   * game. 120s converts that into a clean, retryable error while sitting far
+   * above any plausible quiet stretch of a live turn. (Distinct from the image
+   * render cap, which is a flat 10-min give-up on a nested render that is
+   * legitimately slow — see {@link IMAGE_RENDER_TIMEOUT_MS}.)
+   */
+  private static readonly TURN_STALL_TIMEOUT_MS = 120_000;
 
   // -----------------------------------------------------------------------
   // Image generation
@@ -901,25 +921,58 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // assistant output and resolving `completion` on the wrong turn.
     const collected = new TurnCollector(onDelta);
     const forThisThread = (p: { threadId: string }): boolean => p.threadId === threadId;
+
+    // --- Turn completion future + tool-aware stall watchdog ---
+    // `completion` resolves on `turn/completed` FOR THIS THREAD ONLY (see the
+    // thread-filter rationale above). Two things can stop it ever resolving and
+    // freeze the game on `await completion` below; both are converted into a
+    // thrown error instead of an unbounded hang:
+    //   1. The subprocess dies mid-turn (handled by onSubprocessExit, below).
+    //   2. codex stays ALIVE but goes completely silent — the usual cause is
+    //      codex backing off internally on a persistent rate-limit (429) and
+    //      retrying for minutes, emitting no deltas, items, reasoning, tool
+    //      calls, or completion. The watchdog below catches that.
+    // The watchdog re-arms on ANY codex notification for this thread (that's
+    // `watchdog.note()` on each handler) and is PAUSED for the full duration of
+    // every MV tool dispatch — an image render legitimately runs minutes and a
+    // subagent tens of seconds, during which codex is correctly idle awaiting
+    // our tool_result, so counting that as a stall would kill healthy turns. A
+    // depth counter (not a flag) keeps the pause correct under concurrent tool
+    // calls. So the only thing it ultimately measures is codex itself going
+    // dark while it owes us a turn.
+    let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
+    let completionReject: ((e: Error) => void) | null = null;
+    const settleCompletion = (): void => {
+      completionResolve = null;
+      completionReject = null;
+    };
+    const watchdog = new StallWatchdog(
+      OpenAIChatGptProvider.TURN_STALL_TIMEOUT_MS,
+      () => {
+        completionReject?.(new CodexTurnStalledError(OpenAIChatGptProvider.TURN_STALL_TIMEOUT_MS, threadId));
+        settleCompletion();
+      },
+    );
+
     const unsubAgentDelta = client.onNotification<AgentMessageDeltaNotification>(
       "item/agentMessage/delta",
-      (p) => { if (forThisThread(p)) collected.onAgentMessageDelta(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onAgentMessageDelta(p); },
     );
     const unsubItemStarted = client.onNotification<ItemStartedNotification>(
       "item/started",
-      (p) => { if (forThisThread(p)) collected.onItemStarted(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onItemStarted(p); },
     );
     const unsubItemCompleted = client.onNotification<ItemCompletedNotification>(
       "item/completed",
-      (p) => { if (forThisThread(p)) collected.onItemCompleted(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onItemCompleted(p); },
     );
     const unsubReasoning = client.onNotification<AgentMessageDeltaNotification>(
       "item/reasoning/textDelta",
-      (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onReasoningDelta(p); },
     );
     const unsubReasoningSummary = client.onNotification<AgentMessageDeltaNotification>(
       "item/reasoning/summaryTextDelta",
-      (p) => { if (forThisThread(p)) collected.onReasoningDelta(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onReasoningDelta(p); },
     );
     // We subscribe to `rawResponseItem/completed` for the #597 tripwire only —
     // NOT to capture reasoning for replay. codex emits no usable encrypted
@@ -929,11 +982,11 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // from a future account type that does emit them.
     const unsubRawItem = client.onNotification<RawResponseItemCompletedNotification>(
       "rawResponseItem/completed",
-      (p) => { if (forThisThread(p)) collected.onRawResponseItem(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onRawResponseItem(p); },
     );
     const unsubTokenUsage = client.onNotification<TokenUsageUpdatedNotification>(
       "thread/tokenUsage/updated",
-      (p) => { if (forThisThread(p)) collected.onTokenUsage(p); },
+      (p) => { if (!forThisThread(p)) return; watchdog.note(); collected.onTokenUsage(p); },
     );
 
     // Tool dispatch: install a per-thread dispatcher into the provider's
@@ -943,6 +996,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     //   { success: boolean, contentItems: [{type:"inputText", text}] }
     const dispatchForThread: ThreadToolDispatcher = async (call) => {
       collected.onToolCall(call);
+      watchdog.note();
       const dispatcher = params.dispatchTool;
       if (!dispatcher) {
         // Should be unreachable — we guarded above when tools is set.
@@ -951,6 +1005,11 @@ export class OpenAIChatGptProvider implements LLMProvider {
           contentItems: [{ type: "inputText", text: "no dispatchTool configured" }],
         };
       }
+      // Pause the stall watchdog for the whole dispatch: a tool call (image
+      // render up to ~10 min, a subagent, etc.) legitimately runs long while
+      // codex sits idle awaiting our reply, and that idleness must not read as
+      // a wedged turn.
+      watchdog.enterToolDispatch();
       try {
         const result = await dispatcher(call);
         return {
@@ -963,27 +1022,52 @@ export class OpenAIChatGptProvider implements LLMProvider {
           success: false,
           contentItems: [{ type: "inputText", text: `tool dispatch failed: ${msg}` }],
         };
+      } finally {
+        watchdog.exitToolDispatch();
       }
     };
     this.toolDispatchers.set(threadId, dispatchForThread);
     const unsubToolCall = (): void => { this.toolDispatchers.delete(threadId); };
 
-    // Turn completion future — resolves on `turn/completed` notification
-    // FOR THIS THREAD ONLY (see thread-filter rationale above).
-    let completionResolve: ((p: TurnCompletedNotification) => void) | null = null;
-    const completion = new Promise<TurnCompletedNotification>((resolve) => {
+    // Turn completion future — resolves on `turn/completed` notification FOR
+    // THIS THREAD ONLY (see thread-filter rationale above). State + watchdog
+    // helpers were declared with the stall-watchdog block above.
+    const completion = new Promise<TurnCompletedNotification>((resolve, reject) => {
       completionResolve = resolve;
+      completionReject = reject;
     });
+    // `completion` can be REJECTED before control reaches `await completion`
+    // below: the onSubprocessExit handler (registered just under) fires if
+    // codex dies while `turn/start` is still in-flight, and that `call()` will
+    // reject first, throwing us straight to `finally` without ever awaiting
+    // `completion`. A rejected promise with no handler trips Node's
+    // unhandled-rejection path. Attach a no-op rejection handler so it's always
+    // considered handled; the real awaiter below still observes the rejection
+    // (a promise can carry many handlers), and on the normal path this never
+    // fires because `completion` resolves.
+    void completion.catch(() => { /* observed by the awaiter below; this only marks it handled */ });
     const unsubCompleted = client.onNotification<TurnCompletedNotification>(
       "turn/completed",
       (p) => {
         if (!forThisThread(p)) return;
-        if (completionResolve) {
-          completionResolve(p);
-          completionResolve = null;
-        }
+        completionResolve?.(p);
+        settleCompletion();
       },
     );
+    // If the codex subprocess dies *after* `turn/start` has returned, the
+    // pending-call rejection in rpc.ts — which only covers in-flight `call()`s
+    // — never touches this promise, so `turn/completed` can't arrive and
+    // `await completion` below would hang forever, freezing the game with no
+    // recovery. Reject the instant the subprocess exits so a mid-turn codex
+    // death surfaces as a turn error instead of an unkillable hang. (This is
+    // one of the two ways a codex turn can wedge — subprocess gone. The other,
+    // subprocess alive but stalled, e.g. codex backing off on a 429, is not
+    // covered here.)
+    const onSubprocessExit = (info: { code: number | null; signal: string | null }): void => {
+      completionReject?.(new Error(`codex app-server exited mid-turn (code=${info.code} signal=${info.signal})`));
+      settleCompletion();
+    };
+    client.once("exit", onSubprocessExit);
 
     try {
       // Empty `lastUserText` means we're resuming from history alone
@@ -1019,6 +1103,13 @@ export class OpenAIChatGptProvider implements LLMProvider {
       log.turnStart({ threadId, effort: turnReq.effort });
       const turnStart = await client.call<{ turn: { id: string } }>("turn/start", turnReq);
       const turnId = turnStart.turn.id;
+
+      // Arm the stall watchdog now that the turn is running. A turn that goes
+      // silent from the very first instant (e.g. codex hits a 429 before
+      // emitting anything) produces no notifications to re-arm it, so the
+      // initial arm here is what bounds that case; subsequent codex activity
+      // resets it via watchdog.note().
+      watchdog.note();
 
       const completed = await completion;
       const errorMessage = completed.turn.error?.message ?? null;
@@ -1073,6 +1164,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
       unsubTokenUsage();
       unsubToolCall();
       unsubCompleted();
+      client.off("exit", onSubprocessExit);
+      watchdog.clear();
     }
   }
 }
@@ -1730,7 +1823,7 @@ export { CodexRpcError } from "./rpc.js";
  *    router; better to surface the real codex message and let the player
  *    decide than to claim it's recoverable when it isn't.
  */
-export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schema_mismatch" | "unknown";
+export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schema_mismatch" | "rate_limited" | "unknown";
 
 /**
  * Classify a raw codex error message into a {@link CodexFailureKind}.
@@ -1745,6 +1838,28 @@ export type CodexFailureKind = "auth_expired" | "model_not_found" | "tools_schem
  */
 export function classifyCodexFailure(message: string): CodexFailureKind {
   const m = message.toLowerCase();
+  // Rate limit / quota / credits exhausted. On the ChatGPT (codex) provider
+  // this is a NORMAL, expected, transient condition — the player has hit their
+  // plan's rolling window or run their credit balance to zero — so it must
+  // surface as a clean, recoverable message, never a dead-end. Checked first
+  // because the phrasings ("usage limit reached", "429", "out of credits") are
+  // distinct from the auth/model/tools cases below and we never want a quota
+  // failure misread as one of those. NOTE: codex often does NOT fail the turn
+  // on quota — it backs off and retries internally — so this classifier is the
+  // belt to the suspenders of the caller's turn-stall handling, not the only
+  // line of defense.
+  if (
+    /rate[\s_-]?limit/.test(m)
+    || /\b429\b/.test(m)
+    || /too\s*many\s*requests/.test(m)
+    || /usage\s*limit/.test(m)
+    || /\bquota\b/.test(m)
+    || /(out\s*of|insufficient|no)\s*credit/.test(m)
+    || /credit\s*balance/.test(m)
+    || /reached\s+your\s+(usage\s+)?limit/.test(m)
+  ) {
+    return "rate_limited";
+  }
   // Auth: the canonical case from issue #529 is a refresh-token rejection
   // ("Your access token could not be refreshed because your refresh token
   // was already used. Please log out and sign in again."). Also catch the
@@ -1810,6 +1925,31 @@ export class CodexTurnFailedError extends Error {
     super(`Codex turn ${turnId} failed: ${codexMessage}`);
     this.name = "CodexTurnFailedError";
     this.kind = classifyCodexFailure(codexMessage);
+  }
+}
+
+/**
+ * Thrown by {@link OpenAIChatGptProvider} when a codex turn goes completely
+ * silent past the stall watchdog — no deltas, items, reasoning, tool calls, or
+ * `turn/completed`, while NOT inside an MV tool dispatch. The usual cause is
+ * codex backing off internally on a persistent rate-limit (429) and never
+ * returning; without this the turn would hang indefinitely and freeze the game.
+ *
+ * Distinct from {@link CodexTurnFailedError}, which means codex itself reported
+ * `status: "failed"`: here codex reported *nothing* and MV gave up. Routed to
+ * `retryable` by {@link classifyServerError} — the turn is re-sendable once the
+ * limit clears, so keep the session alive rather than dropping to menu. The
+ * `.message` is user-facing; keep it actionable.
+ */
+export class CodexTurnStalledError extends Error {
+  constructor(
+    public readonly idleMs: number,
+    public readonly threadId: string,
+  ) {
+    super(
+      `The model stopped responding for ${Math.round(idleMs / 1000)}s — it may be rate-limited or temporarily unavailable. Your turn wasn't lost; try again in a moment.`,
+    );
+    this.name = "CodexTurnStalledError";
   }
 }
 

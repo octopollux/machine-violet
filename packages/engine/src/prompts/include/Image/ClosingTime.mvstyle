@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Closing Time"
+rating: "?"
+description: "Closing Time campaign look: Kodachrome by default, CandlelitNatural for quiet scenes inside the shop, Chiaroscuro for dark crisis scenes"
+tags: [film-stock, motion-picture, warm, intimate, dread]
+made-for-model: gpt-image-2
+tokens: 444
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** Kodachrome look below. **Quiet scenes inside the shop** use the candlelit look. **Dark crisis scenes** use the chiaroscuro look.
+
+# Style
+
+Default (most scenes) — `Rendered as a photograph shot on Kodachrome — the legendary archival colour slide film with the timeless "National Geographic" look. Kodachrome's signature: rich, deep, slightly warm colour with famously luminous REDS and warm earth tones, natural but saturated greens and blues, beautiful skin tones, high microcontrast and crisp sharpness, extremely fine grain, and a subtle warm golden cast. A nostalgic, richly-toned, timeless mid-century photographic look. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+Quiet scenes inside the shop — `Rendered as a frame from a film shot ENTIRELY BY NATURAL CANDLELIGHT on specially-made ultra-fast large-aperture lenses — NOT artificially lit. The technique's signature: a soft, warm, low-light interior glow with light falling off naturally into gentle shadow; an extremely SHALLOW depth of field with a delicate focus plane and creamy soft backgrounds (the cost of the wide-open fast lens); a painterly old-master composition like a period oil portrait; warm candle-amber colour, fine grain, and a still, quiet, contemplative atmosphere. Natural, painterly, intimate, luminous. Close with a small caption in an elegant period font.`
+
+Crisis scenes, dark — `Rendered as a frame lit with extreme low-key CHIAROSCURO from a single source — the boldly UNDEREXPOSED, top-lit cinematography technique. The signature: deep, dominant BLACK shadow swallowing most of the frame; a single hard pool of warm amber light from above falling on the subject, the eyes and lower face often dropping into shadow; very high contrast; rich warm low-key colour; and an intense, operatic, dread-laden mood. Dark, sculpted, amber, dramatic. Close with a small caption in an elegant font.`
+
+# Notes
+
+Campaign composite for the **closing-time** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [Kodachrome](./Kodachrome.mvstyle) (warm archival slide-film — the campaign-wide workhorse). SHOP QUIET = [CandlelitNatural](./CandlelitNatural.mvstyle) (natural-candlelight interior glow, ultra-shallow focus). DARK CRISIS = [Chiaroscuro](./Chiaroscuro.mvstyle) (single-source amber-in-black, operatic dread). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![Kodachrome](../ImageStyleExample/Kodachrome.example.png)
+![CandlelitNatural](../ImageStyleExample/CandlelitNatural.example.png)
+![Chiaroscuro](../ImageStyleExample/Chiaroscuro.example.png)

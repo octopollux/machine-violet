@@ -1586,7 +1586,10 @@ export class GameEngine {
         const result = await generateImage({
           prompt: buildPortraitRevisionPrompt(name, change),
           effort: "standard",
-          aspect: "portrait",
+          // The canonical portrait is the multi-angle landscape reference
+          // sheet from setup; re-render in landscape so the revision keeps
+          // that three-view layout rather than cropping to a single pose.
+          aspect: "landscape",
           intent: "character_portrait",
           referenceImages,
         });

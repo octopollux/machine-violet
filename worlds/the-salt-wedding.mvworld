@@ -7,6 +7,7 @@
     "fantasy",
     "mystery"
   ],
+  "image_style": "TheSaltWedding",
   "campaign_scope": "few-sessions",
   "mood": "Tense, salt-and-candlelight",
   "difficulty": "Balanced",
@@ -190,5 +191,11 @@
     "current": 1170,
     "epoch": "The night of the Salt Wedding",
     "display_format": "fantasy"
+  },
+  "_tokens": {
+    "detail": 218,
+    "setup_detail": 0,
+    "forks": 184,
+    "total": 1626
   }
 }

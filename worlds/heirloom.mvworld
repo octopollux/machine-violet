@@ -10,6 +10,7 @@
     "sci-fi",
     "comedy"
   ],
+  "image_style": "Heirloom",
   "setup_detail": "Opening scene: open on the arrival, before any of the mystery has shown itself — the player reaching the house, meeting the nervous lawyer, the keys, a first walk through unfamiliar rooms that feel faintly, unplaceably wrong. The house should read as just an old house with an odd atmosphere, nothing more. The secret you selected for this campaign must NOT appear or be hinted in the opening scene — not the nature of the locked room, not what grandma really was. This is a deliberate slow burn; the opening's only job is to get the player in the door.",
   "detail": "The player inherits a house from a grandmother they barely knew — or knew differently than they thought. The house is large, old, full of things that don't quite make sense. The fortune is real and raises questions about where it came from. The locked room has the player's name on it — not a label, their actual handwriting, though they've never been here. The room is the campaign's destination, not its opening — it stays locked through a long, deliberate first stretch of play.\n\nThe grandmother: She was formidable, private, and not what she appeared. The neighbors respected her. The lawyer handling the estate is nervous. There are photographs in the house of people the player doesn't recognize in places that don't exist. Grandma had a life — a big one — and she kept it from the family.\n\nDM approach — this is a slow burn, and the discipline that makes it work is resisting your own urge to deliver the payoff early:\n- The early game is not you withholding a secret; it has its own content. Getting to know a dead woman through what she left behind — her books, her taste, her habits, the wear in the floorboards, the neighbors' half-stories, photographs of people in places that don't exist. There is a whole campaign in the house before the room ever opens. Play it.\n- Reveal in grades. Each scene adds at most one new edge — a detail that raises a question — and rarely an answer. Let the player accumulate a pile of edges long before they come near the center.\n- The locked room takes many scenes to become reachable, and the delay must feel motivated, never arbitrary: a missing key, a lock that resists, a condition in the will, something the lawyer won't explain. Don't open it until the player has earned it — until they could describe who grandma was without your help, and the wanting-in has become real. If you're unsure it's time, it isn't.\n- When it finally opens, they should feel they knew her — and then be surprised.\n\nThree acts, the first one long: settling in (the lawyer, the keys, the first walk through a house that somehow smells like someone the player remembers, the slow realization that it has secrets); then pursuing those secrets and learning who grandma really was; then the room, and the choice — what do you do with what she left you? Act one is the heart of the burn, not a prologue to rush through.",
   "forks": [
@@ -63,5 +64,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 492,
+    "setup_detail": 117,
+    "forks": 533,
+    "total": 1381
+  }
 }

@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Last Caravan"
+rating: "?"
+description: "The Last Caravan campaign look: AnimatedFamilyFilm hand-drawn animation by default, PaperbackCover 1970s sci-fi cover for the intro and major story beats"
+tags: [animation, painting, stylized, warm, epic]
+made-for-model: gpt-image-2
+tokens: 513
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** hand-drawn animated-family-film look below. The **intro and major story beats** use the 1970s sci-fi paperback-cover look as a title-card — reserve it for the big moments, at most once every several scenes.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame from a high-budget pre-CGI hand-drawn animated family feature of the late 1980s to 1990s: traditional ink-and-paint cels over painted backgrounds. Strict process discipline: render the characters and foreground objects as hand-inked cels — clean, confident black ink outlines filled with FLAT cel paint, and shading done only as a few hard-edged flat shadow and highlight shapes (cel shading), never smooth photographic gradients or rendered surface detail. Behind them, a lush hand-painted background in soft gouache — atmospheric and deep, with visible painterly brushwork and warm cinematic light — clearly a separate painted layer from the crisp cels, with multiplane depth and a slight focus falloff on the background. A warm, harmonious feature-film palette and expressive storybook lighting, with gentle rim light and glow on the key forms. The whole frame carries the soft warm grain of film. Close with a caption like a title card: a short line of elegant hand-lettered type integrated into the frame.`
+
+Intro / major story beats — `Painted as a vintage 1970s science-fiction paperback cover in the tradition of hand-airbrushed gouache matte painting, with strict process discipline. Work from a tightly restrained palette of roughly four or five muted period hues only — admit no other colors. Build the whole image from a few large, simple value masses: group shadow into broad unmodulated dark shapes, and let most of the subject dissolve into soft atmospheric falloff and lost-and-found edges. Reserve fine brushwork and detail for ONE focal element and the lit silhouette edges only; every other surface stays broad, flat, soft, and economical, with no rendered panel or surface detail. Keep large passages of the background calm and near-empty — resist filling negative space. The only fine texture anywhere is the flat, uniform offset-printing rosette grain and paper tooth laid evenly over the finished painting, never rendered surface detail. Close with a cover-style caption integrated like real paperback typography: a bold engraved-serif title treatment naming the place or moment, with one short evocative tagline beneath it, set in elegant period type.`
+
+# Notes
+
+Campaign composite for the **the-last-caravan** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [AnimatedFamilyFilm](./AnimatedFamilyFilm.mvstyle) (late-80s/90s hand-drawn cel-over-painted-background animation — the campaign-wide workhorse). BEATS = [PaperbackCover](./PaperbackCover.mvstyle) (1970s airbrushed-gouache sci-fi cover; its bold serif title + tagline is a natural intro / major-beat title-card — its economy clauses are load-bearing anti-tic, kept verbatim, reserved for occasional use). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![AnimatedFamilyFilm](../ImageStyleExample/AnimatedFamilyFilm.example.png)
+
+![PaperbackCover](../ImageStyleExample/PaperbackCover.example.png)

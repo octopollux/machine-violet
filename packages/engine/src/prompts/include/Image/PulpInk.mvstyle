@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "PulpInk"
+rating: "?"
+description: "Cheap 80s pulp-edition line vignette: bold thick contours degraded by coarse over-inked printing, generous bare paper"
+tags: [printmaking, lo-fi, black-and-white, graphic, gritty]
+made-for-model: gpt-image-2
+tokens: 237
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a black-and-white line illustration from a cheap 1980s abridged-classic edition, reproduced by a coarse, worn-out printing process on rough pulp paper. Strict process discipline: the REPRODUCTION is the constraint — print it through a low-resolution, over-inked, slightly worn offset/letterpress process so that fine detail physically cannot survive: ink spreads and blobs at the line junctions, thin lines break up or fill in solid, edges go rough and slightly gritty, with faint mis-registration and show-through from the cheap paper. Because ONLY bold marks survive that printing, the original drawing is made of THICK, confident, simple ink contour lines with very little hatching — clean bold outlines, a few heavy solid shadow shapes, and otherwise generous bare paper. No fine crosshatching, no etching detail, no grey tone — just bold black line on cream pulp stock. A thin ruled keyline frames the vignette. Close with a caption beneath the frame: a short line of plain serif type, like a quoted line of text captioning the illustration.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The anti-cram lever here is a MATERIAL constraint, not a negation: the cheap REPRODUCTION destroys fine detail — a coarse, over-inked, low-resolution offset/letterpress where thin lines blob and break — so only bold confident contour line survives, forcing a simplicity the model can't cram around. This is exactly what the detailed sibling [PenAndInk](./PenAndInk.mvstyle) could NOT achieve by asking for "economy of line" directly: making the print degrade the detail is what finally worked (an in-distribution medium needs a structural/material reason to go sparse, like the [IntaglioVignette](./IntaglioVignette.mvstyle) fade-to-paper). Keep "the REPRODUCTION is the constraint / only bold marks survive", the framed vignette, and the quoted-line caption.
+
+# Example
+
+![PulpInk](../ImageStyleExample/PulpInk.example.png)

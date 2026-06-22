@@ -1,7 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
+import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { normalizeForks, assembleCampaignDetail } from "../../config/world-forks.js";
@@ -13,6 +13,7 @@ import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { processIncludes } from "../../prompts/process-includes.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -31,7 +32,6 @@ import { campaignPaths } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { slugify } from "../../utils/slug.js";
 import { logEvent } from "../../context/engine-log.js";
-import { normalizeImageEffort, normalizeImageAspect } from "../../providers/image-coerce.js";
 
 // --- Types ---
 
@@ -111,7 +111,7 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "DM-only detail for a FULLY CUSTOM campaign (no seeded world). For seeded worlds leave this out — the DM detail is assembled in code from the seed's base premise plus your fork_selections, so you don't pass it. Omit if the campaign is custom with no special DM notes.", nullable: true },
+      campaign_detail: { type: "string", description: "DM-only detail. For a FULLY CUSTOM campaign (no seeded world) this is the entire DM detail. For a seeded world, the seed's own detail is assembled in code from your fork_selections; anything you pass here is APPENDED to it — use this only to record a specific setup-time DM directive you were asked to add (e.g. a chosen visual-style include). Omit if there is nothing to add.", nullable: true },
       world_slug: { type: "string", description: "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.", nullable: true },
       fork_selections: {
         type: "object",
@@ -125,6 +125,12 @@ const FINALIZE_TOOL: NormalizedTool = {
         type: "string",
         enum: ["on", "off"],
         description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+        nullable: true,
+      },
+      mechanics_mode: {
+        type: "string",
+        enum: ["dm-managed", "player-facing"],
+        description: "Player's answer to the mechanics-handling question. 'dm-managed' if they want you to run the rules silently behind the scenes; 'player-facing' if they want to engage the mechanics directly. ONLY include this field if you actually asked the question, which only happens when the chosen system is light or ultra-light (see the System selection section of your prompt). Omit for crunchy systems and pure-narrative campaigns.",
         nullable: true,
       },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
@@ -284,38 +290,32 @@ function renderRollDice(input: Record<string, unknown>): { content: string; isEr
 const GENERATE_IMAGE_TOOL: NormalizedTool = {
   name: "generate_image",
   description:
-    "Generate a full-length character portrait for the player's character. " +
-    "Use ONLY for character portraits during chargen — never for scenes or other illustrations during setup. " +
-    "The image is shown to the player automatically. After showing each draft, ask the player whether " +
-    "the portrait looks right or what to adjust, then call this again with an updated prompt if needed. " +
-    "When the player confirms a portrait, call `set_portrait` with that draft's filename to keep it. " +
-    "ALWAYS render setup portraits in the style: **simple digital art, plain black background**. " +
-    "Do not match the campaign's visual style during chargen — the black-background style is " +
-    "the canonical character-card look, and it stays consistent across worlds. Describe the " +
-    "character (build, clothing, pose, mood, expression) in the prompt, then end with " +
-    "\"Simple digital art, plain black background.\" Save campaign-styled imagery for in-game scenes. " +
-    "ALWAYS pass `effort: \"standard\"` and `aspect: \"portrait\"` for these chargen portraits — `standard` is a " +
-    "medium-quality render that comes back reasonably fast for iteration. A portrait never needs more than `standard`; " +
-    "do not reach for `quality`/`showcase` here (they're slower and meant for in-campaign scenes).",
+    "Generate the player character's reference sheet: a SINGLE landscape image showing the SAME full-body character " +
+    "from three angles side by side against one plain black background — a front view, a three-quarter view from the " +
+    "front-left, and a three-quarter view from the rear-right. " +
+    "Use ONLY for the character reference sheet during chargen — never for scenes or other illustrations during setup. " +
+    "This sheet becomes the canonical reference the DM later conditions in-game art on, so the multiple angles are what " +
+    "keep generated scenes from defaulting to a stiff, camera-facing pose. " +
+    "The image is shown to the player automatically. After showing each draft, ask the player whether it looks right or " +
+    "what to adjust, then call this again with an updated prompt if needed. " +
+    "When the player confirms, call `set_portrait` with that draft's filename to keep it. " +
+    "Write the prompt as the CHARACTER and the THREE VIEWS only: describe the character once (build, clothing, " +
+    "footwear, mood, expression), then call for the three side-by-side angles (front, front-left three-quarter, " +
+    "rear-right three-quarter) against a plain black background. Do NOT specify an art medium or lighting — the engine " +
+    "renders the CHARACTER in the campaign's visual style against that plain black background (a clean reference sheet, " +
+    "not a scene), so the character card matches the look the DM will condition in-game art on. " +
+    "You don't choose render effort or aspect here either — the engine always renders the chargen sheet at a fixed " +
+    "standard quality (fast enough to iterate, the ceiling a character sheet needs) and landscape framing (the three " +
+    "views need the width). Just write the character.",
   inputSchema: {
     type: "object" as const,
     properties: {
       prompt: {
         type: "string",
-        description: "Vivid description of the character's full-body appearance — clothing, build, pose, mood, background hint, art style. The model composes the image from this; be specific.",
-      },
-      effort: {
-        type: "string",
-        enum: ["draft", "standard", "quality", "showcase"],
-        description: "Render effort. Use 'standard' (medium quality) for chargen portraits — it's the ceiling for a portrait. 'quality' / 'showcase' are slower and reserved for in-campaign scenes.",
-      },
-      aspect: {
-        type: "string",
-        enum: ["portrait", "landscape", "square"],
-        description: "Aspect ratio. Use 'portrait' for character portraits during chargen.",
+        description: "Vivid description of the character's full-body appearance — clothing, build, footwear, mood, expression — described once, since the character is identical in every view. Pin any one-sided feature (a robot arm, a cybernetic eye, an eyepatch, a scar, a missing limb, a holstered weapon) to a definite side in the wording — e.g. \"a robotic LEFT arm\" — so it stays on that side across all three angles instead of flipping. End by calling for the three side-by-side angles (front, front-left three-quarter, rear-right three-quarter) on a plain black background. The model composes the image from this; be specific.",
       },
     },
-    required: ["prompt", "effort", "aspect"],
+    required: ["prompt"],
   },
 };
 
@@ -345,6 +345,50 @@ const SET_PORTRAIT_TOOL: NormalizedTool = {
 
 const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL, ROLL_DICE_TOOL];
 const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
+
+/**
+ * Placeholder fallback style for the chargen reference sheet when the chosen
+ * seed declares no `image_style` (or the campaign is fully custom). Per the
+ * visual-style MVP wiring — `CinematicFilm` until per-seed defaults are graded.
+ */
+const DEFAULT_PORTRAIT_STYLE = "CinematicFilm";
+
+/**
+ * Reference-sheet framing for the chargen portrait, appended after the campaign
+ * style line. The campaign style governs how the CHARACTER renders; this keeps
+ * the sheet a functional turnaround on plain black and strips the chrome the
+ * scene-oriented style directives drag along (captions, letterbox/frames,
+ * HUD/timestamp overlays, vignettes) — none of which belong on a character card.
+ */
+const PORTRAIT_SHEET_FRAMING =
+  "This is a character REFERENCE SHEET, not a scene: place all three views of the same character " +
+  "against a plain, empty, flat black background — no environment, set, props, furniture, or location " +
+  "of any kind. Apply the visual style above ONLY to how the CHARACTER itself is rendered (its medium, " +
+  "grade, linework, texture, lighting, and finish). Keep every one-sided or asymmetric feature — a " +
+  "prosthetic or robotic limb, a cybernetic eye, an eyepatch, a scar, an amputation, a holstered weapon — " +
+  "on the SAME side of the body in all three views; it must not switch sides between angles. Strip any " +
+  "other trappings the style might add: NO " +
+  "caption, title, lettering, or text of any kind; NO frame, border, letterbox bars, vignette, or matte; " +
+  "NO HUD, on-screen display, timestamp, watermark, or logo. Just the three clean character views on plain black.";
+
+/**
+ * Compose the chargen reference-sheet prompt from three ordered parts: the
+ * agent's character + three-view description, then the campaign style's `# Style`
+ * directive, then {@link PORTRAIT_SHEET_FRAMING} LAST. The order is the whole
+ * point — the style line stamps the CHARACTER's render treatment, and the
+ * framing, stated last, wins the composition so scene-oriented styles can't
+ * stage the turnaround or drag along captions/frames/HUD chrome.
+ *
+ * `styleName` is the chosen seed's `image_style` (undefined for a fully custom
+ * campaign); an unknown or missing style falls back to the {@link
+ * DEFAULT_PORTRAIT_STYLE} placeholder. Exported so the exact prompt shape is
+ * unit-testable without driving a live portrait render.
+ */
+export function composeChargenPortraitPrompt(character: string, styleName?: string): string {
+  const name = styleName?.trim() || DEFAULT_PORTRAIT_STYLE;
+  const styleLine = resolveImageStyleLine(name) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
+  return [character, styleLine, PORTRAIT_SHEET_FRAMING].filter(Boolean).join("\n\n");
+}
 
 // --- System prompt ---
 
@@ -417,15 +461,17 @@ function buildSystemPrompt(
   if (imageGenSupported) {
     const portraitSection = portraitLoopActive ? [
       "",
-      "### Character portraits (only when the player said Yes above)",
+      "### Character reference sheet (only when the player said Yes above)",
       "",
-      "Once the player has chosen a character name and given you a description, generate a full-length portrait of them. Use the `generate_image` tool — its `prompt` argument should be a vivid, specific description of the character's full body (build, clothing, pose, mood, background hint), composed in a visual style that matches the campaign's world (illuminated-manuscript serif plate, cinematic matte, painterly fresco, woodcut, anime-comic, etc. — pick what fits). Pass `effort: \"standard\"` (medium quality — plenty for a portrait, and fast enough to iterate) and `aspect: \"portrait\"`.",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, against a plain black background. The extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose, since this sheet becomes the canonical reference the DM conditions in-game art on. Don't specify an art medium or lighting yourself — the engine renders the character in the campaign's visual style against a plain black background (a clean reference sheet, not a scene), so the character card matches the look the DM will use in play. (It also pins a fixed standard quality and landscape framing — you just write the character.)",
+      "",
+      "If the player's description leaves a one-sided feature ambiguous — a robot arm, a cybernetic eye, an eyepatch, a scar, a missing limb, a holstered weapon — COMMIT to a definite side yourself and state it in the prompt (e.g. \"a robotic LEFT arm\", \"an eyepatch over the RIGHT eye\"). The player rarely cares which side; just pick one. If you leave it unstated, the feature lands on a different side in each angle and the three views won't look like the same person. (You don't need to ask the player — choosing for them is the right call.)",
       "",
       "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
       "",
       "When the player confirms (or moves on without enthusiasm), call `set_portrait` with the character's name and the latest draft's filename. The filename comes back as the tool result of `generate_image` — record it and pass it through verbatim. Do this BEFORE calling `finalize_setup`.",
       "",
-      "If the player said No to images at the consent step above, skip this entire section. Don't generate a portrait, don't call set_portrait, just continue with character creation and finalize.",
+      "If the player said No to images at the consent step above, skip this entire section. Don't generate a reference sheet, don't call set_portrait, just continue with character creation and finalize.",
     ].join("\n") : "";
 
     blocks.push({
@@ -620,6 +666,15 @@ export function createSetupConversation(
   };
 
   let finalized: SetupResult | undefined;
+  /**
+   * The world most recently fetched via `load_world`. Tracked so the chargen
+   * portrait can be rendered in that seed's `image_style` (the player loads the
+   * world they're interested in before chargen, so by portrait time this is the
+   * campaign's seed). Undefined for fully custom campaigns → CinematicFilm
+   * fallback. A heuristic, not authoritative: if the player loads several seeds
+   * and reconsiders after the portrait, the last-loaded one wins.
+   */
+  let lastLoadedWorld: WorldFile | undefined;
   // Pending state when present_choices is called — stores tool_use_id so we can send the result back
   let pendingToolUseId: string | null = null;
   // Tool results for tools that ran alongside present_choices (e.g. load_world).
@@ -690,13 +745,25 @@ export function createSetupConversation(
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", isError: true };
     }
-    const effort = normalizeImageEffort(input.effort, "standard");
-    const aspect = normalizeImageAspect(input.aspect, "portrait");
+    // Render the reference sheet in the campaign's visual style: the chosen
+    // seed's `image_style` stamps the CHARACTER's render treatment, the framing
+    // (appended last) keeps the sheet a clean black-background turnaround. The
+    // agent writes only the character + three-view text; the engine owns the
+    // style + framing ordering — see composeChargenPortraitPrompt, where the
+    // ordering IS the fix. Unknown/missing style falls back to the default.
+    const styledPrompt = composeChargenPortraitPrompt(promptText, lastLoadedWorld?.image_style);
     try {
+      // Chargen has exactly one canonical render config — a standard-effort,
+      // landscape multi-angle reference sheet — so we pin both here rather than
+      // read them from the model. Tool args aren't enforced server-side (see
+      // image-coerce), and a stray `aspect: "portrait"` would collapse the
+      // sheet back to a single front pose (defeating the whole point) while a
+      // stray `showcase` would block chargen on a slow maximum-fidelity render.
+      // That's why the tool no longer exposes either knob.
       const result = await provider.generateImage({
-        prompt: promptText,
-        effort,
-        aspect,
+        prompt: styledPrompt,
+        effort: "standard",
+        aspect: "landscape",
         intent: "character_portrait",
       });
       // Persist via image-handler — shared with the DM-side dispatch in
@@ -714,7 +781,7 @@ export function createSetupConversation(
       turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
       const basename = persisted.relPath.split("/").pop() ?? "portrait-draft.png";
       return {
-        content: `Portrait rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
+        content: `Reference sheet rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
         isError: false,
       };
     } catch (e) {
@@ -816,13 +883,19 @@ export function createSetupConversation(
     }
 
     const rawDetail = input.campaign_detail;
+    // Trim the agent's detail: when it is appended to a seeded campaign's
+    // assembled base, a leading-whitespace/newline `<!--include:...-->` would
+    // expand to an INDENTED <TAG>, which applyLayeredOverrides (column-0 only)
+    // would miss — silently dropping the intended override. Trimming keeps the
+    // appended block flush-left so the override is seen.
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
-      ? rawDetail : null;
+      ? rawDetail.trim() : null;
 
-    // For a seeded campaign, CODE owns the DM detail: assemble it from the
-    // seed's fork-invariant base plus the *selected* fork branches, so the DM
-    // sees one collapsed variant and the unchosen branches never reach its
-    // context. Precedence: an explicit world_slug always assembles from the
+    // For a seeded campaign, code assembles the DM-detail FLOOR from the seed's
+    // fork-invariant base plus the *selected* fork branches, so the DM sees one
+    // collapsed variant and the unchosen branches never reach its context; the
+    // setup agent may then APPEND its own campaign_detail on top (see below).
+    // Precedence: an explicit world_slug always assembles from the
     // seed; otherwise (only when the agent supplied no detail) we fall back to
     // a campaign-name-derived slug for back-compat with agents that forget the
     // slug. An agent-supplied detail with no slug = a fully custom campaign.
@@ -842,8 +915,24 @@ export function createSetupConversation(
           }
           if (Object.keys(valid).length) forkSelections = valid;
         }
+        // Append any agent-supplied detail (held in `campaignDetail`) AFTER the
+        // seed base, so a setup-time choice (e.g. a chosen visual-style include)
+        // overrides a seed default for colliding <Tag> blocks at DM-prompt time.
         const assembled = assembleCampaignDetail(world.detail, forks, forkSelections);
-        if (assembled) campaignDetail = assembled;
+        // The seed's visual style reaches the DM as an Image include in
+        // campaign_detail — resolved at DM-prompt time into an <Image> block that
+        // overrides the bare default (the campaign_detail slot outranks
+        // dm-directives). Validated against a real .mvstyle (resolveImageStyleLine
+        // returns null for a bad stem / missing file) so a malformed seed value
+        // can't brick every DM turn with an unresolved-include throw — a bogus
+        // style just leaves the campaign on the default look. Placed BEFORE the
+        // agent's append so a style the setup agent records still wins the
+        // <Image> collision (last occurrence in-slot).
+        const rawStyle = world.image_style?.trim() ?? "";
+        const styleInclude = rawStyle && resolveImageStyleLine(rawStyle)
+          ? `<!--include:Image.${rawStyle}-->`
+          : null;
+        campaignDetail = [assembled, styleInclude, campaignDetail].filter(Boolean).join("\n\n") || null;
       }
     }
 
@@ -875,6 +964,12 @@ export function createSetupConversation(
       contentPreferences: (input.content_preferences as string) || undefined,
       imageGeneration: input.image_generation === "on" || input.image_generation === "off"
         ? (input.image_generation as "on" | "off")
+        : undefined,
+      // Only honored for light/ultra-light systems (the only case the agent is
+      // told to ask). Recorded verbatim when the agent reports it; the DM prefix
+      // applies MECHANICS_MODE_DEFAULT when a light system runs without a choice.
+      mechanicsMode: input.mechanics_mode === "dm-managed" || input.mechanics_mode === "player-facing"
+        ? (input.mechanics_mode as MechanicsMode)
         : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
@@ -972,6 +1067,8 @@ export function createSetupConversation(
       if (call.name === "load_world") {
         const slug = (call.input as { slug?: string }).slug ?? "";
         const world = loadWorldBySlug(slug, userWorldsDir);
+        // Remember the seed so the chargen portrait can adopt its visual style.
+        if (world) lastLoadedWorld = world;
         const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
         return { content, isError: false };
       }

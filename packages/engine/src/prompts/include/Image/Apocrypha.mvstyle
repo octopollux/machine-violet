@@ -1,0 +1,44 @@
+---
+type: visual-style
+title: "Apocrypha"
+rating: "?"
+description: "Apocrypha campaign look: DocumentaryPhoto by default, TealOrange for outdoor night, plus a surveillance-cam sub-menu (Dash/Drone/Lobby/Street) for paranoia spikes"
+tags: [photographic, surveillance, muted, tense, lo-fi]
+made-for-model: gpt-image-2
+tokens: 1256
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** documentary look below. Outdoor scenes at **night** use the teal-and-orange grade. For a spike of **paranoia**, render the moment as one of the surveillance-camera feeds — pick the camera whose vantage fits.
+
+# Style
+
+Default (most scenes) — `Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+Outdoor at night — `Rendered as a frame from a glossy modern blockbuster film with the signature TEAL-AND-ORANGE Hollywood colour grade. Its signature: cool TEAL and cyan pushed into the shadows and backgrounds, warm ORANGE skin tones and highlights, a polished high-contrast digital-cinema sheen, shallow depth of field, anamorphic framing, lens flares, and a slick, expensive, contemporary popcorn-movie look. Glossy, punchy, cinematic. Close with a small caption in a tasteful font.`
+
+Paranoia — render the moment as a surveillance feed; pick the camera whose vantage fits:
+
+· In a vehicle / on a road — `Rendered as a single still from a car windshield dash-camera driving at night — a wide-angle forward-facing dashcam view from behind the wheel. The top edge of the dashboard and a sliver of the car's hood sit across the bottom of the frame; ahead, the road is lit only by the car's own headlights carving a cone of light into the dark, with wet asphalt reflecting it and oncoming streetlights and signs flaring into bloom and lens glare. WIDE lens with mild barrel distortion; a cheap, low-resolution automotive feed — washed, slightly cool colour, sensor noise, motion blur, compression softness, faint windshield reflections. Burn the dashcam OSD across the bottom in a blocky monospace font: a 24-hour clock TIME in HH:MM:SS, a SPEED readout (for example "62 km/h"), and a short GPS coordinate string — show a time only and never a calendar date. Banal, in-motion, faintly ominous.`
+
+· From high above, anonymous — `Rendered as a single still from a military-style aerial surveillance drone (UAV) loitering high above the subject at night — a steep top-down, high-oblique view looking down from altitude. The image is a grainy, low-resolution monochrome night-vision sensor feed: desaturated cold grey, heavy sensor noise, soft optics, low contrast, the ground far below. THE SUBJECT IS SMALL AND CENTERED, tracked from above. Overlay a full targeting HUD in thin monospace vector lines: a central crosshair reticle, a square tracking box locked around the subject, and corner readouts — an altitude figure, a latitude/longitude coordinate pair, a heading and a sensor label (for example "UAV / EO-IR"), and a 24-hour clock TIME in HH:MM:SS; show a time only, never a calendar date. Detached, predatory, clinical, godlike.`
+
+· A cheap indoor corner camera — `Rendered as a single still from a cheap, ancient lobby/entrance security camera — a low-end colour CCTV multiplexer feed. THE FEED IS TINY, HEAVILY UPSCALED AND SOFT: it is captured at a very low resolution and blown up to fill the frame, so the image is built from large blocky macro-pixels, but it is also genuinely SOFT and out of focus, never crisp — cheap blurry optics slightly out of focus, a soft smeary low-pass blur over everything, motion blur, blooming highlights, and crunchy low-bitrate compression smearing the blocks together. Washed, slightly oversaturated cheap colour with an off colour-balance cast, low dynamic range, heavy noise and a soft haze. WIDE fisheye lens, mounted high in a corner over a small drab interior. Nothing in the frame is sharp — the whole image is soft, blurry, low-resolution and degraded. Burn a blocky low-resolution on-screen display into a corner in a crude monospace font: a short camera/zone label and a 24-hour clock TIME in HH:MM:SS — show a time only, never a calendar date. Cheap, soft, ugly, faintly menacing.`
+
+· A public street at night — `Rendered as a single still from a municipal street-surveillance CCTV camera — a colour pan-tilt-zoom camera mounted high on a pole or building, looking down over a public street at night. A wide, elevated vantage over an open expanse of road, pavement and crossing; the high angle leaves large calm areas of empty wet asphalt. Lit by the warm orange glow of sodium-vapour streetlights and a few cold LED ones, so the colour is uneven and washed — pooled orange light under each lamp falling off fast into deep blue-black shadow between them, low dynamic range, blown highlights flaring around the lamps. The picture is a soft, slightly low-resolution video feed: mild sensor noise, faint compression artefacts, a little motion blur, soft optics, a touch of haze. Burn the camera's on-screen display across the top in a plain white municipal-CCTV font: a camera number and a street/zone LOCATION label, with a running 24-hour clock TIME in HH:MM:SS in a corner — show a time only, never a calendar date. Detached, watchful, public, a little lonely; the whole frame reads as a quietly menacing record of a public place at night.`
+
+# Notes
+
+Campaign composite for the **apocrypha** seed — six already-validated catalog styles bundled into one include (no new render). DEFAULT = [DocumentaryPhoto](./DocumentaryPhoto.mvstyle) (grounded reportage — covers interiors and outdoor day). OUTDOOR NIGHT = [TealOrange](./TealOrange.mvstyle) (glossy blockbuster grade). PARANOIA SUB-MENU = the surveillance cluster [DashCam](./DashCam.mvstyle) / [DroneCam](./DroneCam.mvstyle) / [LobbyCam](./LobbyCam.mvstyle) / [StreetCam](./StreetCam.mvstyle), each labelled by its vantage so the DM grabs the fitting lens for a paranoia spike. All six `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`. (Heavy block by design — six looks; the surveillance time-only-OSD rule is preserved in each cam line.)
+
+# Example
+
+Composed from six banked styles — see their worked samples:
+
+![DocumentaryPhoto](../ImageStyleExample/DocumentaryPhoto.example.png)
+![TealOrange](../ImageStyleExample/TealOrange.example.png)
+![DashCam](../ImageStyleExample/DashCam.example.png)
+![DroneCam](../ImageStyleExample/DroneCam.example.png)
+![LobbyCam](../ImageStyleExample/LobbyCam.example.png)
+![StreetCam](../ImageStyleExample/StreetCam.example.png)

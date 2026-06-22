@@ -48,6 +48,96 @@ MV_LIVE_CORPUS=<campaigns-dir> npx vitest run .../harness/   # replay real on-di
 Touching the formatting pipeline or its vocabulary → see
 [maintenance.md](maintenance.md) and keep this harness green.
 
+## Packaged-artifact replay gate (release / nightly CI)
+
+Tier 2 replays goldens against the engine constructed **in-process**. The
+packaged-artifact gate replays the *same kind* of golden against the **built,
+packaged binary** — the Node SEA `MachineViolet` executable with its vendored
+assets — on each OS, **before a release or nightly publishes**. A broken package
+(SEA injection, asset vendoring, boot path, config-dir resolution) fails the
+replay and **blocks publish**. The goal: don't ship a binary that can't run a
+campaign. It is offline and deterministic (no API key) — the replay provider
+serves every model call from the tape.
+
+**Run it locally:**
+
+```bash
+npm run dist                                   # build the SEA binary into dist/
+npm run e2e:replay                             # replay goldens from source
+npm run e2e:replay -- --binary dist/MachineViolet.exe   # ...against the binary
+```
+
+[`bin/replay-golden.ts`](../packages/test-harness/bin/replay-golden.ts) +
+[`src/replay-runner.ts`](../packages/test-harness/src/replay-runner.ts) boot the
+app (from source, or a packaged binary via `--binary`), replay the golden's
+captured `key`/`say`/`pick` inputs, and assert the DM narration matches. With no
+path args it replays the whole [`goldens/`](../packages/test-harness/goldens/)
+corpus (the CI form).
+
+**The runtime knobs it sets** (all env-gated, never set in production):
+
+| Knob | Effect |
+|---|---|
+| `MV_TAPE_MODE=replay` + `MV_TAPE_PATH=<tape>` | Every tier served from the tape — no connection, no network, no API key (`buildReplayTierProviders` in [`tape-mode.ts`](../packages/engine/src/providers/tape-mode.ts)). |
+| `MV_E2E=1` | Surfaces one synthetic, always-valid connection ([`config/e2e.ts`](../packages/engine/src/config/e2e.ts)) so the menu unlocks (it gates "New Campaign" on `connections.length > 0` + a passing health check). Server-side, so the client renders a genuinely-valid state. |
+| `MV_CONFIG_DIR=<temp>` | Forces a throwaway config root, overriding the compiled `%APPDATA%` default — hermetic, no dependence on machine state. |
+
+**Self-driving goldens.** Full-stack goldens
+([`goldens/*.golden.json`](../packages/test-harness/goldens/)) carry an `inputs`
+array (`key`/`say`/`pick` ops captured during `mvplay record`) plus the
+`expectedNarrative` DM lines — so a replay re-drives the whole session (menu →
+setup → handoff → DM turns) with no human in the loop. See
+[tape-format.md](tape-format.md) and [golden-tapes.md](golden-tapes.md).
+
+**Two non-obvious things make codex-recorded tapes replay correctly:**
+
+- *In-band tool dispatch.* openai-chatgpt (codex) dispatches the model's tool
+  calls in-band via `params.dispatchTool` and leaves `ChatResult.toolCalls`
+  empty — the calls survive only as `tool_use` blocks in `assistantContent`. The
+  replay provider re-issues them (`createReplayProvider`), or `present_choices` /
+  `finalize_setup` never fire and setup stalls. Anthropic-shape tapes surface
+  `toolCalls` (the outer loop dispatches them) and are left untouched.
+- *Whitespace-normalized assertion.* Replay reproduces the verbatim streamed
+  text, but line **segmentation** around mid-stream tool-call flush boundaries is
+  a streaming artifact we don't reproduce byte-for-byte — so the assertion
+  compares content with whitespace collapsed, not line breaks. The assertion
+  targets `dm` lines only (`dev` breadcrumbs carry environment-specific paths and
+  are dev-only).
+
+**CI wiring.** A `verify-package` matrix job (win/mac/linux) in
+[`release.yml`](../.github/workflows/release.yml) and
+[`nightly.yml`](../.github/workflows/nightly.yml) downloads each OS's built
+artifact, runs [`scripts/ci/replay-packaged-binary.sh`](../scripts/ci/replay-packaged-binary.sh)
+(extract Portable.zip / tar.gz → `replay-golden --binary`), and is in each
+`release` job's `needs:` so a red replay blocks publish. **Not** in PR `ci.yml` —
+this gate is for the release/nightly pipelines only.
+[`test-build.yml`](../.github/workflows/test-build.yml) runs the same gate so it
+can be validated without cutting a release. Dispatch with `sign=false` to run the
+pack → replay → install-smoke gate on a feature/Dependabot branch (the package is
+unsigned), since Azure Trusted Signing only authenticates from protected refs;
+omit it (default `sign=true`) from `release`/`main` to also exercise signing.
+
+**Velopack install smoke** ([`scripts/ci/velopack-install-smoke.ps1`](../scripts/ci/velopack-install-smoke.ps1)):
+installs `Setup.exe` → replays against the *installed* binary → uninstalls,
+catching install-layout/manifest bugs the portable replay can't. `Setup.exe
+--silent` returns *before* its background install (post-install hook + a
+"kill every running app instance" sweep) finishes, so the script waits for the
+`Installation completed successfully!` marker in `velopack.log` before launching
+the replay — never a fixed sleep, which races a slow runner and lets Velopack's
+completion sweep kill the replay's own app instance. It is
+**impractical to run locally** (it performs a real machine install → uninstall
+and is Windows-only — signing is optional via the `sign` input, so a signed
+`Setup.exe` is no longer the blocker), so it was validated end-to-end on a clean
+runner via a `test-build.yml` dispatch
+(install → replay installed binary → uninstall, all green) and is now
+**blocking in release/nightly and test-build.yml** — a broken Windows installer
+blocks publish like any other packaging failure.
+
+**Known gap (by design):** replay returns taped image bytes, so it exercises
+`sharp` rendering but **not** codex generation — replay bypasses codex entirely.
+codex vendoring is covered instead by the build's vendoring step (which fails
+loudly if codex is missing) and the Tier-3 live smoketest.
+
 ## Two ways to use the live harness: scripted probes vs. interactive play
 
 Built on the same launcher + sidecar:
@@ -402,3 +492,8 @@ Conventions:
 - **Discovering a new gotcha** that cost you a failed run: add it to
   "Engine-state surprises" with a one-paragraph explanation. Future you
   (or future agents) will thank you.
+- **Changing the packaged-artifact gate** (the replay knobs, the runner, the CI
+  job, or the Velopack smoke): update "Packaged-artifact replay gate" above and
+  keep the workflow comments in sync. The Velopack install smoke is now blocking
+  in release/nightly (validated via a `test-build.yml` dispatch); if it ever
+  proves flaky, re-add `continue-on-error` and note it here.

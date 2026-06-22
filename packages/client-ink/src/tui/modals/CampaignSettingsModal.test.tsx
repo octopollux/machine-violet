@@ -34,6 +34,7 @@ function renderModal(
   onPct?: (v: number) => void,
   globalDefault?: number,
   onImages?: (v: "on" | "off") => void,
+  onDismiss?: () => void,
 ) {
   const theme = makeTheme();
   return render(
@@ -43,7 +44,7 @@ function renderModal(
         width={80}
         height={30}
         config={config}
-        onDismiss={() => {}}
+        onDismiss={onDismiss ?? (() => {})}
         onChoicesFrequencyChange={onFreq}
         onDmTurnLengthPctChange={onPct}
         onImageGenerationChange={onImages}
@@ -51,6 +52,35 @@ function renderModal(
       />
     </Box>,
   );
+}
+
+// Real CSI escape sequences. ink's key parser only recognizes an arrow when
+// the chunk carries the leading ESC (a bare "[B" is parsed as text, not a
+// down-arrow), so these MUST keep the \u001b. Written as explicit escapes —
+// not raw control bytes — so they stay visible and greppable in source.
+const ESC = "\u001b";
+const ARROW = {
+  up: `${ESC}[A`,
+  down: `${ESC}[B`,
+  right: `${ESC}[C`,
+  left: `${ESC}[D`,
+} as const;
+
+type Ink = ReturnType<typeof render>;
+
+// Send one key, then wait until the rendered frame satisfies `expectFrame`.
+// Anchoring each step on an observable commit — instead of a fixed
+// setTimeout — keeps the next keystroke from racing a stale useInput closure
+// (ink re-subscribes input on every render). The old fixed-sleep approach is
+// what made stepping through multi-row focus flake under load.
+async function press(
+  stdin: Ink["stdin"],
+  lastFrame: Ink["lastFrame"],
+  key: string,
+  expectFrame: (frame: string) => void,
+) {
+  stdin.write(key);
+  await vi.waitFor(() => expectFrame(lastFrame() ?? ""), { timeout: 2000, interval: 20 });
 }
 
 describe("CampaignSettingsModal", () => {
@@ -123,27 +153,26 @@ describe("CampaignSettingsModal", () => {
   it("moves selection right on →", async () => {
     const onFreq = vi.fn();
     const { stdin, lastFrame } = renderModal(minimalConfig(), onFreq);
-    stdin.write("\u001b[C"); // right arrow
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("[Rarely]");
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[Rarely]"));
   });
 
   it("saves the new value on Enter when changed", async () => {
     const onFreq = vi.fn();
-    const { stdin } = renderModal(minimalConfig(), onFreq);
-    stdin.write("\u001b[C"); // →
-    stdin.write("\u001b[C"); // →
-    await new Promise((r) => setTimeout(r, 10));
+    const { stdin, lastFrame } = renderModal(minimalConfig(), onFreq);
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[Rarely]"));
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[Sometimes]"));
     stdin.write("\r");
-    await new Promise((r) => setTimeout(r, 10));
-    expect(onFreq).toHaveBeenCalledWith("sometimes");
+    await vi.waitFor(() => expect(onFreq).toHaveBeenCalledWith("sometimes"));
   });
 
   it("does not save on Enter if unchanged", async () => {
     const onFreq = vi.fn();
-    const { stdin } = renderModal(minimalConfig(), onFreq);
+    const onDismiss = vi.fn();
+    const { stdin } = renderModal(minimalConfig(), onFreq, undefined, undefined, undefined, onDismiss);
     stdin.write("\r");
-    await new Promise((r) => setTimeout(r, 10));
+    // Enter on a value row commits; an unchanged commit still dismisses, so
+    // dismissal is the observable that Enter was handled without saving.
+    await vi.waitFor(() => expect(onDismiss).toHaveBeenCalled());
     expect(onFreq).not.toHaveBeenCalled();
   });
 
@@ -167,73 +196,57 @@ describe("CampaignSettingsModal", () => {
   it("adjusts DM Turn Length by 5% on ← / → after ↓ to focus", async () => {
     const onPct = vi.fn();
     const { stdin, lastFrame } = renderModal(minimalConfig(), undefined, onPct);
-    stdin.write("[B"); // ↓ — focus length row
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[C"); // → +5
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("85%");
-    stdin.write("[C"); // → +5
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("90%");
-    stdin.write("[D"); // ← -5
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("85%");
+    await press(stdin, lastFrame, ARROW.down, (f) => expect(f).toContain("[80%]")); // focus length
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[85%]"));
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[90%]"));
+    await press(stdin, lastFrame, ARROW.left, (f) => expect(f).toContain("[85%]"));
     stdin.write("\r"); // Enter saves
-    await new Promise((r) => setTimeout(r, 10));
-    expect(onPct).toHaveBeenCalledWith(85);
+    await vi.waitFor(() => expect(onPct).toHaveBeenCalledWith(85));
   });
 
   it("clamps DM Turn Length to the 50–150 range", async () => {
     const { stdin, lastFrame } = renderModal(minimalConfig({ dm_turn_length_pct: 50 }));
-    stdin.write("[B"); // ↓
-    await new Promise((r) => setTimeout(r, 10));
-    // Already at min — left shouldn't go below 50
-    stdin.write("[D"); // ←
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("50%");
-    expect(lastFrame() ?? "").not.toContain("45%");
+    await press(stdin, lastFrame, ARROW.down, (f) => expect(f).toContain("[50%]")); // focus length
+    // Already at min — left shouldn't drop below 50.
+    await press(stdin, lastFrame, ARROW.left, (f) => {
+      expect(f).toContain("[50%]");
+      expect(f).not.toContain("45%");
+    });
   });
 
   it("clamps at the upper bound 150", async () => {
     const { stdin, lastFrame } = renderModal(minimalConfig({ dm_turn_length_pct: 150 }));
-    stdin.write("[B"); // ↓
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[C"); // → — should not go above 150
-    await new Promise((r) => setTimeout(r, 10));
-    expect(lastFrame() ?? "").toContain("150%");
-    expect(lastFrame() ?? "").not.toContain("155%");
+    await press(stdin, lastFrame, ARROW.down, (f) => expect(f).toContain("[150%]")); // focus length
+    await press(stdin, lastFrame, ARROW.right, (f) => {
+      expect(f).toContain("[150%]");
+      expect(f).not.toContain("155%");
+    });
   });
 
   it("up arrow returns focus to the Choices Frequency row", async () => {
     const onFreq = vi.fn();
     const onPct = vi.fn();
-    const { stdin } = renderModal(minimalConfig(), onFreq, onPct);
-    stdin.write("[B"); // ↓ — go to length
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[A"); // ↑ — back to choices
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[C"); // → — should adjust choices, not length
-    await new Promise((r) => setTimeout(r, 10));
+    const { stdin, lastFrame } = renderModal(minimalConfig(), onFreq, onPct);
+    await press(stdin, lastFrame, ARROW.down, (f) => expect(f).toContain("[80%]"));     // focus length
+    await press(stdin, lastFrame, ARROW.up, (f) => expect(f).not.toContain("[80%]"));   // back to choices
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[Rarely]")); // adjusts choices, not length
     stdin.write("\r");
-    await new Promise((r) => setTimeout(r, 10));
-    expect(onFreq).toHaveBeenCalledWith("rarely");
+    await vi.waitFor(() => expect(onFreq).toHaveBeenCalledWith("rarely"));
     expect(onPct).not.toHaveBeenCalled();
   });
 
   it("saves both fields when both are dirty", async () => {
     const onFreq = vi.fn();
     const onPct = vi.fn();
-    const { stdin } = renderModal(minimalConfig(), onFreq, onPct);
-    stdin.write("[C"); // → freq
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[B"); // ↓ length
-    await new Promise((r) => setTimeout(r, 10));
-    stdin.write("[C"); // → length
-    await new Promise((r) => setTimeout(r, 10));
+    const { stdin, lastFrame } = renderModal(minimalConfig(), onFreq, onPct);
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[Rarely]")); // freq → rarely
+    await press(stdin, lastFrame, ARROW.down, (f) => expect(f).toContain("[80%]"));      // focus length
+    await press(stdin, lastFrame, ARROW.right, (f) => expect(f).toContain("[85%]"));     // length → 85
     stdin.write("\r");
-    await new Promise((r) => setTimeout(r, 10));
-    expect(onFreq).toHaveBeenCalledWith("rarely");
-    expect(onPct).toHaveBeenCalledWith(85);
+    await vi.waitFor(() => {
+      expect(onFreq).toHaveBeenCalledWith("rarely");
+      expect(onPct).toHaveBeenCalledWith(85);
+    });
   });
 
   it("shows Image Generation On for configs without an explicit preference (default-on)", () => {
@@ -250,13 +263,6 @@ describe("CampaignSettingsModal", () => {
     expect(frame).toContain("Off");
   });
 
-  // Note: a navigation-driven test ("press down twice, then right, then
-  // Enter") would be the natural integration check, but ink-testing-library
-  // input simulation didn't reliably step through 3-row focus in this
-  // environment. The render-state tests above pin the visible behavior;
-  // commit wiring is covered by the "not dirty" test below + the prop
-  // forwarding in PlayingPhase, which patches /settings directly.
-
   it("groups rows under tinted section headers (About / Preferences / Recovery)", () => {
     const { lastFrame } = renderModal(minimalConfig({ system: "Spire" }));
     const frame = lastFrame() ?? "";
@@ -270,9 +276,10 @@ describe("CampaignSettingsModal", () => {
 
   it("does not call onImageGenerationChange when the toggle is not dirty", async () => {
     const onImages = vi.fn();
-    const { stdin } = renderModal(minimalConfig(), undefined, undefined, undefined, onImages);
+    const onDismiss = vi.fn();
+    const { stdin } = renderModal(minimalConfig(), undefined, undefined, undefined, onImages, onDismiss);
     stdin.write("\r"); // Enter without any change
-    await new Promise((r) => setTimeout(r, 10));
+    await vi.waitFor(() => expect(onDismiss).toHaveBeenCalled());
     expect(onImages).not.toHaveBeenCalled();
   });
 });

@@ -136,6 +136,19 @@ export interface WorldFile {
   mood?: string;
   /** Difficulty (e.g., "hard", "easy"). */
   difficulty?: string;
+  /**
+   * Visual style for this seed's generated images — the stem of a `.mvstyle`
+   * variant in `prompts/include/Image/` (e.g. `"NoirCinema"`, `"CinematicFilm"`).
+   * Drives two things at setup: (1) the setup agent renders the player's
+   * character reference sheet in this style (`CinematicFilm` is the fallback
+   * when unset), and (2) finalize appends `<!--include:Image.<style>-->` to the
+   * campaign's `campaign_detail`, so the DM renders all in-game art in it too —
+   * overriding the campaign-wide default `<Image>` via the campaign_detail
+   * override slot. Omit to leave the campaign on that default (`CinematicFilm`).
+   * A human-graded, one-style-per-seed pairing; the setup agent may still
+   * override it.
+   */
+  image_style?: string;
   /** Intended campaign length. When set, the setup agent uses this instead of
    *  asking the player about scope. Useful for seeds with a clear length (e.g.
    *  a one-shot premise, or a long-form intrigue that doesn't fit short arcs). */
@@ -153,7 +166,10 @@ export interface WorldFile {
    * possible campaign this seed can produce. Branch-specific worldbuilding does
    * NOT live here — it lives in each fork option's `detail` (see {@link WorldFork})
    * and is spliced in only when that branch is selected. The campaign's final
-   * `campaign_detail` is `assembleCampaignDetail(detail, forks, selections)`.
+   * `campaign_detail` is `assembleCampaignDetail(detail, forks, selections)`,
+   * optionally followed by setup-agent-supplied detail appended at finalize (a
+   * setup-time DM directive the agent was asked to record, e.g. a chosen
+   * visual-style include).
    */
   detail?: string;
 
@@ -202,4 +218,14 @@ export interface WorldFile {
 
   /** Calendar state (world time, no alarms). */
   calendar?: WorldCalendar;
+
+  /**
+   * Derived bookkeeping — estimated `o200k_base` token counts of this seed's
+   * content, stamped by `npm run tokens` (refreshed at pre-push;
+   * `scripts/content-tokens.ts`). NOT hand-authored and NOT read by the engine;
+   * it exists so a seed's weight is legible at a glance. `detail` is the
+   * per-turn DM-context cost, `setup_detail`/`forks` the other channels, and
+   * `total` sums every string in the file.
+   */
+  _tokens?: { detail: number; setup_detail: number; forks: number; total: number };
 }

@@ -8,6 +8,7 @@
     "comedy",
     "modern"
   ],
+  "image_style": "SeasonFinale",
   "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
   "detail": "The player has begun to notice things. Conversations resolve too cleanly. There is a faint music when they walk into a room. Their best friend's character arc seems to be wrapping up. Someone — somewhere — has renewed them for another season, and the renewal envelope is the first thing they ever consciously received from outside the frame.\n\nDM approach:\n- Tone: Pirandello on antidepressants. Funny when the player leans in, devastating when they don't.\n- NPCs derive from the variant: the producer and the grandmother-executive (1), the watching widow glimpsed in glass (2), the worried supporting cast doing their best (3).\n- Pacing: episodes have act breaks the player can feel — a held beat after a confession, a cut to commercial after a near-miss. Honor them or violate them on purpose.\n- Seed early: one moment of audible laugh track. One stranger who lingers half a beat too long after the player exits.\n\nPacing: The season finale is six in-fiction weeks out. Episodes are weeks. Act breaks are scenes. The player can track the clock by reading the room — when the music swells, when the lighting changes, when someone's exit line is too neat for daily life.",
   "forks": [
@@ -81,5 +82,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 249,
+    "setup_detail": 9,
+    "forks": 230,
+    "total": 1120
+  }
 }

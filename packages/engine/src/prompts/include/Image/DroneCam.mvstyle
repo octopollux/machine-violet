@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DroneCam"
+rating: "B"
+description: "Military UAV aerial surveillance still: steep top-down night-vision feed, small tracked subject, grainy mono, targeting HUD"
+tags: [surveillance, lo-fi, monochrome, clinical, wide-vista]
+made-for-model: gpt-image-2
+tokens: 201
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a military-style aerial surveillance drone (UAV) loitering high above the subject at night — a steep top-down, high-oblique view looking down from altitude. The image is a grainy, low-resolution monochrome night-vision sensor feed: desaturated cold grey, heavy sensor noise, soft optics, low contrast, the ground far below. THE SUBJECT IS SMALL AND CENTERED, tracked from above. Overlay a full targeting HUD in thin monospace vector lines: a central crosshair reticle, a square tracking box locked around the subject, and corner readouts — an altitude figure, a latitude/longitude coordinate pair, a heading and a sensor label (for example "UAV / EO-IR"), and a 24-hour clock TIME in HH:MM:SS; show a time only, never a calendar date. Detached, predatory, clinical, godlike.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Surveillance-cluster member — the AERIAL / "Predator-feed" lens. LOAD-BEARING LEVERS: (1) the steep TOP-DOWN altitude vantage with a small centred subject is demanding structural work and leaves large calm dark ground (rest); (2) grounding-by-degradation — a grainy low-res monochrome night-vision sensor feed; (3) the rich TARGETING HUD (crosshair reticle + square tracking box + altitude + lat/lon + heading + sensor label + time-only clock) is the busy-work AND the caption, native to the medium. ANONYMOUS-MENACE: the top-down vantage erases the face (you cannot ID a subject from straight above), so like [ThermalCam](./ThermalCam.mvstyle) / [TrafficCam](./TrafficCam.mvstyle) this is an anonymous-menace lens, not a character-beat one — Xera read only as a small tracked figure (correct). Time-only OSD held ("TIME 02:14:46", no date; the [NightVisionCam](./NightVisionCam.mvstyle) codification). Validated landscape. Keep the top-down altitude vantage, the monochrome night-vision degradation, and the full targeting HUD with its time-only clock.
+
+# Example
+
+![DroneCam](../ImageStyleExample/DroneCam.example.png)

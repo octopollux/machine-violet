@@ -74,6 +74,14 @@ export interface HarnessOptions {
   env?: Record<string, string>;
   /** Max time to wait for the sidecar to become reachable. Default 30s. */
   launchTimeoutMs?: number;
+  /**
+   * Spawn this executable instead of running scripts/launcher.ts under tsx.
+   * Used to drive the PACKAGED binary (the SEA exe) in the packaged-artifact
+   * replay gate — the env (sidecar port, MV_E2E, replay, config dir) is built
+   * the same way; only the spawned command changes. When omitted, the harness
+   * runs the from-source launcher as before.
+   */
+  executable?: { command: string; args?: string[] };
 }
 
 export interface ShutdownOptions {
@@ -145,10 +153,13 @@ export class Harness {
       cwd: opts.cwd,
       extraEnv: opts.env,
     });
-    const args = [...LAUNCHER_NODE_ARGS];
+    // Default: run the from-source launcher under node+tsx. With `executable`,
+    // spawn the packaged binary directly (it reads the same MV_* env vars).
+    const command = opts.executable?.command ?? process.execPath;
+    const args = opts.executable ? (opts.executable.args ?? []) : [...LAUNCHER_NODE_ARGS];
 
     const childLog: string[] = [];
-    const child = spawn(process.execPath, args, {
+    const child = spawn(command, args, {
       env,
       cwd,
       stdio: stdio === "inherit" ? "inherit" : ["ignore", "pipe", "pipe"],

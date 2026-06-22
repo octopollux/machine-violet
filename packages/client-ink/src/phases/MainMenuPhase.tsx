@@ -20,6 +20,12 @@ const COL_ARCHIVE = 1;
 const COL_DELETE = 2;
 const COL_COUNT = 3;
 
+/** Shared empty set so an absent `archivingIds` prop is a stable reference. */
+const NO_ARCHIVING: ReadonlySet<string> = new Set<string>();
+
+/** Stable id for a campaign entry — matches what the archive handler keys on. */
+const entryId = (e: CampaignEntry): string => e.id ?? e.name;
+
 export interface MainMenuPhaseProps {
   theme: ResolvedTheme;
   campaigns: CampaignEntry[];
@@ -31,6 +37,8 @@ export interface MainMenuPhaseProps {
   onNewCampaign: () => void;
   onResumeCampaign: (entry: CampaignEntry) => void;
   onArchiveCampaign: (entry: CampaignEntry) => void;
+  /** Campaign ids whose archive is in flight — render "Archiving…" and block re-triggers. */
+  archivingIds?: ReadonlySet<string>;
   onDeleteCampaign: (entry: CampaignEntry) => void;
   /** When non-null, the delete confirmation modal is shown. */
   deleteModal: CampaignDeleteInfo | null;
@@ -57,6 +65,7 @@ export function MainMenuPhase({
   onNewCampaign,
   onResumeCampaign,
   onArchiveCampaign,
+  archivingIds = NO_ARCHIVING,
   onDeleteCampaign,
   deleteModal,
   onConfirmDelete,
@@ -87,6 +96,20 @@ export function MainMenuPhase({
     setMainMenuIndex((i) => Math.min(i, mainMenuItems.length - 1));
   }, [mainMenuItems.length]);
 
+  // The campaign sub-list stays expanded through an archive so the inline
+  // "Archiving…" state is visible; when the archive lands the entry drops out
+  // of `campaigns` (parent refresh). Keep the selection in range, and fold the
+  // list shut if the last campaign just left.
+  useEffect(() => {
+    if (campaigns.length === 0) {
+      setExpandedCampaigns(false);
+      setCampaignColumn(COL_NAME);
+      setCampaignSelectIndex(0);
+      return;
+    }
+    setCampaignSelectIndex((i) => Math.min(i, campaigns.length - 1));
+  }, [campaigns.length]);
+
   const isItemDisabled = (item: string): boolean =>
     API_REQUIRED_ITEMS.has(item) && !apiKeyValid;
 
@@ -106,7 +129,24 @@ export function MainMenuPhase({
         return;
       }
       if (key.downArrow) {
-        setCampaignSelectIndex((i) => Math.min(campaigns.length - 1, i + 1));
+        if (campaignSelectIndex === campaigns.length - 1) {
+          // Scrolling past the end collapses the list and advances to the
+          // main-menu item below "Continue Campaign" — the mirror of the
+          // up-arrow collapse at the top. Together they make the sub-list
+          // feel woven into the parent menu rather than a trap you can
+          // only back out of the way you came in.
+          setExpandedCampaigns(false);
+          setCampaignColumn(COL_NAME);
+          const continueIndex = mainMenuItems.indexOf("Continue Campaign");
+          setMainMenuIndex(Math.min(mainMenuItems.length - 1, continueIndex + 1));
+        } else {
+          // Clamp inside the updater, not via the closure's stale
+          // campaignSelectIndex: a held ↓ can fire several events against
+          // the same render before React commits, and an unclamped i + 1
+          // would then run repeatedly and overshoot campaigns.length - 1
+          // (making campaigns[campaignSelectIndex] undefined on Enter).
+          setCampaignSelectIndex((i) => Math.min(campaigns.length - 1, i + 1));
+        }
         return;
       }
       if (key.rightArrow) {
@@ -119,14 +159,17 @@ export function MainMenuPhase({
       }
       if (key.return) {
         const entry = campaigns[campaignSelectIndex];
+        // An archive in flight will delete the source on success — block resume,
+        // re-archive, and delete on that entry until it resolves.
+        if (entry && archivingIds.has(entryId(entry))) return;
         if (campaignColumn === COL_NAME) {
           setExpandedCampaigns(false);
           setCampaignColumn(COL_NAME);
           onResumeCampaign(entry);
         } else if (campaignColumn === COL_ARCHIVE) {
+          // Leave the list expanded so the inline "Archiving…" state is visible;
+          // the entry drops out on its own when the parent refresh lands.
           onArchiveCampaign(entry);
-          setExpandedCampaigns(false);
-          setCampaignColumn(COL_NAME);
         } else if (campaignColumn === COL_DELETE) {
           onDeleteCampaign(entry);
         }
@@ -228,6 +271,7 @@ export function MainMenuPhase({
     if (item === "Continue Campaign" && expandedCampaigns) {
       for (let j = 0; j < campaigns.length; j++) {
         const cSelected = j === campaignSelectIndex;
+        const archiving = archivingIds.has(entryId(campaigns[j]));
         const nameActive = cSelected && campaignColumn === COL_NAME;
         const archiveActive = cSelected && campaignColumn === COL_ARCHIVE;
         const deleteActive = cSelected && campaignColumn === COL_DELETE;
@@ -239,9 +283,16 @@ export function MainMenuPhase({
             <Text color={cColor}>{cMarker}</Text>
             <Text color={nameActive ? accentColor : undefined} bold={nameActive}>{` ${campaigns[j].name}`}</Text>
             <Text>{`  `}</Text>
-            <Text color="yellow" bold={archiveActive} dimColor={!cSelected}>{archiveActive ? "[Archive]" : " Archive "}</Text>
-            <Text>{` `}</Text>
-            <Text color="red" bold={deleteActive} dimColor={!cSelected}>{deleteActive ? "[Delete]" : " Delete "}</Text>
+            {archiving ? (
+              // In flight — actions are suppressed (see the Enter guard).
+              <Text color="yellow" dimColor>{`Archiving…`}</Text>
+            ) : (
+              <>
+                <Text color="yellow" bold={archiveActive} dimColor={!cSelected}>{archiveActive ? "[Archive]" : " Archive "}</Text>
+                <Text>{` `}</Text>
+                <Text color="red" bold={deleteActive} dimColor={!cSelected}>{deleteActive ? "[Delete]" : " Delete "}</Text>
+              </>
+            )}
           </Text>,
         );
       }

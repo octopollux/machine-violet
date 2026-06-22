@@ -8,6 +8,7 @@
     "horror",
     "mystery"
   ],
+  "image_style": "BeneathTheSkin",
   "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
   "detail": "The \"different\" is subtle and specific: affected people become slightly better versions of themselves. The angry drunk is calm. The neglectful parent is attentive. The bully is kind. This is the horror — something is fixing people, and it's working.\n\nThe tell: Affected people all share one tiny behavioral tic that's easy to miss — they pause exactly one beat too long before laughing, or they all hum the same four notes when idle, or they never blink when making eye contact.\n\nPacing: Open with normalcy disrupted in small ways. The player should spend 2-3 scenes thinking this might be a good thing before the first crack appears. Someone the player cares about gets \"fixed,\" and the player has to decide if they want them back the way they were.\n\nSetting: the player chooses where this happens (the 'Where it happens' fork). Wherever they land, ground every scene relentlessly in that real place — its food, weather, speech, work, faith, architecture, and social grain. The horror lands hardest against a concrete, accurate backdrop: render the locale so truthfully that the wrongness of the 'better' people shows against it. Each setting also carries its own local idea of what 'better' means, and its own particular loss — play to that.",
   "forks": [
@@ -75,5 +76,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 259,
+    "setup_detail": 8,
+    "forks": 1327,
+    "total": 2187
+  }
 }

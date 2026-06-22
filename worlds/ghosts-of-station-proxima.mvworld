@@ -6,6 +6,7 @@
   "genres": [
     "sci-fi"
   ],
+  "image_style": "GhostsOfStationProxima",
   "detail": "The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?\n\nStation structure: Six modules connected by a central spine. Gravity works in some, not others. Power flickers between modules — the player can restore it, but each module powered up reveals something uncomfortable. One module is completely missing from the blueprints but physically present.\n\nKey NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is helpful, chatty, deeply lonely, and knows more than it admits. It may be compromised. It may just be scared.\n\nYou can trust the mystery itself, the station's unfolding reveals, and the player's agency to manage pacing. PELL fills silence with company, not demands — it does not push the player toward decisions.",
   "forks": [
     {
@@ -53,5 +54,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 166,
+    "setup_detail": 0,
+    "forks": 126,
+    "total": 556
+  }
 }

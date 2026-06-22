@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DocumentaryPhoto"
+rating: "A"
+description: "Candid photojournalistic DSLR still: available light, handheld imperfection, muted true-to-life colour, high-ISO grain"
+tags: [photographic, photoreal, muted, gritty, any-scene]
+made-for-model: gpt-image-2
+tokens: 159
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+# Notes
+
+Append at the END — style last. Grounded DOCUMENTARY / reportage photograph — candid available-light photojournalism, handheld imperfection, muted true-to-life colour, high-ISO grain, photo-essay caption. The grounded "you-are-there, observed-not-staged" register; distinct from the cold degraded SURVEILLANCE cluster ([NightVisionCam](./NightVisionCam.mvstyle) etc.) and from the polished [CinematicFilm](./CinematicFilm.mvstyle). I rated it weakly-differentiated; the USER rated it a TOP-5-OVERALL keeper (eyeballs win, cf. [[show-renders-before-banking]]) — the candid reportage mood reads stronger than I credited. Scene-neutral. A photo-essay caption may include an in-world (future) date — fine, NOT the surveillance no-date rule. Validated on the Xera corridor; a BIG keeper (user). Keep the available-light candid realism + photo-essay caption.
+
+# Example
+
+![DocumentaryPhoto](../ImageStyleExample/DocumentaryPhoto.example.png)

@@ -423,7 +423,7 @@ describe("GameEngine", () => {
       base64: Buffer.from(renderedPng).toString("base64"),
       mimeType: "image/png",
       effortUsed: "standard" as const,
-      aspectUsed: "portrait" as const,
+      aspectUsed: "landscape" as const,
     }));
     const provider = {
       providerId: "mock",
@@ -477,7 +477,7 @@ describe("GameEngine", () => {
     const generateImage = vi.fn(async () => {
       const i = call++;
       await new Promise((r) => setTimeout(r, 3));
-      return { base64: Buffer.from(outs[i]).toString("base64"), mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "portrait" as const };
+      return { base64: Buffer.from(outs[i]).toString("base64"), mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "landscape" as const };
     });
     // Two update_portrait tool calls in ONE turn → dispatched concurrently.
     const responses: ChatResult[] = [
@@ -524,7 +524,7 @@ describe("GameEngine", () => {
   });
 
   it("update_portrait errors before rendering when persistence is unavailable", async () => {
-    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "portrait" as const }));
+    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png" as const, effortUsed: "standard" as const, aspectUsed: "landscape" as const }));
     const responses: ChatResult[] = [
       {
         text: "",
@@ -560,7 +560,7 @@ describe("GameEngine", () => {
   });
 
   it("update_portrait with no existing portrait errors and renders nothing", async () => {
-    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png", effortUsed: "standard" as const, aspectUsed: "portrait" as const }));
+    const generateImage = vi.fn(async () => ({ base64: "AAA=", mimeType: "image/png", effortUsed: "standard" as const, aspectUsed: "landscape" as const }));
     const provider = {
       providerId: "mock",
       chat: vi.fn(async () => responses[idx++]),

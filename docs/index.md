@@ -24,6 +24,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand DM identity and prompting | [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) + [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) |
 | Understand game setup flow | [game-initialization.md](game-initialization.md) |
 | Understand inline image generation | [image-generation.md](image-generation.md) |
+| Add or edit an image-gen visual style | [visual-style-authoring.md](visual-style-authoring.md) |
 | Understand game systems and rule cards | [rules-systems.md](rules-systems.md) |
 | Understand PDF import and content processing | [document-ingestion.md](document-ingestion.md) |
 | Understand error recovery and git | [error-recovery.md](error-recovery.md) |

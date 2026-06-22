@@ -104,14 +104,24 @@ export function createReplayProvider(reader: TapeReader): LLMProvider {
     },
 
     async chat(params: ChatParams): Promise<ChatResult> {
-      return takeChat(params).result;
+      const result = takeChat(params).result;
+      if (isInternalDispatchRecording(params, result)) await replayToolDispatch(params, result);
+      return result;
     },
 
     async stream(params: ChatParams, onDelta: (text: string) => void): Promise<ChatResult> {
       const entry = takeChat(params);
-      // Re-emit recorded deltas; fall back to one delta of the full text for
-      // entries taped via non-streaming chat().
+      // Re-emit the recorded deltas — the verbatim streamed text the player saw
+      // (assistantContent text blocks differ from the stream for codex and can
+      // duplicate). Fall back to one delta of the full text for chat()-taped
+      // entries.
       for (const d of entry.streamDeltas ?? [entry.result.text]) onDelta(d);
+      // Then re-issue the in-band tool dispatches so the engine sees
+      // present_choices / finalize_setup / scribe / style_scene etc. Exact
+      // segmentation around tool boundaries isn't reproduced (the assertion
+      // normalizes whitespace), but every side effect and the full narrative
+      // content is.
+      if (isInternalDispatchRecording(params, entry.result)) await replayToolDispatch(params, entry.result);
       return entry.result;
     },
 
@@ -129,4 +139,37 @@ export function createReplayProvider(reader: TapeReader): LLMProvider {
       return entry.result;
     },
   };
+}
+
+/**
+ * True when the recorded result came from an internal-dispatch provider
+ * (openai-chatgpt / codex app-server): the model's tool calls were dispatched
+ * in-band via `params.dispatchTool` during the turn, so they survive only as
+ * `tool_use` blocks in `assistantContent` and `ChatResult.toolCalls` is empty.
+ * Anthropic-shape recordings surface tool calls via `toolCalls` (dispatched by
+ * the outer agent loop) — replaying those through `dispatchTool` would
+ * double-dispatch, so we exclude them here.
+ */
+function isInternalDispatchRecording(params: ChatParams, result: ChatResult): boolean {
+  return (
+    params.dispatchTool != null &&
+    result.toolCalls.length === 0 &&
+    result.assistantContent.some((b) => b.type === "tool_use")
+  );
+}
+
+/**
+ * Re-issue a codex-shape turn's tool calls (the `tool_use` blocks in
+ * `assistantContent`) through `params.dispatchTool`, in recorded order, so the
+ * engine sees every side effect: present_choices / finalize_setup / set_portrait
+ * / scribe / style_scene … Dispatch results are discarded — the model's
+ * continuation is fixed by the tape; only the side effects matter on replay.
+ */
+async function replayToolDispatch(params: ChatParams, result: ChatResult): Promise<void> {
+  if (!params.dispatchTool) return;
+  for (const part of result.assistantContent) {
+    if (part.type === "tool_use") {
+      await params.dispatchTool({ id: part.id, name: part.name, input: part.input });
+    }
+  }
 }

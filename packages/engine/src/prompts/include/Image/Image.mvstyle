@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Image"
+rating: "?"
+description: "GPU-rendered Japanese MMO photo-mode game render, no HUD or nameplates, with a tasteful caption overlay"
+tags: [game-render, stylized, color, any-scene]
+made-for-model: gpt-image-2
+tokens: 44
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`a GPU-rendered Japanese MMO (in photo mode, no nameplates or HUD), with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim.
+
+# Example
+
+![Image](../ImageStyleExample/Image.example.png)

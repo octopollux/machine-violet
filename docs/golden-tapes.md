@@ -83,26 +83,29 @@ tape out afterward:
 ```bash
 mvplay record <scenario> [--player NAME] [--fresh]   # boots with MV_TAPE_MODE=record
 # ...drive it turn-for-turn, exactly like the /play skill...
-mvplay save-tape packages/engine/src/testing/goldens/<scenario>.golden.json
+mvplay save-tape packages/test-harness/goldens/<scenario>.golden.json
 mvplay stop
 ```
 
 `save-tape` pulls the tape via the engine's dev-only `GET /tape` route and writes
-`{ scenario, tape, expectedNarrative }`. Pull it **before** `mvplay stop` — the
-teardown force-kills the engine (and its in-memory tape) without running exit
-handlers, which is exactly why the tape is read over an HTTP route rather than
-flushed on exit (see `packages/engine/src/providers/tape-mode.ts`).
+a [`FullStackGolden`](../packages/test-harness/src/golden.ts) —
+`{ scenario, tape, expectedNarrative, inputs }`, where `inputs` is the ordered
+`key`/`say`/`pick` sequence captured during the session and `expectedNarrative`
+is the `dm` narration. Pull it **before** `mvplay stop` — the teardown
+force-kills the engine (and its in-memory tape) without running exit handlers,
+which is exactly why the tape is read over an HTTP route rather than flushed on
+exit (see `packages/engine/src/providers/tape-mode.ts`).
 
-> **The setup *agent* now replays offline via the in-process setup corpus
-> (path A).** Reach for `mvplay record` only when you need the parts the
-> in-process path can't construct: the actual TUI render, the WebSocket events,
-> or the setup→game handoff through the **real** `SessionManager` loader.
-> Auto-replaying *those* captured full-stack tapes is the remaining edge — the
-> capture records neither the player inputs nor a replayable narrative
-> segmentation (its `expectedNarrative` is the sidecar's accumulated
-> `narrativeLines`), so re-driving the HTTP/sidecar session isn't wired. A
-> captured full-stack tape is still a real artifact to inspect or seed a future
-> test from; just don't commit one as a passing golden yet.
+> **These full-stack tapes now replay** through the running server stack (and a
+> packaged binary) via [`replay-runner.ts`](../packages/test-harness/src/replay-runner.ts):
+> the captured `inputs` re-drive menu → setup → handoff → DM turns, and a
+> replay-provider seam (`MV_TAPE_MODE=replay` + `MV_E2E`, symmetric to
+> `wrapForRecording`) serves every model call from the tape with no API key. This
+> is what powers the **packaged-artifact gate** — see
+> [e2e-harness.md](e2e-harness.md#packaged-artifact-replay-gate-release--nightly-ci).
+> Reach for `mvplay record` when you need the parts the in-process corpus can't
+> construct: the real TUI render, the WebSocket events, or the setup→game handoff
+> through the **real** `SessionManager` loader.
 
 ## How recording is wired
 
@@ -137,21 +140,24 @@ which:
   of the engine graph is ~20-30s, too heavy per commit).
 - **pre-push**: full `npm run check`, which includes the golden replays.
 
-Activated by `npm install` (the root `prepare` runs `lefthook install`).
+Activated by `npm install` (the root `prepare` runs `scripts/install-hooks.mjs`,
+which installs the lefthook hooks — force-installing into the shared `.git/hooks`
+dir when `core.hooksPath` points there, so all worktrees share one set of hooks).
 
 ## Deferred / open edges
 
-- **Full-stack capture replay** — the setup *agent* and the DM loop both replay
-  offline via the in-process corpora. What's still capture-only is the *mvplay
-  full-stack tape*: replaying a real setup→game session through the **server
-  stack** (TUI render, WebSocket events, the `SessionManager` campaign loader at
-  the handoff) isn't wired, because the capture records neither the player inputs
-  nor a replayable narrative segmentation. Building that runner means adding
-  input capture to `mvplay record` + a replay-provider seam in the stack
-  (symmetric to `wrapForRecording`); Tier-3 live smoke covers that path in the
-  meantime.
+- **Full-stack capture replay** — ✅ **done.** `mvplay record` captures player
+  `inputs`, and [`replay-runner.ts`](../packages/test-harness/src/replay-runner.ts)
+  re-drives the captured session through the real server stack (and a packaged
+  binary) via the `MV_TAPE_MODE=replay` + `MV_E2E` seam. This is the
+  packaged-artifact gate (see
+  [e2e-harness.md](e2e-harness.md#packaged-artifact-replay-gate-release--nightly-ci)).
+  Remaining sub-edge: the assertion is whitespace-normalized over `dm` lines
+  because exact line segmentation around mid-stream tool-call flushes isn't
+  reproduced byte-for-byte.
 - **CI enforcement** of `golden:verify` on PRs — deferred until the pre-commit
-  hook has proven stable in practice.
+  hook has proven stable in practice. (The packaged-artifact replay *is* now
+  enforced in release/nightly CI.)
 - **Freshness guard** — a periodic real-API *structural* re-pilot (tool calls /
   state transitions still match though text drifts) so tapes can't silently lie.
   Designed later.

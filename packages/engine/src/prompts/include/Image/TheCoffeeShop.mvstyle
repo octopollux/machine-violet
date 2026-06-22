@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Coffee Shop"
+rating: "?"
+description: "The Coffee Shop campaign look: GraphicNovel painted bande-dessinée by default, NurseryWatercolor spare spot illustration for emotional character highlights"
+tags: [comic, illustration, painterly, muted, tender]
+made-for-model: gpt-image-2
+tokens: 493
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** painted graphic-novel look below. An **emotional character highlight** — a tender beat on a single character — uses the nursery-watercolor spot-illustration look; for it, keep the subject deliberately spare: describe a single figure (or a small, close group) and only the one or two things they are actually holding or touching, with NO landscape, sky, room, or filled-in background — the wide bare white page around the figure is the whole point of that look.
+
+# Style
+
+Default (most scenes) — `Rendered as a modern painted graphic-novel illustration — confident ink line work under rich painted colour, in the tradition of a high-end European bande-dessinee album. Clean varied ink contour lines holding fully painted, atmospheric colour with soft modelling and a harmonious limited palette; a clear focal hierarchy with the figure crisply inked and rendered and the background looser and more atmospheric. Cinematic lighting, mature and polished. Close with a small tasteful caption in clean type, like an album plate.`
+
+Emotional character highlight — `Rendered in the manner of a vintage children's storybook spot illustration: a small picture set alone in the centre of a large sheet of clean white paper, with a wide plain-paper margin all around it. The drawing is carried first and foremost by an expressive dip-pen ink line of living, varying weight — fine and broken in the lights, thicker where forms turn, with the gentle wobble of a real nib — describing most of the form by line alone. Over that line lay only a few transparent watercolour washes, wet-on-dry, touched in here and there in a soft, limited, faded palette — pale ochre, sage and moss green, dove grey, a little dusty rose and faded blue — letting the pigment granulate at the wet edges. Hold strict watercolour discipline: there is no white paint; every highlight is the bare paper, reserved by painting around it. Let the line and washes concentrate on the figure and the few things she touches and fade out softly within a hand's breadth, so the image reads as a gentle floating vignette on the open page. Airy, line-forward, tender, faintly naive, with the quiet of a single storybook page. Finish with a caption as a short line of looping handwritten ink lettering beneath the picture, fully legible.`
+
+# Notes
+
+Campaign composite for the **the-coffee-shop** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [GraphicNovel](./GraphicNovel.mvstyle) (painted European bande-dessinée — the campaign-wide workhorse). EMOTIONAL HIGHLIGHT = [NurseryWatercolor](./NurseryWatercolor.mvstyle) (tender white-page spot illustration; SCENE-COUPLED, so its load-bearing spare-subject steering — one figure, no environment, bare page — is carried positively in the `# Direction`, scoped to this case). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![GraphicNovel](../ImageStyleExample/GraphicNovel.example.png)
+
+![NurseryWatercolor](../ImageStyleExample/NurseryWatercolor.example.png)

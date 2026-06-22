@@ -19,12 +19,14 @@
     "golden:verify": "vitest run golden",
     "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
     "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
+    "e2e:replay": "node --import tsx/esm packages/test-harness/bin/replay-golden.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
+    "tokens": "node --import tsx/esm scripts/content-tokens.ts",
     "voice-guide": "node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
     "theme-editor": "node tools/theme-editor/scripts/dev.js",
-    "prepare": "lefthook install"
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "keywords": [
     "rpg",
@@ -37,7 +39,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
+    "@anthropic-ai/sdk": "^0.104.1",
     "clipboardy": "^5.3.1",
     "dotenv": "^17.4.2",
     "fflate": "^0.8.2",
@@ -51,16 +53,17 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.2.0",
     "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
+    "js-tiktoken": "^1.0.21",
     "knip": "^6.15.0",
-    "lefthook": "^1.13.6",
+    "lefthook": "^2.1.9",
     "rcedit": "^5.0.2",
     "react-devtools-core": "^7.0.1",
     "tsx": "^4.7.0",
@@ -74,7 +77,7 @@
     "tools/theme-editor"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=25.0.0"
   },
   "overrides": {
     "ink-scroll-view": {

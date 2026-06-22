@@ -66,11 +66,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prep.outputs.tag }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -122,7 +122,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: matrix.os == 'windows-latest'
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -160,28 +160,71 @@ jobs:
 
       - name: Upload artifact (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: velopack-out/*
 
       - name: Upload artifact (macOS/Linux)
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: machine-violet-${{ matrix.asset_suffix }}
           path: machine-violet-*.${{ matrix.archive }}
 
-  release:
+  # Gate: replay the golden corpus against the PACKAGED per-OS artifact before
+  # publishing — a broken package (SEA injection, asset vendoring, boot) fails
+  # here and blocks the release. Deterministic + offline (MV_E2E + replay, no
+  # API key). See docs/e2e-harness.md.
+  verify-package:
     needs: [prep, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            asset_suffix: windows-x64
+          - os: macos-latest
+            asset_suffix: darwin-arm64
+          - os: ubuntu-latest
+            asset_suffix: linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prep.outputs.tag }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 25
+          cache: npm
+      - run: npm ci
+      - name: Build shared package
+        run: npm run build -w packages/shared
+      - name: Download packaged artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: machine-violet-${{ matrix.asset_suffix }}
+          path: pkg-artifact
+      - name: Replay goldens against the packaged binary
+        shell: bash
+        run: bash scripts/ci/replay-packaged-binary.sh pkg-artifact
+      - name: Velopack install/uninstall smoke (Windows)
+        if: matrix.os == 'windows-latest'
+        # Blocking: validated end-to-end on a clean runner via test-build.yml
+        # (install -> replay installed binary -> uninstall). See docs/e2e-harness.md.
+        shell: pwsh
+        run: scripts/ci/velopack-install-smoke.ps1 -ArtifactDir pkg-artifact -RepoRoot .
+
+  release:
+    needs: [prep, build, verify-package]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prep.outputs.tag }}
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true

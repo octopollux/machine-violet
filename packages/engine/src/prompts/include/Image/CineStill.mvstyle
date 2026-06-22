@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "CineStill"
+rating: "?"
+description: "CineStill 800T tungsten night film: cyan shadows, teal midtones, amber highlights, trademark red-orange halation glow"
+tags: [film-stock, photoreal, cool, dreamy, interior-friendly, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 142
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph shot on CineStill 800T — the tungsten-balanced cinema colour film famous for its night look. CineStill's signature: a cool tungsten colour balance with cyan-leaning shadows and teal midtones, warm amber highlights, and — the unmistakable trademark — a soft red-orange HALATION GLOW blooming around every bright light source, where the bright halos bleed a warm red ring. Cinematic, moody, nocturnal, with fine grain. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. FILM-STOCK family — CINESTILL 800T, the tungsten-balanced NIGHT cinema film: cyan shadows + teal midtones + amber highlights + the trademark soft red-orange HALATION GLOW around bright lights. PROOF-SCENE matters: rendered on the NIGHT CORRIDOR (not the daylight clearing) so the halation-around-lights signature shows — a night / artificial-light scene is its native habitat. USER NOTE: it reads "a little weak — doesn't quite look like FILM, basically a really high-quality UNSTYLED render" — kept anyway (a clean cinematic night look). Photorealism lever (see [Kodachrome](./Kodachrome.mvstyle)). Caption = clean photographic font. Validated on the corridor; a keeper (user). Keep the tungsten balance + red halation.
+
+# Example
+
+![CineStill](../ImageStyleExample/CineStill.example.png)

@@ -9,16 +9,22 @@
  * harness force-kills the process tree (`taskkill /F`), which skips exit
  * handlers (see packages/test-harness/src/harness.ts).
  *
- * Replay does NOT go through here: the deterministic Tier-2 runner constructs
- * the engine in-process with a replay provider directly.
+ * Replay has two homes: the in-process Tier-2 runner constructs the engine
+ * directly with a replay provider (it never touches this module), while
+ * full-stack / packaged-binary replay flows through {@link buildReplayTierProviders}
+ * here — `MV_TAPE_MODE=replay` serves every tier from a tape, so the real
+ * server stack (and, in CI, the packaged binary) runs with no connection,
+ * network, or API key.
  *
  * Production never sets `MV_TAPE_MODE`, so `wrapForRecording` is an identity
- * pass-through and these providers behave exactly as built.
+ * pass-through, `buildReplayTierProviders` returns null, and these providers
+ * behave exactly as built.
  */
+import { readFileSync } from "node:fs";
 import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import type { LLMProvider, TierProvider } from "./types.js";
-import { TapeWriter, type Tape } from "./tape.js";
-import { createTapingProvider } from "./tape-provider.js";
+import { TapeReader, TapeWriter, deserializeTape, type Tape } from "./tape.js";
+import { createReplayProvider, createTapingProvider } from "./tape-provider.js";
 
 export function recordingActive(): boolean {
   return process.env.MV_TAPE_MODE === "record";
@@ -59,8 +65,60 @@ export function getRecordedTape(): Tape | null {
   return recordingActive() && writer ? writer.build() : null;
 }
 
-/** Test-only: clear the process-global recorder state between cases. */
+// ---------------------------------------------------------------------------
+// Replay mode (full-stack / packaged-binary E2E).
+//
+// `MV_TAPE_MODE=replay` + `MV_TAPE_PATH=<serialized tape>` makes the provider
+// seam serve every tier from a recorded tape — no connection, no network, no
+// API key. This is what lets the deterministic golden replay run against the
+// *running server stack* (and, in CI, the packaged binary), not just the
+// in-process Tier-2 runner. The harness writes the bare serialized Tape to
+// MV_TAPE_PATH (extracted from the golden envelope) before launching.
+//
+// Gated, env-only, never set in production. See docs/e2e-harness.md.
+// ---------------------------------------------------------------------------
+
+/** Fallback model id for replayed tiers when the tape recorded none. */
+const REPLAY_MODEL = "replay-tape";
+
+export function replayActive(): boolean {
+  return process.env.MV_TAPE_MODE === "replay";
+}
+
+let reader: TapeReader | null = null;
+function getReader(): TapeReader {
+  if (reader) return reader;
+  const path = process.env.MV_TAPE_PATH;
+  if (!path) throw new Error("MV_TAPE_MODE=replay requires MV_TAPE_PATH to point at a serialized tape");
+  reader = new TapeReader(deserializeTape(readFileSync(path, "utf8")));
+  return reader;
+}
+
+/**
+ * In replay mode, a tier map whose three tiers share ONE tape-backed provider
+ * (buckets are keyed by conversationId inside the provider, so a single shared
+ * instance is correct — this mirrors the in-process corpus runner, which hands
+ * the same replay provider to all three tiers). Returns null when replay is
+ * inactive, so callers fall through to live connection resolution.
+ */
+export function buildReplayTierProviders(): Record<ModelTier, TierProvider> | null {
+  if (!replayActive()) return null;
+  const reader = getReader();
+  const provider = createReplayProvider(reader);
+  // Drive the tiers with a model id the tape actually recorded, so the replay
+  // provider's getCapabilities resolves to the recorded snapshot (image-gen,
+  // etc.) instead of the unrecorded-model fallback that reports no image
+  // capability — otherwise replaying an image-bearing golden would silently
+  // skip the consent/portrait flow. Falls back to the synthetic id only for a
+  // capability-less / empty tape.
+  const model = reader.defaultModel() ?? REPLAY_MODEL;
+  const tp = (): TierProvider => ({ provider, model });
+  return { large: tp(), medium: tp(), small: tp() };
+}
+
+/** Test-only: clear the process-global recorder/replay state between cases. */
 export function __resetTapeModeForTest(): void {
   writer = null;
+  reader = null;
   wrapped = new WeakMap<LLMProvider, LLMProvider>();
 }

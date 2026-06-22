@@ -8,6 +8,7 @@
     "modern",
     "fantasy"
   ],
+  "image_style": "Symmetrical",
   "detail": "For years they have been each other's whole career. The Hound, a detective with a reputation. The Fox, a thief with a style. Their rivalry is a public sport in this city — the front pages know the joke and so do the bartenders. Today a crime has been committed, in the style of one of them, against a target that belongs to the other. By tomorrow there will be another. Someone is framing them both, and doing it with affection.\n\nDM approach:\n- Tone: banter, theatre, romance disguised as enmity. Both leads know each other's tells. The chase has rules and the rules are old.\n- NPCs by variant: a fawning rookie reporter who has been documenting both their careers and may be the copycat (1); an antiques dealer who passes messages and used to work for someone older (2); a long-lost sibling who is too composed when interviewed (3).\n- Seed early: a calling card left at the wrong scene; a stolen object returned with a note; an old case file the precinct doesn't have on record.\n- Pacing: each new crime is more intimate. The first is property. The third is personal. The sixth is the meeting they were too proud to make.\n- Both Hound and Fox are tired. Underneath the performance they are exhausted by each other. The frame-up is, in part, mercy.\n\nPacing: Six escalating crimes, each more personal than the last. The clock is the next morning paper — every fresh headline is a fresh staging, and the city is keeping score. By the sixth, both leads are out of professional pretext and have to meet as themselves.",
   "forks": [
     {
@@ -80,5 +81,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 338,
+    "setup_detail": 0,
+    "forks": 246,
+    "total": 1320
+  }
 }

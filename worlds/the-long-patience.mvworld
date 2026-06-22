@@ -8,6 +8,7 @@
     "horror",
     "mystery"
   ],
+  "image_style": "PainterlyGame",
   "system": "fate-accelerated",
   "mood": "Tense, paranoid",
   "difficulty": "Unforgiving",
@@ -129,5 +130,11 @@
         "body": "The CIA and the KGB: the two great machines of the Cold War, locked in a standoff each believes it is winning. Both run [[LAZARUS]]. Neither knows the other does, and neither knows what he is. To the old things they are not rivals so much as two halves of the same farm.\n\n## DM only\nKeep them mostly offstage — the field is where this plays, not headquarters. They are the source of missions, of pressure, and of betrayal, and of the dawning horror that the player's own side is feeding the thing on the far side of the table. Inside the Western half, [[The Archivists]] are the ones who have begun to suspect."
       }
     }
+  },
+  "_tokens": {
+    "detail": 975,
+    "setup_detail": 567,
+    "forks": 0,
+    "total": 4263
   }
 }

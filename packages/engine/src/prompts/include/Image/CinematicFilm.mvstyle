@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "CinematicFilm"
+rating: "C"
+description: "Prestige 35mm anamorphic film still: gentle horizontal flares, shallow DoF, grain, teal/warm grade, letterbox title"
+tags: [motion-picture, photoreal, muted, cool, glamorous]
+made-for-model: gpt-image-2
+tokens: 179
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography: a wide anamorphic frame with gentle horizontal lens flares, a shallow depth of field with creamy bokeh and oval out-of-focus highlights, and natural filmic sharpness on the subject. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting with an atmospheric haze catching the light. The composed, intentional look of a single frame lifted from a beautifully shot film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+# Notes
+
+Append at the END — style last. The catalog's prestige CINEMATIC FILM-STILL register (35mm anamorphic, horizontal lens flares, shallow DoF, film grain, teal/warm grade, letterbox + film-title caption) — the "this is a movie moment" look the catalog lacked. Differentiates from the photoreal game renders not by the base render (which converges) but by the cinematic FRAMING + FINISH (letterbox, anamorphic flares, title treatment). Genre-neutral (scrubbed "science-fiction" → "film" so it serves any setting). Sibling: the B&W [NoirCinema](./NoirCinema.mvstyle). NOTE: user wants a higher-FLARE take too ("sometimes you just need some lens flares") — a flarier render is under review; may update this style line or add a sibling. Validated on the Xera corridor; a keeper (user). Keep the anamorphic + letterbox + title caption.
+
+# Example
+
+![CinematicFilm](../ImageStyleExample/CinematicFilm.example.png)

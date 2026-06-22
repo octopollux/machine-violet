@@ -8,6 +8,7 @@
     "modern",
     "comedy"
   ],
+  "image_style": "TriX",
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
   "detail": "The player is losing time. Two hours here, three there, a whole evening once. They wake to apartments they tidied while asleep, conversations friends remember and they do not, money they did not earn. Eventually there is a note. The note is polite. The note is in handwriting that is theirs and is not theirs. The tenant introduces themselves. The tenant would like to be a good neighbor.\n\nDM approach:\n- Tone: domestic, intimate, the horror of finding small kindnesses you did not perform.\n- NPCs: the tenant (always offstage when the player is on); the coworker, friend, or stranger who knows both of them; the manager at the corporation, or the priest who handles these cases, depending on the variant.\n- Pacing structure: blackouts at first, two hours a day. Then negotiated co-tenancy. Then the body itself starts to change.\n- Seed early: a small physical alteration the tenant is responsible for — a new callus, a haircut, a piercing. Let the player look in the mirror and see the negotiation.\n- The tenant is a roommate, not a parasite. Play their kindness against the loss of self.\n\nWhat the tenant leaves behind (weave ALL of these in — the texture of the shared life, not a menu):\n- **money** — deposits larger than the player's salary appear in their account on a rising curve, from work the player never did and the tenant won't explain; the tax implications will eventually be the player's problem.\n- **wounds** — bruises and cuts the player doesn't remember earning; once a neatly stitched gash with a note pinned to the bandage, an apology and the name of an antibiotic. The tenant lives a more dangerous life than the player does.\n- **a beloved** — someone loves the tenant, and the tenant cannot appear without the player, so the player has to keep meeting them: looked at the way no one has ever looked at them, unable to say why their eyes don't settle the way this person remembers.\n- **skills in the hands, not the head** — the player can suddenly play piano, or speak Cantonese, or pick a lock; the knowledge is there when they reach for it and gone when they try to explain it. The tenant practiced for years; the player inherited the muscle, not the patience.\nThese accumulate: the longer the co-tenancy runs, the more of the tenant's life the player is living without having chosen it.\n\nPacing: the time the tenant takes grows on a measurable curve. The first week is two hours a day. By the end of the first month it is half. The body itself begins to show the shared use — a new mark, a softened voice, a preference for tea. The clock the player can read is their own calendar, and the gaps in it.",
   "forks": [
@@ -60,5 +61,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 575,
+    "setup_detail": 9,
+    "forks": 221,
+    "total": 1243
+  }
 }

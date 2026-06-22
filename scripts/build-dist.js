@@ -215,7 +215,11 @@ rmSync(join(DIST, "bundle.js"), { force: true });
 
 // --- Step 3: Copy assets ---
 const assets = [
-  { src: "packages/engine/src/prompts", dest: "prompts" },
+  // `exclude` drops a subtree from the copy (returning false for a directory
+  // skips its whole contents). ImageStyleExample/ holds full-res worked sample
+  // images for each `.mvstyle` style variant — an authoring aid for assigning
+  // styles to seeds, never read at runtime — so it must NOT ship in the SEA.
+  { src: "packages/engine/src/prompts", dest: "prompts", exclude: /[\\/]ImageStyleExample(?:[\\/]|$)/ },
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
   { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
@@ -226,12 +230,19 @@ const assets = [
   { src: "packages/engine/src/assets", dest: "assets", filter: /(?:\.json$|(?:^|[\\/])(?:LICENSE|README\.md)$)/ },
 ];
 
-for (const { src, dest, filter } of assets) {
+for (const { src, dest, filter, exclude } of assets) {
   const srcDir = join(ROOT, src);
   const destDir = join(DIST, dest);
   console.log(`  Copying ${dest}/...`);
-  if (filter) {
-    cpSync(srcDir, destDir, { recursive: true, filter: (s) => statSync(s).isDirectory() || filter.test(s) });
+  if (filter || exclude) {
+    cpSync(srcDir, destDir, {
+      recursive: true,
+      filter: (s) => {
+        if (exclude && exclude.test(s)) return false;
+        if (filter) return statSync(s).isDirectory() || filter.test(s);
+        return true;
+      },
+    });
   } else {
     cpSync(srcDir, destDir, { recursive: true });
   }

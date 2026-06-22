@@ -15,6 +15,7 @@ import {
   maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
+import { e2eActive, e2eConnectionStore, E2E_HEALTH } from "../../config/e2e.js";
 import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
 import {
@@ -24,8 +25,9 @@ import {
 import type { OAuthFlow } from "../../providers/openai-chatgpt/index.js";
 import {
   archiveCampaign, deleteCampaign, listArchivedCampaigns,
-  unarchiveCampaign, getCampaignDeleteInfo,
+  unarchiveCampaign, getCampaignDeleteInfo, archiveDir,
 } from "../../config/campaign-archive.js";
+import { norm } from "../../utils/paths.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
 import { loadMachineSettings, saveMachineSettings } from "../../config/machine-settings.js";
 import { createArchiveFileIO } from "../fileio.js";
@@ -46,6 +48,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // -----------------------------------------------------------------------
 
   function getConnections(): ConnectionStore {
+    // E2E: one synthetic always-valid connection so the menu unlocks without
+    // real credentials. Real LLM calls still route through the replay tier
+    // seam (MV_TAPE_MODE=replay), which ignores connections.
+    if (e2eActive()) return e2eConnectionStore();
     const stored = loadConnectionStore(server.configDir);
     return buildEffectiveConnections(stored, server.configDir);
   }
@@ -157,6 +163,12 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     const conn = store.connections.find((c) => c.id === (request.params as { id: string }).id);
     if (!conn) {
       return reply.status(404).send({ error: "Connection not found." });
+    }
+
+    // E2E: the synthetic connection is always valid — short-circuit before
+    // building a real provider (which would make a live network call).
+    if (e2eActive()) {
+      return { id: conn.id, ...E2E_HEALTH };
     }
 
     // configDir is required for openai-chatgpt: without it the provider
@@ -521,6 +533,16 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
   });
 
+  // Per-campaign in-flight archive guard. Two concurrent archives of the same
+  // campaign race each other: both compute the same destination zip path (it
+  // doesn't exist yet for either), both write to it, and one's source deletion
+  // races the other's walk/read-back — yielding a corrupt or "contents mismatch
+  // on disk" archive. A double-fire from the UI (no input block) is the common
+  // trigger. Reject the duplicate rather than queueing it: one archive is one
+  // intentional action. The `isBusy` check above only covers active *sessions*,
+  // not a second archive of an idle campaign.
+  const archivesInProgress = new Set<string>();
+
   /** Archive a campaign to zip. */
   server.post("/campaigns/:id/archive", {
     schema: {
@@ -533,14 +555,23 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       return reply.status(409).send({ error: "Cannot archive while a session is active." });
     }
 
-    const campaignPath = join(campaignsDir(), (request.params as { id: string }).id);
-    const io = createArchiveFileIO();
-    const result = await archiveCampaign(campaignPath, campaignsDir(), io);
-
-    if (!result.ok) {
-      return reply.status(500).send({ error: result.error ?? "Archive failed." });
+    const id = (request.params as { id: string }).id;
+    if (archivesInProgress.has(id)) {
+      return reply.status(409).send({ error: "Archive already in progress for this campaign." });
     }
-    return { ok: true, zipPath: result.zipPath };
+    archivesInProgress.add(id);
+    try {
+      const campaignPath = join(campaignsDir(), id);
+      const io = createArchiveFileIO();
+      const result = await archiveCampaign(campaignPath, campaignsDir(), io);
+
+      if (!result.ok) {
+        return reply.status(500).send({ error: result.error ?? "Archive failed." });
+      }
+      return { ok: true, zipPath: result.zipPath };
+    } finally {
+      archivesInProgress.delete(id);
+    }
   });
 
   /** Permanently delete a campaign. */
@@ -577,25 +608,54 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return { archives };
   });
 
-  /** Restore an archived campaign. Body includes zipPath from the list response. */
+  // Per-archive in-flight restore guard — the symmetric twin of the archive
+  // lock. Restore stays on the archived-campaigns screen with no input block, so
+  // a mashed Enter is even easier than the archive double-fire: two concurrent
+  // restores of the same zip race the unique-dir loop (TOCTOU between the
+  // `exists` check and `mkdir`) and can collide on one dir or spawn duplicate
+  // `-2`/`-3` slots. Keyed by the resolved zip path; reject the duplicate.
+  const restoresInProgress = new Set<string>();
+
+  /** Restore an archived campaign. Body may carry the zipPath from the list response. */
   server.post("/campaigns/archived/:name/restore", {
     schema: {
       tags: ["Management"],
       params: NameParams,
       body: RestoreRequest,
-      response: { 200: OkResponse, 500: ErrorResponse },
+      response: { 200: OkResponse, 400: ErrorResponse, 409: ErrorResponse, 500: ErrorResponse },
     },
   }, async (request, reply) => {
-    // Prefer explicit zipPath from body; fall back to reconstructing from name
-    const zipPath = (request.body as { zipPath?: string })?.zipPath
-      ?? join(campaignsDir(), "archivedcampaigns", `${(request.params as { name: string }).name}.zip`);
-    const io = createArchiveFileIO();
-    const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
-
-    if (!result.ok) {
-      return reply.status(500).send({ error: result.error ?? "Restore failed." });
+    // Resolve the target strictly INSIDE the canonical archive dir. The client
+    // echoes back a zipPath from the list endpoint, but we never trust it as a
+    // path: take only its filename component (everything after the last
+    // separator drops directory parts and `..`), so a crafted body or `:name`
+    // can't turn this into an arbitrary-zip reader or escape via traversal.
+    // Archives live in archiveDir() — a SIBLING of campaignsDir, not a child —
+    // so the by-name fallback must reconstruct from there, not from campaignsDir.
+    const archDir = norm(archiveDir(campaignsDir()));
+    const requested = ((request.body as { zipPath?: string }).zipPath
+      ?? `${(request.params as { name: string }).name}.zip`).replace(/\\/g, "/");
+    const fileName = requested.slice(requested.lastIndexOf("/") + 1);
+    if (!fileName || fileName.includes("\0") || !fileName.toLowerCase().endsWith(".zip")) {
+      return reply.status(400).send({ error: "Invalid archive name." });
     }
-    return { ok: true };
+    const zipPath = norm(join(archDir, fileName));
+
+    if (restoresInProgress.has(zipPath)) {
+      return reply.status(409).send({ error: "Restore already in progress for this archive." });
+    }
+    restoresInProgress.add(zipPath);
+    try {
+      const io = createArchiveFileIO();
+      const result = await unarchiveCampaign(zipPath, campaignsDir(), io);
+
+      if (!result.ok) {
+        return reply.status(500).send({ error: result.error ?? "Restore failed." });
+      }
+      return { ok: true };
+    } finally {
+      restoresInProgress.delete(zipPath);
+    }
   });
 
   // -----------------------------------------------------------------------

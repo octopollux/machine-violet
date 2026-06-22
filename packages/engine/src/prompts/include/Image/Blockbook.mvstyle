@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Blockbook"
+rating: "?"
+description: "Hand-coloured medieval blockbook woodcut: carved black key-block with flat out-of-register medieval colour washes"
+tags: [printmaking, period, limited-palette, epic, establishing]
+made-for-model: gpt-image-2
+tokens: 268
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a hand-coloured medieval woodcut from a late-medieval / early-Renaissance illuminated blockbook — bold black ink printed from a hand-carved woodblock onto rough off-white paper, then hand-tinted with flat translucent colour washes. Strict process discipline: keep the underlying image a true woodcut — built from bold carved black outlines, flat black shapes, the bare paper, and coarse parallel gouge-hatching for shadow, with no smooth photographic tone. Over that black key-block lay flat, naive, slightly uneven hand-applied colour washes in a limited medieval palette — vermilion red, ochre and saffron yellow, verdigris and copper green, lapis and indigo blue, a little gold — the colour sitting in flat areas, often slightly out of register so it strays past the black lines, with the rough paper showing through. Intricate and richly worked, with a flat medieval pictorial space and no realistic perspective. The bold carving and the limited flat palette keep the image graphic and coherent even where the scene is crowded. Ancient, vivid, and hand-made. Close with a caption as a line of crude carved or letterpress block lettering beneath the image, like the text beneath a broadsheet woodcut.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The COLOUR sibling of [Woodcut](./Woodcut.mvstyle) — a hand-coloured medieval illuminated-blockbook woodcut: the same bold carved black key-block (so it stays a relief PRINT, not a generic oil painting — which is exactly what got plain "Old Master oil" rejected as too in-distribution), overlaid with flat, naive, slightly out-of-register hand-applied colour washes in a limited medieval palette. This is the one register where THE TIC IS WELCOME: a teeming Dante/Bosch-style hellscape WANTS to be packed corner to corner, so lean INTO the density rather than fighting it (like [Risograph](./Risograph.mvstyle) being maximalist), and the carving + limited flat palette keep even a crowded frame graphic and coherent. Distinct from [GildedVellum](./GildedVellum.mvstyle) (that is a painted gilded illumination; this is a relief print with flat colour). SCENE-AGNOSTIC: the style line describes only the MEDIUM. An earlier cut hard-coded "blockbook of Hell … devotional but infernal" and would have smuggled demons and fire into ANY scene (a real latent bug — the user caught it); those content words were removed. Validated BOTH ways on the generalised prompt — a Dante "abandon all hope" hellscape AND a sunny cheerful village market — and it renders whatever the scene calls for, the caption matching the mood (pseudo-Latin Dante for hell, a merry broadsheet rhyme for the market). Its welcome-the-density trait still makes it shine on crowded / infernal subjects, but it is not locked to them. The LOOK is driven by the medium + flat palette, not by mood words. Best rendered LANDSCAPE for gameplay. Keep the carved black key-block, the flat out-of-register medieval colour washes, and the broadsheet block-caption.
+
+# Example
+
+![Blockbook](../ImageStyleExample/Blockbook.example.png)

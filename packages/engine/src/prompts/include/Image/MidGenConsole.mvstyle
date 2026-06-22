@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "MidGenConsole"
+rating: "D"
+description: "2007 Xbox-360/PS3 game render: waxy pre-PBR speculars, bloom-drunk HDR, crude SSAO halos, brown/teal grade, jaggies"
+tags: [game-render, retro, muted, nostalgic]
+made-for-model: gpt-image-2
+tokens: 282
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an authentic in-game screenshot from a 2007-era Xbox-360 / PlayStation-3 generation game engine (DirectX 9c / Shader Model 3) — a clearly last-generation real-time render, NOT modern and NOT pre-rendered. Make the period limitations VISIBLE: chunky last-gen geometry (smoother than the early 2000s but still obviously low-detail, with simple silhouettes), CRUNCHY normal-mapped textures at limited resolution, and a waxy PRE-PBR look where everything carries the same plasticky over-glossy specular sheen. Lighting is heavy-handed and dated: aggressive early-HDR BLOOM blowing out every bright source, crude tone-mapping, FIRST-GENERATION screen-space ambient occlusion drawing obvious muddy dark halos around objects, and LOW-RESOLUTION shadow maps with visibly jagged, aliased, flickery edges. A thick period colour grade — heavily crushed blacks and a strong brown-and-orange or teal cast over everything. Hard edge aliasing with no temporal anti-aliasing (jaggies and shimmer), and a limited draw distance. The unmistakable look of a flagship 2007 console game — impressive for its day, plasticky, bloom-drunk, and clearly dated. Close with a caption overlaid in a period game font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt — `gpt-image-2` adheres better when style guidance comes last. Game-render ERA LADDER ([RetroDX9](./RetroDX9.mvstyle) 2004 → MidGenConsole 2007 → [DeferredDX11](./DeferredDX11.mvstyle) 2011 → [RayTracedAAA](./RayTracedAAA.mvstyle) 2019): the mid-2000s Xbox-360 / PS3 generation rung. Forced into its era by AGGRESSIVE structural degradation (chunky last-gen geometry, crunchy textures, waxy PRE-PBR speculars, bloom-drunk early HDR, crude first-gen SSAO halos, jagged low-res shadow maps, brown/teal grade, no-TAA aliasing) — the [RetroDX9](./RetroDX9.mvstyle) lesson; moderate callouts just converge to modern (the rejected non-degraded 2007 twin proved it). Reads as the over-the-shoulder 360-era console game. Scene-neutral. Caption = period game font. Validated on the Xera corridor scene; a keeper (user). Keep the aggressive period degradation (the era-lander).
+
+# Example
+
+![MidGenConsole](../ImageStyleExample/MidGenConsole.example.png)

@@ -1,4 +1,4 @@
-import type { CampaignConfig, PlayerConfig, CampaignScope } from "@machine-violet/shared/types/config.js";
+import type { CampaignConfig, PlayerConfig, CampaignScope, MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 import type { DMPersonality } from "@machine-violet/shared/types/config.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
@@ -38,6 +38,14 @@ export interface SetupResult {
    * — the ESC-menu toggle can flip it later.
    */
   imageGeneration?: "on" | "off";
+  /**
+   * How the player wants the active light system's mechanics surfaced. Only
+   * set when a light/ultra-light system was chosen and the setup agent asked
+   * the question; omitted for crunchy systems and systemless campaigns. When
+   * a light system is run without an explicit choice, the DM prefix falls back
+   * to MECHANICS_MODE_DEFAULT.
+   */
+  mechanicsMode?: MechanicsMode;
   /**
    * Handoff postcard for the DM's first turn. Written by the setup agent
    * as free-form prose summarising what the player actually said (character
@@ -97,6 +105,7 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     difficulty: result.difficulty,
     campaign_scope: result.campaignScope,
     image_generation: result.imageGeneration,
+    mechanics_mode: result.mechanicsMode,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
     fork_selections: result.forkSelections && Object.keys(result.forkSelections).length > 0

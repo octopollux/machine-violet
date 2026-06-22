@@ -1,0 +1,4 @@
+# Shell scripts must stay LF — they run on Linux/macOS CI runners, where CRLF
+# breaks the shebang ($'\r': command not found). Keeps the packaged-artifact
+# gate (scripts/ci/replay-packaged-binary.sh) reliable across platforms.
+*.sh text eol=lf

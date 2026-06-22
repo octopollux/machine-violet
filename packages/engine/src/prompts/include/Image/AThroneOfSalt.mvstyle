@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "A Throne of Salt"
+rating: "?"
+description: "A Throne of Salt campaign look: ValueBlocked big-shape illustration by default, LargeFormat70 65/70mm clarity for sweeping outdoor 'wow' shots"
+tags: [illustration, graphic, epic, wide-vista, establishing]
+made-for-model: gpt-image-2
+tokens: 315
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most images use the **default** look below; reserve the **wide** look for the occasional sweeping outdoor "wow" establishing shot — a grand vista, the advancing salt horizon, monumental scale.
+
+# Style
+
+Default (most images) — `Rendered as a clean modern digital illustration designed around BIG SHAPES and a strong value read. Strict process discipline: design the whole image as a few large, simple, interlocking shapes of light and shadow (a clear notan) with a powerful silhouette read; keep those big shapes flat and clean and subordinate ALL detail to them; only the focal point gets a little refinement, everything else stays in big calm value masses. A harmonious limited palette. Bold, clear, modern, uncluttered. Close with a small tasteful caption in clean type.`
+
+Wide, sweeping outdoor "wow" shots only — `Rendered as a frame shot on large-format 65/70MM film — the high-resolution epic-cinema format. The signature: extraordinary CLARITY and resolution with immense fine detail held from the extreme foreground to the far horizon; DEEP focus front-to-back; rich, smooth, almost grainless tonality; a vast widescreen sense of scale and grandeur; natural, restrained colour; and the immersive, monumental quality of a roadshow epic. Crisp, deep, vast, monumental. Close with a small caption in an elegant period film-title font — a scene or place title only; do NOT print the film process or format name in the caption.`
+
+# Notes
+
+Campaign composite for the **a-throne-of-salt** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [ValueBlocked](./ValueBlocked.mvstyle) (big-shape notan illustration, the campaign-wide workhorse). WIDE = [LargeFormat70](./LargeFormat70.mvstyle) (65/70mm deep-focus epic clarity, for the rare grand vista / salt-horizon establishing shot). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`. Lean by design: two looks, one include, minimal connective prose. Named after the seed for simplicity (a campaign composite, not a reusable building block).
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![ValueBlocked](../ImageStyleExample/ValueBlocked.example.png)
+
+![LargeFormat70](../ImageStyleExample/LargeFormat70.example.png)

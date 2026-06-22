@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "PracticalMiniature"
+rating: "C"
+description: "Pre-CGI late-70s practical motion-control miniature on anamorphic film: hard key, smoke-filled black, shallow focus"
+tags: [motion-picture, film-stock, retro, muted, establishing]
+made-for-model: gpt-image-2
+tokens: 225
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Photographed as a practical motion-control miniature model from a pre-CGI late-1970s science-fiction film, shot on a large physical model with an anamorphic lens. Strict process discipline: the subject is a real built object — matte-painted model surfaces with restrained weathering, panel lines or sculpted texture, and a few sharp greebles concentrated ONLY on the focal section; broad areas of the surface stay clean, simple, and unmodulated. Light it with one hard key from a single direction, deep falloff into black; let smoke, haze, and atmospheric depth fill the negative space instead of detail. Shallow depth of field — only the focal subject is crisp, everything else softens. Fine 35mm film grain, gentle anamorphic flare and bloom on the single brightest light, slight gate weave. Keep large passages of the frame dark and near-empty — resist filling them. Close with a film-still caption: a single line of subtitle text in a clean lower-third, as if burned into the print.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The economy directives (restrained weathering concentrated on one focal section, broad clean surfaces, single hard key with deep falloff, smoke/haze filling negative space, shallow depth of field, large dark near-empty passages) are load-bearing — they keep gpt-image-2 from greebling every surface. The shallow depth of field and single-key falloff also flatter a referenced character dropped into the frame: a figure rendered from behind or in soft focus reads as a real actor on the model stage, not a pasted-in portrait. Don't trim them.
+
+# Example
+
+![PracticalMiniature](../ImageStyleExample/PracticalMiniature.example.png)

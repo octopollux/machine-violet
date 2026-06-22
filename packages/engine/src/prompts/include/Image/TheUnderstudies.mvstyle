@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Understudies"
+rating: "?"
+description: "The Understudies campaign look: Portra soft warm portrait film by default, SilentFilm black-and-white intertitle when mocking the PC(s)"
+tags: [film-stock, motion-picture, warm, period, nostalgic]
+made-for-model: gpt-image-2
+tokens: 309
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** soft Portra portrait-film look below. When the moment is **mocking the player character(s)** — a comedic jab at their expense — use the silent-film look, its melodramatic intertitle card delivering the punchline.
+
+# Style
+
+Default (most scenes) — `Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+Mocking the PC(s) — `Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+# Notes
+
+Campaign composite for the **the-understudies** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [Portra](./Portra.mvstyle) (soft Kodak Portra 400 colour negative; the warm, flattering, tender register is the campaign-wide workhorse). MOCKERY = [SilentFilm](./SilentFilm.mvstyle) (early-1920s silent black-and-white; the under-cranked slapstick + intertitle card delivers a comedic jab at the PCs' expense). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![Portra](../ImageStyleExample/Portra.example.png)
+
+![SilentFilm](../ImageStyleExample/SilentFilm.example.png)

@@ -7,6 +7,7 @@
     "modern",
     "horror"
   ],
+  "image_style": "GraveyardShift",
   "setup_detail": "Opening scene: compose it as the quiet start of the shift, before anything is wrong. The player arrives at the museum after closing, clocks in at the time clock, takes up the flashlight and radio and the ring of keys; the last of the day staff file out, the galleries go dark, the HVAC settles into its after-hours hum. Establish the ordinary routine cleanly and ground the texture in the player's chosen background and museum. Do NOT open on an anomaly or mid-hijinks. The first beat should feel completely normal, so the wrongness has somewhere to arrive from once the rounds begin.",
   "detail": "Midnight, the museum, a flashlight and a radio and a set of keys that open more doors than the player was told about. The day staff have gone home. The HVAC has dropped into the after-hours cycle. The player walks the rounds — they were trained on the rounds — and the rounds are wrong tonight in a way the player will have to put words to before morning, because the morning shift is going to ask.\n\nDM approach:\n- Tone: hum of climate control, footsteps that echo too long, a smell of old varnish.\n- The new curator: charming, well-credentialed, lives in the city, takes calls at odd hours. Knows the artifacts by inventory number and never quite by name.\n- The day janitor: knows everything and pretends not to. Has worked here twenty years. Will trade pieces of the truth for cigarettes and small kindnesses.\n- Seed early: a label card the player remembers reading yesterday that says something different tonight; a display case that is, by daylight, locked, and is, by 2 a.m., not.\n- Pacing: six-hour shift, one anomaly per shift. By shift four the anomalies overlap.\n\nThe clock is the rounds. The player has to complete the loop every hour and sign the sheet by the time clock. Track time by sheet signatures and by which gallery the player did not enter on round three. When the player begins skipping a specific room, the museum has won that round.",
   "forks": [
@@ -90,5 +91,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 297,
+    "setup_detail": 121,
+    "forks": 319,
+    "total": 1565
+  }
 }

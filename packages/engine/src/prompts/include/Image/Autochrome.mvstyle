@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Autochrome"
+rating: "D"
+description: "Earliest-colour Autochrome plate (1907): dreamy muted low-contrast colour with delicate pointillist starch-grain stipple"
+tags: [photographic, vintage, muted, dreamy, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 166
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph on an AUTOCHROME plate — the earliest practical colour photography (circa 1907), an additive potato-starch-grain process. The signature: soft, dreamy, slightly muted and desaturated colour with a gentle warm cast; a delicate POINTILLIST grain texture from the dyed starch grains, like a fine colour stipple; a soft, painterly, low-contrast, almost impressionist quality; gentle vignetting; and the fragile, luminous, antique atmosphere of a turn-of-the-century colour plate. Dreamy, painterly, muted, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the photographic process or plate name in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR family (user vein: mine early colour for the JAZZ-ERA + COLD-WAR campaigns). AUTOCHROME (circa 1907, additive potato-starch): dreamy, soft, muted, low-contrast, POINTILLIST grain, antique — the most VELVETY of the set, the JAZZ-ERA hero. CAPTION RULE baked in (title only, no process name — vintage prints stamped the stock on them, so it leaks). Validated on the clearing; an instant keeper (user, "every single one is a keeper"). Keep the pointillist grain + dreamy muted palette.
+
+# Example
+
+![Autochrome](../ImageStyleExample/Autochrome.example.png)

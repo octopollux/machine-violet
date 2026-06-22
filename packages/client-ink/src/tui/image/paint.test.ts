@@ -1,4 +1,4 @@
-import { composePaint, type PaintBox } from "./paint.js";
+import { composePaint, paintSignature, type PaintBox } from "./paint.js";
 
 const SAVE = "\x1b7";
 const RESTORE = "\x1b8";
@@ -59,5 +59,34 @@ describe("composePaint", () => {
     const out = composePaint("", null, box(5, 4), 30, [{ top: 5, rows: 2 }]);
     const eraseCount = (out.match(/ {10}/g) ?? []).length;
     expect(eraseCount).toBe(2);
+  });
+});
+
+describe("paintSignature", () => {
+  it("is null when nothing is shown (hide/show always repaints)", () => {
+    expect(paintSignature(null, 0, 30, 0)).toBeNull();
+  });
+
+  it("is stable for identical inputs (the skip case)", () => {
+    const b = box(5, 8);
+    expect(paintSignature(b, 2, 30, 1)).toBe(paintSignature(box(5, 8), 2, 30, 1));
+  });
+
+  it("changes when the box moves, resizes, or its band/app-height/raster changes", () => {
+    const base = paintSignature(box(5, 8), 2, 30, 1);
+    // Each field, perturbed one at a time, must flip the signature.
+    expect(paintSignature({ row: 6, col: 0, rows: 8, cols: 10 }, 2, 30, 1)).not.toBe(base); // moved
+    expect(paintSignature({ row: 5, col: 1, rows: 8, cols: 10 }, 2, 30, 1)).not.toBe(base); // shifted left
+    expect(paintSignature({ row: 5, col: 0, rows: 9, cols: 10 }, 2, 30, 1)).not.toBe(base); // taller band
+    expect(paintSignature({ row: 5, col: 0, rows: 8, cols: 12 }, 2, 30, 1)).not.toBe(base); // wider
+    expect(paintSignature(box(5, 8), 3, 30, 1)).not.toBe(base); // clipped differently at top
+    expect(paintSignature(box(5, 8), 2, 31, 1)).not.toBe(base); // app height (resize)
+    expect(paintSignature(box(5, 8), 2, 30, 2)).not.toBe(base); // fresh decode (new raster)
+  });
+
+  it("does not collide across field boundaries (delimited fields)", () => {
+    // Without delimiters, e.g. row=51,col=0 vs row=5,col=10 could both read "510".
+    expect(paintSignature({ row: 51, col: 0, rows: 8, cols: 10 }, 2, 30, 1))
+      .not.toBe(paintSignature({ row: 5, col: 10, rows: 8, cols: 10 }, 2, 30, 1));
   });
 });

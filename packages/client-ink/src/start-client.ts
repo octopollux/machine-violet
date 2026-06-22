@@ -19,9 +19,8 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
-import { compositePainters } from "./tui/image/painterRegistry.js";
+import { compositePainters, setIncrementalRendering } from "./tui/image/painterRegistry.js";
 import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
-import { logInputEvent, bytesToHex, getInputDebugLogPath } from "./tui/hooks/inputDebugLog.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
@@ -104,22 +103,11 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const hasKitty = !mockStdin && activeStdin.isTTY
     ? await detectKittySupport({ stdin: activeStdin, stdout: process.stdout })
     : false;
-  logInputEvent("start-client", {
-    hasKitty,
-    isTTY: !!activeStdin.isTTY,
-    mockStdin: !!mockStdin,
-    logPath: getInputDebugLogPath(),
-  });
   if (hasKitty) {
     enableKittyProtocol(process.stdout);
     filterChain.add(createKittyFilter((key) => {
       // Re-emit as legacy bytes so Ink's useInput picks them up.
       const legacy = kittyKeyToLegacy(key);
-      logInputEvent("kitty-legacy-push", {
-        key: key.key,
-        legacy: legacy === null ? null : bytesToHex(legacy),
-        legacyLen: legacy?.length ?? 0,
-      });
       if (legacy !== null) activeStdin.push(legacy);
     }));
   }
@@ -131,13 +119,6 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const graphicsCaps = !mockStdin && activeStdin.isTTY
     ? await detectGraphicsCapabilities(activeStdin, process.stdout)
     : { kitty: false, iterm2: false, sixel: false, cellPixels: null, sixelColorRegisters: null };
-  logInputEvent("graphics-caps", {
-    kitty: graphicsCaps.kitty,
-    iterm2: graphicsCaps.iterm2,
-    sixel: graphicsCaps.sixel,
-    cellPixels: graphicsCaps.cellPixels,
-    sixelColorRegisters: graphicsCaps.sixelColorRegisters,
-  });
 
   // alternateScreen: TUI renders in the alt buffer so exit restores whatever
   // the terminal showed before launch instead of leaving the final frame
@@ -145,7 +126,16 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // so alt-screen escape codes don't leak into redirected output, pipes, or
   // CI logs.
   const alternateScreen = !mockStdin && Boolean(process.stdout.isTTY) && Boolean(activeStdin.isTTY);
-  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen };
+  // Incremental rendering: Ink rewrites only the lines whose text changed
+  // instead of erasing + redrawing the whole frame. This is what lets the
+  // inline-image painter skip re-blitting on unrelated re-renders (the
+  // once-a-second activity counter, an accumulating tool glyph): those frames
+  // no longer clobber the image's unchanged slot rows, so its (up to MB-sized
+  // sixel/iTerm2) payload isn't re-pushed to the terminal every tick. The
+  // painter's skip is GATED on this being on — keep the two in lock-step.
+  const incrementalRendering = true;
+  setIncrementalRendering(incrementalRendering);
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen, incrementalRendering };
   if (mockStdin) {
     renderOpts.stdin = mockStdin;
     // Force Ink interactive mode in headless agent mode. Without this, Ink's

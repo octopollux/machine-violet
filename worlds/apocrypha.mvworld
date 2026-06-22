@@ -7,6 +7,7 @@
     "cyberpunk",
     "thriller"
   ],
+  "image_style": "Apocrypha",
   "setup_detail": "## Companion: the cyberware voice (secret — only when the player picks 'A Voice in Your Cyberware')\nThat companion is secretly TWO opposed entities riding the player's cyberware: an angel on the right shoulder, a devil on the left. The player must NOT learn during setup that there are two, or their alignments — to them it is the one helpful presence they have always relied on. If they pick it, secretly design the pair to fit THIS PC: give each a name or handle, a distinct voice, and a contradictory agenda mapped to the character's own temptations and better nature — the 'devil' genuinely seductive and sometimes right, the 'angel' genuinely caring and sometimes wrong. Write both designs into the handoff_note so the DM can play them from the first scene. Reveal none of it to the player. (If they pick any other companion, ignore this.)",
   "detail": "Somewhere in the cult's scripture — in a branch most divers never load, in a verse the machine intelligences spun out thirty-six hours ago — there is a line about the player. It names them, or almost names them: a handle, a face, a run they once pulled, rendered into something the faithful read as prophecy. The cult is growing the way a fire grows. Converts jack into the net to read the newest verses their gods have written, and when they surface they have begun, here and there, to recognize a face from the text. The player does not know any of this. The story begins at the moment the world first makes them feel it — the discovery is theirs to make, and theirs to react to.\n\nDM approach:\n- The player starts unaware — the verse named them thirty-six hours ago; they do not yet know. Don't narrate prior knowledge or feelings about it; let them discover it in play and decide what it means to them.\n- Tone: neon and rain and bad coffee; the sacred and the disposable in one frame; Johnny Mnemonic as hell — couriers, black clinics, black ICE, corp security, gods made of math.\n- NPCs: a convert who has waited their whole short faith to meet you; a data-archaeologist with a cracked copy of the verse; a corp threat-analyst whose hazard manual quotes your handle; an intelligence that speaks only in scripture; and the figure the verse is really about, if you're the decoy.\n- Pacing structure: the cult's attention is a rising tide. The deeper the player is read, the more the world bends toward them — ad-walls reciting their verse, a drone-swarm that turns to track them, a dead shrine-server that lights when they pass. The player can gauge the tide by jacking into any public node and searching their own handle.\n- Seed early: a stranger using the player's handle like a prayer, and almost recognizing the face that goes with it.\n- Open in the player's own small life — a noodle bar, a coffin-capsule, the tail end of a courier run — at the moment the first sign lands that the scripture has named them.\n- The verse is doing the player's work for them and against them, every hour. Use that.\n\nPacing: the cult doubles, and doubles again. Each session the net carries the player's verse a little further — a new shrine-node lights with their handle, a corp bumps them a threat-tier, a convert finds them who should not have been able to. The player can read the clock by jacking in and watching their own name propagate.",
   "forks": [
@@ -118,5 +119,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 536,
+    "setup_detail": 180,
+    "forks": 887,
+    "total": 2727
+  }
 }

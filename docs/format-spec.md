@@ -137,7 +137,8 @@ Everything else is created during play.
   "premise": "A frontier town...",        // Player-visible campaign premise.
   "campaign_detail": "Hidden DM notes...",// DM-only instructions. For seed-built campaigns this is the
                                           // ASSEMBLED detail: fork-invariant base + selected fork-option
-                                          // detail, flattened at finalize (§10.6). No unchosen branches.
+                                          // detail, flattened at finalize (§10.6), plus any setup-agent
+                                          // detail appended on top. No unchosen branches.
   "fork_selections": {                    // Optional. forkId → optionId — which seed variant was resolved
     "starting-faction": "iron-circle"     // at setup. First-class record; drives scoped materialization. Absent for custom campaigns.
   },
@@ -224,6 +225,19 @@ Everything else is created during play.
                                           // field is silently ignored. Reversible at any time from the
                                           // in-game Campaign Settings modal's "Image Generation"
                                           // toggle (Esc → Settings; persisted via PATCH /settings).
+
+  // Mechanics handling (light systems only)
+  "mechanics_mode": "dm-managed"          // Optional. "dm-managed" | "player-facing".
+                                          // How the active LIGHT system's mechanics are surfaced. The
+                                          // setup agent asks the player only when a light/ultra-light
+                                          // system is chosen; "dm-managed" = the DM runs the rules
+                                          // silently behind the fiction, "player-facing" = mechanics
+                                          // are named at the table. Absent for crunchy systems
+                                          // (implicitly player-facing) and systemless campaigns.
+                                          // When a light system runs without this field (older
+                                          // saves), the DM prefix falls back to "dm-managed".
+                                          // Read by the DM prefix (the "## Game System" block +
+                                          // volatile [stats] tail); see rules-systems.md.
 }
 ```
 
@@ -848,6 +862,7 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "mood": "gritty",
   "difficulty": "hard",
   "campaign_scope": "open-ended",        // Optional. Bakes campaign length into the seed; setup agent skips the length question.
+  "image_style": "NoirCinema",           // Optional. A .mvstyle stem (prompts/include/Image/). Styles the chargen portrait + in-game art (§10.8).
   "dm_personality": { "name": "...", "prompt_fragment": "..." },
   "calendar_display_format": "fantasy",
 
@@ -894,6 +909,9 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
     "current": 14400,
     "epoch": "The founding of Valdris",
     "display_format": "fantasy"
+  },
+  "_tokens": {                           // Derived. Stamped by `npm run tokens` (refreshed at pre-push). Not hand-authored; not read by the engine. See §10.9.
+    "detail": 2278, "setup_detail": 296, "forks": 524, "total": 3726
   }
 }
 ```
@@ -916,7 +934,7 @@ A campaign seed is a world file with only the identity and DM-only fields:
 
 The setup agent receives world summaries (name, summary, genres, slug) in its system prompt. It uses the `load_world` tool to fetch a world's **forks** and config hints by slug (§10.6) — player forks to present, agent forks for it to decide (rolling the `roll_dice` tool). It resolves every fork and reports the choices in `finalize_setup.fork_selections`.
 
-The setup agent only ever sees this **thin slice** — the forks (labels/options/ids) and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. It does **not** receive the DM-only premise prose: `campaign_detail` is assembled in code at finalize from the seed's base + the selected branches (§10.6). A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is likewise never loaded into the agent's context; it is materialized in code at build time (§10.5).
+The setup agent only ever sees this **thin slice** — the forks (labels/options/ids) and the suggested `system`/`mood`/`difficulty`/`campaign_scope`. It does **not** receive the DM-only premise prose: `campaign_detail`'s seed base is assembled in code at finalize from the seed's base + the selected branches (§10.6). The agent *may*, however, supply its own `campaign_detail` even on a seeded campaign — it is **appended** after the assembled base (used to record a setup-time DM directive, e.g. a chosen visual-style include; a colliding `<Tag>` block in the agent's addition wins at DM-prompt time). A world's rich inline content (`entities`, `maps`, `rules`, `calendar`) is likewise never loaded into the agent's context; it is materialized in code at build time (§10.5).
 
 At finalize the setup agent also composes a one-sentence **opening-scene directive** (`finalize_setup.opening_scene` → `config.opening_scene`) telling the DM where/how to open turn 1. This is deliberately the setup agent's job, not the DM's: the DM's "you are a DM" framing biases it toward dropping the player straight onto the main objective, whereas a good campaign usually opens on a character-grounded beat. A seed can nudge the chosen opening by putting a "begins in…" hint in `setup_detail` (the setup-agent-only channel, §10.7); the agent honors it if present, or **suppress the declaration entirely** with `<!--include:OpeningScene.DMHandled-->` in `setup_detail` (the agent then passes an empty `opening_scene` and the DM opens from the campaign's own brief — used by seeds like `cold-open` whose `detail` already scripts turn 1). The directive is injected once into the DM's first-turn priming ([game-initialization.md](game-initialization.md#step-4-handoff-to-the-dm)) and never reaches the cached DM prefix.
 
@@ -972,6 +990,29 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 | **Player** | player-fork option `name`/`description`, `suboptions` | the setup agent presents them via `present_choices` | player |
 
 `setup_detail` is the **setup-agent-only** channel. The setup agent acts on it (e.g. presents a scope/pacing variant) but it is **never assembled into `campaign_detail`** — the exclusion is by omission (`assembleCampaignDetail` only reads `detail` + selected option `detail`), so it is structurally impossible for it to reach the DM. This is the home for content that is neither DM-facing nor directly player-facing: scope/rhythm presentation (e.g. `<!--include:Pacing.EndlessCampaigns-->`), the opening-scene opt-out (`<!--include:OpeningScene.DMHandled-->` — the agent declares no opening and the DM opens instead), chargen hints, alternate hooks the agent should weigh. **Setup-only includes (notably the `Pacing.*` scope blocks) belong here, not in `detail`** — in `detail` they would expand into the DM's context and make it re-ask the scope question on turn 1.
+
+### 10.8 Visual style (`image_style`)
+
+`image_style` names one visual style for the seed — the **stem of a `.mvstyle` variant** in [`packages/engine/src/prompts/include/Image/`](../packages/engine/src/prompts/include/Image/) (e.g. `"NoirCinema"`, `"CinematicFilm"`, `"StreetCam"`). It is a single, human-graded, one-style-per-seed pairing (see [docs/visual-style-authoring.md](visual-style-authoring.md)). It drives two things, both at setup:
+
+A stem may point at either a **single catalog style** (one backtick-fenced `# Style` directive) or a per-seed **composite** — a `.mvstyle` named after the seed whose `# Style` lists a labeled *menu*: a **default** look plus situational variants (outdoor night, dark crisis, a surveillance cam, a player-requested image, …) the DM chooses between per the file's `# Direction`. Composites are authored **default-first**.
+
+1. **The chargen portrait.** The setup agent's character reference sheet is rendered in this style. The engine stamps the style's **default render directive** onto the portrait prompt — for a plain style that's its lone `# Style` sentence; for a composite it's the *default* look (the first backtick-fenced span), never the whole situational menu, whose extra variants and caption clauses would fight the reference-sheet framing. When a seed declares no `image_style` — or the campaign is fully custom — the fallback is `CinematicFilm` (a placeholder until per-seed defaults are graded).
+2. **In-game art.** At finalize, `<!--include:Image.<style>-->` is appended to the campaign's `campaign_detail`. At DM-prompt time it resolves into an `<Image>` block that **overrides the bare `<Image>` default** — the `campaign_detail` override slot outranks the `dm-directives` slot where the default lives. A setup-agent-appended `<Image>` (a setup-time style choice) is placed *after* the seed's, so it still wins the in-slot collision.
+
+The value is validated against a real `.mvstyle` at finalize (`resolveImageStyleLine`): a bogus stem or missing file emits **no** include rather than bricking every DM turn with an unresolved-include throw — the campaign just stays on the default look. The setup agent may also override the seed's style (clobbering seed data is a feature — §10.6).
+
+### 10.9 Token stamps (`_tokens` / `tokens:`)
+
+Prompt-content files carry a **derived, at-a-glance estimate** of their own token weight, stamped by `npm run tokens` ([`scripts/content-tokens.ts`](../scripts/content-tokens.ts)):
+
+- `.mvworld` → a `_tokens` object: `{ detail, setup_detail, forks, total }`. `detail` is the per-turn DM-context cost (the channel that rides in the cached prefix every turn); `total` sums every string in the file.
+- `.mvdm` → a `_tokens` object: `{ prompt_fragment, detail, total }`.
+- `.mvstyle` → a scalar `tokens:` in frontmatter: the **emitted** weight (`# Direction` + `# Style` only; `# Notes`/`# Example` are authoring-only and don't reach the image model).
+
+The count is an **estimate** — OpenAI's `o200k_base` encoding (GPT-4o/5) via `js-tiktoken`: local, deterministic, offline. The DM may run on Claude or GPT and tokenizers differ by ~10–15%, but the encoding is fixed, so counts are consistent and rank seed weight reliably. The field is **derived bookkeeping**: hand-editing it is pointless (it's overwritten), and the engine never reads it. Counts come from the content fields only (the stamp itself is excluded), so stamping is idempotent.
+
+`npm run tokens` prints a sorted report and touches nothing; `--write` stamps the files. The **pre-push** hook runs `--write --commit`: if any stamp was stale it commits just the stamped files and aborts the push (re-run it to include the commit), so what lands on a branch always has current stamps. In steady state it's a no-op; during a content sprint it fires often.
 
 ---
 

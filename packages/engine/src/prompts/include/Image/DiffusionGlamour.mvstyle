@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DiffusionGlamour"
+rating: "C"
+description: "Heavy diffusion soft-focus glamour: blooming halated highlights, gauzy romantic glow, lifted milky blacks, pearlescent palette"
+tags: [motion-picture, stylized, warm, glamorous, dreamy, portrait]
+made-for-model: gpt-image-2
+tokens: 138
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame shot through a heavy DIFFUSION / soft-focus filter — the dreamy old-Hollywood-and-1970s glamour technique. The signature: a soft, glowing, slightly hazy image where the highlights BLOOM and halate into a romantic gauzy glow; gentle low contrast with lifted milky blacks; a flattering, wrinkle-softening softness on the subject; a warm pastel pearlescent palette; and a nostalgic, dreamy, luminous quality, as if the lens were breathed upon. Soft, glowing, romantic, hazy. Close with a small caption in an elegant font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the heavy DIFFUSION / soft-focus glamour technique: blooming halated highlights, gauzy romantic glow, lifted milky blacks, warm pastel pearlescence, breathed-on-lens dreaminess. The soft / romantic register (the bloom also softens fine detail, a gentle anti-cram). AAA-tier. Caption = elegant font. Validated on a golden-hour clearing; an instant bank (user). Keep the diffusion bloom + soft low contrast.
+
+# Example
+
+![DiffusionGlamour](../ImageStyleExample/DiffusionGlamour.example.png)

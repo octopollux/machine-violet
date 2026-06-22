@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "MobaAnime"
+rating: "?"
+description: "Anime hero splash art: clean cel-and-painted lineart, dynamic heroic pose, glowing VFX, bold name title lockup"
+tags: [game-render, animation, stylized, high-saturation, epic, scene-coupled]
+made-for-model: gpt-image-2
+tokens: 177
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, make the SUBJECT a single character filling the frame in a dynamic, heroic action pose — this is character splash art, so put the hero front and centre in motion (not a wide landscape with a small figure), with the setting reduced to a dramatic background behind them. Then render in this visual style:
+
+# Style
+
+`Rendered as anime-style hero splash art — the clean, polished character key-art of a high-budget anime gacha or battle-arena game. The character fills the frame in a dynamic heroic anime pose, with clean anime lineart and cel-and-painted colour, expressive features, flowing hair and gear caught in motion, glowing magical and tech effects, dramatic bloom and rim light, and a bright atmospheric background. Polished, expressive, dynamic anime key-art. Close with the hero's name in a bold stylised title treatment.`
+
+# Notes
+
+Append the style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. MOBA / gacha hero SPLASH ART in the ANIME register — clean anime lineart + cel-and-painted colour, dynamic heroic pose, VFX, bold title lockup. The most DISTINCT of the MOBA takes (the anime prior separates cleanly, as it does for [AnimeIllustration](./AnimeIllustration.mvstyle)). Same SCENE-COUPLED, CHARACTER-FORWARD requirement as its sibling [MobaStylized](./MobaStylized.mvstyle): the hero must fill the frame in a dynamic pose, so the steering lives in the DM-FACING intro above (a vista brief won't read as splash). Caption = the hero's name in a bold stylised title treatment. Validated on a heroic-action Xera scene; a keeper (user). Keep the character-forward intro, the anime render + VFX, and the bold title lockup.
+
+# Example
+
+![MobaAnime](../ImageStyleExample/MobaAnime.example.png)

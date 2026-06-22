@@ -9,6 +9,8 @@ import type { FileIO } from "../agents/scene-manager.js";
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { assetDir } from "../utils/paths.js";
+import type { MechanicsMode } from "@machine-violet/shared/types/config.js";
+import { MECHANICS_MODE_DEFAULT } from "@machine-violet/shared/types/config.js";
 
 export type SystemComplexity = "ultra-light" | "light" | "medium" | "high";
 
@@ -74,6 +76,34 @@ export function readChargenSection(slug: string): string | null {
  */
 export function findSystem(slug: string): SystemEntry | undefined {
   return KNOWN_SYSTEMS.find((s) => s.slug === slug);
+}
+
+/**
+ * True when a system runs on the light/ultra-light end — the tier for which
+ * the "DM runs it silently vs. player-facing" mechanics question applies.
+ */
+export function isLightSystem(slug: string | undefined): boolean {
+  if (!slug) return false;
+  const c = findSystem(slug)?.complexity;
+  return c === "light" || c === "ultra-light";
+}
+
+/**
+ * Resolve the effective mechanics mode for a campaign. Mechanics mode is only
+ * meaningful for light/ultra-light systems: for those, an explicit choice if
+ * recorded, otherwise the default (`dm-managed`). For crunchy systems (which
+ * are implicitly player-facing) and systemless campaigns it is always
+ * undefined — a stray `mechanics_mode` left on a hand-edited crunchy config is
+ * ignored rather than rendering a nonsensical "run D&D silently". Single source
+ * of truth shared by the DM prefix and the volatile [stats] tail so both
+ * surfaces agree.
+ */
+export function effectiveMechanicsMode(config: {
+  system?: string;
+  mechanics_mode?: MechanicsMode;
+}): MechanicsMode | undefined {
+  if (!isLightSystem(config.system)) return undefined;
+  return config.mechanics_mode ?? MECHANICS_MODE_DEFAULT;
 }
 
 /**

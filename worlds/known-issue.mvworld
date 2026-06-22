@@ -9,6 +9,7 @@
     "sci-fi",
     "comedy"
   ],
+  "image_style": "KnownIssue",
   "detail": "The simulation is not a secret, a conspiracy, or a twist. It's physics. Everyone has always known. The sky has a render distance. Déjà vu is a caching artifact. Dreams are background processes. There are whole academic disciplines, religious traditions, and folk superstitions built around this knowledge. Some people pray to the developers. Some people think \"outside\" is a meaningless concept. Some people file bug reports. None of this was a problem until the glitches started.\n\nHow present the simulation actually is: treat it like nuclear energy in our own world. Everyone knows it's there, and it is enormous in the culture — in the physics, the religions, the folklore, the turns of phrase (\"déjà vu is just a caching artifact\"). Almost no one ever encounters it directly. The world looks and feels completely, ordinarily real: people are born, work, love, and die without ever once seeing a render distance or a caching artifact with their own eyes — those are explanations people cite, not things the world visibly does. Do not render reality as a glitchy video game or a VHS-horror tape; the sky is just the sky. An actual glitch is rare — most people live and die without witnessing one — which is exactly why the ones in this campaign matter, and why the few whose job is to deal with them are a small, specific profession.\n\nThe tone depends on the combination, but the constant is: the characters are not having an existential crisis about living in a simulation. That's settled. That's Tuesday. The crisis is that the thing they've built their entire worldview around — stable, known, accepted — is changing. It's the difference between \"oh no, is this real?\" and \"it was always real to us, and now it's breaking.\"\n\nDM approach:\n- Never play the simulation as fake. These are real people with real lives in the only world they've ever known. The fact that it's computed doesn't make their grief or joy or bread less real. If the player tries to treat the world as disposable because it's a simulation, the world should push back through characters who care.\n- Glitches should escalate from curiosities to inconveniences to genuine threats. A texture glitch is funny. A physics glitch is dangerous. A glitch that affects memory or identity is terrifying.\n- The society's relationship to the simulation is rich territory. There are simulation-atheists (it's just a metaphor), simulation-theologians (the developers are gods), simulation-engineers (we can fix this ourselves), and simulation-nihilists (nothing computes forever). These aren't just philosophical positions — they're political factions now that the glitches have made the question urgent.\n- The \"developers\" or \"outside\" may or may not exist. Don't answer this early. Let the question breathe. The campaign is better when \"is anyone out there?\" remains open.\n\nPacing: Start with a glitch the player witnesses — small, odd, easy to dismiss. The first act is the glitch becoming a pattern. The second act is the world responding: institutions, factions, panic, opportunity. The third act is contact — with whatever is causing this — and the choice of what to do about it.",
   "forks": [
     {
@@ -94,5 +95,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 639,
+    "setup_detail": 0,
+    "forks": 946,
+    "total": 2378
+  }
 }

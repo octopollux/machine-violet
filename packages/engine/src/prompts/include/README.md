@@ -21,11 +21,15 @@ comment for the authoritative spec. Short version:
 
 ## Cascading override
 
-When the same top-level XML tag appears in more than one prompt layer
-(main DM prompt → campaign seed → DM personality), the latest layer wins.
-Earlier occurrences are removed entirely. So a personality template can
-include `NPCS.HighFantasy` to replace whatever `<NPCS>` block the main DM
-prompt established, without editing the main file.
+When the same top-level XML tag appears in more than one override slot, the
+latest slot wins and earlier occurrences are removed entirely. `buildDMPrefix`
+passes **five slots**, lowest → highest priority: `dm-identity` →
+`dm-directives` → `campaign_detail` → DM-personality `prompt_fragment` →
+DM-personality `detail` (three conceptual sources — main DM, campaign seed, DM
+personality — but five distinct slots). So a personality template can include
+`NPCS.HighFantasy` to replace whatever `<NPCS>` block the main DM prompt
+established, without editing the main file; likewise the setup agent's appended
+`campaign_detail` can override a seed's block.
 
 This applies to inline `<NPCS>…</NPCS>` blocks too, not just blocks
 produced by `<!--include:-->`.

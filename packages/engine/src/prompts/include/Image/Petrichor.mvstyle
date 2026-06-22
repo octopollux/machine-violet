@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Petrichor"
+rating: "?"
+description: "Petrichor campaign look: ModernIllustration clean contemporary illustration by default, DiffusionGlamour dreamy soft-focus glow for the dramatic first rain"
+tags: [illustration, stylized, warm, dreamy, glamorous]
+made-for-model: gpt-image-2
+tokens: 317
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** clean contemporary-illustration look below. The **dramatic moment of the first rain** uses the heavy-diffusion soft-focus glamour look — a dreamy, glowing, romantic frame to mark the moment.
+
+# Style
+
+Default (most scenes) — `Rendered as a clean, friendly contemporary digital illustration — the warm, approachable look of modern book covers and editorial art. Build forms from clean confident shapes with soft cel-like shading (a few smooth tonal steps, not heavy rendering), a warm harmonious limited palette, and gentle appealing stylisation. Light, even, attractive lighting; a clear focal subject with a calmer, simpler background; a subtle soft grain or paper texture over the colour so it reads handcrafted, not sterile. Modern, clean, inviting, versatile. Close with a small tasteful caption in clean contemporary type.`
+
+Dramatic shot — the first time it rains — `Rendered as a frame shot through a heavy DIFFUSION / soft-focus filter — the dreamy old-Hollywood-and-1970s glamour technique. The signature: a soft, glowing, slightly hazy image where the highlights BLOOM and halate into a romantic gauzy glow; gentle low contrast with lifted milky blacks; a flattering, wrinkle-softening softness on the subject; a warm pastel pearlescent palette; and a nostalgic, dreamy, luminous quality, as if the lens were breathed upon. Soft, glowing, romantic, hazy. Close with a small caption in an elegant font.`
+
+# Notes
+
+Campaign composite for the **petrichor** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [ModernIllustration](./ModernIllustration.mvstyle) (clean, friendly contemporary illustration — the campaign-wide workhorse). FIRST-RAIN = [DiffusionGlamour](./DiffusionGlamour.mvstyle) (heavy-diffusion soft-focus glamour; its blooming, dreamy glow marks the dramatic first rainfall). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![ModernIllustration](../ImageStyleExample/ModernIllustration.example.png)
+
+![DiffusionGlamour](../ImageStyleExample/DiffusionGlamour.example.png)

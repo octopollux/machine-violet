@@ -16,7 +16,13 @@
  *  - REPLAY (always, offline; skipped until the golden exists): a pure
  *    tape-backed provider reproduces the SAME per-turn narrative AND the same
  *    finalized SetupResult with ZERO live calls, and the handoff scaffolds a
- *    campaign whose config matches. Runs in the normal `npm test`.
+ *    campaign whose config matches. Runs in the normal `npm test`. Two prose
+ *    fields are excepted from the SetupResult deep-equal — `personality.detail`
+ *    (from the seed `.mvdm`) and a seeded world's `campaignDetail` (assembled
+ *    from the `.mvworld` detail block) — because finalize assembles both from
+ *    bundled seed files at runtime, not from the tape; pinning their prose
+ *    would force a live re-record on every seed edit (issue #620). We pin their
+ *    presence instead — see the replay assertion.
  *
  * Why this is the in-process setup→game replay backbone (vs. replaying an
  * mvplay full-stack capture): the setup agent had no offline coverage at all,
@@ -101,12 +107,20 @@ const goldenPath = (name: string) =>
 
 // ---------------------------------------------------------------------------
 // The scenarios. Each is a distinct setup path to a finalized campaign.
+//
+// Every scenario requests The Chronicler as the DM personality ON PURPOSE: it is
+// the stable, minimal-content "seedless" default, so these goldens (which pin the
+// finalized personality's prompt_fragment) do NOT churn when other personalities
+// are edited, disabled, or revived. We had to re-record all four once already when
+// their organic picks got disabled (see #660/#661) — pinning Chronicler prevents a
+// repeat. The personality choice is incidental to what these scenarios test (world /
+// system / mechanics-mode / character / handoff resolution).
 // ---------------------------------------------------------------------------
 const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-quickstart-fantasy",
     inputs: [
-      "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue.",
+      "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue. Use The Chronicler as the DM personality.",
       "That world sounds great, let's use it.",
       "My character is Aldric, a weathered sellsword chasing a blood debt. Keep it simple — no extra mechanics. I'm an adult, surprise me with the rest.",
     ],
@@ -114,7 +128,7 @@ const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-custom-noir",
     inputs: [
-      "I'm Sam, an adult. I want a fully custom game: 1970s occult noir in a rain-soaked city. Pure narrative, no rules system.",
+      "I'm Sam, an adult. I want a fully custom game: 1970s occult noir in a rain-soaked city. Pure narrative, no rules system. Use The Chronicler as the DM personality.",
       "Mood tense and melancholy, difficulty unforgiving. Call the campaign 'Neon Requiem'.",
       "I'm playing Marlowe Cray, a burned-out PI who can see the dead.",
     ],
@@ -122,8 +136,20 @@ const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-dnd-character",
     inputs: [
-      "I'm Sam, an adult. Let's play D&D 5e — classic heroic fantasy.",
+      "I'm Sam, an adult. Let's play D&D 5e — classic heroic fantasy. Use The Chronicler as the DM personality.",
       "My character is Vesper Quill, a sly, charming half-elf rogue who's light on her feet. Standard array is fine and you can pick sensible skills.",
+    ],
+  },
+  {
+    // Light system → exercises the mechanics-mode question. The player states a
+    // light system (FATE Accelerated) AND the dm-managed preference up front, so
+    // finalize_setup records `mechanics_mode: "dm-managed"` — locking the new
+    // light-system branch end to end (system slug + mechanics_mode through
+    // finalize → SetupResult → scaffolded config).
+    name: "setup-fate-light-silent",
+    inputs: [
+      "I'm Sam, an adult. Full setup, please. I want a pulpy planar-adventure on FATE Accelerated — the light system. And I'd like you to run the rules for me, behind the scenes; I won't be tracking dice, aspects, or fate points myself. Use The Chronicler as the DM personality.",
+      "My character is Roan Calloway, a quick-witted sky-courier who smuggles refugees off worlds marked for erasure; his recurring trouble is a blood-debt to the very tyrant whose work he's undoing. Flashy daring is his strongest approach. Mood heroic pulp, a tight one-shot — surprise me with the rest.",
     ],
   },
 ];
@@ -247,8 +273,33 @@ describe("setup golden corpus", () => {
 
         // 1. The conversation reproduces verbatim, offline.
         expect(narrative).toEqual(golden.expectedNarrative);
-        // 2. finalize_setup derives the same campaign blueprint.
-        expect(finalized).toEqual(golden.expectedSetup);
+        // 2. finalize_setup derives the same campaign blueprint — but two prose
+        //    fields are excluded from the verbatim deep-equal because finalize
+        //    assembles them from bundled seed files at runtime, NOT from the
+        //    tape:
+        //      • personality.detail — loaded from personalities/*.mvdm
+        //        (handleFinalize → getPersonality);
+        //      • campaignDetail — for a seeded world, assembled from the
+        //        .mvworld detail block (handleFinalize → assembleCampaignDetail).
+        //    Pinning either by value forces a live re-record of the setup
+        //    goldens whenever a seed's prose is edited (issue #620 — exactly
+        //    what #619's voice-prior rewrite triggered). The golden should pin
+        //    the agent's *selections* — worldSlug, personality.name, premise,
+        //    handoffNote, all deterministic from the tape and still compared
+        //    verbatim below — not the bundled prose the seed files already own.
+        //    So strip both fields from the deep-equal and pin their PRESENCE
+        //    instead: a regression that drops the prose still fails, while a
+        //    seed content edit stays free. (Custom campaigns/personalities
+        //    legitimately carry neither, so presence — truthy↔truthy — is the
+        //    right invariant, not non-emptiness.)
+        const stripSeedProse = (s: SetupResult): SetupResult => {
+          const { detail: _detail, ...personality } = s.personality; // eslint-disable-line @typescript-eslint/no-unused-vars
+          const { campaignDetail: _campaignDetail, ...rest } = s; // eslint-disable-line @typescript-eslint/no-unused-vars
+          return { ...rest, personality };
+        };
+        expect(stripSeedProse(finalized as SetupResult)).toEqual(stripSeedProse(golden.expectedSetup));
+        expect(Boolean(finalized?.personality.detail)).toBe(Boolean(golden.expectedSetup.personality.detail));
+        expect(Boolean(finalized?.campaignDetail)).toBe(Boolean(golden.expectedSetup.campaignDetail));
 
         // 3. The handoff scaffolds a campaign matching that blueprint. Runs the
         //    real buildCampaignWorld against in-memory FileIO (config.json's

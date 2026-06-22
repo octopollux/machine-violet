@@ -12,7 +12,7 @@
     "start": "node --max-semi-space-size=16 dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.100.1",
+    "@anthropic-ai/sdk": "^0.104.1",
     "@fastify/cors": "^11.0.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/websocket": "^11.0.0",
@@ -27,7 +27,7 @@
     "openai": "^6.39.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.1"
   },
   "devDependencies": {
     "@types/ws": "^8.18.0",

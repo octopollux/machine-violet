@@ -26,8 +26,9 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
-import { wrapForRecording } from "../providers/tape-mode.js";
-import type { LLMProvider } from "../providers/types.js";
+import { wrapForRecording, buildReplayTierProviders } from "../providers/tape-mode.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
@@ -498,21 +499,36 @@ export class SessionManager {
     // reconnect after the new session is ready.
     this.broadcast({ type: "session:transition", data: { campaignId, campaignName: campaignName ?? campaignId } });
 
-    // Dispose the setup-session's tier providers before nulling the
-    // reference — otherwise an openai-chatgpt setup tier leaves its
-    // codex subprocess running for the rest of the process lifetime.
+    // Detach the setup session before nulling the reference; we dispose its
+    // tier providers below, after the bookkeeping but before the respawn.
     const oldSetup = this.setupSession;
     this.setupSession = null;
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
-    void oldSetup?.dispose();
     this.clearIdleTimer();
     this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
 
     logEvent("session:end", { reason: "setup_transition", campaignId });
+
+    // Fully tear down the setup session's codex subprocess BEFORE spawning the
+    // game session's. The two are distinct subprocesses (each tier resolution
+    // builds its own provider cache) but share one CODEX_HOME (~/.codex), and
+    // with it a single SQLite state runtime and a single-use OAuth refresh
+    // token. Letting them overlap races both: the new codex can crash on
+    // startup initializing the shared SQLite state ("disk I/O error"), or lose
+    // an OAuth refresh and 401 with "refresh token has already been used" —
+    // either way a hard failure exactly at handoff. dispose() awaits the
+    // subprocess `exit`, which releases those handles; awaiting it here closes
+    // the overlap window. (Was fire-and-forget since #538, which added the
+    // dispose to stop accumulating processes but never waited for it before the
+    // respawn.) dispose() catches per-provider errors internally so the await
+    // won't reject, and rpc.stop() escalates SIGTERM→SIGKILL after 2s so in
+    // practice it settles promptly — it still awaits the process `exit` event,
+    // so the bound is "SIGKILL then exit," not a hard timeout.
+    await oldSetup?.dispose();
 
     // Start the newly created campaign
     await this.startSession(campaignId);
@@ -573,23 +589,31 @@ export class SessionManager {
     // Medium/Small=Anthropic) routes each call to the right vendor without
     // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const { createAnthropicProvider } = await import("../providers/anthropic.js");
-    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
-    const tierProviders = wrapForRecording(tierResolution.tiers);
+    this.providersByConnectionId.clear();
+    let tierProviders: Record<ModelTier, TierProvider>;
+    const replayTiers = buildReplayTierProviders();
+    if (replayTiers) {
+      // Full-stack replay (E2E): every tier served from the tape at
+      // MV_TAPE_PATH — no connection, no network, no key. byConnectionId
+      // stays empty; a taped session has no management-route providers.
+      tierProviders = replayTiers;
+    } else {
+      const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+      const { createAnthropicProvider } = await import("../providers/anthropic.js");
+      const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+      // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+      tierProviders = wrapForRecording(tierResolution.tiers);
+      // Build the connectionId → provider lookup for management routes.
+      for (const [connId, provider] of tierResolution.byConnectionId) {
+        this.providersByConnectionId.set(connId, provider);
+      }
+    }
 
     // Track unique providers for end-of-session disposal. Stateful providers
     // (openai-chatgpt) own subprocesses that linger across sessions otherwise.
     this.sessionProviders.add(tierProviders.large.provider);
     this.sessionProviders.add(tierProviders.medium.provider);
     this.sessionProviders.add(tierProviders.small.provider);
-
-    // Build the connectionId → provider lookup for management routes.
-    this.providersByConnectionId.clear();
-    for (const [connId, provider] of tierResolution.byConnectionId) {
-      this.providersByConnectionId.set(connId, provider);
-    }
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.

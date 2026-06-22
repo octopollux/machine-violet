@@ -13,6 +13,14 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "scoped-seed") {
         return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
       }
+      if (slug === "styled-seed") {
+        // Carries a real .mvstyle stem (Velvia.mvstyle exists on disk) so the
+        // finalize image-include guard resolves it.
+        return { name: "Styled Seed", summary: "A seed with a visual style.", genres: ["fantasy"], detail: "Base premise.", image_style: "Velvia" };
+      }
+      if (slug === "bad-style-seed") {
+        return { name: "Bad Style Seed", summary: "A seed naming a nonexistent style.", genres: ["fantasy"], detail: "Base premise.", image_style: "NoSuchStyle" };
+      }
       if (slug === "forked-seed") {
         return {
           name: "Forked Seed", summary: "A seed with forks.", genres: ["fantasy"],
@@ -51,7 +59,8 @@ vi.mock("../../config/personality-loader.js", async (importOriginal) => {
   };
 });
 
-import { createSetupConversation, renderWorldForAgent } from "./setup-conversation.js";
+import { createSetupConversation, renderWorldForAgent, composeChargenPortraitPrompt } from "./setup-conversation.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
@@ -389,6 +398,33 @@ describe("createSetupConversation", () => {
     const result = await conv.start(noop);
 
     expect(result.finalized!.campaignScope).toBe("few-sessions");
+  });
+
+  it("finalize_setup passes through a valid mechanics_mode", async () => {
+    const input = { ...FINALIZE_INPUT, system: "fate-accelerated", mechanics_mode: "player-facing" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.mechanicsMode).toBe("player-facing");
+  });
+
+  it("finalize_setup leaves mechanicsMode undefined when omitted or invalid", async () => {
+    // Omitted (the agent didn't ask — crunchy/pure-narrative) and a garbage
+    // value both resolve to undefined; the DM prefix applies the light-system
+    // default downstream.
+    for (const extra of [{}, { mechanics_mode: "loud" }]) {
+      const provider = mockProvider([
+        finalizeResponse({ ...FINALIZE_INPUT, ...extra }),
+        textResponse("Onward!"),
+      ]);
+      const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+      const result = await conv.start(noop);
+      expect(result.finalized!.mechanicsMode).toBeUndefined();
+    }
   });
 
   it("finalize_setup defaults campaign_scope to few-sessions when given an unknown value", async () => {
@@ -1002,6 +1038,93 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.forkSelections).toEqual({ wrapper: "scifi", faction: "iron" });
   });
 
+  it("finalize_setup appends agent-supplied campaign_detail after the seed base", async () => {
+    // The new rule: on a seeded campaign the agent MAY pass its own
+    // campaign_detail (e.g. a setup-time visual-style include); it is appended
+    // after the code-assembled seed base rather than discarded.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+      campaign_detail: "<!--include:Image.Velvia-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\nServer farms.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
+  it("finalize_setup appends the seed's image_style as an Image include", async () => {
+    // A seed declaring image_style gets `<!--include:Image.<style>-->` appended
+    // to campaign_detail (after the assembled base), so the DM renders in-game
+    // art in that style. Resolved at DM-prompt time into an <Image> block.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
+  it("finalize_setup orders the seed style include BEFORE the agent's appended detail", async () => {
+    // The seed's style is the campaign default; an agent-supplied include comes
+    // after it, so a setup-time <Image> choice still wins the in-slot collision.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+      campaign_detail: "<!--include:Image.NoirCinema-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->\n\n<!--include:Image.NoirCinema-->",
+    );
+  });
+
+  it("finalize_setup skips the include when the seed names a nonexistent style", async () => {
+    // Defense-in-depth: a bogus image_style must not emit an include that would
+    // throw on every DM turn — it's dropped, leaving the default look.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Bad Style",
+      world_slug: "bad-style-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
+  });
+
   it("finalize_setup drops fork selections that name unknown forks or options", async () => {
     const input = {
       ...FINALIZE_INPUT,
@@ -1020,5 +1143,40 @@ describe("createSetupConversation", () => {
     // No valid selection → base only, and nothing stored.
     expect(result.finalized!.campaignDetail).toBe("Base premise.");
     expect(result.finalized!.forkSelections).toBeUndefined();
+  });
+});
+
+describe("composeChargenPortraitPrompt", () => {
+  // A stand-in for what the setup agent writes: the character + the three-view call.
+  const CHAR = "Mira, a weary station heir in a worn jacket; three views front, front-left, rear-right.";
+
+  it("orders character -> style line -> black-background framing (framing LAST)", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    const styleLine = resolveImageStyleLine("NoirCinema")!;
+    expect(prompt).toContain(CHAR);
+    expect(prompt).toContain(styleLine);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+    // The ordering IS the fix: character first, style line next, framing last —
+    // so the framing wins the background composition over a scene-coupled style.
+    expect(prompt.indexOf(styleLine)).toBeGreaterThan(prompt.indexOf(CHAR));
+    expect(prompt.indexOf("REFERENCE SHEET")).toBeGreaterThan(prompt.indexOf(styleLine));
+  });
+
+  it("instructs the model to keep one-sided features on the SAME side across all three views", () => {
+    // Guards the cross-angle consistency fix: an ambiguous lateral feature (a
+    // robot arm, an eyepatch) must not drift to a different side per angle.
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    expect(prompt).toMatch(/SAME side of the body in all three views/);
+  });
+
+  it("falls back to the CinematicFilm default when no style is given", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, undefined);
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+  });
+
+  it("falls back to the default when the seed names an unknown style", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoSuchStyle");
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
   });
 });

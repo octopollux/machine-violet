@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DayForNight"
+rating: "B"
+description: "Day-for-night technique: deep cool-blue moonlit grade carrying daylight tells like too-crisp shadows and a sun-as-moon"
+tags: [motion-picture, stylized, cool, dreamy, outdoor-revealing]
+made-for-model: gpt-image-2
+tokens: 143
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — the DAY-FOR-NIGHT technique: a deep cool BLUE moonlit grade carrying the give-away DAYLIGHT artifacts (too-crisp shadows, too much detail, a "moon" that's really the sun). A distinct artificial-nocturnal register. SCENE AFFINITY: outdoor "night" scenes. Caption overlaid. Validated on a moonlit clearing; an instant bank (user). Keep the blue grade + the daylight-crispness tell.
+
+# Example
+
+![DayForNight](../ImageStyleExample/DayForNight.example.png)

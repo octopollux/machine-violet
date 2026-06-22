@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Salt Wedding"
+rating: "?"
+description: "The Salt Wedding campaign look: Super8 warm home-movie by default, SilentFilm black-and-white intertitle for record-scratch moments"
+tags: [motion-picture, lo-fi, vintage, nostalgic, period]
+made-for-model: gpt-image-2
+tokens: 323
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** warm Super-8 home-movie look below. A **record-scratch moment** — the action freezing for a beat — uses the silent-film look, its intertitle card carrying the aside.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font — a scene or place title only; do NOT print the film format or process name in the caption.`
+
+Record-scratch moments — `Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+# Notes
+
+Campaign composite for the **the-salt-wedding** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [Super8](./Super8.mvstyle) (warm, faded, intimate Super-8 home-movie; the home-movie register fits a wedding as the campaign-wide workhorse). RECORD-SCRATCH = [SilentFilm](./SilentFilm.mvstyle) (early-1920s silent black-and-white; the action freezes and its intertitle card carries the comedic/dramatic aside). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![Super8](../ImageStyleExample/Super8.example.png)
+
+![SilentFilm](../ImageStyleExample/SilentFilm.example.png)

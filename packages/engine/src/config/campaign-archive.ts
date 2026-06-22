@@ -154,6 +154,47 @@ function fileStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 }
 
+/** Pause before the read-back retry — long enough to outlast a transient hold. */
+const READBACK_RETRY_MS = 50;
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Read the just-written zip back and confirm it's byte-identical to what we
+ * wrote. A *transient* external hold on the file — an antivirus real-time scan,
+ * a cloud-sync client briefly re-writing it — can make the immediate read-back
+ * come back short, differ, or throw, then resolve a moment later. So on a first
+ * mismatch or read error we wait briefly and re-read once before declaring the
+ * write corrupt. The failure names both byte lengths (or the read error) so a
+ * genuine corruption is self-diagnosing rather than an opaque "mismatch".
+ */
+async function verifyWrittenZip(
+  io: ArchiveFileIO,
+  zipPath: string,
+  expected: Uint8Array,
+): Promise<ArchiveResult> {
+  const check = async (): Promise<{ ok: true } | { ok: false; detail: string }> => {
+    try {
+      const readBack = await io.readBinary(zipPath);
+      if (bytesEqual(readBack, expected)) return { ok: true };
+      return {
+        ok: false,
+        detail: `zip file contents mismatch on disk (expected ${expected.length} bytes, read ${readBack.length})`,
+      };
+    } catch (e) {
+      return { ok: false, detail: `could not read back zip (${e instanceof Error ? e.message : String(e)})` };
+    }
+  };
+
+  let result = await check();
+  if (!result.ok) {
+    await delay(READBACK_RETRY_MS);
+    result = await check();
+  }
+  if (!result.ok) return { ok: false, error: `Write verification failed: ${result.detail}` };
+  return { ok: true, zipPath };
+}
+
 /**
  * Walk → zip → verify-in-memory → write → read-back-verify. Does NOT modify the
  * source folder. Shared by `archiveCampaign` (which then deletes the source)
@@ -198,12 +239,9 @@ async function buildAndWriteVerifiedZip(
   await io.mkdir(archDir);
   await io.writeBinary(zipPath, zipped);
 
-  // Step 5: Read back and verify byte-level equality
-  const readBack = await io.readBinary(zipPath);
-  if (!bytesEqual(readBack, zipped)) {
-    return { ok: false, error: "Write verification failed: zip file contents mismatch on disk" };
-  }
-  return { ok: true, zipPath };
+  // Step 5: Read back and verify byte-level equality, retrying once to ride out
+  // a transient antivirus/sync hold on the freshly written file.
+  return await verifyWrittenZip(io, zipPath, zipped);
 }
 
 // --- Core operations ---

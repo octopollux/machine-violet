@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Oath-Eaters"
+rating: "?"
+description: "The Oath-Eaters campaign look: InkWash spare meditative sumi-e by default, Woodcut stark folk-horror broadsheet when an eater is revealed"
+tags: [painting, printmaking, monochrome, black-and-white, grim]
+made-for-model: gpt-image-2
+tokens: 522
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** spare, meditative sumi-e ink-wash look below. When an **eater is revealed** — the monster beat — switch to the stark folk-horror woodcut look: bold black masses and coarse gouged hatching, like a plague broadsheet.
+
+# Style
+
+Default (most scenes) — `Rendered as an atmospheric INK-WASH painting in the East Asian sumi-e tradition, brushed on heavy fibrous handmade paper — black ink and water on a real textured rag and mulberry (washi) sheet. Strict process discipline: paint with economical, confident brush strokes and graded washes of diluted black ink, from deep black to palest grey, with large areas of bare paper left empty as mist, sky and space; let the ink bleed and feather softly into the fibrous TOOTH of the paper, the paper's grain and fibre showing through, carrying the texture instead of rendered detail. A few decisive strokes describe the focal forms; everything else dissolves into soft graded wash or empty paper. Spare, calm, meditative, monochrome with at most one restrained accent. The economy of the brush and the character of the paper are the whole craft. Close with a small tasteful caption in clean type.`
+
+Eater revealed — `Rendered as a bold black-and-white woodcut print in the tradition of an old plague broadsheet or danse-macabre pamphlet — black ink printed from a hand-carved woodblock onto rough off-white paper. THE CARVING IS THE CONSTRAINT: every mark is gouged into the block with a blade, so there is no fine or smooth detail anywhere — the image is built only from bold flat black shapes, the bare white paper where the wood was cut away, and coarse parallel gouge-lines for shadow and form. Strict process discipline: design in stark high contrast — bold masses of solid black against the bare white of the cut-away block; render shadow and texture only as vigorous, slightly crude parallel gouge-hatching and cross-hatching cut by hand, never as smooth tone; keep forms simple, graphic and a little primitive, with strong confident outlines. Show the character of the medium: slightly uneven cut lines, occasional chip marks and broken lines, faint wood grain, uneven hand-inking and a touch of off-register impression on the rough paper. Ancient, stark, ominous. Close with a caption as a line of crude carved or letterpress block lettering beneath the image, like the text under a broadsheet woodcut.`
+
+# Notes
+
+Campaign composite for the **the-oath-eaters** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [InkWash](./InkWash.mvstyle) (spare, meditative sumi-e ink-wash on washi; its bare-paper economy is the campaign-wide workhorse). EATER REVEALED = [Woodcut](./Woodcut.mvstyle) (stark folk-horror plague-broadsheet woodcut; the monster beat erupts in bold black masses — its carving-as-constraint lever is load-bearing, kept verbatim). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![InkWash](../ImageStyleExample/InkWash.example.png)
+
+![Woodcut](../ImageStyleExample/Woodcut.example.png)
