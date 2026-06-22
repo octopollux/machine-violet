@@ -107,12 +107,20 @@ const goldenPath = (name: string) =>
 
 // ---------------------------------------------------------------------------
 // The scenarios. Each is a distinct setup path to a finalized campaign.
+//
+// Every scenario requests The Chronicler as the DM personality ON PURPOSE: it is
+// the stable, minimal-content "seedless" default, so these goldens (which pin the
+// finalized personality's prompt_fragment) do NOT churn when other personalities
+// are edited, disabled, or revived. We had to re-record all four once already when
+// their organic picks got disabled (see #660/#661) — pinning Chronicler prevents a
+// repeat. The personality choice is incidental to what these scenarios test (world /
+// system / mechanics-mode / character / handoff resolution).
 // ---------------------------------------------------------------------------
 const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-quickstart-fantasy",
     inputs: [
-      "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue.",
+      "I'm Sam, an adult. Quick start, please — pick a fantasy world for me, something with intrigue. Use The Chronicler as the DM personality.",
       "That world sounds great, let's use it.",
       "My character is Aldric, a weathered sellsword chasing a blood debt. Keep it simple — no extra mechanics. I'm an adult, surprise me with the rest.",
     ],
@@ -120,7 +128,7 @@ const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-custom-noir",
     inputs: [
-      "I'm Sam, an adult. I want a fully custom game: 1970s occult noir in a rain-soaked city. Pure narrative, no rules system.",
+      "I'm Sam, an adult. I want a fully custom game: 1970s occult noir in a rain-soaked city. Pure narrative, no rules system. Use The Chronicler as the DM personality.",
       "Mood tense and melancholy, difficulty unforgiving. Call the campaign 'Neon Requiem'.",
       "I'm playing Marlowe Cray, a burned-out PI who can see the dead.",
     ],
@@ -128,7 +136,7 @@ const SETUP_SCENARIOS: SetupScenario[] = [
   {
     name: "setup-dnd-character",
     inputs: [
-      "I'm Sam, an adult. Let's play D&D 5e — classic heroic fantasy.",
+      "I'm Sam, an adult. Let's play D&D 5e — classic heroic fantasy. Use The Chronicler as the DM personality.",
       "My character is Vesper Quill, a sly, charming half-elf rogue who's light on her feet. Standard array is fine and you can pick sensible skills.",
     ],
   },
@@ -140,7 +148,7 @@ const SETUP_SCENARIOS: SetupScenario[] = [
     // finalize → SetupResult → scaffolded config).
     name: "setup-fate-light-silent",
     inputs: [
-      "I'm Sam, an adult. Full setup, please. I want a pulpy planar-adventure on FATE Accelerated — the light system. And I'd like you to run the rules for me, behind the scenes; I won't be tracking dice, aspects, or fate points myself.",
+      "I'm Sam, an adult. Full setup, please. I want a pulpy planar-adventure on FATE Accelerated — the light system. And I'd like you to run the rules for me, behind the scenes; I won't be tracking dice, aspects, or fate points myself. Use The Chronicler as the DM personality.",
       "My character is Roan Calloway, a quick-witted sky-courier who smuggles refugees off worlds marked for erasure; his recurring trouble is a blood-debt to the very tyrant whose work he's undoing. Flashy daring is his strongest approach. Mood heroic pulp, a tight one-shot — surprise me with the rest.",
     ],
   },
