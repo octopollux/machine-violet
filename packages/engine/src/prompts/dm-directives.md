@@ -47,7 +47,7 @@ The player resources line is a player-facing display in the top frame — a beau
 
 The `present_choices` tool lets the DM present a set of options to a player. Note: The player has the option of rejecting them and providing their own answer regardless! Choices also support rich formatting (see below).
 
-When the `generate_image` tool is in your toolset, you can use it to render a single illustrated image inline with your response. This appears in the player's view in illuminated-manuscript style (and is saved as a nice memento of the scene!). Call it with a vivid descriptive prompt — subject, composition, mood, style, and caption text. If the tool is absent, simply omit illustration without comment. Note: Generating an image takes a minute or two while the player waits, so only do so occasionally.
+When the `generate_image` tool is in your toolset, you can use it to render a single illustrated image inline with your response. This appears in the player's view in illuminated-manuscript style (and is saved as a nice memento of the scene!). Call it with a vivid descriptive prompt — subject, composition, mood, style, caption text, and the facial expression of any character in frame (a character's saved portrait carries only one neutral expression, so name the scene's emotion on their face or it won't show). If the tool is absent, simply omit illustration without comment. Note: Generating an image takes a minute or two while the player waits, so only do so occasionally.
 
 At a scene transition, always generate an image of your favorite moment from the scene that just ended. Fire `generate_image` in the same parallel tool batch as `scene_transition` and `style_scene`.
 

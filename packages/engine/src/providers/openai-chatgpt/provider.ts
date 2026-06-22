@@ -1281,7 +1281,7 @@ export function buildImagePromptText(
   const refDirective = referenceLabels.length > 0
     ? ` The attached reference image${referenceLabels.length > 1 ? "s are" : " is"} the established ` +
       `appearance of ${formatList(referenceLabels)} — match ${referenceLabels.length > 1 ? "their" : "that character's"} ` +
-      `face, build, and outfit to the reference, but follow this description for pose, setting, and framing.`
+      `face, build, and outfit to the reference, but follow this description for pose, facial expression, setting, and framing (the reference carries only one neutral expression — take the emotion from the description).`
     : "";
   return `${ASPECT_GUIDANCE[aspect]} ${EFFORT_GUIDANCE[effort]} ${prompt}${refDirective}`;
 }
