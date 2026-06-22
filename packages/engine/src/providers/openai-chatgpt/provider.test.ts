@@ -368,11 +368,11 @@ describe("buildImagePromptText", () => {
 
     const one = buildImagePromptText("a scene", "portrait", "standard", ["Xera"]);
     expect(one).toMatch(/reference image is the established appearance of Xera/i);
-    expect(one).toMatch(/match that character's face, build, and outfit/i);
+    expect(one).toMatch(/match that character's facial features, build, and outfit/i);
 
     const two = buildImagePromptText("a scene", "landscape", "quality", ["Xera", "Vera"]);
     expect(two).toMatch(/reference images are the established appearance of Xera and Vera/i);
-    expect(two).toMatch(/match their face, build, and outfit/i);
+    expect(two).toMatch(/match their facial features, build, and outfit/i);
   });
 });
 
