@@ -1224,8 +1224,7 @@ const IMAGE_RENDERER_INSTRUCTIONS =
  * reliably: a live A/B (2026-06-22) showed `landscape` → 1536×1024 and `square`
  * → 1254×1254, i.e. the backend honors the *shape* but renders a FIXED ~1.57 MP
  * budget either way. So `aspect` reshapes the pixel layout; it does not change
- * the pixel count (or cost). See docs/image-generation.md and the
- * image-quality-probe harness.
+ * the pixel count (or cost). See docs/image-generation.md (Provider backends).
  */
 const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
   portrait: "Use a tall vertical portrait orientation (roughly 1024x1536).",
@@ -1248,6 +1247,17 @@ const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
 // reaches the render. There is intentionally no EFFORT_GUIDANCE constant.
 
 /**
+ * Retry policy for {@link OpenAIChatGptProvider.generateImage}: retry iff the
+ * failure is a transient {@link ImageGenNoDataError} (clean turn, no bytes)
+ * AND we have attempts left. Every other failure — auth, a failed/interrupted
+ * turn, the render-timeout backstop — is terminal. Pure + exported so the
+ * policy is unit-tested without driving a live codex turn.
+ */
+export function shouldRetryImageRender(error: unknown, attempt: number, maxAttempts: number): boolean {
+  return error instanceof ImageGenNoDataError && attempt < maxAttempts;
+}
+
+/**
  * Fold the working knob (`aspect`) into the prompt text. The built-in image_gen
  * tool accepts no explicit size/quality params over the RPC, so orientation is
  * steered in natural language via {@link ASPECT_GUIDANCE}. The `effort` knob is
@@ -1261,17 +1271,6 @@ const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
  *
  * Exported for unit tests.
  */
-/**
- * Retry policy for {@link OpenAIChatGptProvider.generateImage}: retry iff the
- * failure is a transient {@link ImageGenNoDataError} (clean turn, no bytes)
- * AND we have attempts left. Every other failure — auth, a failed/interrupted
- * turn, the render-timeout backstop — is terminal. Pure + exported so the
- * policy is unit-tested without driving a live codex turn.
- */
-export function shouldRetryImageRender(error: unknown, attempt: number, maxAttempts: number): boolean {
-  return error instanceof ImageGenNoDataError && attempt < maxAttempts;
-}
-
 export function buildImagePromptText(
   prompt: string,
   aspect: ImageAspect,
