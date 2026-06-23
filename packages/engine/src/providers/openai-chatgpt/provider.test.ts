@@ -330,47 +330,43 @@ describe("getCapabilities", () => {
 
 describe("buildImagePromptText", () => {
   it("prepends landscape guidance for landscape aspect", () => {
-    const text = buildImagePromptText("a red cube", "landscape", "standard");
+    const text = buildImagePromptText("a red cube", "landscape");
     expect(text).toContain("landscape orientation");
     expect(text).toContain("1536x1024");
     expect(text).toContain("a red cube");
   });
 
   it("prepends portrait guidance for portrait aspect", () => {
-    const text = buildImagePromptText("a hero", "portrait", "standard");
+    const text = buildImagePromptText("a hero", "portrait");
     expect(text).toContain("vertical portrait");
     expect(text).toContain("1024x1536");
   });
 
   it("prepends square guidance for square aspect", () => {
-    const text = buildImagePromptText("a sigil", "square", "draft");
+    const text = buildImagePromptText("a sigil", "square");
     expect(text).toContain("square 1:1");
     expect(text).toContain("1024x1024");
   });
 
-  it("emits graduated quality/speed steering per effort level", () => {
-    expect(buildImagePromptText("x", "square", "draft")).toContain("low fidelity");
-    expect(buildImagePromptText("x", "square", "standard")).toContain("medium quality");
-    expect(buildImagePromptText("x", "square", "quality")).toContain("high quality");
-    expect(buildImagePromptText("x", "square", "showcase")).toContain("highest standard quality");
-  });
-
-  it("steers quality and showcase away from the slowest maximum-fidelity pass", () => {
-    // The whole point of the render-time cap: even the top routine tier must not
-    // invoke gpt-image's slowest mode (the multi-minute render we want to avoid).
-    expect(buildImagePromptText("x", "square", "quality")).toMatch(/do NOT engage the slowest/i);
-    expect(buildImagePromptText("x", "square", "showcase")).toMatch(/avoid the slowest/i);
+  it("folds in NO effort/quality steering — effort is a no-op on the codex path", () => {
+    // The built-in image_gen tool has no quality/size param and the backend
+    // renders at a fixed budget regardless of wording (live-verified), so the
+    // render prompt must carry only aspect + subject, never fidelity/speed
+    // directives. Guards against re-introducing the misleading steering.
+    const text = buildImagePromptText("a quiet harbor", "square");
+    expect(text).not.toMatch(/fidelity|quality|render quickly|hero-shot|slowest/i);
+    expect(text).toBe("Use a square 1:1 orientation (roughly 1024x1024). a quiet harbor");
   });
 
   it("appends a reference directive naming the characters only when labels are given", () => {
-    const none = buildImagePromptText("a scene", "landscape", "quality");
+    const none = buildImagePromptText("a scene", "landscape");
     expect(none).not.toMatch(/reference image/i);
 
-    const one = buildImagePromptText("a scene", "portrait", "standard", ["Xera"]);
+    const one = buildImagePromptText("a scene", "portrait", ["Xera"]);
     expect(one).toMatch(/reference image is the established appearance of Xera/i);
     expect(one).toMatch(/match that character's facial features, build, and outfit/i);
 
-    const two = buildImagePromptText("a scene", "landscape", "quality", ["Xera", "Vera"]);
+    const two = buildImagePromptText("a scene", "landscape", ["Xera", "Vera"]);
     expect(two).toMatch(/reference images are the established appearance of Xera and Vera/i);
     expect(two).toMatch(/match their facial features, build, and outfit/i);
   });
