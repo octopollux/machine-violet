@@ -209,6 +209,9 @@ Three points, increasing DM control of turn 1:
 ### NPC includes (DM-facing, place at the END of `detail`)
 [`packages/engine/src/prompts/include/NPC.md`](../packages/engine/src/prompts/include/NPC.md): `NPC` (default), `Atmospheric`, `Introverted`, `AsParty` — referenced as e.g. `<!--include:NPC.Introverted-->`. Use to tune how much the world's cast crowds the player.
 
+### Visual style (`image_style`)
+Every seed sets a top-level `image_style` — the stem of a `.mvstyle` variant in [`packages/engine/src/prompts/include/Image/`](../packages/engine/src/prompts/include/Image/) — which drives the chargen portrait and in-game art ([format-spec §10.8](format-spec.md#108-visual-style-image_style)). **Default a new seed to `PainterlyGame`** — a stylised painterly render that goes with essentially any genre. Leave the *specific* pick (a fitting catalog style, or a per-seed composite) to the render-and-eyeball **grade pass**, where styles are chosen by looking at renders, not guessing from seed text ([docs/visual-style-authoring.md](visual-style-authoring.md)).
+
 ### Disable / delete / rename-an-homage
 - **Disable** (drop from enumeration, keep the file & concept): `git mv foo.mvworld foo.mvworld.disabled`. Use for rebuild candidates and set-asides. Fork-test counts change — expect that.
 - **Delete** (truly redundant; fold the best bits into a neighbor first): `git rm`.
