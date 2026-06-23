@@ -129,22 +129,30 @@ export interface NormalizedMessage {
  *   - `showcase` — highest polish for a rare hero shot; slower, so reserved
  *                  for set-piece moments.
  *
- * On the OpenAI API-key path these map to `quality: low|medium|high|high`.
- * On the ChatGPT/codex path (no explicit quality param) they become
- * natural-language steering in the prompt; both paths deliberately steer
- * `quality` short of gpt-image's slowest maximum-fidelity pass so ordinary
- * play never blocks on a multi-minute render.
+ * Per-backend reality of this knob:
+ *   - **openai-apikey** — REAL. Maps to `quality: low|medium|high|high` on the
+ *     `images.generate` REST call (see openai.ts EFFORT_TO_QUALITY).
+ *   - **openai-chatgpt (codex)** — a NO-OP. The built-in image_gen tool exposes
+ *     no quality/size param (upstream openai/codex#20839, open) and the backend
+ *     renders at a fixed ~1.57 MP / `auto` quality regardless of the prompt
+ *     (live-verified 2026-06-22). The value still rides the request and echoes
+ *     back via `effortUsed` for contract parity, but does not affect the render.
  *
- * The model picks per-call from the `generate_image` tool's `effort` arg
- * (each subagent's system prompt directs the model on when to pick what).
+ * The knob is kept in the cross-provider contract regardless: it's load-bearing
+ * on openai-apikey today and ready for any future image-capable backend (e.g.
+ * Anthropic). The model picks per-call from the `generate_image` tool's `effort`
+ * arg (each subagent's system prompt directs the model on when to pick what).
  */
 export type ImageEffort = "draft" | "standard" | "quality" | "showcase";
 
 /**
- * Abstract aspect ratio. Provider implementations map to the nearest
- * supported dimensions (OpenAI: portrait → 1024×1536, landscape →
- * 1536×1024, square → 1024×1024). Future backends pick their own
- * canonical sizes without breaking the schema.
+ * Abstract aspect ratio — the one render knob that steers output on EVERY
+ * backend, including codex. Provider implementations map to the nearest
+ * supported dimensions (OpenAI: portrait → 1024×1536, landscape → 1536×1024,
+ * square → 1024×1024). On the codex path the backend honors the orientation but
+ * renders a fixed pixel budget (~1.57 MP) either way, so `aspect` reshapes the
+ * layout, not the pixel count/cost. Future backends pick their own canonical
+ * sizes without breaking the schema.
  */
 export type ImageAspect = "portrait" | "landscape" | "square";
 

@@ -757,8 +757,9 @@ export function createSetupConversation(
       // landscape multi-angle reference sheet — so we pin both here rather than
       // read them from the model. Tool args aren't enforced server-side (see
       // image-coerce), and a stray `aspect: "portrait"` would collapse the
-      // sheet back to a single front pose (defeating the whole point) while a
-      // stray `showcase` would block chargen on a slow maximum-fidelity render.
+      // sheet back to a single front pose (defeating the whole point); pinning
+      // `effort: "standard"` keeps the card off the apikey path's slow `high`
+      // tier (it's a no-op on the codex path — see types.ts ImageEffort).
       // That's why the tool no longer exposes either knob.
       const result = await provider.generateImage({
         prompt: styledPrompt,

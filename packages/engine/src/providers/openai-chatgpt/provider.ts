@@ -289,10 +289,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
    *
    * The turn runs `sandbox: "read-only"` + terse instructions so the model
    * can't wander off into shell/file-copy steps (it tried to in the spike;
-   * read-only blocks them harmlessly, but we'd rather it not try). The
-   * effort/aspect knobs are folded into the prompt text as best-effort
-   * steering — the built-in tool doesn't take explicit size/quality params
-   * over the wire the way the REST path does.
+   * read-only blocks them harmlessly, but we'd rather it not try). Only the
+   * `aspect` knob is folded into the prompt text (orientation steering) — the
+   * built-in tool takes no explicit size/quality params over the wire, and a
+   * live A/B confirmed `effort` can't change render cost/quality here, so it's
+   * a no-op on this path (echoed via `effortUsed` for contract parity only).
+   * See {@link buildImagePromptText}.
    *
    * Runs as a nested turn on the shared codex subprocess (the DM turn that
    * called generate_image is paused awaiting our tool reply). Codex handles
@@ -435,11 +437,17 @@ export class OpenAIChatGptProvider implements LLMProvider {
         url: `data:${r.mimeType};base64,${r.base64}`,
       }));
       const labels = references.map((r) => r.label).filter((l): l is string => !!l);
+      // NOTE: `effort` is intentionally NOT folded into the prompt here. It's a
+      // no-op on this backend (see buildImagePromptText) — the render is a fixed
+      // ~1.57 MP at the backend's own `auto` quality regardless of any
+      // fidelity/speed wording. It still rides the request (and echoes back via
+      // `effortUsed`) to keep the cross-provider GenerateImageRequest contract,
+      // and IS honored on the openai-apikey path. Only `aspect` steers here.
       await client.call("turn/start", {
         threadId,
         input: [
           ...referenceItems,
-          { type: "text", text: buildImagePromptText(prompt, aspect, effort, labels) },
+          { type: "text", text: buildImagePromptText(prompt, aspect, labels) },
         ],
         // Lowest reasoning the model needs to call one tool. Summaries off; we
         // don't surface thinking from image turns. NOTE: "low" is the FLOOR
@@ -1208,59 +1216,36 @@ const IMAGE_RENDERER_INSTRUCTIONS =
   "move, or list files — the caller harvests the rendered bytes directly. Do NOT " +
   "write any explanatory prose, captions, or follow-up. Render the image and stop.";
 
+/**
+ * Orientation steering — the ONE render knob that actually works on this
+ * backend. The built-in image_gen tool takes no explicit size/quality params
+ * (codex sends the hosted `image_generation` tool bare → backend `auto`), so
+ * the only lever is the prompt text, and orientation is the only thing it moves
+ * reliably: a live A/B (2026-06-22) showed `landscape` → 1536×1024 and `square`
+ * → 1254×1254, i.e. the backend honors the *shape* but renders a FIXED ~1.57 MP
+ * budget either way. So `aspect` reshapes the pixel layout; it does not change
+ * the pixel count (or cost). See docs/image-generation.md (Provider backends).
+ */
 const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
   portrait: "Use a tall vertical portrait orientation (roughly 1024x1536).",
   landscape: "Use a wide landscape orientation (roughly 1536x1024).",
   square: "Use a square 1:1 orientation (roughly 1024x1024).",
 };
 
-/**
- * Natural-language steering for the abstract `effort` knob.
- *
- * The built-in image_gen tool takes no explicit quality/size params over the
- * RPC — codex configures it with `size`/`quality` unset, so the backend runs
- * at `auto` and infers both from the prompt text. That makes the prompt our
- * ONLY lever, but a real one: the same channel that already steers orientation
- * also steers fidelity. So each effort level emits an explicit quality + speed
- * directive rather than leaving the model on its slow `auto` default.
- *
- * Deliberately render-time-aware: even the top routine tier (`quality`) tells
- * the model NOT to engage gpt-image's slowest maximum-fidelity pass — that
- * "ultra" mode is where a render balloons to multiple minutes, and we never
- * want the player waiting on it for ordinary play. `showcase` allows a little
- * more time for a rare hero shot but still stops short of the exhaustive pass.
- *
- * Internal — covered indirectly by the exported {@link buildImagePromptText}
- * unit tests, which assert each level's steering shows up in the prompt.
- */
-const EFFORT_GUIDANCE: Record<ImageEffort, string> = {
-  draft:
-    "Render quickly at low fidelity — a rough draft thumbnail is fine; favor speed over fine detail.",
-  standard:
-    "Render at medium quality — a clean, good-looking image with a balanced, reasonably fast render.",
-  quality:
-    "Render at high quality with rich detail, but keep the render time reasonable: " +
-    "do NOT engage the slowest maximum-fidelity mode.",
-  showcase:
-    "Render at the highest standard quality for a hero-shot moment — extra polish is worth " +
-    "a little more time, but still avoid the slowest exhaustive ultra-detail pass.",
-};
+// Why there's NO effort/quality steering folded into the codex render prompt:
+// the built-in image_gen tool exposes no quality/size param (confirmed against
+// codex 0.133–0.142; upstream openai/codex#20839 is open with no fix), and the
+// hosted tool's quality is request-level config codex sends bare → the backend
+// renders at its own `auto` quality regardless of any wording. A live A/B
+// (2026-06-22) confirmed prompt fidelity/speed language does NOT reliably change
+// render time, pixel count, or plan-usage cost — it only nudges how *detailed*
+// the image looks (a content/aesthetic effect, not a cost dial), and the old
+// "do NOT engage the slowest pass" wording was premised on a quality control
+// that doesn't exist here. So `effort` is a documented NO-OP on this path: it
+// rides the request and echoes via `effortUsed` for the cross-provider
+// GenerateImageRequest contract (and IS real on openai-apikey), but never
+// reaches the render. There is intentionally no EFFORT_GUIDANCE constant.
 
-/**
- * Fold the abstract aspect/effort knobs into the prompt text. The built-in
- * image_gen tool doesn't accept explicit size/quality params over the RPC
- * (the SKILL.md's CLI fallback does, but that path needs OPENAI_API_KEY and
- * we deliberately never touch it), so we steer in natural language —
- * orientation via {@link ASPECT_GUIDANCE}, fidelity/speed via
- * {@link EFFORT_GUIDANCE}.
- *
- * When `referenceLabels` is non-empty, a directive naming the referenced
- * characters is appended so the model knows the attached images are
- * appearance references for those names (the images themselves ride as
- * separate `image` input items on the turn — see {@link generateImage}).
- *
- * Exported for unit tests.
- */
 /**
  * Retry policy for {@link OpenAIChatGptProvider.generateImage}: retry iff the
  * failure is a transient {@link ImageGenNoDataError} (clean turn, no bytes)
@@ -1272,10 +1257,23 @@ export function shouldRetryImageRender(error: unknown, attempt: number, maxAttem
   return error instanceof ImageGenNoDataError && attempt < maxAttempts;
 }
 
+/**
+ * Fold the working knob (`aspect`) into the prompt text. The built-in image_gen
+ * tool accepts no explicit size/quality params over the RPC, so orientation is
+ * steered in natural language via {@link ASPECT_GUIDANCE}. The `effort` knob is
+ * deliberately NOT steered here — it's a no-op on this backend (see the comment
+ * above {@link ASPECT_GUIDANCE} and on the call site in {@link renderImageOnce}).
+ *
+ * When `referenceLabels` is non-empty, a directive naming the referenced
+ * characters is appended so the model knows the attached images are
+ * appearance references for those names (the images themselves ride as
+ * separate `image` input items on the turn — see {@link generateImage}).
+ *
+ * Exported for unit tests.
+ */
 export function buildImagePromptText(
   prompt: string,
   aspect: ImageAspect,
-  effort: ImageEffort,
   referenceLabels: string[] = [],
 ): string {
   const refDirective = referenceLabels.length > 0
@@ -1283,7 +1281,7 @@ export function buildImagePromptText(
       `appearance of ${formatList(referenceLabels)} — match ${referenceLabels.length > 1 ? "their" : "that character's"} ` +
       `facial features, build, and outfit to the reference, but follow this description for pose, facial expression, setting, and framing (the reference carries only one neutral expression — take the emotion from the description).`
     : "";
-  return `${ASPECT_GUIDANCE[aspect]} ${EFFORT_GUIDANCE[effort]} ${prompt}${refDirective}`;
+  return `${ASPECT_GUIDANCE[aspect]} ${prompt}${refDirective}`;
 }
 
 /** Oxford-comma join: ["a"] → "a"; ["a","b"] → "a and b"; ["a","b","c"] → "a, b, and c". */
