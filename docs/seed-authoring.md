@@ -122,6 +122,29 @@ own terms — not a retread of any one film). If a built seed turns out to be an
 unmistakable homage, rename it so MV isn't shipping someone else's title and
 disable it until it can be rebuilt as something original.
 
+### Broad appeal — the archetype, plus one fresh angle
+The catalog skews to a narrow taste (high-concept, literary, modern/sci-fi); the
+broad audience is the union of three overlapping crowds — **Players** (be the
+hero), **Readers** (live inside a novel; romance above all), and **Shippers/AO3**
+(play the trope and the ship) — and the overlaps are where MV's character-driven,
+text-first engine beats combat-and-dungeon competitors. To serve them, build the
+*familiar* archetype (heroic fantasy, space-opera, cozy romance, whodunit), but
+deliver it cleanly **and** alive with one fresh, specific angle, so it reads as
+instantly legible *and* not generic — e.g. heroic save-the-realm → the gathering
+dark is *literal* (relight the realm's old lights, region by region). The danger
+is blandness; the fix is one sharp angle plus the usual bars (a real place, a
+clear call to action, a good opening, a crucial-question for replay depth).
+
+### Framework, not fandom
+The biggest IP-driven crowds (superhero fans, fandom shippers) are served by
+shipping **generic, clean-room frameworks** that the *player* specializes at
+setup — they turn `the-coffee-shop` into a Stony fic, a powered-team framework
+into the Avengers, in *their* private game. We never ship the IP; they bring it.
+This reaches those audiences **and** keeps the originality bar intact (above). The
+craft: design a framework to be great *empty* and a great *canvas* — rich on its
+own, and an easy thing for a player to pour a fandom into. `the-coffee-shop` is
+the exemplar.
+
 ### Player-identity forks are optional
 Players can always state their own character concept at chargen, so a seed does
 **not** need a "who you are" fork for parity. Add one only when it earns its place
@@ -135,6 +158,13 @@ not just worldbuilding), propose the *game*, enrich harder. The fantasy seeds
 that work are engine-first + grounded (a real company town, economic pressure,
 grief) with the fantasy/horror as an *intrusion*, not seeds that are all
 cosmology and no happening.
+
+### Authoring romance & relationship seeds
+The relationship lane (Readers + Shippers) is a strength to lean into, with its own craft:
+- **Seed the romantic hook *explicitly*.** Romance does not emerge from a neutral world — name the love interest(s), make them genuinely desirable, and structure the pull, or the DM simply won't run it. (A fae-bargain seed has to *say* the patron is the love interest.)
+- **Offer contrasting love interests where it fits.** The choice between two desirable-but-very-different options is a core romance pleasure (a stranger-spouse *and* a written-in paramour).
+- **The call to action is relational**, not a quest objective — pursue the bond, navigate the obstacle, earn the slow burn. A found-family fellowship is the same engine wrapped around any genre pillar.
+- **Stay maturity-neutral.** Do **not** encode a heat level in the seed (no "fade to black", no "keep it tasteful", no steaminess directives — in either direction). Enforcement lives *outside* seed content: the player's age bracket, the model's guardrails (which vary over time), and content classifiers. Build a relationship-rich framework and let the runtime + player + model govern how far a session goes; don't QA the guardrails from the seed side.
 
 ---
 
@@ -193,6 +223,8 @@ All live in [`packages/engine/src/prompts/include/Pacing.md`](../packages/engine
 | `<!--include:Pacing.EndlessCampaigns-->` | Open-Ended / Serialized / Unstructured | living cities, anthology/episodic, serialized cases |
 | `<!--include:Pacing.TimedCampaigns-->` | (skips the scope question) | a real in-game clock with teeth — escape, siege, beat-the-collapse |
 | `<!--include:Pacing.Iterated-->` | (skips the scope question) | time-loop / iterated-game premises |
+
+**Epic / multi-act pacing (when the DM tends to rush the arc).** The scope buckets don't *enforce* pacing, and the DM biases toward delivering the payoff early — collapsing a save-the-realm epic into a few scenes. For a long arc, write a DM-facing **movement ladder** in `detail` (Act I local & personal → Act II the long middle → Act III the source) with explicit anti-rush directives ("hold each until it pays off"; "when unsure it's time to escalate, it isn't") and progress framed as a *rising tally*, not a countdown. Best of all, make the pacing **structural**: an engine where the player *can't* skip ahead (relight the realm region by region — they physically can't do it all at once) enforces the acts better than any directive. See `the-gathering-dark`.
 
 ### The opening-scene spectrum (`setup_detail`)
 Three points, increasing DM control of turn 1:
