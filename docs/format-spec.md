@@ -993,7 +993,7 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 
 ### 10.8 Visual style (`image_style`)
 
-`image_style` names one visual style for the seed — the **stem of a `.mvstyle` variant** in [`packages/engine/src/prompts/include/Image/`](../packages/engine/src/prompts/include/Image/) (e.g. `"NoirCinema"`, `"CinematicFilm"`, `"StreetCam"`). It is a single, human-graded, one-style-per-seed pairing (see [docs/visual-style-authoring.md](visual-style-authoring.md)). It drives two things, both at setup:
+`image_style` names one visual style for the seed — the **stem of a `.mvstyle` variant** in [`packages/engine/src/prompts/include/Image/`](../packages/engine/src/prompts/include/Image/) (e.g. `"NoirCinema"`, `"CinematicFilm"`, `"StreetCam"`). It is a single, human-graded, one-style-per-seed pairing (see [docs/visual-style-authoring.md](visual-style-authoring.md)). **When authoring a new seed, default `image_style` to `PainterlyGame`** — a painterly render that suits any genre — and defer the specific pick to the eyeball/grade pass. It drives two things, both at setup:
 
 A stem may point at either a **single catalog style** (one backtick-fenced `# Style` directive) or a per-seed **composite** — a `.mvstyle` named after the seed whose `# Style` lists a labeled *menu*: a **default** look plus situational variants (outdoor night, dark crisis, a surveillance cam, a player-requested image, …) the DM chooses between per the file's `# Direction`. Composites are authored **default-first**.
 
