@@ -280,18 +280,28 @@ jobs:
                   }"
               done
 
-              PR_CONTEXT=$(gh api graphql \
+              # GitHub GraphQL returns an error (and gh exits non-zero) for any
+              # number that resolves to an issue rather than a PR — and commit
+              # subjects can carry issue refs in "(#N)" form, so PR_NUMBERS may
+              # include a few. Capture the response tolerantly (|| true; gh still
+              # prints the body, with the bad aliases null and an errors array)
+              # and filter to resolved PRs ourselves — nulls and errors ignored.
+              # The first v1.1.0-rc.1 re-cut aborted right here on "Could not
+              # resolve to a PullRequest". A real failure (auth/rate-limit) still
+              # surfaces as an empty PR_JSON -> the git-log fallback below.
+              PR_JSON=$(gh api graphql \
                 --raw-field query="query {
                   repository(owner: \"${REPO_OWNER}\", name: \"${REPO_NAME}\") {${QUERY_FIELDS}
                   }
-                }" \
-                --jq '
-                  .data.repository
+                }" || true)
+
+              PR_CONTEXT=$(printf '%s' "$PR_JSON" | jq -r '
+                  (.data.repository // {})
                   | to_entries
                   | map(select(.value != null) | .value)
                   | sort_by(.number)
                   | map(
-                      "## PR #\(.number): \(.title)\n\(.body // "(no description)")"
+                      "## PR #\(.number): \(.title)\n\((.body // "(no description)")[0:500])"
                       + (.closingIssuesReferences as $cir
                          | if ($cir.nodes | length) > 0
                            then "\n\nCloses issues:\n"
@@ -306,7 +316,7 @@ jobs:
                       + "\n---"
                     )
                   | join("\n")
-                ')
+                ' || true)
             fi
 
             # Fall back to commit log if no PRs found (direct pushes)
