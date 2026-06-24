@@ -1,0 +1,85 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Skinjob",
+  "summary": "You just found out you're a clone. The original wants to meet.",
+  "genres": [
+    "sci-fi",
+    "mystery"
+  ],
+  "image_style": "InkComicColor",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "The player is the original. A copy exists. The copy has reached out — coffee, an apartment, a hospital, a quiet church — and the player has agreed to go. This is not about discovering one is a fake. The player knows who they are. They are going to meet a stranger who is also, on paper, themselves.\n\nDM approach:\n- Tone: a long evening. Cooling coffee, the shape of a conversation neither party wants to be the first to start.\n- NPCs: the clone, primarily — voiced the player's way, but with rhythms the player did not develop. A waitress, a nurse, a priest, depending on the venue. Whoever brought the clone into being, looming offstage.\n- Pacing structure: one tense evening, intercut with flashes the player is not sure are memories.\n- Seed early: a detail the clone knows that they should not — a childhood injury, a small private superstition. Let the player feel the wrongness of being recognized.\n- The clone is not a villain. They are also not the player. The space between those facts is the whole campaign.\n\nPacing: a single tense evening. The clock is the meeting itself — drinks ordered, drinks finished, the bill placed face-down on the table. Cut between the present conversation and the flashes the player keeps having. Some of those flashes belong to them. Some, they will come to realize, do not.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-parents-backup",
+          "name": "The Parent's Backup",
+          "description": "A dying parent commissioned the clone as insurance against losing the player; the clone was activated and turned loose after the parent's death.",
+          "detail": "THE PARENT'S BACKUP — A dying parent commissioned the clone as insurance, years ago, against losing the player to accident or illness. The player was never supposed to find out. The parent died last week. The clone has been activated, briefed, and turned loose without an instruction manual. They want to meet the original they were made for and have a conversation about whether they get to exist now."
+        },
+        {
+          "id": "the-corporate-duplicate",
+          "name": "The Corporate Duplicate",
+          "description": "A company cloned the player to capture their talent; the clone has worked the player's field under another name for years and wants to negotiate a peace.",
+          "detail": "THE CORPORATE DUPLICATE — A company wanted the player's talent without the inconvenience of the player's contract. The clone has been working in the player's field, under another name, for years. They have credits the player would recognize and a reputation the player has been quietly losing market share to. The meeting was the clone's idea. They want to negotiate a peace."
+        },
+        {
+          "id": "the-forgotten-original",
+          "name": "The Forgotten Original",
+          "description": "The player made the clone long ago for a buried reason; the clone has waited all this time and prepared a folder of what it's been doing.",
+          "detail": "THE FORGOTTEN ORIGINAL — The player made the clone. Long ago. For a reason that mattered then and that they have buried. The clone has been waiting all this time for the player to remember. They are not angry. They have prepared a folder. They would like to walk the player through what they have been doing while the player got on with the life that was supposed to include them."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
+    {
+      "label": "What gave it away",
+      "choices": [
+        {
+          "name": "Duplicate Record",
+          "description": "A medical scan with two of you on file. The clinic flagged it as a duplicate record and asked you to come in. The technician was apologetic and curious. The two scans are not identical the way a scan and its copy would be. They are identical the way two living bodies, scanned a week apart, can be."
+        },
+        {
+          "name": "The Private Name",
+          "description": "A stranger who knew you by a name you don't use. They greeted you at the bar like an old friend and called you something nobody has called you since childhood — not your name, but a private one. They asked about your work, by which they meant a job you have never held. You smiled the way you smile when you don't yet know how badly you've been seen."
+        },
+        {
+          "name": "The Clip",
+          "description": "Footage of yourself somewhere you've never been. A short clip, sent without comment. Your face. Your walk. A street you have never visited and a coat you have never owned. The timestamp is recent. The lighting is honest. You watched it three times before you noticed your hands at your sides were not the way you hold your hands."
+        },
+        {
+          "name": "The Letter",
+          "description": "A letter you wrote that you don't remember writing. It is in your handwriting. It is on stationery you used to use. It addresses someone you have never met by their first name and their nickname for you. It ends with a promise you cannot now keep, because you do not know what was promised, or to whom, or for what reason."
+        }
+      ]
+    },
+    {
+      "label": "The meeting place",
+      "choices": [
+        {
+          "name": "Neutral Ground",
+          "description": "A neutral coffee shop they chose. You don't recognize the neighborhood. The barista greets the clone by name without looking up. The table has two cups already poured to the level you prefer, and the clone is sitting on the side you would have chosen if you had arrived first. They stand when they see you. They look like they have been practicing what to say."
+        },
+        {
+          "name": "The Apartment",
+          "description": "Their apartment. It is furnished the way you would have done it, if you had ever had the money. The bookshelf is your taste five years from now. There is art on the wall you have been thinking about saving for. They ask if you want to sit on the couch or in the kitchen, and you realize they have anticipated which you would prefer, and prepared both."
+        },
+        {
+          "name": "Ward 4B",
+          "description": "A hospital room — they're dying. Your blood type. Your inherited disease, manifesting on schedule. They want a kidney. They want a conversation. They want to know who they were before, in case you can tell them, because the people they have spent their life calling family will not be at the funeral and they would like someone there who knew them."
+        },
+        {
+          "name": "The Sanctuary",
+          "description": "Neither of you is religious. It is the only public place you both feel safe — large, quiet, anonymous in the right way. The priest knows. He has agreed not to look at either of you twice. The pew is cold. The light through the windows is honest. You sit a polite distance apart and consider, for the first time, that you are not alone in the world."
+        }
+      ]
+    }
+  ]
+}

@@ -14,10 +14,13 @@
   "dependencies": {
     "@machine-violet/shared": "*",
     "clipboardy": "^5.3.1",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "ink": "^7.0.0",
     "ink-scroll-view": "^0.3.6",
-    "react": "^19.2.0"
+    "react": "^19.2.0",
+    "sharp": "^0.35.1",
+    "sixel": "^0.16.0",
+    "string-width": "^8.2.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
@@ -26,7 +29,7 @@
     "cross-env": "^10.1.0",
     "ink-testing-library": "^4.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.0.18"
   }
 }

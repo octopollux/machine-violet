@@ -11,6 +11,7 @@ import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
 import { scrollAmount } from "../components/NarrativeArea.js";
+import { useRegisterOcclusion } from "../image/occlusion.js";
 
 /**
  * Handle exposed via forwardRef. Extends the shared ScrollHandle with
@@ -187,6 +188,9 @@ export const CenteredModal = forwardRef<CenteredModalHandle, CenteredModalProps>
     const modalHeight = visibleRows + 2 * borderHeight;
     const topMargin = Math.max(0, topOffset + Math.floor((height - modalHeight) / 2));
     const leftPad = Math.max(0, Math.floor((width - modalWidth) / 2));
+
+    // Report our row-span so inline images hide only when actually occluded.
+    useRegisterOcclusion({ top: topMargin, rows: modalHeight });
 
     const scrollRef = useRef<ScrollViewRef>(null);
     const [linesBelow, setLinesBelow] = useState(0);

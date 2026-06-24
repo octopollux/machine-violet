@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Beneath the Skin"
+rating: "?"
+description: "Beneath the Skin campaign look: DocumentaryPhoto by default, DayForNight for outdoor night scenes"
+tags: [photographic, photoreal, muted, cool, outdoor-revealing]
+made-for-model: gpt-image-2
+tokens: 321
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** documentary look below; outdoor scenes at **night** use the day-for-night look.
+
+# Style
+
+Default (most scenes) — `Rendered as a grounded documentary photograph — a candid, photojournalistic still as if shot by an embedded reportage photographer on a full-frame DSLR with available light, NOT a game render, NOT a cinematic movie still, and NOT a posed studio shot. Naturalistic and unglamorous: a real available-light exposure with motivated practical sources, honest skin and materials, a slightly imperfect handheld composition, a moderate natural depth of field, true-to-life muted colour, and fine high-ISO sensor grain in the shadows. The authentic, in-the-moment, you-are-there feeling of reportage — observed, not staged. Close with a small caption in a plain documentary font, like a photo-essay caption.`
+
+Outdoor at night — `Rendered as a frame using the classic DAY-FOR-NIGHT film technique — a scene shot in real daylight but exposed and graded to read as night. The signature: a deep, cool BLUE moonlit cast over everything; underexposed, slightly crushed midtones; but with the tell-tale artifacts of a daylight shoot — crisp hard-edged shadows pointing the wrong way for moonlight, bright specular glints, and far more fine detail than a real night shot would hold; and a bright "moon" that is really the sun. Cool, eerie, artificial night. Close with a small caption in a tasteful font.`
+
+# Notes
+
+Campaign composite for the **beneath-the-skin** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [DocumentaryPhoto](./DocumentaryPhoto.mvstyle) (grounded reportage — the campaign-wide workhorse). OUTDOOR NIGHT = [DayForNight](./DayForNight.mvstyle) (cool-blue artificial-night technique). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![DocumentaryPhoto](../ImageStyleExample/DocumentaryPhoto.example.png)
+
+![DayForNight](../ImageStyleExample/DayForNight.example.png)

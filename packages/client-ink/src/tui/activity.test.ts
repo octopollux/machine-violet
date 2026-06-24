@@ -37,6 +37,13 @@ describe("activity indicators", () => {
     expect(ACTIVITY_MAP.scene_transition).toBeDefined();
     expect(ACTIVITY_MAP.dm_thinking).toBeDefined();
     expect(ACTIVITY_MAP.starting_session).toBeDefined();
+    expect(ACTIVITY_MAP.generating_image).toBeDefined();
+  });
+
+  it("returns the image-generation indicator", () => {
+    const indicator = getActivity("generating_image");
+    expect(indicator).toBeDefined();
+    expect(indicator!.label).toBe("The DM is creating an image...");
   });
 
   it("returns starting_session indicator for setup→game handoff", () => {
@@ -77,6 +84,13 @@ describe("getActivityLabel", () => {
     expect(getActivityLabel("tool_running", 45)).toBe("Still working...");
   });
 
+  it("escalates generating_image over a multi-minute render", () => {
+    expect(getActivityLabel("generating_image", 0)).toBe("The DM is creating an image...");
+    expect(getActivityLabel("generating_image", 44)).toBe("The DM is creating an image...");
+    expect(getActivityLabel("generating_image", 45)).toBe("Still rendering the image...");
+    expect(getActivityLabel("generating_image", 120)).toBe("The image is taking a little while...");
+  });
+
   it("returns undefined for null or unknown state", () => {
     expect(getActivityLabel(null, 0)).toBeUndefined();
     expect(getActivityLabel("nope", 0)).toBeUndefined();
@@ -89,6 +103,7 @@ describe("hasElapsedAwareLabel", () => {
     expect(hasElapsedAwareLabel("dm_thinking")).toBe(true);
     expect(hasElapsedAwareLabel("tool_running")).toBe(true);
     expect(hasElapsedAwareLabel("starting_session")).toBe(true);
+    expect(hasElapsedAwareLabel("generating_image")).toBe(true);
     // Mapped but tier-less — fast states should NOT trigger ticker/suffix
     expect(hasElapsedAwareLabel("roll_dice")).toBe(false);
     expect(hasElapsedAwareLabel("rule_lookup")).toBe(false);
@@ -159,6 +174,15 @@ describe("getToolGlyph", () => {
   it("returns glyph for entity/scribe tools", () => {
     expect(getToolGlyph("scribe")!.glyph).toBe("✎");
     expect(getToolGlyph("dm_notes")!.glyph).toBe("✎");
+  });
+
+  it("returns a single-width glyph for image generation", () => {
+    const img = getToolGlyph("generate_image");
+    expect(img).toBeDefined();
+    expect(img!.glyph).toBe("❖");
+    expect(img!.color).toBe("magenta");
+    // Single code point so it aligns in the concatenated glyph row.
+    expect([...img!.glyph]).toHaveLength(1);
   });
 
   it("returns undefined for unknown tool names", () => {

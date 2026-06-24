@@ -26,7 +26,9 @@ import { getActivePlayer } from "../agents/player-manager.js";
 import { loadEnv } from "../config/first-launch.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
-import type { LLMProvider } from "../providers/types.js";
+import { wrapForRecording, buildReplayTierProviders } from "../providers/tape-mode.js";
+import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
@@ -39,7 +41,8 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
-import { markdownToNarrativeLines } from "../context/display-log.js";
+import { markdownToNarrativeLines, iterDisplayLogReplay } from "../context/display-log.js";
+import { hasPriorPlay } from "../context/state-persistence.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -353,10 +356,18 @@ export class SessionManager {
 
     // Create a temp campaign directory for setup state.
     // Clean up any previous setup state first (inspectable between runs).
+    // Scaffold the full standard campaign dir tree (state/, characters/,
+    // campaign/images/, etc.) so the setup-conversation has a real
+    // campaign on disk for things like portrait-draft writes — keeps
+    // image-handler's mkdir(recursive) defensive but means tools that
+    // assume the tree exists never get a surprise on the setup path.
     const setupRoot = join(this.campaignsDir, "__setup__");
     const { mkdir, rm } = await import("node:fs/promises");
     await rm(setupRoot, { recursive: true, force: true });
-    await mkdir(join(setupRoot, "state"), { recursive: true });
+    const { campaignDirs } = await import("../tools/filesystem/index.js");
+    for (const dir of campaignDirs(setupRoot)) {
+      await mkdir(dir, { recursive: true });
+    }
 
     // Build a minimal GameState so turns, context dumps, etc. work
     const setupConfig: CampaignConfig = {
@@ -488,21 +499,36 @@ export class SessionManager {
     // reconnect after the new session is ready.
     this.broadcast({ type: "session:transition", data: { campaignId, campaignName: campaignName ?? campaignId } });
 
-    // Dispose the setup-session's tier providers before nulling the
-    // reference — otherwise an openai-chatgpt setup tier leaves its
-    // codex subprocess running for the rest of the process lifetime.
+    // Detach the setup session before nulling the reference; we dispose its
+    // tier providers below, after the bookkeeping but before the respawn.
     const oldSetup = this.setupSession;
     this.setupSession = null;
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
-    void oldSetup?.dispose();
     this.clearIdleTimer();
     this.status = "idle";
     this.campaignId = null;
     this.currentMode = "play";
 
     logEvent("session:end", { reason: "setup_transition", campaignId });
+
+    // Fully tear down the setup session's codex subprocess BEFORE spawning the
+    // game session's. The two are distinct subprocesses (each tier resolution
+    // builds its own provider cache) but share one CODEX_HOME (~/.codex), and
+    // with it a single SQLite state runtime and a single-use OAuth refresh
+    // token. Letting them overlap races both: the new codex can crash on
+    // startup initializing the shared SQLite state ("disk I/O error"), or lose
+    // an OAuth refresh and 401 with "refresh token has already been used" —
+    // either way a hard failure exactly at handoff. dispose() awaits the
+    // subprocess `exit`, which releases those handles; awaiting it here closes
+    // the overlap window. (Was fire-and-forget since #538, which added the
+    // dispose to stop accumulating processes but never waited for it before the
+    // respawn.) dispose() catches per-provider errors internally so the await
+    // won't reject, and rpc.stop() escalates SIGTERM→SIGKILL after 2s so in
+    // practice it settles promptly — it still awaits the process `exit` event,
+    // so the bound is "SIGKILL then exit," not a hard timeout.
+    await oldSetup?.dispose();
 
     // Start the newly created campaign
     await this.startSession(campaignId);
@@ -563,22 +589,31 @@ export class SessionManager {
     // Medium/Small=Anthropic) routes each call to the right vendor without
     // ever sending an Anthropic model ID through an OpenAI client.
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    const { createAnthropicProvider } = await import("../providers/anthropic.js");
-    const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    const tierProviders = tierResolution.tiers;
+    this.providersByConnectionId.clear();
+    let tierProviders: Record<ModelTier, TierProvider>;
+    const replayTiers = buildReplayTierProviders();
+    if (replayTiers) {
+      // Full-stack replay (E2E): every tier served from the tape at
+      // MV_TAPE_PATH — no connection, no network, no key. byConnectionId
+      // stays empty; a taped session has no management-route providers.
+      tierProviders = replayTiers;
+    } else {
+      const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+      const { createAnthropicProvider } = await import("../providers/anthropic.js");
+      const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+      // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+      tierProviders = wrapForRecording(tierResolution.tiers);
+      // Build the connectionId → provider lookup for management routes.
+      for (const [connId, provider] of tierResolution.byConnectionId) {
+        this.providersByConnectionId.set(connId, provider);
+      }
+    }
 
     // Track unique providers for end-of-session disposal. Stateful providers
     // (openai-chatgpt) own subprocesses that linger across sessions otherwise.
     this.sessionProviders.add(tierProviders.large.provider);
     this.sessionProviders.add(tierProviders.medium.provider);
     this.sessionProviders.add(tierProviders.small.provider);
-
-    // Build the connectionId → provider lookup for management routes.
-    this.providersByConnectionId.clear();
-    for (const [connId, provider] of tierResolution.byConnectionId) {
-      this.providersByConnectionId.set(connId, provider);
-    }
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.
@@ -652,6 +687,20 @@ export class SessionManager {
         sessionNumber: 1,
         sessionRecapPending: false,
       };
+    }
+
+    // The current-scene transcript is the weakest signal of prior play. If it's
+    // empty but conversation.json / display-log.md show history — a crash before
+    // the first transcript flush, a hand-checked-out commit, a missing scene dir
+    // — RESUME anyway. Starting a fresh opening over an existing campaign
+    // silently grafts a new beginning onto old history, which players see as a
+    // vanished narrative log. See hasPriorPlay() and docs/error-recovery.md.
+    if (!isResume && await hasPriorPlay(campaignRoot, fileIO)) {
+      isResume = true;
+      logEvent("session:resume_recovered", {
+        campaignId,
+        reason: "prior-play-without-current-scene-transcript",
+      });
     }
 
     // --- Load DM session state ---
@@ -1114,11 +1163,15 @@ export class SessionManager {
     // Broadcast state snapshot — carries sessionRecap exactly once when set.
     this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
 
-    // Send display history from previous session as a single chunk per kind-group.
-    // Joining lines with \n lets appendDelta handle paragraph spacing correctly.
+    // Send display history from previous session by replaying it through
+    // the broadcast pipeline. The grouping + image-broadcast logic lives
+    // in iterDisplayLogReplay (display-log.ts) so it's testable in
+    // isolation; passing the campaign root means relative image paths
+    // in the display-log resolve to absolute on the way out (and absolute
+    // paths from legacy display-logs flow through unchanged).
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
-      const narrativeLines = markdownToNarrativeLines(historyLines);
+      const narrativeLines = markdownToNarrativeLines(historyLines, engine.getGameState().campaignRoot);
       // Seed the committed transcript with dm/player lines from history so a
       // mid-session rollback after resume produces a snapshot that contains
       // the prior session's text — not just lines accumulated since this load.
@@ -1129,29 +1182,8 @@ export class SessionManager {
           this.committedNarrative.push({ kind: line.kind, text: line.text });
         }
       }
-      // Group consecutive same-kind lines and send each group as one chunk.
-      // Separators (---) are sent as DM lines — the formatting pipeline
-      // converts them to styled horizontal rules during rendering.
-      let currentKind = "";
-      let currentText = "";
-      for (const line of narrativeLines) {
-        let kind = line.kind as string;
-        let text = line.text;
-        // Convert separators to DM lines with --- text for the formatting pipeline
-        if (kind === "separator") {
-          kind = "dm";
-          text = "---";
-        }
-        if (kind !== "dm" && kind !== "player" && kind !== "system" && kind !== "dev") continue;
-        if (kind !== currentKind && currentText) {
-          this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
-          currentText = "";
-        }
-        currentKind = kind;
-        currentText += (currentText ? "\n" : "") + text;
-      }
-      if (currentText) {
-        this.broadcast({ type: "narrative:chunk", data: { text: currentText, kind: currentKind as "dm" | "player" | "system" | "dev" } });
+      for (const event of iterDisplayLogReplay(narrativeLines)) {
+        this.broadcast(event);
       }
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }
@@ -1180,8 +1212,14 @@ export class SessionManager {
     // stream live to the client as activity:update events during this call.
     //
     // Priming message layout:
-    //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>. <PC>.]"
-    //      This is the cue the DM is trained to react to.
+    //   1. Bracketed stage direction: "[Session begins. Set the scene. <premise>.
+    //      <PC>. <opening scene>.]" — the cue the DM is trained to react to. When
+    //      the setup agent declared an opening scene, its sentence is dropped into
+    //      the bracket verbatim: where/how to open turn 1, a character-grounded
+    //      beat so the DM doesn't default to dropping the player onto the main
+    //      objective. No instruction wraps it — the setup agent's sentence IS the
+    //      directive, and the DM needs no extra static prompting on the matter.
+    //      One-shot read; persists in config.json for resume only.
     //   2. If the setup agent wrote a handoff note, a blank line + the note verbatim.
     //      The note carries the player's own words and any setup-agent notes that
     //      don't survive into structured config. It's a one-shot read; after the
@@ -1196,6 +1234,13 @@ export class SessionManager {
     if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
     const pc = config.players[0];
     if (pc) openingParts.push(`The player character is ${pc.character}.`);
+    // The setup agent's opening-scene sentence is already phrased as a direct
+    // instruction ("Open with …" / "Begin mid-flight …"); drop it into the
+    // stage direction verbatim. No surrounding framing — the sentence is the
+    // whole of the directive.
+    if (config.opening_scene && config.opening_scene.trim()) {
+      openingParts.push(config.opening_scene.trim());
+    }
     let priming = openingParts.join(" ") + "]";
     if (config.setup_handoff && config.setup_handoff.trim()) {
       priming += "\n\nSetup agent's handoff note:\n" + config.setup_handoff.trim();

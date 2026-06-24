@@ -16,8 +16,6 @@ import { EntityStore } from "../../entities/store.js";
 import { isFileBackedEntityType } from "@machine-violet/shared/schemas/entities/index.js";
 import type { FileIO } from "../scene-manager.js";
 
-// Re-export slugify from world-builder so the game engine doesn't need a separate import
-export { slugify } from "../world-builder.js";
 import { slugify } from "../world-builder.js";
 
 // --- Types ---
@@ -274,6 +272,28 @@ export function mergeSectionBodies(existing: string, incoming: string): string {
   return parts.join("\n\n");
 }
 
+// --- Entity path resolution (shared by the tool handler and prefetch) ---
+
+/**
+ * Resolve the on-disk file path for an entity. File-backed types route through
+ * the campaign-rooted EntityStore; `player` is machine-scope (homeDir); unknown
+ * types fall back to lore for back-compat. Single source of truth so the
+ * prefetch reads the exact file the `read_entity` tool would.
+ */
+function resolveEntityFilePath(
+  store: EntityStore,
+  mPaths: ReturnType<typeof machinePaths> | undefined,
+  entityType: string,
+  slug: string,
+): string {
+  if (isFileBackedEntityType(entityType)) return store.pathFor(entityType, slug).abs;
+  if (entityType === "player") {
+    if (!mPaths) throw new Error("player entity type requires homeDir");
+    return mPaths.player(slug);
+  }
+  return store.pathFor("lore", slug).abs;
+}
+
 // --- Tool Handler Factory ---
 
 export function buildScribeToolHandler(
@@ -292,19 +312,8 @@ export function buildScribeToolHandler(
   // campaign-scope, and don't fit the store's campaign-rooted model.
   const store = new EntityStore(campaignRoot, fileIO);
 
-  function playerPath(slug: string): string {
-    if (!mPaths) throw new Error("player entity type requires homeDir");
-    return mPaths.player(slug);
-  }
-
-  function entityPath(entityType: string, slug: string): string {
-    if (isFileBackedEntityType(entityType)) {
-      return store.pathFor(entityType, slug).abs;
-    }
-    if (entityType === "player") return playerPath(slug);
-    // Unknown type — fall back to lore for back-compat with prior behavior.
-    return store.pathFor("lore", slug).abs;
-  }
+  const entityPath = (entityType: string, slug: string): string =>
+    resolveEntityFilePath(store, mPaths, entityType, slug);
 
   function entityDir(entityType: string): string {
     if (isFileBackedEntityType(entityType)) return store.dirFor(entityType);
@@ -543,6 +552,90 @@ export function buildScribeToolHandler(
   };
 }
 
+// --- Input prefetch ---
+
+/**
+ * Word-boundary substring test (both args pre-lowercased). Avoids "kael"
+ * matching inside "kaeldor" while still allowing "the kael" / "kael's".
+ */
+function mentions(haystack: string, needle: string): boolean {
+  let idx = haystack.indexOf(needle);
+  while (idx !== -1) {
+    const before = idx === 0 ? "" : haystack[idx - 1];
+    const after = haystack[idx + needle.length] ?? "";
+    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
+    idx = haystack.indexOf(needle, idx + 1);
+  }
+  return false;
+}
+
+/**
+ * Prefetch the current on-disk content of entities the update batch references,
+ * so the Scribe is handed them as canonical instead of spending a tool
+ * round-trip pulling each via `read_entity` — that read burst is ~a third of
+ * the Scribe's wall-clock. Matches a registry entry when its name or any alias
+ * appears in the batch text (case-insensitive, word-boundary), so an aliased
+ * mention still surfaces the canonical entity for dedup; reads the matched
+ * files and returns a formatted block (empty string when nothing resolves).
+ * Capped to bound context; overflow and any unmatched/created entity falls back
+ * to the `read_entity` tool, so this is a pure latency optimization with
+ * graceful degradation — never a correctness dependency.
+ */
+export async function buildPrefetchedEntityBlock(
+  updates: ScribeUpdate[],
+  entityTree: EntityTree | undefined,
+  campaignRoot: string,
+  fileIO: ScribeFileIO,
+  homeDir?: string,
+  maxEntities = 16,
+): Promise<string> {
+  if (!entityTree) return "";
+  const haystack = updates.map((u) => u.content).join("\n").toLowerCase();
+  if (!haystack.trim()) return "";
+
+  const store = new EntityStore(campaignRoot, fileIO);
+  const mPaths = homeDir ? machinePaths(homeDir) : undefined;
+
+  // Match phase (sync, cheap): registry entries whose name/alias appears in the
+  // batch text, resolved to a file path. Capped to bound context.
+  const matched: { entry: EntityTree[string]; path: string }[] = [];
+  for (const [slug, entry] of Object.entries(entityTree)) {
+    if (matched.length >= maxEntities) break;
+    const names = [entry.name, ...(entry.aliases ?? [])]
+      .filter((n) => n && n.trim().length >= 3)
+      .map((n) => n.toLowerCase());
+    if (!names.some((n) => mentions(haystack, n))) continue;
+    try {
+      matched.push({ entry, path: norm(resolveEntityFilePath(store, mPaths, entry.type, slug)) });
+    } catch {
+      // e.g. player entity with no homeDir — let the read_entity tool fetch it.
+    }
+  }
+  if (matched.length === 0) return "";
+
+  // Read phase (parallel — independent files, ≤ maxEntities): a stale/unreadable
+  // entry drops to null and is skipped (scribe falls back to read_entity).
+  const blocks = (
+    await Promise.all(
+      matched.map(async ({ entry, path }) => {
+        try {
+          const content = await fileIO.readFile(path);
+          return `### ${entry.name} (${entry.type})\n${content.trim()}`;
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((b): b is string => b !== null);
+
+  if (blocks.length === 0) return "";
+  return (
+    "\n\nCurrent on-disk content of referenced entities " +
+    "(CANONICAL — do NOT call read_entity for these; update them directly):\n\n" +
+    `${blocks.join("\n\n")}\n`
+  );
+}
+
 // --- Main Entry Point ---
 
 /**
@@ -581,7 +674,17 @@ export async function runScribe(
   const treeRendered = input.entityTree ? renderEntityTree(input.entityTree) : undefined;
   const treeContext = treeRendered ? `\n\nEntity registry (use to find existing entities before creating):\n${treeRendered}\n` : "";
 
-  const userMessage = `Process these updates:${treeContext}\n\n${updateLines}`;
+  // Prefetch the content of entities the batch references, so the Scribe goes
+  // straight to write_entity instead of pulling each via read_entity first.
+  const prefetchBlock = await buildPrefetchedEntityBlock(
+    input.updates,
+    input.entityTree,
+    input.campaignRoot,
+    fileIO,
+    input.homeDir,
+  );
+
+  const userMessage = `Process these updates:${treeContext}${prefetchBlock}\n\n${updateLines}`;
 
   const result: SubagentResult = await spawnSubagent(provider, {
     name: "scribe",

@@ -13,8 +13,16 @@ vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(async () => {}),
 }));
 
-beforeEach(() => {
+beforeEach(async () => {
   resetContextDump();
+  // The mocked fs/promises module exposes ONE writeFile/mkdir spy shared by the
+  // whole file. dump*() records its writeFile call synchronously, so a prior
+  // test's call lingers in mock.calls. Clear here — not just in the tests that
+  // remember to — so the no-op guards that assert `not.toHaveBeenCalled()` pass
+  // regardless of execution order (shuffle-safe).
+  const fs = await import("node:fs/promises");
+  (fs.writeFile as ReturnType<typeof vi.fn>).mockClear();
+  (fs.mkdir as ReturnType<typeof vi.fn>).mockClear();
 });
 
 // --- dumpContext guards ---
@@ -61,6 +69,53 @@ describe("dumpContext", () => {
     expect(parsed.max_tokens).toBe(4096);
     expect(parsed.system).toBe("You are a DM.");
     expect(parsed.messages).toEqual([{ role: "user", content: "Hello" }]);
+  });
+
+  it("elides inline base64 image data to a size placeholder", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    (writeFile as ReturnType<typeof vi.fn>).mockClear();
+    setContextDumpDir("/tmp/test-dump");
+
+    // A portrait-shaped message: ~1.5 KB of base64 that would otherwise
+    // dominate the dump. (Real portraits are ~1.8 MB.)
+    const bigBase64 = "A".repeat(2000);
+    dumpContext("dm", {
+      model: "claude-opus-4-6",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Party portraits:" },
+            { type: "image_input", base64: bigBase64, mimeType: "image/webp", label: "Xera" },
+          ],
+        },
+      ],
+    });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const written = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    // The raw base64 must not survive into the dump...
+    expect(written).not.toContain(bigBase64);
+    // ...replaced by a human-readable size placeholder.
+    const parsed = JSON.parse(written);
+    expect(parsed.messages[0].content[1].base64).toMatch(/^<base64 elided, ~\d+ KB>$/);
+    // Sibling fields on the same part are untouched.
+    expect(parsed.messages[0].content[1].mimeType).toBe("image/webp");
+    expect(parsed.messages[0].content[0].text).toBe("Party portraits:");
+  });
+
+  it("leaves short base64-ish values untouched", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    (writeFile as ReturnType<typeof vi.fn>).mockClear();
+    setContextDumpDir("/tmp/test-dump");
+
+    dumpContext("dm", { model: "test", messages: [], base64: "QUJD" });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const written = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(JSON.parse(written).base64).toBe("QUJD");
   });
 
   it("preserves all fields including unknown ones", async () => {

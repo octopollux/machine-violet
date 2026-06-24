@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "LowPoly"
+rating: "D"
+description: "Stylised low-poly 3D render with flat-shaded polygon facets, crisp edges, and a coordinated limited swatch palette"
+tags: [game-render, stylized, limited-palette, cool, any-scene]
+made-for-model: gpt-image-2
+tokens: 121
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a stylised LOW-POLY 3D illustration — forms built from a small number of flat-shaded polygon facets, faceted geometry with crisp polygon edges and flat or gently-graded facets, a coordinated limited colour-swatch palette, soft clean lighting. Strict economy: keep the polygon count low and the shapes big and simple, the focal subject a touch more detailed, the background simplified into large faceted forms. Clean, geometric, stylish, modern. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style (a modern digital register beyond the painted-illustration / clean-digital families). Low-poly faceted 3D — the FORMAT enforces economy for free: a small polygon count + flat-shaded facets means the model CANNOT cram fine detail, so a structural format escapes BOTH the painted-default convergence AND the tic. This confirms the round's lesson: a structural FORMAT (polygon facets, pixel grid, isometric projection, neon-on-black) beats a soft "stylised" adjective — the one soft ask in the round, "stylised 3D", drifted straight to a realistic CG render and was not banked. Coordinated limited swatch palette + big faceted shapes. Crystalline, geometric, clean, stylish. Caption = tasteful clean type. Validated on the Xera dusk scene; an instant keeper (user).
+
+# Example
+
+![LowPoly](../ImageStyleExample/LowPoly.example.png)

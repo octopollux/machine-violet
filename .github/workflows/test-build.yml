@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       windows:
-        description: "Build Windows (installer + signing)"
+        description: "Build Windows (installer)"
+        type: boolean
+        default: true
+      sign:
+        description: "Sign the Windows installer (Azure OIDC — protected branches only; set false on feature/Dependabot branches)"
         type: boolean
         default: true
       macos:
@@ -25,9 +29,9 @@ jobs:
     if: inputs.windows
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -63,7 +67,8 @@ jobs:
           fi
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        if: inputs.sign
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -75,24 +80,45 @@ jobs:
           dotnet tool install -g vpk
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
-      - name: Package and sign (Velopack)
+      - name: Package (Velopack)
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          # Signing is gated on the `sign` input: Azure Trusted Signing only
+          # authenticates from protected refs, so feature/Dependabot branches
+          # pack unsigned (sign=false) to still exercise the gate below.
+          SIGN_ARGS=()
+          if [ "${{ inputs.sign }}" = "true" ]; then
+            SIGN_ARGS+=(--azureTrustedSignFile assets/trusted-signing.json)
+          fi
           vpk pack \
             --packId MachineViolet \
             --packVersion "${VERSION}-test" \
             --packTitle "Machine Violet" \
             --packDir dist \
-            --mainExe machine-violet.exe \
+            --mainExe MachineViolet.exe \
             --icon assets/machine-violet.ico \
             --shortcuts StartMenuRoot \
-            --azureTrustedSignFile assets/trusted-signing.json \
+            "${SIGN_ARGS[@]}" \
             --channel test \
             --outputDir velopack-out
 
+      # Validate the packaged-artifact gate end-to-end (the same scripts
+      # release.yml / nightly.yml run). Both legs are blocking here and in
+      # release/nightly. With sign=false the package is unsigned, which lets
+      # this gate (pack + replay + install smoke) run on feature/Dependabot
+      # branches where the OIDC trust boundary blocks signing. See
+      # docs/e2e-harness.md.
+      - name: Replay goldens against the packaged binary
+        shell: bash
+        run: bash scripts/ci/replay-packaged-binary.sh velopack-out
+
+      - name: Velopack install/uninstall smoke
+        shell: pwsh
+        run: scripts/ci/velopack-install-smoke.ps1 -ArtifactDir velopack-out -RepoRoot .
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-build-windows-x64
           path: velopack-out/*
@@ -101,9 +127,9 @@ jobs:
     if: inputs.macos
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -122,8 +148,13 @@ jobs:
       - name: Package
         run: tar -czf machine-violet-test-darwin-arm64.tar.gz -C dist .
 
+      - name: Replay goldens against the packaged binary
+        run: |
+          mkdir -p pkg && cp machine-violet-test-darwin-arm64.tar.gz pkg/
+          bash scripts/ci/replay-packaged-binary.sh pkg
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-build-darwin-arm64
           path: machine-violet-test-darwin-arm64.tar.gz
@@ -132,9 +163,9 @@ jobs:
     if: inputs.linux
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 25
           cache: npm
@@ -153,8 +184,13 @@ jobs:
       - name: Package
         run: tar -czf machine-violet-test-linux-x64.tar.gz -C dist .
 
+      - name: Replay goldens against the packaged binary
+        run: |
+          mkdir -p pkg && cp machine-violet-test-linux-x64.tar.gz pkg/
+          bash scripts/ci/replay-packaged-binary.sh pkg
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-build-linux-x64
           path: machine-violet-test-linux-x64.tar.gz

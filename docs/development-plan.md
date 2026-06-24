@@ -463,4 +463,5 @@ Phases 2 and 3 can be developed in parallel (tools vs TUI). Phases 3 and 4 conve
 | Subagent outputs | Vitest + schema validation | Validate return shapes, value bounds, consistency. Real API optional for integration tests. |
 | Scene cascades | Vitest | Mock subagents, verify all steps fire, idempotent re-execution. |
 | Filesystem | Vitest + temp dirs | Write/read/validate entity files in temporary campaign directories. |
-| E2E | Manual + scripted | Full game sessions. Cost tracking. Cross-platform verification. |
+| E2E Tier-2 (backbone) | Vitest + golden tapes | Real `GameEngine` replaying recorded LLM I/O — deterministic, offline. The regression gate. See [golden-tapes.md](golden-tapes.md). |
+| E2E Tier-3 (live, rare) | test-harness + live API | Full live game sessions (setup→game walk), interactive `mvplay`. See [e2e-harness.md](e2e-harness.md). |

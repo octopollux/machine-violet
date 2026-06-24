@@ -1,7 +1,8 @@
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
-import type { LLMProvider, NormalizedMessage, SystemBlock } from "../providers/types.js";
+import type { LLMProvider, NormalizedMessage, NormalizedTool, SystemBlock } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME, UPDATE_PORTRAIT_TOOL_NAME } from "../providers/types.js";
 
 // --- TUI tools ---
 
@@ -19,14 +20,28 @@ export const TUI_TOOLS = new Set([
   "scribe",
   "dm_notes",
   "promote_character",
+  // generate_image returns `_tui: { type: "display_image", ... }` on the
+  // ToolResult so the image broadcasts mid-turn (see GameEngine.dispatchGenerateImage).
+  // Without this entry the bridge skips _tui extraction entirely — the bytes
+  // still land on disk, but the client never receives display_image and the
+  // image silently fails to render in the TUI.
+  "generate_image",
 ]);
 
-/** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents. */
-const DM_EXCLUDED_TOOLS = new Set(["show_character_sheet", "rollback"]);
-
-export function isTuiCommand(toolName: string): boolean {
-  return TUI_TOOLS.has(toolName);
-}
+/** Tools registered in the ToolRegistry but only exposed to OOC / Dev Mode agents.
+ *  The `swap_*` / `howto_*` family are operator-facing meta tools (PC handoff,
+ *  DM-voice swap, campaign-state catch-all) — they belong to the OOC surface,
+ *  not the in-character narrator's tool list. */
+export const DM_EXCLUDED_TOOLS = new Set([
+  "show_character_sheet",
+  "rollback",
+  "swap_pc",
+  "howto_swap_pc",
+  "list_dm_personalities",
+  "swap_dm_personality",
+  "howto_swap_dm_personality",
+  "howto_campaign_state",
+]);
 
 // --- Types (canonical definitions) ---
 
@@ -53,6 +68,16 @@ export interface AgentLoopConfig {
   onToolEnd?: (name: string, result: ToolResult) => void;
   /** Called when the full response is complete */
   onComplete?: (usage: UsageStats) => void;
+  /**
+   * When true, append the `generate_image` function tool to the DM's
+   * tool list. The model invokes it like any other tool; the host's
+   * asyncToolHandler dispatches the call to `provider.generateImage`,
+   * persists the bytes, and broadcasts a `display_image` TUI command.
+   * Caller is responsible for verifying both `provider.getCapabilities
+   * (model).imageGeneration` AND the campaign preference before
+   * flipping this on — the agent loop trusts the flag verbatim.
+   */
+  imageGenEnabled?: boolean;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -74,11 +99,13 @@ export interface AgentLoopResult {
   /** Whether the loop was cut short by maxToolRounds */
   truncated: boolean;
   /**
-   * All messages appended during this loop (assistant + tool_result pairs).
-   * Normally ends with the final assistant message, but when `truncated` is
-   * true it may end with a user tool_result instead.
+   * The complete turn as one canonical, self-consistent message sequence
+   * (see `normalizeTurn`): `assistant([…, tool_use*])` → `user([tool_result*])`
+   * pairs ending in an `assistant` message whose content is the narration.
+   * Provider-agnostic and always ends on an assistant message — the engine
+   * stores it verbatim without inspecting its shape.
    */
-  roundMessages: NormalizedMessage[];
+  turnMessages: NormalizedMessage[];
 }
 
 // --- Agent Loop ---
@@ -131,6 +158,103 @@ async function runAgentLoopInternal(
     ? async (name: string, input: Record<string, unknown>) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
     : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
 
+  // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
+  // `generate_image` function tool when image generation is gated on.
+  // The DM's asyncToolHandler (GameEngine.dispatchGenerateImage) routes
+  // the call through provider.generateImage and emits the display_image
+  // TUI command + bytes-on-disk side effects.
+  const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
+  if (config.imageGenEnabled) {
+    tools.push({
+      name: GENERATE_IMAGE_TOOL_NAME,
+      description:
+        "Generate one illustrated image rendered inline with this response. " +
+        "Provide a vivid descriptive prompt covering subject, composition, mood, " +
+        "and style. The caption (if any) should be composed into the image itself " +
+        "as a printed plate, not emitted as separate text. Use sparingly — at most " +
+        "one image per turn. " +
+        "Default to `effort: \"quality\"` for scene snapshots and player-requested " +
+        "illustrations — a high-quality render that still comes back at reasonable speed. " +
+        "Drop to `\"standard\"` (medium) for quick or minor inserts where speed matters more. " +
+        "Reserve `\"showcase\"` for rare set-piece hero shots; it takes a bit longer. " +
+        "Use `aspect: \"landscape\"` for scenes, " +
+        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
+        "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
+        "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
+        "when the player explicitly asked for an illustration of something. The " +
+        "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
+        "affect the rendered image. " +
+        "When a specific player character is clearly the subject of the image, list " +
+        "their name in `reference_characters` so the render matches their established " +
+        "portrait (face, build, outfit). Only name characters who actually appear in " +
+        "THIS image, and only when their likeness matters — it adds noticeable render " +
+        "time and pulls the picture toward that person, so leave it off for wide " +
+        "scenes, crowds, or anyone whose exact look doesn't matter.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "Vivid description of the image to render, including any in-image caption text. For every character in frame, state their facial expression and body language for this moment (teeth bared in a snarl, eyes wide with terror, a weary half-smile) — a portrait reference carries only one neutral expression, so the scene's emotion has to be named explicitly or it won't appear.",
+          },
+          effort: {
+            type: "string",
+            enum: ["draft", "standard", "quality", "showcase"],
+            description: "Render effort. Default 'quality' (high quality, reasonable speed) for scenes; 'standard' (medium) for quick inserts; 'showcase' for rare set-piece hero shots (slower).",
+          },
+          aspect: {
+            type: "string",
+            enum: ["portrait", "landscape", "square"],
+            description: "Aspect ratio. Match to the subject: landscape for scenes, portrait for characters, square for objects.",
+          },
+          intent: {
+            type: "string",
+            enum: ["scene_snapshot", "player_request", "character_portrait"],
+            description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
+          },
+          reference_characters: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. The portrait fixes identity, build, and outfit — NOT expression or pose, so always describe the character's facial expression for this moment in `prompt`, or the render inherits the portrait's neutral expression. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
+          },
+        },
+        required: ["prompt", "effort", "aspect"],
+      },
+    });
+    tools.push({
+      name: UPDATE_PORTRAIT_TOOL_NAME,
+      description:
+        "Silently revise a player character's saved portrait when the fiction has " +
+        "durably changed how they look — a lost or gained piece of gear, a new scar " +
+        "or lasting wound, a different outfit, a permanent physical change. The new " +
+        "portrait is rendered from their CURRENT one, so their identity (face, build) " +
+        "carries forward and only the described change is applied. " +
+        "This is NOT shown to the player as an image and is NOT a scene render — it " +
+        "quietly updates the reference the engine uses for future scene images and " +
+        "your own visual sense of the character. Do not announce 'here is the new " +
+        "portrait'; simply narrate the change in the fiction as you normally would. " +
+        "Use sparingly and only for changes that PERSIST — never for a transient state " +
+        "the next scene undoes. You do not wait for it: the updated portrait returns to " +
+        "you in context on a later turn.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          character: {
+            type: "string",
+            description: "Name of the player character whose portrait to revise. Must be a PC who already has a portrait.",
+          },
+          change: {
+            type: "string",
+            description:
+              "The character's appearance AFTER the change, described concretely — the new state, not the action that caused it. " +
+              "e.g. 'left boot torn off, bare foot mud-streaked to the shin; jacket singed at the right cuff'.",
+          },
+        },
+        required: ["character", "change"],
+      },
+    });
+  }
+
   const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "dm",
     model: config.model,
@@ -138,7 +262,7 @@ async function runAgentLoopInternal(
     maxToolRounds: config.maxToolRounds,
     effort: config.effort,
     stream,
-    tools: registry.getDefinitions(DM_EXCLUDED_TOOLS),
+    tools,
     toolHandler,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
@@ -162,6 +286,6 @@ async function runAgentLoopInternal(
       cacheCreationTokens: result.usage.cacheCreationTokens,
     },
     truncated: result.truncated,
-    roundMessages: result.roundMessages,
+    turnMessages: result.turnMessages,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StatePersister, STATE_FILES } from "./state-persistence.js";
+import { StatePersister, STATE_FILES, CONFIG_FILE, hasPriorPlay } from "./state-persistence.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { CombatState } from "@machine-violet/shared/types/combat.js";
 import type { MapData } from "@machine-violet/shared/types/maps.js";
@@ -195,6 +195,28 @@ describe("StatePersister", () => {
 
     const loaded = await persister.loadAll();
     expect(loaded.resources).toEqual(resources);
+  });
+
+  it("persistConfig writes config.json at campaign root", async () => {
+    const fio = mockFileIO();
+    const persister = new StatePersister("/tmp/campaign", fio);
+    const config = {
+      name: "Test Campaign",
+      dm_personality: { name: "DM", prompt_fragment: "be a DM" },
+      players: [{ name: "Beep", character: "Maren", type: "human" as const }],
+      combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+      context: { retention_exchanges: 5, max_conversation_tokens: 0 },
+      recovery: { auto_commit_interval: 3, max_commits: 500, enable_git: true },
+      choices: { campaign_default: "never" as const, player_overrides: {} },
+    };
+
+    persister.persistConfig(config);
+    await persister.flush();
+
+    const written = files[norm("/tmp/campaign/config.json")];
+    expect(written).toBeDefined();
+    expect(JSON.parse(written)).toEqual(config);
+    expect(CONFIG_FILE).toBe("config.json");
   });
 
   it("loadAll returns undefined for missing files", async () => {
@@ -486,15 +508,19 @@ describe("write serialization", () => {
   });
 
   it("concurrent writes to different files proceed independently", async () => {
-    const callTimes: Record<string, number[]> = {};
+    // Record a start/end event log instead of wall-clock timestamps: a
+    // wall-clock delta threshold flakes under load (GC pauses, parallel test
+    // workers) and on coarse clocks. Event ordering distinguishes concurrent
+    // from serialized deterministically.
+    const events: string[] = [];
     const fio = mockFileIO();
     (fio.writeFile as ReturnType<typeof vi.fn>).mockImplementation(
       async (path: string, content: string) => {
         const key = norm(path);
-        if (!callTimes[key]) callTimes[key] = [];
-        callTimes[key].push(Date.now());
+        events.push(`start:${key}`);
         await new Promise((r) => setTimeout(r, 20));
         files[key] = content;
+        events.push(`end:${key}`);
       },
     );
 
@@ -503,13 +529,15 @@ describe("write serialization", () => {
     persister.persistClocks(createClocksState());
 
     await persister.flush();
-    // Both files were written
+    // Both files were written exactly once.
     const combatKey = norm("/tmp/campaign/state/combat.json");
     const clocksKey = norm("/tmp/campaign/state/clocks.json");
-    expect(callTimes[combatKey]).toHaveLength(1);
-    expect(callTimes[clocksKey]).toHaveLength(1);
-    // They started concurrently (within 5ms of each other)
-    expect(Math.abs(callTimes[combatKey][0] - callTimes[clocksKey][0])).toBeLessThan(15);
+    expect(events.filter((e) => e === `start:${combatKey}`)).toHaveLength(1);
+    expect(events.filter((e) => e === `start:${clocksKey}`)).toHaveLength(1);
+    // Writes to different files are concurrent, not per-file serialized: both
+    // START before either FINISHES. A serialized scheduler would instead
+    // produce start→end→start→end.
+    expect(events.slice(0, 2).every((e) => e.startsWith("start:"))).toBe(true);
   });
 
   it("error in one write does not block subsequent writes", async () => {
@@ -841,5 +869,40 @@ describe("format spec compliance: JSON formatting (§4)", () => {
     const raw = files[norm(`/tmp/campaign/${STATE_FILES.conversation}`)];
     // Compact JSON has no newlines (single line)
     expect(raw.split("\n")).toHaveLength(1);
+  });
+});
+
+describe("hasPriorPlay", () => {
+  const ROOT = "/tmp/campaign";
+  const convPath = norm(`${ROOT}/${STATE_FILES.conversation}`);
+  const logPath = norm(`${ROOT}/${STATE_FILES.displayLog}`);
+
+  it("returns false for a fresh campaign with no state files", async () => {
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("returns true when conversation.json has exchanges", async () => {
+    files[convPath] = JSON.stringify([{ user: { role: "user", content: "hi" } }]);
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(true);
+  });
+
+  it("returns true when display-log.md has scrollback (even with no transcript)", async () => {
+    files[logPath] = "The tavern door creaks open.\n> I step inside.\n";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(true);
+  });
+
+  it("treats an empty conversation array as no prior play", async () => {
+    files[convPath] = "[]";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("treats whitespace-only display-log as no prior play", async () => {
+    files[logPath] = "  \n\n";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
+  });
+
+  it("does not throw on malformed conversation.json — reads as no prior play", async () => {
+    files[convPath] = "{not valid json";
+    expect(await hasPriorPlay(ROOT, mockFileIO())).toBe(false);
   });
 });

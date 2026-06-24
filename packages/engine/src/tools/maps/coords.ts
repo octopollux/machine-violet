@@ -64,7 +64,7 @@ export function gridDistance(
 }
 
 /** Get all adjacent coordinates for a square grid */
-export function squareNeighbors(coord: CoordKey): CoordKey[] {
+function squareNeighbors(coord: CoordKey): CoordKey[] {
   const [x, y] = parseCoord(coord);
   const neighbors: CoordKey[] = [];
   for (let dx = -1; dx <= 1; dx++) {
@@ -77,7 +77,7 @@ export function squareNeighbors(coord: CoordKey): CoordKey[] {
 }
 
 /** Get all adjacent coordinates for a hex grid (even-q offset) */
-export function hexNeighbors(coord: CoordKey): CoordKey[] {
+function hexNeighbors(coord: CoordKey): CoordKey[] {
   const [x, y] = parseCoord(coord);
   const isEvenCol = x % 2 === 0;
 

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "MobaStylized"
+rating: "?"
+description: "Bright stylised MOBA hero splash art: a single champion filling the frame in a dynamic pose with glowing VFX and title lockup"
+tags: [game-render, stylized, high-saturation, epic, portrait, action, scene-coupled]
+made-for-model: gpt-image-2
+tokens: 173
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, make the SUBJECT a single character filling the frame in a dynamic, heroic action pose — this is character splash art, so put the hero front and centre in motion (not a wide landscape with a small figure), with the setting reduced to a dramatic background behind them. Then render in this visual style:
+
+# Style
+
+`Rendered as bright, stylised MOBA hero splash art — clean, polished, exaggerated key-art of a competitive battle-arena game champion. The character fills the frame in a bold dynamic heroic pose with slightly exaggerated stylised proportions, rendered in clean bright stylised colour with bold readable shapes, punchy saturated lighting, glowing colourful VFX, and a clean dynamic background. Bright, energetic, appealing, polished stylised key-art. Close with the hero's name in a bold stylised title treatment.`
+
+# Notes
+
+Append the style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. MOBA / battle-arena champion SPLASH ART — bright, clean, STYLISED hero key-art. This is a SCENE-COUPLED, CHARACTER-FORWARD register (like [NurseryWatercolor](./NurseryWatercolor.mvstyle)): splash art needs the hero filling the frame in a dynamic pose, so the steering lives in the DM-FACING intro above (the `%%` note is stripped before the DM sees it, and the style line is read by the image model, not the DM) — a normal vista brief would render a small figure in a landscape, not a splash. The bright / clean / graphic finish separates it from the moodier painterly + realistic MOBA cousins (which converged and were not banked). MOBA splash WANTS energy / VFX / drama — lean in (density-as-feature, the tic is welcome here). Sibling: [MobaAnime](./MobaAnime.mvstyle) (the anime version, the most distinct of the takes). Caption = the hero's name in a bold stylised title treatment. Validated on a heroic-action Xera scene; a keeper (user). Keep the character-forward intro, the bright stylised render + VFX, and the bold title lockup.
+
+# Example
+
+![MobaStylized](../ImageStyleExample/MobaStylized.example.png)

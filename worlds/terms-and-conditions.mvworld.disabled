@@ -1,0 +1,84 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Terms and Conditions",
+  "summary": "You clicked 'I Agree' on a contract with a demon. The EULA is 40,000 pages.",
+  "genres": [
+    "comedy",
+    "modern",
+    "horror"
+  ],
+  "detail": "The button was blue. The button was right there. The player scrolled fast and clicked Agree without reading because everyone does. Within the hour, a polite letter arrives on cream paper. The terms have begun. The player has thirty days of trial period and the document grows when read.\n\nDM approach:\n- Tone: legalese comedy with the slow heat of arbitration looming. The horror is being a small reasonable person inside a large unreasonable document.\n- NPCs derive from the variant: a kind paralegal who will help with the read-down (1), the principal in the next room and their good intentions (2), the previous demon, weary and helpful (3).\n- Pacing: each clause is a scene. Arbitration is in Hell. The document grows. The player can be reading and writing the document at the same time.\n- Seed early: the first physical manifestation of a small obligation. A bill the player owes that is itemized in a font no printer should produce.\n\nPacing: Each clause is a scene. The document's page count is the visible clock — it grows when read. Arbitration is in Hell on day thirty. The player can see the calendar advance and the page count rise together.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-lien",
+          "name": "The Lien",
+          "description": "A small soul-lien the player can outlive by reading the whole growing document and opting out before the thirty-day trial ends.",
+          "detail": "THE LIEN — Small soul-lien. Nothing huge. The player can outlive it if they read the rest of the document inside the trial period and exercise the opt-out clause in Section 117. The catch is the document is forty thousand pages and adds three pages every time the player reads one. The trial ends in thirty days. The math is doable. Barely."
+        },
+        {
+          "id": "the-co-sign",
+          "name": "The Co-Sign",
+          "description": "The player unknowingly co-signed a friend's damnation, and the principal is the well-meaning person in the next room.",
+          "detail": "THE CO-SIGN — The player co-signed someone else's damnation. The principal is in the next room and has been for some time. They are friendly. They were the friend who recommended the streaming service. They did not realize what they were doing either. The player's signature is what made the principal's contract enforceable."
+        },
+        {
+          "id": "the-onboarding",
+          "name": "The Onboarding",
+          "description": "The player agreed to become the next demon — not a punishment, an onboarding, complete with a benefits package and a weary outgoing incumbent.",
+          "detail": "THE ONBOARDING — The player agreed to become the next demon. This is not a punishment. This is onboarding. There is a benefits package. The previous incumbent is rotating out and has questions for the player about the handover. Outside the player's window there is now a building that was not there yesterday with the player's name on it."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
+    {
+      "label": "What you were trying to do",
+      "choices": [
+        {
+          "name": "Subsection 4.7.b",
+          "description": "Update your phone. A routine software update. The terms popped up in a modal the player has dismissed a hundred times before. The new clauses were buried in subsection 4.7.b. The phone has been operating normally otherwise. Notifications have started arriving from senders whose names are not in the player's contacts."
+        },
+        {
+          "name": "The Free Trial",
+          "description": "Sign up for a streaming free trial. Thirty days free. The promotional banner had a smiling family on a couch. The player wanted to watch one specific show. The show was not actually on the platform. The platform has not refunded the trial fee, which was zero, which has nonetheless been collected."
+        },
+        {
+          "name": "The Offer",
+          "description": "Accept a job offer. A new position at a company that was almost too good to be true. The onboarding packet was thick. HR was warm. The player signed at the bottom of every page they were asked to sign at the bottom of. The first paycheck cleared. The second one arrived in an envelope made of skin."
+        },
+        {
+          "name": "The Auto-Renew",
+          "description": "Cancel an old subscription you forgot you had. Something the player signed up for years ago and never used. The cancellation flow had a confirmation page with a long block of text. The player clicked Confirm. The subscription has not actually been cancelled and the player is now subject to its updated terms, retroactive to original sign-up."
+        }
+      ]
+    },
+    {
+      "label": "Your counsel",
+      "choices": [
+        {
+          "name": "The Class Action",
+          "description": "She is assembling other signatories, dozens of them, and has a war chest. She thinks the player is lucky. The other signatories meet at a community center on Thursdays. Most of them have already lost something — a name, a finger, a marriage. She takes thirty percent."
+        },
+        {
+          "name": "The Compliance Officer",
+          "description": "A compliance officer from the company itself. He is secretly on the player's side. He was the one who flagged the boilerplate years ago and was ignored. He cannot be seen helping. He communicates in margin notes inside other documents the player receives in the course of the dispute. His handwriting is excellent."
+        },
+        {
+          "name": "Pro Se",
+          "description": "Yourself. Nobody else can be trusted with the document. The player has to read it. The player has to understand it. The player has set up a card table and a lamp and is making notes. The document grows three pages for every one the player reads, and the player has begun underlining."
+        },
+        {
+          "name": "Saint of the Inattentive",
+          "description": "A small saint. She handles these cases pro bono. She is patron of the inattentively damned. Her office is the back room of a parish hall in a neighborhood the player has never been to. She is tired but kind. She has won most of her cases. The ones she hasn't, she remembers by name."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Giallo"
+rating: "?"
+description: "Italian giallo horror frame: bold unnatural red-and-blue gel lighting, hard theatrical shadows, stylised glamorous dread"
+tags: [motion-picture, stylized, high-saturation, horror, tense]
+made-for-model: gpt-image-2
+tokens: 132
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a classic Italian GIALLO horror-thriller film — the lurid, stylised colour-horror look. Its signature: bold, saturated, unnatural COLOURED GEL LIGHTING (deep blood reds against cold electric blues), hard theatrical shadows, high contrast, a glossy expressionistic palette, and an atmosphere of stylised, glamorous dread. Lurid, vivid, suspenseful, beautiful and sinister. Close with a small caption in ENGLISH (NOT Italian — use English words despite the Italian-horror style), set in a stylish period font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family — Italian GIALLO colour-horror: bold saturated unnatural COLOURED GEL LIGHTING (blood reds vs electric blues), hard theatrical shadows, high contrast, stylised glamorous dread. CAPTION FIX BAKED IN (user): the model defaults to ITALIAN captions for giallo (the first cut titled itself "L'OSSESSIONE DELLO SPAZIO PROFONDO"); the style line now explicitly demands an ENGLISH caption — KEEP that directive or it reverts to Italian. SCENE AFFINITY: wants a dark scene it can flood with red / blue gels (validated on a shadow chamber). A distinct lurid-colour-horror lane vs the photographic horror ([SurvivalHorror](./SurvivalHorror.mvstyle) / [LandCamera](./LandCamera.mvstyle)) and the B&W [NoirCinema](./NoirCinema.mvstyle). Caption = English, stylish period font. Validated (v2); a keeper (user). Keep the red / blue gel lighting + the explicit English-caption directive.
+
+# Example
+
+![Giallo](../ImageStyleExample/Giallo.example.png)

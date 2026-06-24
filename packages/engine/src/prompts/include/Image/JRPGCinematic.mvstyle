@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "JRPGCinematic"
+rating: "C"
+description: "Epic anime-flavoured JRPG cutscene render with cinematic depth of field, volumetric god-rays, and atmospheric distance"
+tags: [game-render, stylized, high-saturation, epic, establishing]
+made-for-model: gpt-image-2
+tokens: 199
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a cinematic cutscene still from a high-budget modern Japanese RPG, in photo mode (no HUD) — a polished, dramatic, anime-flavoured real-time cinematic render. Beautiful stylised anime-inflected characters, lush fantastical environments, dramatic cinematic lighting. Strict process discipline to keep it clean: a SHALLOW cinematic DEPTH OF FIELD with the focal character crisp and everything else softening into bokeh, strong VOLUMETRIC LIGHTING (god-rays, atmospheric haze, light shafts) filling the air, and a LONG ATMOSPHERIC DRAW DISTANCE — push all the environmental clutter and detail far back into the distance where aerial perspective and haze dissolve it into soft simple shapes, keeping the near-field clean and uncluttered. A rich saturated palette, bloom, flare, emotional staging. Epic, cinematic, anime-JRPG. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([Image](./Image.mvstyle)) — the epic, anime-flavoured JRPG CINEMATIC / cutscene register, the most dramatic of the high-fidelity game renders. Same tic-fix as [HeroShooter](./HeroShooter.mvstyle): DoF + VOLUMETRIC LIGHTING plus a long ATMOSPHERIC draw distance that DISSOLVES the far clutter into soft simple shapes (aerial perspective), keeping the near-field clean (the [PracticalMiniature](./PracticalMiniature.mvstyle) DoF-and-haze lever). KEY LESSON (user, learned the hard way): a literal "long CLUTTER draw distance" — lots of detail RENDERED far out — is a MAXIMAL manifestation of the tic, NOT richness; the clean version DISSOLVES distant clutter into atmosphere, it does not pack it in. Epic, dramatic, cinematic. Caption overlaid. Validated on the Xera dusk scene; a keeper (user). Keep the DoF + volumetric + atmospheric-DISSOLVE (the anti-tic), and the overlaid caption.
+
+# Example
+
+![JRPGCinematic](../ImageStyleExample/JRPGCinematic.example.png)

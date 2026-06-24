@@ -1,0 +1,96 @@
+{
+  "scenario": "dm-talk-npc",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-talk-npc",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "The <color=#cc8844>hooded figure</color> shifts slightly as you approach, one weathered hand tightening around the tankard. For a moment they don't answer — just a low exhalation that might be a sigh or a warning.\n\n\"Not one for conversation,\" they finally say, voice rough as gravel. \"Drink your ale and forget you saw me.\"\n\nThe figure turns slightly away, angling their shoulder to discourage further inquiry. In the firelight, you catch a glimpse of scarred knuckles and the edge of what might be a faded burn mark creeping up their neck — but their face remains in shadow beneath the hood.\n\nBehind you, <color=#44cc44>Mella</color> has gone very still. The mug she was polishing stops moving. Her jaw tightens.\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 391,
+            "outputTokens": 192,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "The <color=#cc8844>hooded figure</color> shifts slightly as you approach, one weathered hand tightening around the tankard. For a moment they don't answer — just a low exhalation that might be a sigh or a warning.\n\n\"Not one for conversation,\" they finally say, voice rough as gravel. \"Drink your ale and forget you saw me.\"\n\nThe figure turns slightly away, angling their shoulder to discourage further inquiry. In the firelight, you catch a glimpse of scarred knuckles and the edge of what might be a faded burn mark creeping up their neck — but their face remains in shadow beneath the hood.\n\nBehind you, <color=#44cc44>Mella</color> has gone very still. The mug she was polishing stops moving. Her jaw tightens.\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "The",
+          " <color=#cc8844>hooded figure</color> shifts slightly as you approach, one",
+          " weathered hand tightening around the tankard. For a moment they don't answer —",
+          " just a low exhalation that might be a sigh or a warning",
+          ".\n\n\"Not one for conversation,\" they finally say, voice",
+          " rough as gravel. \"Drink your ale and forget you",
+          " saw me.\"\n\nThe figure turns slightly away,",
+          " angling their shoulder to discourage further inquiry. In the firelight, you catch a glimpse of scar",
+          "red knuckles and the edge of what might be a faded burn mark creeping up their neck",
+          " — but their face remains in shadow beneath the hood.\n\nBehind you, ",
+          "<color=#44cc44>Mella</color> has gone very still. The mug she",
+          " was polishing stops moving. Her jaw tightens.",
+          "\n\nWhat do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "The <color=#cc8844>hooded figure</color> shifts slightly as you approach, one weathered hand tightening around the tankard. For a moment they don't answer — just a low exhalation that might be a sigh or a warning.\n\n\"Not one for conversation,\" they finally say, voice rough as gravel. \"Drink your ale and forget you saw me.\"\n\nThe figure turns slightly away, angling their shoulder to discourage further inquiry. In the firelight, you catch a glimpse of scarred knuckles and the edge of what might be a faded burn mark creeping up their neck — but their face remains in shadow beneath the hood.\n\nBehind you, <color=#44cc44>Mella</color> has gone very still. The mug she was polishing stops moving. Her jaw tightens.\n\nWhat do you do?"
+  ]
+}

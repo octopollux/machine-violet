@@ -1,0 +1,81 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Briar Crown",
+  "summary": "Here the old tales are true — and they have teeth.",
+  "genres": [
+    "fantasy",
+    "fairytale",
+    "adventure"
+  ],
+  "image_style": "PainterlyGame",
+  "mood": "Storybook and dangerous — wonder with teeth, beautiful and cruel, never twee",
+  "setup_detail": "Opening scene: open the player INSIDE a tale already turning, grounded in their chosen way-in (their fork), at the moment a fairytale problem with a face lands on them — the wood gone wrong at the village edge, the sibling who did not come home, the stranger at the crossroads with an offer. Establish the fairytale LOGIC (the world runs on old story-rules with real, biting stakes) and the wonder-with-teeth tone (beautiful and dangerous, never twee). Open small and personal, in a place they know. Do NOT reveal the deeper tale they are caught in (the crucial-question) or who the real villain is — let the tale unfold and the rules be discovered.\n\nScope: a tale has a shape — a beginning, an ordeal, a reckoning — and can run as a single tale (a few sessions) or a saga of tales in the same kingdom. Let the player pick scope; default to A Few Sessions if they are unsure.",
+  "detail": "## The Briar Crown — a kingdom where the tales are true\nThis is a storybook kingdom that runs on fairytale logic, with real and biting stakes. The deep wood at its edge is old and hungry; witches keep crooked houses; bargains struck at the crossroads must be honored; talking beasts, cursed nobles, and godmothers are real; and the old rules — the rule of three, the unbreakable promise, the price of a name, never eat the food, be kind to the creature on the road — bite when you break them. It is beautiful and cruel: wonder with teeth, never twee, and never grimdark either. The cottage is charming AND the witch is hungry.\n\n## Run the world on fairytale logic\nThe world obeys story-rules, not physics. Make them vivid, consistent, discoverable, and exploitable:\n- **The rule of three**, the unbreakable promise, the bargain and its price, the power of a true name, the one thing you must not do (and so will).\n- **Kindness rewarded, cruelty punished** — the beggar is a queen, the kind word at the well comes back threefold, the mockery curdles into a curse.\n- **The curse with terms**, and the loophole that is always there for the clever and the good; inevitability that bends only to wit and heart.\nReward cleverness and kindness; let broken bargains and cruelty cost dearly. The danger is real — the wood eats people, the oven is hot, the bargain takes exactly what it named.\n\n## You are someone small\nThe player is not a chosen hero but someone small thrust into a tale — a woodcutter's child, a runaway servant, a godmother's apprentice, a soldier home from a war. Their power is wit, kindness, stubbornness, and learning the rules — not might. The tale means to use them; they have to learn to use it back. Keep them human-sized, and let cleverness and heart, not power, be how they win.\n\n## The land of tales (location skeleton — grow more as the player moves)\n- **the village at the wood's edge** — home; the ordinary world the tale comes to disrupt.\n- **the deep wood** — old, hungry, alive; where the tales happen and people do not come back.\n- **the witch's crooked house** — the one who deals in bargains and knows the rules; ally, threat, or both.\n- **the crossroads** — where bargains are struck and every choice has a price.\n- **the well, the mill, the market** — the village's small ordinary places, each with its own small tale waiting.\n- **the road & the wayhouse** — travelers and talking beasts and the strangers who are never only strangers.\n- **the bramble-and-glass castle** — the seat of the Briar Crown; the king or queen, and the kingdom's deeper tale.\n- **the old chapel & the standing stones** — powers older than the fairy tales; the rules behind the rules.\n- **the beast's domain, the godmother's tower, the witch's wood-deep lair** — the destinations a tale leads to.\n- **under the hill / the other side** — the realm of fae or dream or the dead that the wood opens onto.\n\n## DM approach\n- **Run fairytale logic vividly and consistently.** Make the rules real and discoverable; honor the bargains; charge the prices. The loophole is always there for the kind and the quick — let the player earn it.\n- **Wonder WITH teeth.** Beautiful and dangerous in the same breath; keep the storybook glow and the genuine stakes both. Never cute, never grimdark.\n- **Start with one tale-problem with a face** (a sibling taken, a curse to break, a bargain to escape) and let it lead deeper; the crucial-question is the bigger tale underneath.\n- **A tale has shape** — beginning, ordeal, reckoning. Honor it. In a longer game, one tale resolved opens the next, the kingdom persisting as a place where tales keep happening.\n\n## The cursed companion (and the cast; romance available)\nThe beauty-and-the-beast shape lives right here — seed it, and let it grow at the player's pace:\n- **the cursed one** — a beast, an enchanted noble, a creature bound by a spell, who falls in with the player; their curse is a thread the player can help unwind, and the bond is a natural slow-burn (the player's choice to make, never forced). Romanceable.\n- **a companion or two out of the tale** — a talking animal who owes a debt or guides, a witch's apprentice, a fellow small-person caught in the same story. Found-family among the cast.\nName the hooks and make them wanted; let any romance grow at the player's pace, or not at all.\n\nPacing: default — a tale flexes from a single arc (a few sessions) to a saga of tales in the same kingdom; see setup.",
+  "forks": [
+    {
+      "id": "the-deeper-tale",
+      "label": "The bigger tale you're really in",
+      "chooser": "agent",
+      "prompt": "Roll or choose — the deeper story beneath the player's small tale. Do NOT reveal early; let it surface as the tale leads deeper and the old rules show their shape.",
+      "options": [
+        {
+          "id": "the-sleeping-kingdom",
+          "name": "The Sleeping Kingdom",
+          "description": "The whole kingdom is under one long curse, and the player's small tale is the thread that can break it.",
+          "detail": "THE SLEEPING KINGDOM — The Briar Crown itself is cursed: a long enchantment grips the whole kingdom — a sleep, a forgetting, a frozen century, a doom that repeats — and the hungry wood is that curse spreading. The player's small, personal tale turns out to be the loose thread that can wake or break the larger one. The campaign climbs from a village problem to the heart of the kingdom's long sleep, and the player learns their little story was the one the whole curse turned on."
+        },
+        {
+          "id": "the-old-bargain",
+          "name": "The Old Bargain",
+          "description": "The kingdom's good fortune rests on a terrible old bargain — and it's coming due.",
+          "detail": "THE OLD BARGAIN — The Briar Crown's prosperity has always been paid for: a terrible old bargain with the wood, the fae, or a witch — a child a year, a name, the firstborn, a tithe of something precious — struck at the founding and honored ever since. Now it is coming due, or someone has tried to break it, and the price is falling on people like the player. Their tale exposes the cost the kingdom has always quietly paid, and forces the question of whether to keep paying it, break it (and bear what breaking it unleashes), or find the loophole no one has dared look for."
+        },
+        {
+          "id": "the-pattern",
+          "name": "The Pattern",
+          "description": "Something is MAKING the tales happen — and the player might be the one who rewrites them.",
+          "detail": "THE PATTERN — The tales are not merely happening; something is making them happen, enforcing the old cruel rules because it needs the kingdom to keep telling the same stories: the wood, a witch-queen, a godmother turned tyrant of tales, or the Briar Crown itself. People are cast into roles and ground through the same endings again and again. The player, by learning the rules deeply enough, can become the rare thing the pattern fears — the one who rewrites the tale instead of living it. The deep question: can the old rules be broken at all, and what does the kingdom become if they are?"
+        }
+      ]
+    },
+    {
+      "id": "who-you-are-in-the-tale",
+      "label": "Who you are in the tale",
+      "chooser": "player",
+      "prompt": "The player picks who the tale catches — their lens and their first foothold. Each option's detail is the DM's angle: what they know of the rules, who they have, and how the tale takes hold of them.",
+      "options": [
+        {
+          "id": "the-woodcutters-child",
+          "name": "The Woodcutter's Child",
+          "description": "Ordinary, poor, and braver than is safe — the kind of soul the tales love to test.",
+          "detail": "THE WOODCUTTER'S CHILD — the classic fairytale protagonist and the everyperson lens. Ordinary and poor, with little but courage, kindness, and stubbornness — exactly the shape the tales love to test and reward. The first thing the tale takes is close to home (a sibling, a parent, the family's last hope), making it personal from the first beat. Their power is heart and grit; their journey is learning the rules the hard way."
+        },
+        {
+          "id": "the-runaway-servant",
+          "name": "The Runaway Servant",
+          "description": "You fled a cruel house, or the castle itself, and you know the kingdom's underside — and a secret or two.",
+          "detail": "THE RUNAWAY SERVANT — the insider-underside lens. Fled service (a cruel master, the castle, a marriage they would not make) and knows how the kingdom looks from below — its cruelties, its gossip, and very likely a dangerous secret carried out the door. The tale catches them on the road, between the life they fled and wherever they were running to. Their way in is what they know and who is hunting them for it."
+        },
+        {
+          "id": "the-godmothers-apprentice",
+          "name": "The Godmother's Apprentice",
+          "description": "Half-trained in the rules and the small magics. You know more than most how tales work — and what that knowledge costs.",
+          "detail": "THE GODMOTHER'S APPRENTICE — the expert lens. Half-trained by a godmother, hedge-witch, or wise-woman in the rules and the small magics, so they grasp how tales work and how bargains bite better than anyone in the village — and carry the danger that knowledge brings (debts to their teacher, powers half-mastered, the attention of things that notice the trained). Their way in is competence shadowed by what they have not yet learned."
+        },
+        {
+          "id": "the-soldier-home-from-the-war",
+          "name": "The Soldier Home from the War",
+          "description": "Older, harder, out of place in a fairy tale — and home to find the wood already at the door.",
+          "detail": "THE SOLDIER HOME FROM THE WAR — the reluctant, practical lens. Older and harder than a tale's usual hero, back from a real war to a home where the old rules still hold and the wood has crept to the door. Out of place among the wonders and impatient with the rules — which makes both the danger and the discovery land differently (they will try to solve a tale like a soldier, and learn why that fails). Their way in is a homecoming gone wrong, and a hard person learning a softer kind of strength."
+        }
+      ]
+    }
+  ],
+  "_tokens": {
+    "detail": 1046,
+    "setup_detail": 198,
+    "forks": 757,
+    "total": 2379
+  }
+}

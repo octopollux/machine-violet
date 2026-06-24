@@ -41,6 +41,12 @@ export interface ModelCapabilities {
   tools: boolean;
   streaming: boolean;
   caching: boolean;
+  /**
+   * Model supports inline image generation as part of a chat turn. When
+   * absent, treat as false — the field is opt-in so older registry entries
+   * don't have to be updated when a new capability bit is added.
+   */
+  imageGeneration?: boolean;
 }
 
 export interface TierDefaults {
@@ -153,13 +159,6 @@ export function modelFamilyFor(connectionProvider: string): string {
 }
 
 /**
- * Get pricing for a model. Returns undefined for unknown models.
- */
-export function getModelPricing(modelId: string, configDir?: string): ModelPricing | undefined {
-  return getKnownModel(modelId, configDir)?.pricing;
-}
-
-/**
  * Fallback `max_tokens` value for models not present in the registry.
  *
  * Generous enough that the DM, scribe, and any plausible subagent can run
@@ -192,8 +191,12 @@ export function getTierDefaults(provider: string, configDir?: string): TierDefau
 }
 
 /**
- * List all known model IDs.
+ * Whether the named model can emit inline image generation. Unknown models
+ * (custom OpenAI-compatible endpoints, off-registry overrides) default to
+ * false — the safer bet, since enabling the tool against a model that
+ * doesn't understand it produces noisy turn failures rather than a
+ * graceful skip.
  */
-export function listKnownModelIds(configDir?: string): string[] {
-  return Object.keys(loadModelRegistry(configDir).models);
+export function supportsImageGeneration(modelId: string, configDir?: string): boolean {
+  return getKnownModel(modelId, configDir)?.capabilities.imageGeneration === true;
 }

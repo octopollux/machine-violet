@@ -45,6 +45,45 @@ interface JsonRpcMessage {
   error?: { code: number; message: string; data?: unknown };
 }
 
+/**
+ * A line that fails `JSON.parse` and is at least this many bytes is treated as
+ * a dropped/corrupt payload and logged, not silently ignored. Below it we stay
+ * quiet to avoid spam from the occasional short non-JSON line on stdout. (Codex
+ * tracing is NOT the source of those — it goes to codex's stderr, which we drain
+ * to the engine log separately; see {@link handleLine} and the spawn below.)
+ * 4 KB is well above any stray short line yet far below an inline image payload.
+ */
+const RPC_PARSE_FAIL_LOG_MIN_BYTES = 4 * 1024;
+
+/** Strip SGR (color) escape sequences from a codex stderr line before logging. */
+// eslint-disable-next-line no-control-regex
+const ANSI_SGR_RE = /\x1b\[[0-9;]*m/g;
+/** Cap each logged stderr line so a panic backtrace can't bloat one log entry. */
+const STDERR_LINE_MAX_CHARS = 4000;
+
+/**
+ * Per-spawn feature disables for codex's app-server. MV uses NONE of codex's
+ * plugin system (we pass our own `dynamicTools` on `thread/start`) or its shell
+ * tooling (we run `sandbox: "read-only"`), so leaving these on is pure waste:
+ *  - `plugins` re-reads + re-validates every plugin manifest under `~/.codex`
+ *    on every turn (240+ WARN lines in one live session against a single
+ *    malformed user plugin) and fires a startup remote-sync that 401s.
+ *  - `shell_snapshot` attempts a shell-environment snapshot per `thread/start`
+ *    that isn't even supported on PowerShell.
+ * Disabling both is transient — `--disable X` is the `-c features.X=false`
+ * equivalent, NOT a write to `~/.codex/config.toml` — and was A/B-verified to
+ * eliminate the noise and the work behind it with no protocol impact. See
+ * docs/openai-chatgpt-provider.md (Transport reliability) and #597.
+ */
+const CODEX_LEAN_FLAGS = ["--disable", "plugins", "--disable", "shell_snapshot"];
+
+/**
+ * A line that *parses* and is at least this large is noted (with its method) so
+ * we can confirm big payloads — chiefly inline base64 images — survive the
+ * stdio pipe intact. Ordinary protocol messages are well under 256 KB.
+ */
+const RPC_LARGE_LINE_LOG_MIN_BYTES = 256 * 1024;
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -59,6 +98,7 @@ export interface CodexRpcClientOptions {
 export class CodexRpcClient extends EventEmitter {
   private proc: ChildProcess | null = null;
   private rl: ReadlineInterface | null = null;
+  private rlErr: ReadlineInterface | null = null;
   private nextId = 1;
   private pending = new Map<number, PendingCall>();
   private notifListeners = new Map<string, Set<NotificationHandler>>();
@@ -85,8 +125,10 @@ export class CodexRpcClient extends EventEmitter {
     const bin = resolveCodexBinary();
     log.spawn({ binaryPath: bin.path, sessionId: this.sessionId });
 
-    this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...this.extraArgs], {
-      stdio: ["pipe", "pipe", "inherit"],
+    this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...CODEX_LEAN_FLAGS, ...this.extraArgs], {
+      // Pipe stderr (not `inherit`) so codex's own diagnostics land in the
+      // engine log instead of vanishing to the terminal — see handleStderrLine.
+      stdio: ["pipe", "pipe", "pipe"],
       env: bin.extraEnv ? { ...process.env, ...bin.extraEnv } : process.env,
       // `.cmd` shims on Windows (used by PATH-resolved global installs) need
       // shell resolution. Bundled-mode invokes node directly so shell is off.
@@ -110,6 +152,19 @@ export class CodexRpcClient extends EventEmitter {
     this.rl = createInterface({ input: this.proc.stdout });
     this.rl.on("line", (line) => this.handleLine(line));
 
+    // Drain codex's stderr into the engine log. stderr is where codex's
+    // `tracing` subscriber writes (INFO/WARN/ERROR) plus any direct diagnostics
+    // — the only window into a render/tool turn that misbehaves. We must READ it
+    // continuously (not merely pipe it) or the OS pipe buffer fills and codex
+    // blocks on a stderr write; readline drains it. It's a SEPARATE fd from the
+    // stdout protocol pipe, so it never corrupts our JSON — confirmed
+    // empirically while investigating #597 (codex tracing was wrongly suspected
+    // of splicing into stdout; it does not).
+    if (this.proc.stderr) {
+      this.rlErr = createInterface({ input: this.proc.stderr });
+      this.rlErr.on("line", (line) => this.handleStderrLine(line));
+    }
+
     // Wait for the process to actually be running. The first message we
     // expect after spawn is one of our own — there's no "ready" signal
     // from the server itself. Returning here lets the caller send the
@@ -122,11 +177,49 @@ export class CodexRpcClient extends EventEmitter {
     try {
       msg = JSON.parse(line);
     } catch {
-      // Non-JSON line on stdout — Codex sometimes writes non-JSON tracing
-      // lines (e.g. ANSI-colored ERROR records from its dynamic_tools
-      // module) interleaved with the protocol stream. Ignore those lines
-      // rather than crash; stderr is also inherited so tracing is captured.
+      // Non-JSON line on stdout. This is NOT codex's tracing — that goes to
+      // codex's stderr (drained to the engine log in handleStderrLine) on a
+      // separate fd that can't reach this pipe, confirmed empirically (#597).
+      // So a non-JSON line here is foreign bytes on the protocol stream: a codex
+      // module printing directly to stdout, or — for a *large* line — a multi-MB
+      // payload (typically an inline base64 image) that arrived truncated/
+      // corrupted, the silent drop that makes an image render "complete" with no
+      // bytes and no error. Short lines we ignore to avoid spam; a large one we
+      // surface loudly with enough of the line to tell a truncated-JSON drop
+      // from genuine noise, plus the salvaged `method` so a non-image drop is
+      // attributable by its method name rather than opaque. Measure actual UTF-8
+      // bytes off the pipe, not
+      // `line.length` (UTF-16 code units) — threshold and logged `bytes` are
+      // both wire size (identical for all-ASCII base64, honest for non-ASCII).
+      const byteLen = Buffer.byteLength(line, "utf8");
+      if (byteLen >= RPC_PARSE_FAIL_LOG_MIN_BYTES) {
+        const methodGuess = salvageMethod(line);
+        log.parseFailure({
+          bytes: byteLen,
+          head: line.slice(0, 200),
+          tail: line.slice(-200),
+          ...(methodGuess ? { methodGuess } : {}),
+          sessionId: this.sessionId,
+        });
+      }
       return;
+    }
+
+    // A large line that *did* parse: note it (with method) so we can confirm
+    // big base64 payloads survive the transport intact. If we see a 256 KB+
+    // `item/completed` parse cleanly yet the render still yields no bytes, the
+    // loss is the backend's, not the pipe's. Byte count, not code-unit count
+    // (see parse-failure branch). Runs per parsed line, but Buffer.byteLength is
+    // a fast O(n) scan over short messages — negligible next to the JSON.parse
+    // that just ran on the same string.
+    const lineBytes = Buffer.byteLength(line, "utf8");
+    if (lineBytes >= RPC_LARGE_LINE_LOG_MIN_BYTES) {
+      log.largeLine({
+        bytes: lineBytes,
+        method: msg.method,
+        hasResult: msg.result !== undefined,
+        sessionId: this.sessionId,
+      });
     }
 
     // Response to one of our calls
@@ -166,6 +259,24 @@ export class CodexRpcClient extends EventEmitter {
         for (const cb of listeners) cb(msg.params);
       }
     }
+  }
+
+  /**
+   * Forward one line of codex's stderr to the engine log. Strips ANSI color
+   * codes (codex's tracing subscriber emits SGR-colored records), filters to the
+   * diagnostic levels (see {@link codexStderrLineWorthLogging}), and caps the
+   * length so a panic backtrace can't bloat a single log entry. Never consumed
+   * as protocol; this is diagnostics only.
+   */
+  private handleStderrLine(line: string): void {
+    const clean = line.replace(ANSI_SGR_RE, "").trimEnd();
+    if (!clean || !codexStderrLineWorthLogging(clean)) return;
+    // Cap the FULL logged line — suffix included — at STDERR_LINE_MAX_CHARS.
+    const suffix = "…[truncated]";
+    const capped = clean.length > STDERR_LINE_MAX_CHARS
+      ? clean.slice(0, STDERR_LINE_MAX_CHARS - suffix.length) + suffix
+      : clean;
+    log.stderr({ line: capped, sessionId: this.sessionId });
   }
 
   private async handleServerRequest(id: number, method: string, params: unknown): Promise<void> {
@@ -255,6 +366,37 @@ export class CodexRpcClient extends EventEmitter {
   private replyError(id: number, code: number, message: string): void {
     this.write({ jsonrpc: "2.0", id, error: { code, message } });
   }
+}
+
+/**
+ * Best-effort recovery of the JSON-RPC `"method"` from a line that failed to
+ * parse. A corrupted large line is usually truncated at the *tail* (the head
+ * survives), and `method` sits near the front of every notification, so this
+ * salvages it often enough to attribute a drop to a message type (#597).
+ * Scans only the head — `method` is never deep in a multi-MB payload. Returns
+ * undefined if no plausible method token is present.
+ */
+function salvageMethod(line: string): string | undefined {
+  const m = /"method"\s*:\s*"([^"\\]{1,80})"/.exec(line.slice(0, 1024));
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Decide whether an (already ANSI-stripped) codex stderr line is worth logging.
+ * codex's tracing format is `<ts> <LEVEL> <target>: <msg>`. At `RUST_LOG=info`
+ * the per-request INFO span records alone run to 100k+ lines per turn (measured
+ * live, #597) — each a synchronous append that would flood the engine log and
+ * slow the game. We keep **WARN/ERROR** (the diagnostic signal, including the
+ * "ERROR records from dynamic_tools" the issue is about) and drop TRACE/DEBUG/
+ * INFO. A line that does NOT match the tracing format (a panic, a stack frame,
+ * a raw print) is **kept** — anomalous codex output is exactly what we don't
+ * want to silently drop. At the default `RUST_LOG` codex's stderr is near-silent
+ * regardless, so this only matters when someone raises the level for debugging.
+ */
+export function codexStderrLineWorthLogging(clean: string): boolean {
+  const m = /^\S+\s+(TRACE|DEBUG|INFO|WARN|ERROR)\b/.exec(clean);
+  if (!m) return true; // not a recognizable tracing record — keep it
+  return m[1] === "WARN" || m[1] === "ERROR";
 }
 
 export class CodexRpcError extends Error {

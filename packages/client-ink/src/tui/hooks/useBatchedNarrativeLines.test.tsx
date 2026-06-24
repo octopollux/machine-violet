@@ -34,8 +34,9 @@ describe("useBatchedNarrativeLines", () => {
       return <Text>{lines.map((l) => l.text).join("|") || "empty"}</Text>;
     }
     const { lastFrame } = render(<C />);
-    await sleep(50);
-    expect(lastFrame()!).toContain("Hello");
+    // Direct set flushes immediately, but the render still needs an effect
+    // cycle — waitFor instead of a fixed sleep so it can't flake under load.
+    await vi.waitFor(() => expect(lastFrame()!).toContain("Hello"));
   });
 
   it("batches functional updates and flushes on timer", async () => {
@@ -78,9 +79,9 @@ describe("useBatchedNarrativeLines", () => {
       return <Text>{lines.map((l) => l.text).join("|") || "empty"}</Text>;
     }
     const { lastFrame } = render(<C />);
-    await sleep(50);
-    expect(lastFrame()!).toContain("new");
-    // After the original flush interval, should still show "new" not "old"
+    await vi.waitFor(() => expect(lastFrame()!).toContain("new"));
+    // After the original flush interval (200ms) the cleared functional update
+    // must not resurface — wait past it, then confirm it's still "new", not "old".
     await sleep(250);
     expect(lastFrame()!).toContain("new");
   });

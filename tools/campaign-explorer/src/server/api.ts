@@ -143,15 +143,47 @@ export function createApiRouter(
     const agent = typeof req.query.agent === "string" ? req.query.agent : undefined;
     const limit = Math.max(1, Math.min(500, Number(req.query.limit) || 50));
 
-    const logPath = resolveEngineLogPath(getMachineDir, getCampaigns, getCampaignPath);
+    const logPath = resolveDebugLogPath("engine.jsonl", getMachineDir, getCampaigns, getCampaignPath);
     if (!logPath) {
       res.json([]);
       return;
     }
 
     try {
-      const events = await tailApiCallEvents(logPath, limit, agent);
+      const events = await tailJsonlEvents(
+        logPath,
+        limit,
+        (o) => o.event === "api:call" && (!agent || o.agent === agent),
+      );
       res.json(events);
+    } catch {
+      res.json([]);
+    }
+  });
+
+  // Spans: the per-turn flame-chart data from trace.jsonl, filtered to one
+  // campaign. A single turn produces dozens of spans, so the cap is far higher
+  // than api-calls. A last-N tail can split the oldest turn across the boundary;
+  // the client (buildSegments) drops any turnId group missing its root span
+  // (the one with parentId === null), which also keeps detached `background`
+  // roots rather than only `turn` roots.
+  router.get("/engine-log/spans", async (req, res) => {
+    const campaign = typeof req.query.campaign === "string" ? req.query.campaign : undefined;
+    const limit = Math.max(1, Math.min(20000, Number(req.query.limit) || 5000));
+
+    const logPath = resolveDebugLogPath("trace.jsonl", getMachineDir, getCampaigns, getCampaignPath);
+    if (!logPath) {
+      res.json([]);
+      return;
+    }
+
+    try {
+      const spans = await tailJsonlEvents(
+        logPath,
+        limit,
+        (o) => typeof o.kind === "string" && (!campaign || o.campaignId === campaign),
+      );
+      res.json(spans);
     } catch {
       res.json([]);
     }
@@ -161,15 +193,15 @@ export function createApiRouter(
 }
 
 /**
- * Stream `engine.jsonl` line-by-line and return the last `limit` `api:call`
- * events (optionally filtered to one agent). Memory is bounded by
- * `max(limit * 2, 200)` events — no matter how many MB the log has grown to,
- * this never loads the full file at once.
+ * Stream a JSONL log line-by-line and return the last `limit` records matching
+ * `predicate`. Memory is bounded by `max(limit * 2, 200)` records — no matter
+ * how many MB the log has grown to, this never loads the full file at once.
+ * Shared by the api-calls (engine.jsonl) and spans (trace.jsonl) endpoints.
  */
-async function tailApiCallEvents(
+export async function tailJsonlEvents(
   logPath: string,
   limit: number,
-  agent: string | undefined,
+  predicate: (obj: Record<string, unknown>) => boolean,
 ): Promise<Record<string, unknown>[]> {
   const matched: Record<string, unknown>[] = [];
   // Trim threshold: allow the buffer to grow past `limit` before trimming, so
@@ -183,8 +215,7 @@ async function tailApiCallEvents(
       if (!line) continue;
       try {
         const obj = JSON.parse(line) as Record<string, unknown>;
-        if (obj.event !== "api:call") continue;
-        if (agent && obj.agent !== agent) continue;
+        if (!predicate(obj)) continue;
         matched.push(obj);
         if (matched.length > trimAt) {
           matched.splice(0, matched.length - limit);
@@ -201,24 +232,26 @@ async function tailApiCallEvents(
 }
 
 /**
- * Locate engine.jsonl. Prefer the machine-scope .debug dir; fall back to
- * {dirname(campaignsDir)}/.debug for dev setups where machine mode is off.
+ * Locate a top-level `.debug/<filename>` log (engine.jsonl, trace.jsonl).
+ * Prefer the machine-scope .debug dir; fall back to {dirname(campaignsDir)}/.debug
+ * for dev setups where machine mode is off.
  */
-function resolveEngineLogPath(
+function resolveDebugLogPath(
+  filename: string,
   getMachineDir: (() => string | null) | undefined,
   getCampaigns: () => CampaignInfo[],
   getCampaignPath: (slug: string) => string | undefined,
 ): string | null {
   const machineDir = getMachineDir?.();
-  if (machineDir) return join(machineDir, "engine.jsonl");
+  if (machineDir) return join(machineDir, filename);
 
   // Fallback: siblings of the first campaign's parent
   const first = getCampaigns()[0];
   if (!first) return null;
   const path = getCampaignPath(first.slug);
   if (!path) return null;
-  // campaign path = {campaignsDir}/{slug}; engine.jsonl at {dirname(campaignsDir)}/.debug
-  return join(dirname(dirname(path)), ".debug", "engine.jsonl");
+  // campaign path = {campaignsDir}/{slug}; log at {dirname(campaignsDir)}/.debug
+  return join(dirname(dirname(path)), ".debug", filename);
 }
 
 /** Recursively walk a directory and return tree entries. */

@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Redundancy"
+rating: "?"
+description: "Redundancy campaign look: NoirCinema black-and-white film-noir by default, with a surveillance sub-menu (NightVisionCam interior IR, DroneCam aerial outdoors) for surveillance photos"
+tags: [motion-picture, surveillance, black-and-white, monochrome, tense]
+made-for-model: gpt-image-2
+tokens: 654
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** black-and-white film-noir look below. A **surveillance photo** uses one of the camera looks — pick the camera whose vantage fits the moment: the fixed infrared security camera for an interior, or the aerial drone feed for an outdoor subject seen from above.
+
+# Style
+
+Default (most scenes) — `Rendered as a black-and-white still frame from a classic film-noir motion picture, shot on high-contrast 35mm — NOT a game render and NOT a modern photo. Dramatic chiaroscuro cinematography: a single hard key light carving the subject out of deep, inky black, bold geometric shadow shapes thrown across the scene, slatted light and drifting haze or smoke catching the beam, a glistening highlight on wet surfaces. Rich monochrome with crushed blacks and luminous highlights, fine photochemical film grain, soft highlight roll-off, and a low, dramatic camera angle. Moody, tense, expressionist, timeless. Close with a small caption in an elegant period film-title font within a subtle letterbox bar.`
+
+Surveillance photo — infrared security camera (interior, fixed high corner) — `Rendered as a single still grabbed from low-bitrate CCD security-camera footage, lit by an infrared illuminator. Low-key monochrome night-vision: the IR floods a narrow cone of cold grey light, and everything beyond its reach sits in crushed, featureless black; bright surfaces bloom and trail faint vertical CCD smear. Fixed ultra-wide lens, mild barrel distortion, angled down from a high corner. The picture is degraded by its own medium — luminance sensor noise, blocky video-compression artefacts, low dynamic range, a faint horizontal interlace tear. Burn the camera's on-screen display into one top corner in a blocky white monospace video font: a short camera-and-zone identifier (for example "CAM 04 · SUBLEVEL 2") above a running 24-hour clock TIME in HH:MM:SS — show a time only and NEVER a calendar date, so the footage reads as surveillance in any setting or era, and let the zone label name the place. No colour, no warmth.`
+
+Surveillance photo — aerial drone feed (outdoors, from above) — `Rendered as a single still from a military-style aerial surveillance drone (UAV) loitering high above the subject at night — a steep top-down, high-oblique view looking down from altitude. The image is a grainy, low-resolution monochrome night-vision sensor feed: desaturated cold grey, heavy sensor noise, soft optics, low contrast, the ground far below. THE SUBJECT IS SMALL AND CENTERED, tracked from above. Overlay a full targeting HUD in thin monospace vector lines: a central crosshair reticle, a square tracking box locked around the subject, and corner readouts — an altitude figure, a latitude/longitude coordinate pair, a heading and a sensor label (for example "UAV / EO-IR"), and a 24-hour clock TIME in HH:MM:SS; show a time only, never a calendar date. Detached, predatory, clinical, godlike.`
+
+# Notes
+
+Campaign composite for the **redundancy** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [NoirCinema](./NoirCinema.mvstyle) (black-and-white film-noir chiaroscuro — the campaign-wide workhorse). SURVEILLANCE sub-menu (DM picks the vantage that fits): [NightVisionCam](./NightVisionCam.mvstyle) (fixed interior infrared CCD; IR-cone-into-black + medium-degradation + time-only OSD) and [DroneCam](./DroneCam.mvstyle) (aerial top-down UAV night-vision feed with targeting HUD; outdoors, anonymous-menace). All three `# Style` lines are verbatim from the parents — keep them intact (the cams' time-only OSD rule and degradation levers are load-bearing); the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![NoirCinema](../ImageStyleExample/NoirCinema.example.png)
+![NightVisionCam](../ImageStyleExample/NightVisionCam.example.png)
+![DroneCam](../ImageStyleExample/DroneCam.example.png)

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "PaperbackCover"
+rating: "C"
+description: "Hand-airbrushed gouache 1970s sci-fi paperback cover: muted palette, flat value masses, soft lost edges, print grain"
+tags: [painting, vintage, muted, limited-palette, epic, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 234
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Painted as a vintage 1970s science-fiction paperback cover in the tradition of hand-airbrushed gouache matte painting, with strict process discipline. Work from a tightly restrained palette of roughly four or five muted period hues only — admit no other colors. Build the whole image from a few large, simple value masses: group shadow into broad unmodulated dark shapes, and let most of the subject dissolve into soft atmospheric falloff and lost-and-found edges. Reserve fine brushwork and detail for ONE focal element and the lit silhouette edges only; every other surface stays broad, flat, soft, and economical, with no rendered panel or surface detail. Keep large passages of the background calm and near-empty — resist filling negative space. The only fine texture anywhere is the flat, uniform offset-printing rosette grain and paper tooth laid evenly over the finished painting, never rendered surface detail. Close with a cover-style caption integrated like real paperback typography: a bold engraved-serif title treatment naming the place or moment, with one short evocative tagline beneath it, set in elegant period type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The economy directives (limited palette, large flat value masses, lost edges, detail reserved to one focal element, near-empty negative space, grain only from the print process) are load-bearing — they are what keep gpt-image-2 from crowding every surface with reflexive "bored-model" detail. Don't trim them.
+
+# Example
+
+![PaperbackCover](../ImageStyleExample/PaperbackCover.example.png)

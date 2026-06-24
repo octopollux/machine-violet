@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "AnimeIllustration"
+rating: "C"
+description: "Polished modern anime illustration with crisp lineart, flat cel shading, and a softly painted atmospheric background"
+tags: [illustration, stylized, color, warm, portrait]
+made-for-model: gpt-image-2
+tokens: 112
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a polished modern anime illustration — clean Japanese-animation-style art with crisp confident line work and soft cel-and-painted colour. Clean lineart, flat cel shading with a few soft gradient accents, expressive appealing stylised character design, a bright harmonious palette, and a softly painted atmospheric background with gentle depth behind the crisp foreground figure. Warm cinematic anime lighting with gentle bloom and rim light. Polished, expressive, broadly appealing. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. General-purpose illustration workhorse, family member with [DigitalPainting](./DigitalPainting.mvstyle). The ONE round-1 flavour that stayed cleanly DISTINCT — "anime" is a strong enough prior to resist the painted-default collapse (clean lineart + cel/painted colour + the anime sky and character idiom). Broadly appealing and genre-flexible. The tradition is described generically (Japanese animation) — name no studio or artist (see docs/seed-authoring.md on no artist imitation). Carries some tic in the background but forgivable. Caption = tasteful clean type.
+
+# Example
+
+![AnimeIllustration](../ImageStyleExample/AnimeIllustration.example.png)

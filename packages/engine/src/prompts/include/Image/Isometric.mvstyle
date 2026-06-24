@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Isometric"
+rating: "?"
+description: "Tidy isometric diorama with the location as subject and a tiny figure, floating on a deep solid black field"
+tags: [game-render, stylized, limited-palette, establishing, wide-vista]
+made-for-model: gpt-image-2
+tokens: 222
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean ISOMETRIC illustration — a tidy isometric (axonometric) diorama view, the whole scene built as a neat 3D-looking miniature floating on a deep solid BLACK background. THE LOCATION IS THE SUBJECT, not the character: render the full setting as the diorama and place any character as a SMALL figure within it — the character occupies only a small part of the frame, roughly a tenth of the image at most, a tiny inhabitant standing inside the larger miniature scene, never a big foreground figure. Crisp clean shapes with flat or softly-graded colour from a coordinated limited swatch palette, neat geometric forms, soft even lighting and tidy small shadows. The diorama sits as a small island of colour on the surrounding deep-black field, which fills the rest of the frame. Strict economy: big simple shapes, minimal clutter. Charming, clean, modern isometric on black, with the location as the focus and the figure small within it. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A DISTINCT-DIGITAL style — a tidy isometric (axonometric) DIORAMA: the whole scene rendered as a neat 3D-looking miniature on an isometric base. The isometric PROJECTION is the structural format that escapes the painted-default and the tic (same lesson as [LowPoly](./LowPoly.mvstyle)). BLACK GROUND is load-bearing and was the user's fix: the first cut floated the diorama on WHITE, which reads as a bright rectangle in the dark TUI — forcing a deep solid black background composites it cleanly into the terminal (the same dark-ground-for-TUI choice as [Tapestry](./Tapestry.mvstyle) / [Ukiyoe](./Ukiyoe.mvstyle) / [NeonSynthwave](./NeonSynthwave.mvstyle)). Coordinated limited swatch palette + big simple shapes keep it clean. Especially good for LOCATIONS / scenes / maps (a place as a little diorama). FIGURE SCALE is load-bearing and was the user's second fix: THE LOCATION IS THE SUBJECT and any character is a SMALL figure (~a tenth of the frame), a tiny inhabitant of the diorama — the first cuts rendered the PC titan-sized, dominating the map; for crunchy / tactical roleplay the value is the navigable LOCATION, with the PC small within it. Caption = tasteful clean type. Validated on the Xera overlook scene. Keep the isometric-diorama framing, the deep-black ground, the SMALL-figure / location-as-subject rule, and the swatch + big-shape economy.
+
+# Example
+
+![Isometric](../ImageStyleExample/Isometric.example.png)

@@ -2,11 +2,44 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Good Soil",
-  "summary": "You found a patch of land where things grow clean. Everyone else found out too.",
+  "summary": "A clean patch of ground in a poisoned world. Can you defend it?",
   "genres": [
-    "post-apocalyptic"
+    "post-apocalyptic",
+    "thriller",
+    "drama",
+    "mystery"
   ],
-  "detail": "The world is poisoned and the player has a piece of ground that isn't. Things grow there that don't grow anywhere else within a week's walk. The player has been quiet about it for as long as they could. Quiet is over. Someone outside the patch has started asking the wrong neighbors the right questions.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. REMEDIATION PROJECT — Before the collapse, a research consortium seeded several sites with engineered microbes designed to detox the soil. Most failed. A handful succeeded. The player stumbled onto one. Others exist; they are marked on a map that nobody who is still alive owns, and the documents that describe what the patches do are in archives accessible only to the very organized.\n2. INNOCENT FLUKE — The patch is good because of a specific coincidence — wind shadow, an old mineral seam, a fungal partnership nobody has named. The leverage exists only as long as the cause is unknown. Once the cause is named, the patch is reproducible and worth nothing. While the cause is unknown, the patch is worth everything and the player owns it.\n3. THE THING BELOW — Something underground is feeding the soil. It is not a machine. It is not a god. It is alive, slow, and has been keeping the patch clean because the patch is the surface of its mouth. The player has been in a relationship with it for as long as they've farmed the land. It will eventually ask for something back.\n\nDM approach:\n- Tone: pastoral and tense. The horror is social. The patch is small and the world is large and the world has been listening.\n- NPCs to seed: a neighbor who suspects but hasn't told; a trader who passes through the region and gossips; one starving stranger who shows up at dawn and won't leave.\n- Pacing structure: the clock is social, not military. Count who knows. Each session, the circle widens by one. When the circle reaches a critical number, someone arrives with an army.\n- Seed early: a specific crop the patch supports that shouldn't be possible; a tool the player uses to keep the patch hidden; one ally who has helped keep the secret and who has their own reasons.\n- The patch should be physical and specific. Mark its borders. Describe the smell of the dirt.\n\nPacing: Count who knows. Each new person who learns moves the clock forward one tick. The player can track this by the visitors at their door, the changing tone of trade conversations, the maps that start to include their valley.\n\n<!--include:Pacing.TimedCampaigns-->",
+  "image_style": "InkComicColor",
+  "setup_detail": "<!--include:Pacing.TimedCampaigns-->",
+  "detail": "The world is poisoned and the player has a piece of ground that isn't. Things grow there that don't grow anywhere else within a week's walk. The player has been quiet about it for as long as they could. Quiet is over. Someone outside the patch has started asking the wrong neighbors the right questions.\n\nDM approach:\n- Tone: pastoral and tense. The horror is social. The patch is small and the world is large and the world has been listening.\n- NPCs to seed: a neighbor who suspects but hasn't told; a trader who passes through the region and gossips; one starving stranger who shows up at dawn and won't leave.\n- Pacing structure: the clock is social, not military. Count who knows. Each session, the circle widens by one. When the circle reaches a critical number, someone arrives with an army.\n- Seed early: a specific crop the patch supports that shouldn't be possible; a tool the player uses to keep the patch hidden; one ally who has helped keep the secret and who has their own reasons.\n- The patch should be physical and specific. Mark its borders. Describe the smell of the dirt.\n\nPacing: Count who knows. Each new person who learns moves the clock forward one tick. The player can track this by the visitors at their door, the changing tone of trade conversations, the maps that start to include their valley.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "remediation-project",
+          "name": "Remediation Project",
+          "description": "An engineered detox site from before the collapse; others exist on a lost map.",
+          "detail": "REMEDIATION PROJECT — Before the collapse, a research consortium seeded several sites with engineered microbes designed to detox the soil. Most failed. A handful succeeded. The player stumbled onto one. Others exist; they are marked on a map that nobody who is still alive owns, and the documents that describe what the patches do are in archives accessible only to the very organized."
+        },
+        {
+          "id": "innocent-fluke",
+          "name": "Innocent Fluke",
+          "description": "A coincidence whose leverage lasts only as long as the cause stays unknown.",
+          "detail": "INNOCENT FLUKE — The patch is good because of a specific coincidence — wind shadow, an old mineral seam, a fungal partnership nobody has named. The leverage exists only as long as the cause is unknown. Once the cause is named, the patch is reproducible and worth nothing. While the cause is unknown, the patch is worth everything and the player owns it."
+        },
+        {
+          "id": "the-thing-below",
+          "name": "The Thing Below",
+          "description": "Something alive underground feeds the soil — and will eventually ask for something back.",
+          "detail": "THE THING BELOW — Something underground is feeding the soil. It is not a machine. It is not a god. It is alive, slow, and has been keeping the patch clean because the patch is the surface of its mouth. The player has been in a relationship with it for as long as they've farmed the land. It will eventually ask for something back."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Who you were before",
@@ -50,5 +83,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 278,
+    "setup_detail": 9,
+    "forks": 225,
+    "total": 1264
+  }
 }

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "CelAnimated"
+rating: "?"
+description: "Modern high-budget cel-shaded animation frame: flat hard-edged toon shading over a lush separate painted background"
+tags: [animation, stylized, color, epic, establishing]
+made-for-model: gpt-image-2
+tokens: 187
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a modern high-budget animated feature film — polished cel-shaded (toon-shaded) animation. Strict process discipline: render the characters and foreground forms with crisp clean outlines and FLAT cel-shaded colour — bold flat local colours broken into just a few hard-edged toon-shading bands of light and shadow (clear stepped cel shading), with NO photoreal rendering, no soft gradients on the forms and no realistic texture; the flatness is the whole look. Behind the cel-shaded foreground, a lush, beautifully painted background with atmospheric depth and cinematic lighting, clearly a separate painted layer. A rich, harmonious, appealing palette, a warm cinematic key light, gentle rim light and glow. Polished, expressive, high-production-value modern animation. Close with a small tasteful caption in clean type, like a title card.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A modern, polished, high-budget CEL-SHADED ANIMATED-FEATURE register (user-requested). LOAD-BEARING LEVER: "FLAT cel-shaded colour broken into a few HARD-EDGED toon-shading bands, NO photoreal rendering, no soft gradients" — the cel/toon flatness is a STRUCTURAL anti-realism constraint that forces the animated look and KEEPS IT from drifting to a realistic CG render (which is exactly what sank the rejected soft "stylised 3D" ask — structure beats adjective, cf. [LowPoly](./LowPoly.mvstyle)). Second lever: the cel-shaded foreground over a SEPARATE lush painted background (the [AnimatedFamilyFilm](./AnimatedFamilyFilm.mvstyle) cel-over-painted-bg layering) gives depth + economy (foreground flat, background painterly). Distinct from its cousins: [AnimatedFamilyFilm](./AnimatedFamilyFilm.mvstyle) is the RETRO pre-CGI hand-drawn 80s/90s look; [AnimeIllustration](./AnimeIllustration.mvstyle) is anime; this is the MODERN Western high-budget animated feature. The multiplane stacked-cel sibling ([CelMultiplane](./CelMultiplane.mvstyle), transparent cels stacked for depth) is an additional anti-tic experiment. Caption = a title-card line. Validated on the Xera dusk scene. Keep the flat hard-edged toon-shading, the cel-over-painted-background layering, and the title-card caption.
+
+# Example
+
+![CelAnimated](../ImageStyleExample/CelAnimated.example.png)

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { LLMProvider, ChatResult, ContentPart, NormalizedUsage } from "../providers/types.js";
-import { agentLoop } from "./agent-loop.js";
+import { agentLoop, TUI_TOOLS, DM_EXCLUDED_TOOLS } from "./agent-loop.js";
 import { extractStatus, retryDelay } from "../utils/retry.js";
 import type { AgentLoopConfig } from "./agent-loop.js";
-import { createTestRegistry } from "./tool-registry.js";
+import { createTestRegistry, registry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
@@ -318,7 +318,7 @@ describe("agentLoop", () => {
     }));
   });
 
-  it("passes through roundMessages from agent session", async () => {
+  it("passes through turnMessages from agent session", async () => {
     const provider = mockProvider([
       toolUseResult("roll_dice", { expression: "1d20" }),
       textResult("You rolled a 15!"),
@@ -334,10 +334,10 @@ describe("agentLoop", () => {
     );
 
     // Should have: assistant(tool_use), user(tool_result), assistant(text)
-    expect(result.roundMessages).toHaveLength(3);
-    expect(result.roundMessages[0].role).toBe("assistant");
-    expect(result.roundMessages[1].role).toBe("user");
-    expect(result.roundMessages[2].role).toBe("assistant");
+    expect(result.turnMessages).toHaveLength(3);
+    expect(result.turnMessages[0].role).toBe("assistant");
+    expect(result.turnMessages[1].role).toBe("user");
+    expect(result.turnMessages[2].role).toBe("assistant");
   });
 
   it("executes multiple tool calls from a single response", async () => {
@@ -410,6 +410,20 @@ describe("agentLoop", () => {
   });
 });
 
+describe("TUI_TOOLS registry", () => {
+  // Regression for the silent "image lands on disk but never renders" bug
+  // (Palimpsest scene-transition image, 2026-05-29). The bridge gates
+  // `_tui` extraction on `tuiToolNames.has(tc.name)` in dispatchToolCall.
+  // generate_image returns `_tui: { type: "display_image", ... }` from
+  // GameEngine.dispatchGenerateImage; if the tool name isn't in
+  // TUI_TOOLS, onTuiCommand never fires, the client never receives
+  // display_image, and the image silently fails to render even though
+  // the bytes were correctly persisted.
+  it("includes generate_image so display_image broadcasts to the client", () => {
+    expect(TUI_TOOLS.has("generate_image")).toBe(true);
+  });
+});
+
 describe("thinking block filtering", () => {
   it("strips thinking blocks from conversation history", async () => {
     // First response has thinking + tool_use, second is text-only
@@ -456,6 +470,34 @@ describe("thinking block filtering", () => {
     );
     expect(blockTypes).not.toContain("thinking");
     expect(blockTypes).toContain("tool_use");
+  });
+});
+
+describe("DM_EXCLUDED_TOOLS", () => {
+  // The operator-facing meta tools (PC handoff, DM-voice swap, campaign-state
+  // catch-all) live on the OOC/Dev surface, not the in-character narrator's.
+  const META_TOOLS = [
+    "swap_pc",
+    "howto_swap_pc",
+    "list_dm_personalities",
+    "swap_dm_personality",
+    "howto_swap_dm_personality",
+    "howto_campaign_state",
+  ];
+
+  it("excludes the swap_*/howto_* meta tools from the DM tool list", () => {
+    const dmTools = registry.getDefinitions(DM_EXCLUDED_TOOLS).map((t) => t.name);
+    for (const name of META_TOOLS) {
+      expect(dmTools).not.toContain(name);
+    }
+  });
+
+  it("still registers the meta tools (they remain available to OOC/Dev)", () => {
+    // Excluding from the DM view must not unregister them — OOC pulls the
+    // whole registry, so they have to stay in it.
+    for (const name of META_TOOLS) {
+      expect(registry.has(name)).toBe(true);
+    }
   });
 });
 

@@ -69,6 +69,11 @@ export function assetDir(category: "prompts" | "themes" | "systems" | "worlds" |
  * `.env`, `connections.json`, `machine-settings.json`, `discord-settings.json`,
  * ChatGPT OAuth token storage, and (via client-ink) `client-settings.json`.
  *
+ * `MV_CONFIG_DIR` forces an explicit root, overriding both branches below.
+ * The E2E harness uses it to run the packaged binary against a throwaway,
+ * pre-seeded temp dir instead of the user's real %APPDATA% — hermetic, with
+ * no dependency on machine state.
+ *
  * Compiled: platform-conventional config dir (e.g. %APPDATA%\MachineViolet).
  * Dev: walk up from cwd looking for an ancestor containing `connections.json`
  * so a worktree picks up the parent repo's saved config. Falls back to cwd
@@ -79,7 +84,12 @@ let _configDir: string | undefined;
 
 export function configDir(): string {
   if (_configDir) return _configDir;
-  _configDir = isCompiled() ? defaultConfigDir() : findConfigDirUpward(process.cwd());
+  const override = process.env.MV_CONFIG_DIR;
+  _configDir = override
+    ? resolve(override)
+    : isCompiled()
+      ? defaultConfigDir()
+      : findConfigDirUpward(process.cwd());
   return _configDir;
 }
 

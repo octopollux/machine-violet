@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Graveyard Shift"
+rating: "?"
+description: "Graveyard Shift campaign look: CinematicFilm prestige film-still by default, Portra soft film for funny/light scenes, EightiesSciFi neon-haze for dark/scary scenes"
+tags: [motion-picture, photoreal, muted, cool, tense]
+made-for-model: gpt-image-2
+tokens: 501
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** cinematic film-still look below. A **funny or light** scene uses the soft Portra film look. A **dark or scary** scene uses the 1980s neon-and-haze sci-fi look.
+
+# Style
+
+Default (most scenes) — `Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography: a wide anamorphic frame with gentle horizontal lens flares, a shallow depth of field with creamy bokeh and oval out-of-focus highlights, and natural filmic sharpness on the subject. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting with an atmospheric haze catching the light. The composed, intentional look of a single frame lifted from a beautifully shot film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+Funny / light scenes — `Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+Dark / scary scenes — `Rendered as a frame from a 1980s science-fiction action film, using that era's practical cinematography techniques — NOT a modern render. The signature: ANAMORPHIC widescreen with horizontal lens flares; thick atmospheric HAZE and smoke filling the air; hard, dramatic BACKLIGHT and rim-light carving the figure out of the dark; glowing coloured NEON and practical light sources; a moody blue-and-amber or neon-noir palette; visible 35mm Kodak film grain; and motion-control, miniature-and-practical-effects solidity. Smoky, backlit, neon, atmospheric, analog. Close with a small caption in a bold period sci-fi font.`
+
+# Notes
+
+Campaign composite for the **graveyard-shift** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [CinematicFilm](./CinematicFilm.mvstyle) (prestige 35mm anamorphic film still — the campaign-wide workhorse). FUNNY/LIGHT = [Portra](./Portra.mvstyle) (soft Kodak Portra 400 colour negative; the warm, tender, flattering register for a lighter beat). DARK/SCARY = [EightiesSciFi](./EightiesSciFi.mvstyle) (anamorphic-flare, haze, hard-backlit neon 80s sci-fi; its hard backlight + haze dissolve the background for a tense, ominous frame). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![CinematicFilm](../ImageStyleExample/CinematicFilm.example.png)
+![Portra](../ImageStyleExample/Portra.example.png)
+![EightiesSciFi](../ImageStyleExample/EightiesSciFi.example.png)

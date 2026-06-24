@@ -35,6 +35,28 @@ When multiple players are in the session, the bottom of the TUI shows a player b
 
 **During initiative:** The TUI automatically activates the player whose turn it is. Human players type their action; AI players act automatically. The player bar shows turn order highlighting.
 
+The `switch_player` tool is the agent-side equivalent of Tab: it only moves `activePlayerIndex` between characters that are **already** in `config.players`. It does not change who controls what.
+
+### Swapping the PC (handoff to a new or existing character)
+
+Who a player controls is a roster entry: `config.json` → `players[]`, each with a `character` field, selected by `activePlayerIndex` (persisted in `state/scene.json`). `config.json` is loaded fresh at every session start, so changing the PC means rewriting that roster entry on disk — not just flipping the active index.
+
+A PC swap (retiring a PC to continue as an NPC, or introducing a brand-new PC) spans several pieces of state:
+
+| Piece | Where | Tool |
+|---|---|---|
+| Roster entry + active index | `config.json` `players[]`, `scene.json` `activePlayerIndex` | **`swap_pc`** (persists `config.json`) |
+| New PC's sheet | `characters/<slug>.md` (`Type: PC`, `Player`, `Display Resources`, `Theme Color`) | `entity` (create/update) |
+| Outgoing PC demotion | `characters/<old>.md` (`Type: character`, clear `Player`) | `entity` (update) |
+| Party roster | `characters/party.md` Members | `entity` / scribe |
+| Top-frame resources | `state/resources.json` | `set_display_resources`, `set_resource_values` |
+| Modeline | `state/ui.json` | `update_modeline` |
+| Theme color | `state/ui.json` | `style_scene` |
+
+`swap_pc` is the only tool that edits `config.players`, and it is the step that persists the roster — without it the swap reverts to the old PC on the next load. `switch_player` will **not** do a swap: it rejects any character not already in the roster. The `howto_swap_pc` knowledge tool returns the full procedure above; call it before swapping so nothing is left half-done.
+
+> Note: the DM's in-context PC sheet block (`pcSheets`) is loaded once at session start and intentionally not refreshed mid-session, so it still shows the old sheet after a swap until the next reload. The on-disk state — which is what the next load reads — is correct.
+
 ### Multiple Players in the Agent Loop
 
 From the DM's perspective, multiple players are just multiple characters. The DM's narration goes to everyone (it's one screen). Player inputs are tagged with who said them:

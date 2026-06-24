@@ -1,0 +1,95 @@
+{
+  "scenario": "dm-use-item",
+  "tape": {
+    "version": 1,
+    "scenario": "dm-use-item",
+    "capabilities": {
+      "claude-haiku-4-5-20251001": {
+        "imageGeneration": false
+      }
+    },
+    "entries": [
+      {
+        "kind": "chat",
+        "bucket": "dm",
+        "ordinal": 0,
+        "request": {
+          "model": "claude-haiku-4-5-20251001",
+          "messageCount": 1,
+          "systemHash": "9d270259c954",
+          "tools": [
+            "advance_turn",
+            "alarm",
+            "deck",
+            "describe_entity_type",
+            "detect_orphans",
+            "dm_notes",
+            "end_combat",
+            "enter_ooc",
+            "entity",
+            "find_schema_drift",
+            "list_entity_types",
+            "manage_objectives",
+            "map",
+            "map_entity",
+            "map_query",
+            "modify_initiative",
+            "present_choices",
+            "promote_character",
+            "resolve_turn",
+            "roll_dice",
+            "scene_transition",
+            "scribe",
+            "search_campaign",
+            "search_content",
+            "session_end",
+            "set_display_resources",
+            "set_resource_values",
+            "start_combat",
+            "style_scene",
+            "switch_player",
+            "time",
+            "update_modeline",
+            "validate_entity"
+          ],
+          "lastMessagePreview": "<context> ## Current State PCs: Aldric [length] Terminal: 80 cols × 16 visible rows. [stats] Turn: Aldric </context> [Al"
+        },
+        "result": {
+          "text": "Mella's hand stops mid-wipe. Her jaw tightens.\n\n\"No,\" she says flatly, not looking at you. The coin sits untouched on the bar between you.\n\nShe sets down the mug with a deliberate *clink* and finally meets your eyes — there's something harder in them now, a calculation running behind her weathered face. \"Cellar's closed. Been closed. Nothing down there but rot and rats, and I don't rent the key to anyone.\"\n\nThe hooded figure by the hearth hasn't moved, but you notice their grip has shifted on the tankard. Listening, maybe. The rain drums harder against the shutters.\n\nMella leans forward slightly, lowering her voice. \"You looking for something specific, or just trouble?\"\n\nWhat do you do?",
+          "toolCalls": [],
+          "usage": {
+            "inputTokens": 394,
+            "outputTokens": 182,
+            "cacheReadTokens": 9506,
+            "cacheCreationTokens": 0,
+            "reasoningTokens": 0
+          },
+          "stopReason": "end",
+          "assistantContent": [
+            {
+              "type": "text",
+              "text": "Mella's hand stops mid-wipe. Her jaw tightens.\n\n\"No,\" she says flatly, not looking at you. The coin sits untouched on the bar between you.\n\nShe sets down the mug with a deliberate *clink* and finally meets your eyes — there's something harder in them now, a calculation running behind her weathered face. \"Cellar's closed. Been closed. Nothing down there but rot and rats, and I don't rent the key to anyone.\"\n\nThe hooded figure by the hearth hasn't moved, but you notice their grip has shifted on the tankard. Listening, maybe. The rain drums harder against the shutters.\n\nMella leans forward slightly, lowering her voice. \"You looking for something specific, or just trouble?\"\n\nWhat do you do?"
+            }
+          ]
+        },
+        "streamDeltas": [
+          "M",
+          "ella's hand stops mid-wipe. Her jaw t",
+          "ightens.\n\n\"No,\" she says flatly, not looking at you. The coin",
+          " sits untouched on the bar between you.\n\nShe sets down the mug with a deliberate *c",
+          "link* and finally meets your eyes — there's something harder in them now, a",
+          " calculation running behind her weathered face. \"Cellar's closed",
+          ". Been closed. Nothing down there but rot and rats",
+          ", and I don't rent the key to anyone.\"\n\nThe hooded figure by the hearth hasn",
+          "'t moved, but you notice their grip has shifted on the tank",
+          "ard. Listening, maybe. The rain drums",
+          " harder against the shutters.\n\nMella leans forward slightly, lowering her voice. \"You looking for something specific,",
+          " or just trouble?\"\n\nWhat do you do?"
+        ]
+      }
+    ]
+  },
+  "expectedNarrative": [
+    "Mella's hand stops mid-wipe. Her jaw tightens.\n\n\"No,\" she says flatly, not looking at you. The coin sits untouched on the bar between you.\n\nShe sets down the mug with a deliberate *clink* and finally meets your eyes — there's something harder in them now, a calculation running behind her weathered face. \"Cellar's closed. Been closed. Nothing down there but rot and rats, and I don't rent the key to anyone.\"\n\nThe hooded figure by the hearth hasn't moved, but you notice their grip has shifted on the tankard. Listening, maybe. The rain drums harder against the shutters.\n\nMella leans forward slightly, lowering her voice. \"You looking for something specific, or just trouble?\"\n\nWhat do you do?"
+  ]
+}

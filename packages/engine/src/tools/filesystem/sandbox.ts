@@ -37,5 +37,15 @@ export function sandboxFileIO(inner: FileIO, allowedRoots: string[]): FileIO {
     listDir: async (p) => inner.listDir(guard(p)),
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
     ...(inner.deleteFile ? { deleteFile: async (p: string) => inner.deleteFile!(guard(p)) } : {}),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
+    ...(inner.writeBinaryFile ? { writeBinaryFile: async (p: string, b: Uint8Array) => inner.writeBinaryFile!(guard(p), b) } : {}),
+    // readBinaryFile MUST be forwarded symmetrically with writeBinaryFile.
+    // Dropping it silently breaks the DM PC-portrait inject: loadDmPortraitMessage
+    // gates on `fileIO.readBinaryFile` and returns null when it's missing, so the
+    // portrait never reaches the DM context (it just falls back to text). The
+    // omission is invisible — images still persist (writeBinaryFile is here) — so
+    // it surfaced only as generated characters drifting off-model.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by ternary
+    ...(inner.readBinaryFile ? { readBinaryFile: async (p: string) => inner.readBinaryFile!(guard(p)) } : {}),
   };
 }

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "VHS"
+rating: "?"
+description: "Degraded VHS videotape frame: scanlines, chroma bleed, tracking distortion, washed noisy colour, camcorder OSD timestamp"
+tags: [analog-video, lo-fi, vintage, muted, dread]
+made-for-model: gpt-image-2
+tokens: 129
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from an old VHS videotape — the degraded analog-video technique. The signature: low-resolution soft video, visible horizontal SCANLINES and interlacing, CHROMA BLEED and colour smearing, tracking noise and tape distortion bands, slightly washed and noisy colour, a faint timestamp / camcorder OSD, and a grungy late-80s/90s home-video or found-footage feel. Lo-fi, analog, degraded, eerie. Close with a small caption styled as a blocky video-camera on-screen display.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — degraded VHS analog video: scanlines, interlacing, chroma bleed, tracking distortion, washed noisy colour, a camcorder OSD. Lo-fi found-footage register. CAPTION NOTE: the model gives itself a camcorder DATE STAMP (e.g. "OCT 26 1997") — a real year can break far-future / fantasy immersion (cf. the surveillance-cam TIME-ONLY rule, [NightVisionCam](./NightVisionCam.mvstyle)); flagged to the user, who KEPT the period stamp (VHS is inherently a period / anachronistic FLAIR choice). If a seed needs it era-neutral, make the OSD time-only or an in-world date. Caption = blocky video OSD. Validated on the corridor; an instant bank (user). Keep the analog-video degradation + OSD.
+
+# Example
+
+![VHS](../ImageStyleExample/VHS.example.png)

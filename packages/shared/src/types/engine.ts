@@ -65,6 +65,11 @@ export type EngineState =
   | "waiting_input"
   | "dm_thinking"
   | "tool_running"
+  // Set while one or more image renders are in flight. Distinct from
+  // tool_running because image gen is slow (minutes) and worth its own
+  // "creating an image" indicator; the engine holds this state until the
+  // last in-flight render finishes, even as faster sibling tools come and go.
+  | "generating_image"
   | "scene_transition"
   | "session_ending";
 

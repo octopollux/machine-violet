@@ -2,8 +2,10 @@ import React, { useRef, useEffect, useState, useCallback, useMemo, forwardRef } 
 import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
+import { InlineImage } from "../image/InlineImage.js";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
+import { QUOTE_RULE } from "../narrative/layout.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
@@ -12,6 +14,32 @@ import { useOptionalGameContext } from "../game-context.js";
 import { composeTurnSeparator } from "../themes/composer.js";
 import type { ThemeAsset } from "../themes/types.js";
 import { UsageGauge } from "./UsageGauge.js";
+
+/**
+ * Tallest an inline image may stand, as a fraction of the narrative viewport.
+ * The model is "fill width, grow taller until you'd run past the visible pane":
+ * an image fills the content width and only switches to filling height (leaving
+ * symmetric side pillars) when that would push it past this cap. The cap is a
+ * stylistic budget: an image takes at most this fraction of the narrative pane
+ * so surrounding narration stays on screen alongside it (a taller source is
+ * shrunk to fit, not cropped — landscapes lose width to side pillars, portraits
+ * cap their height).
+ *
+ * Every displayed image now gets nearly the whole pane. This used to be keyed
+ * off intent — `character_portrait` got a smaller 0.6 slice because the setup
+ * portrait was a tall front-facing close-up that would otherwise dominate. The
+ * setup portrait is now a *landscape* multi-angle reference sheet (the only
+ * `character_portrait` image the player ever sees; the DM's silent
+ * `update_portrait` render isn't displayed), so it's wide-not-tall and is the
+ * focus of the chargen moment — same as a scene. The intent param is retained
+ * so a future tall-portrait intent could reintroduce a tighter cap.
+ */
+const IMAGE_HEIGHT_CAP_SCENE = 0.9;
+
+/** Fraction of the narrative pane an image may occupy, by its display intent. */
+function imageHeightCapFraction(_intent: ProcessedLine["intent"]): number {
+  return IMAGE_HEIGHT_CAP_SCENE;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -153,6 +181,12 @@ interface NarrativeAreaProps {
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
   /** When true, dev/debug lines are shown in the narrative. */
   showVerbose?: boolean;
+  /**
+   * Absolute top row of the narrative viewport (where the ScrollView clips).
+   * Passed to InlineImage so it can crop the out-of-band graphics to the
+   * viewport. Equals PlayingPhase's `conversationPaneTop`.
+   */
+  viewportTop?: number;
 }
 
 /** Compute scroll step: 25% of viewport, min 2 if <25, min 1 if <12 */
@@ -168,7 +202,7 @@ export function scrollAmount(viewportRows: number): number {
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose }, ref) {
+  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, viewportTop }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
@@ -245,6 +279,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   // Incremental pipeline: frozen prefix cached, only tail reprocessed
   const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
+  // Graphics capabilities for inline images (null → render nothing inline).
+  const graphicsCaps = gameCtx?.graphicsCaps ?? null;
+
   // Bottom-right overlay: the scroll indicator (when there's content
   // below) takes priority over the usage gauge. They share the same row,
   // and rendering both would risk visual bleed through the absolute
@@ -262,6 +299,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
             width={width}
             themeAsset={themeAsset}
             separatorColor={separatorColor}
+            viewportTop={viewportTop ?? 0}
+            viewportRows={maxRows}
+            graphicsCaps={graphicsCaps}
           />
         ))}
       </ScrollView>
@@ -284,16 +324,53 @@ interface NarrativeLineProps {
   width?: number;
   themeAsset?: ThemeAsset;
   separatorColor?: string;
+  /** Absolute top row of the narrative viewport (for image cropping). */
+  viewportTop?: number;
+  /** Narrative viewport height in rows. */
+  viewportRows?: number;
+  /** Terminal graphics capabilities (null → image renders nothing inline). */
+  graphicsCaps?: import("../image/capabilities.js").GraphicsCapabilities | null;
 }
 
 /** A single narrative line rendered based on its kind. */
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
-  line, playerColor, width, themeAsset, separatorColor,
+  line, playerColor, width, themeAsset, separatorColor, viewportTop, viewportRows, graphicsCaps,
 }: NarrativeLineProps) {
   // Spacer lines render as visual blank lines (paragraph spacing)
   // but are invisible to the formatting/healing pipeline.
   if (line.kind === "spacer") {
     return <Text>{" "}</Text>;
+  }
+
+  // Image lines render the generated PNG via our MV-owned InlineImage, which
+  // composes correctly with the live TUI (aspect-true sizing, vertical crop,
+  // atomic repaint, occlusion-aware band, no-graphics → nothing). `nodes[0]` is
+  // the absolute path the engine wrote.
+  //
+  // We pass BOUNDS, not a footprint: the full content width, and a height cap —
+  // a fraction of the narrative viewport (0.9; see imageHeightCapFraction) so an
+  // image leaves room for surrounding narration without swallowing the pane.
+  // InlineImage reads the image's true aspect and reserves exactly the scaled
+  // footprint inside these bounds — no letterboxing here, no `isPortrait`
+  // guesswork (landscapes fill width, portraits fill height up to the cap).
+  if (line.kind === "image") {
+    const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+    if (!path) return <Text dimColor>[image: missing path]</Text>;
+    const maxCols = Math.max(20, width ?? 80);
+    const viewRows = viewportRows ?? maxCols;
+    const maxRows = Math.max(6, Math.round(viewRows * imageHeightCapFraction(line.intent)));
+    return (
+      <Box flexDirection="column" marginTop={1} marginBottom={1}>
+        <InlineImage
+          path={path}
+          maxCols={maxCols}
+          maxRows={maxRows}
+          viewportTop={viewportTop ?? 0}
+          viewportRows={viewRows}
+          graphicsCaps={graphicsCaps}
+        />
+      </Box>
+    );
   }
 
   // Separator lines render with built-in blank lines above and below,
@@ -345,12 +422,39 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
       return <Text wrap="truncate" color="#FFBF00">{text}</Text>;
     }
 
+    case "list": {
+      // Layout already wrapped the content to width − indent, so marker + content
+      // (first row) and indent + content (continuation rows) each fit `width`.
+      const indent = line.listIndent ?? 0;
+      if (line.listMarker !== undefined) {
+        return (
+          <Text wrap="truncate">
+            <Text>{line.listMarker} </Text>
+            {renderNodes(line.nodes)}
+          </Text>
+        );
+      }
+      return <Text wrap="truncate">{" ".repeat(indent)}{renderNodes(line.nodes)}</Text>;
+    }
+
     case "dm": {
+      // Blockquote row: a left rule + the wrapped inner content. Layout reserved
+      // the rule's columns, so rule + content fits `width`.
+      const sole = line.nodes.length === 1 && typeof line.nodes[0] !== "string" ? line.nodes[0] : undefined;
+      if (sole && sole.type === "quote") {
+        return (
+          <Text wrap="truncate">
+            <Text dimColor>{QUOTE_RULE} </Text>
+            {renderNodes(sole.content)}
+          </Text>
+        );
+      }
+
       // Alignment lines get Box layout
       if (width && line.alignment) {
         const justify = line.alignment === "center" ? "center" : "flex-end";
         // Unwrap the outer alignment tag to get inner content
-        const inner = line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+        const inner = line.nodes.length === 1 && typeof line.nodes[0] !== "string" && "content" in line.nodes[0]
           ? line.nodes[0].content
           : line.nodes;
         return (

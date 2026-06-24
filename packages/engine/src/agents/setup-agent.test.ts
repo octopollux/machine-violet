@@ -69,10 +69,34 @@ describe("buildCampaignConfig", () => {
     expect(config.campaign_scope).toBeUndefined();
   });
 
+  it("passes mechanicsMode through as mechanics_mode", () => {
+    const result = makeSetupResult({ system: "fate-accelerated", mechanicsMode: "player-facing" });
+    const config = buildCampaignConfig(result);
+    expect(config.mechanics_mode).toBe("player-facing");
+  });
+
+  it("omits mechanics_mode when not chosen", () => {
+    const result = makeSetupResult();
+    const config = buildCampaignConfig(result);
+    expect(config.mechanics_mode).toBeUndefined();
+  });
+
   it("omits setup_handoff when handoffNote is undefined", () => {
     const result = makeSetupResult();
     const config = buildCampaignConfig(result);
     expect(config.setup_handoff).toBeUndefined();
+  });
+
+  it("passes openingScene through as opening_scene", () => {
+    const result = makeSetupResult({ openingScene: "Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below." });
+    const config = buildCampaignConfig(result);
+    expect(config.opening_scene).toBe("Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below.");
+  });
+
+  it("omits opening_scene when openingScene is undefined", () => {
+    const result = makeSetupResult();
+    const config = buildCampaignConfig(result);
+    expect(config.opening_scene).toBeUndefined();
   });
 
   it("passes personality detail through to config", () => {

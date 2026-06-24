@@ -246,6 +246,7 @@ function routeTuiCommand(
     case "set_resource_values":
     case "resource_refresh":
     case "set_theme":
+    case "display_image":
       broadcast({
         type: "activity:update",
         data: { engineState: `tui:${command.type}`, ...command },
@@ -254,6 +255,16 @@ function routeTuiCommand(
 
     // --- Client-rendered modals (forwarded for OOC/Dev Mode) ---
     case "show_character_sheet":
+      broadcast({
+        type: "activity:update",
+        data: { engineState: `tui:${command.type}`, ...command },
+      });
+      break;
+
+    // Rollback summary — emitted right before the engine throws
+    // RollbackCompleteError and the session ends. Spread the command so the
+    // `summary` payload survives to the client (the default branch drops it).
+    case "show_rollback_summary":
       broadcast({
         type: "activity:update",
         data: { engineState: `tui:${command.type}`, ...command },

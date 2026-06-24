@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DarkAirbrush"
+rating: "B"
+description: "Silver-age sci-fi masked-airbrush illustration: crisp masked edges over smooth graded fills, moody low-key palette"
+tags: [illustration, stylized, muted, dreamy, period]
+made-for-model: gpt-image-2
+tokens: 210
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Illustrated as a silver-age (mid-1950s to 1960s) science-fiction magazine illustration rendered in technical masked airbrush: built up with frisket masks and an airbrush so the image is made of crisp hard masked edges set against perfectly smooth, even airbrushed gradients. Strict process discipline: every form is a clean masked shape filled with a smooth graded airbrush blend — no visible brushwork, no photographic texture, no digital gradient banding. Render polished retro-futurist surfaces with airbrushed specular highlights and soft graded shadows, a limited period palette of a few harmonious mid-century hues, and a faint airbrushed atmospheric haze. Crisp masked highlight edges and small reserved white catch-lights do the detail work; large forms stay smooth and graded. A subtle paper-stock tooth and the slightly faded ink of vintage magazine printing. Close with a caption set in clean mid-century type, integrated like a magazine illustration's plate caption.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The load-bearing anti-tic work is the masked-airbrush TECHNIQUE itself: smooth graded airbrush fills are inherently anti-cram, and the crisp masked edges + reserved catch-lights concentrate detail at the focal forms while large surfaces stay smooth — no negative-space instruction required. The palette here is left neutral ("a few harmonious mid-century hues"), and in practice it reads dark and moody — the scene's own tone pulls it low-key, which is the look this variant is named for. Its sibling [SilverAgeAirbrush](./SilverAgeAirbrush.mvstyle) takes the same masked-airbrush technique but forces the bright, high-key, optimistic mid-century register instead. Keep the masking technique and the smooth graded fills.
+
+# Example
+
+![DarkAirbrush](../ImageStyleExample/DarkAirbrush.example.png)

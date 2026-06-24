@@ -94,3 +94,46 @@ describe("installSyncWriteCombiner", () => {
     expect(writes).toEqual(["prefix" + BSU + "content" + ESU]);
   });
 });
+
+describe("installSyncWriteCombiner with pre-ESU injection", () => {
+  it("splices injection just before ESU on the buffered path", () => {
+    const { stream, writes } = makeStream();
+    installSyncWriteCombiner(stream, () => "<IMG>");
+    stream.write(BSU);
+    stream.write("frame");
+    stream.write(ESU);
+    expect(writes).toEqual([BSU + "frame" + "<IMG>" + ESU]);
+  });
+
+  it("splices injection just before ESU on the single-chunk path", () => {
+    const { stream, writes } = makeStream();
+    installSyncWriteCombiner(stream, () => "<IMG>");
+    stream.write(BSU + "frame" + ESU);
+    expect(writes).toEqual([BSU + "frame" + "<IMG>" + ESU]);
+  });
+
+  it("is a no-op when the injector returns empty", () => {
+    const { stream, writes } = makeStream();
+    installSyncWriteCombiner(stream, () => "");
+    stream.write(BSU);
+    stream.write("frame");
+    stream.write(ESU);
+    expect(writes).toEqual([BSU + "frame" + ESU]);
+  });
+
+  it("does not inject into non-synchronized passthrough writes", () => {
+    const { stream, writes } = makeStream();
+    installSyncWriteCombiner(stream, () => "<IMG>");
+    stream.write("plain");
+    expect(writes).toEqual(["plain"]);
+  });
+
+  it("calls the injector once per flushed block (fresh content each frame)", () => {
+    const { stream, writes } = makeStream();
+    let n = 0;
+    installSyncWriteCombiner(stream, () => `<${n++}>`);
+    stream.write(BSU); stream.write("a"); stream.write(ESU);
+    stream.write(BSU); stream.write("b"); stream.write(ESU);
+    expect(writes).toEqual([BSU + "a<0>" + ESU, BSU + "b<1>" + ESU]);
+  });
+});

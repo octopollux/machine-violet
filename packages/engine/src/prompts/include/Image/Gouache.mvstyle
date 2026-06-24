@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Gouache"
+rating: "?"
+description: "Contemporary gouache illustration with opaque matte paint, visible brush and stipple texture, and a warm limited palette"
+tags: [painting, painterly, warm, muted, cozy]
+made-for-model: gpt-image-2
+tokens: 114
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a contemporary gouache illustration — a soft, matte, hand-painted look. Forms built from opaque gouache in flat-to-softly-modelled shapes, with visible brush and stipple texture, a warm harmonious limited palette, and the gentle matte tooth of paint on paper. A clear focal subject in fuller paint, the background simpler and softer with loose painterly washes and atmospheric depth. Warm, tactile, painterly but restrained. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. General-purpose illustration workhorse, family member with [DigitalPainting](./DigitalPainting.mvstyle). The most DISTINCT of the painterly round-1 group — WARMER, MATTE, more traditional-paint feel, the closest to a real medium (which previews the material-constraint idea: a harder "photo of a real gouache on watercolour paper" lever could counter the tic further). Carries the forgivable tic. Caption = tasteful clean type.
+
+# Example
+
+![Gouache](../ImageStyleExample/Gouache.example.png)

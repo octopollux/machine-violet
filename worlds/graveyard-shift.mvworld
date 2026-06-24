@@ -7,7 +7,43 @@
     "modern",
     "horror"
   ],
-  "detail": "Midnight, the museum, a flashlight and a radio and a set of keys that open more doors than the player was told about. The day staff have gone home. The HVAC has dropped into the after-hours cycle. The player walks the rounds — they were trained on the rounds — and the rounds are wrong tonight in a way the player will have to put words to before morning, because the morning shift is going to ask.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PRISON — The museum is a containment facility dressed up as a museum. The artifacts are awake and have been waking up since the new curator started, six months ago. One of them is the warden, and the warden has noticed the player. The new curator either does not know or knows perfectly well; the player will have to decide which is worse.\n2. THE SHELL GAME — Exactly one artifact moves. It rearranges all the others to disguise which one it is. The display cards are correct except for one, and that one changes by the hour. If the player can identify the moving piece by dawn, it stops. If they cannot, it spends another night studying their habits and tries again tomorrow.\n3. THE BUILDING IS ALIVE — The exhibits are not moving. The rooms are. The Egyptian wing is where the medieval armor was. The mastodon is in a hallway that did not exist on Tuesday. The museum is breathing, slowly, and the player is inside the lung. The building wants to be seen. The night staff are its first witnesses.\n\nDM approach:\n- Tone: hum of climate control, footsteps that echo too long, a smell of old varnish.\n- The new curator: charming, well-credentialed, lives in the city, takes calls at odd hours. Knows the artifacts by inventory number and never quite by name.\n- The day janitor: knows everything and pretends not to. Has worked here twenty years. Will trade pieces of the truth for cigarettes and small kindnesses.\n- Seed early: a label card the player remembers reading yesterday that says something different tonight; a display case that is, by daylight, locked, and is, by 2 a.m., not.\n- Pacing: six-hour shift, one anomaly per shift. By shift four the anomalies overlap.\n\nThe clock is the rounds. The player has to complete the loop every hour and sign the sheet by the time clock. Track time by sheet signatures and by which gallery the player did not enter on round three. When the player begins skipping a specific room, the museum has won that round.",
+  "image_style": "GraveyardShift",
+  "setup_detail": "Opening scene: compose it as the quiet start of the shift, before anything is wrong. The player arrives at the museum after closing, clocks in at the time clock, takes up the flashlight and radio and the ring of keys; the last of the day staff file out, the galleries go dark, the HVAC settles into its after-hours hum. Establish the ordinary routine cleanly and ground the texture in the player's chosen background and museum. Do NOT open on an anomaly or mid-hijinks. The first beat should feel completely normal, so the wrongness has somewhere to arrive from once the rounds begin.",
+  "detail": "Midnight, the museum, a flashlight and a radio and a set of keys that open more doors than the player was told about. The day staff have gone home. The HVAC has dropped into the after-hours cycle. The player walks the rounds — they were trained on the rounds — and the rounds are wrong tonight in a way the player will have to put words to before morning, because the morning shift is going to ask.\n\nDM approach:\n- Tone: hum of climate control, footsteps that echo too long, a smell of old varnish.\n- The new curator: charming, well-credentialed, lives in the city, takes calls at odd hours. Knows the artifacts by inventory number and never quite by name.\n- The day janitor: knows everything and pretends not to. Has worked here twenty years. Will trade pieces of the truth for cigarettes and small kindnesses.\n- Seed early: a label card the player remembers reading yesterday that says something different tonight; a display case that is, by daylight, locked, and is, by 2 a.m., not.\n- Pacing: six-hour shift, one anomaly per shift. By shift four the anomalies overlap.\n\nThe clock is the rounds. The player has to complete the loop every hour and sign the sheet by the time clock. Track time by sheet signatures and by which gallery the player did not enter on round three. When the player begins skipping a specific room, the museum has won that round.",
+  "forks": [
+    {
+      "id": "the-museums-secret",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "the-prison",
+          "name": "The Prison",
+          "description": "The museum is a containment facility; the artifacts are waking, and one of them is the warden.",
+          "detail": "THE PRISON — The museum is a containment facility dressed up as a museum. The artifacts are awake and have been waking up since the new curator started, six months ago. One of them is the warden, and the warden has noticed the player. The new curator either does not know or knows perfectly well; the player will have to decide which is worse."
+        },
+        {
+          "id": "the-shell-game",
+          "name": "The Shell Game",
+          "description": "Exactly one artifact moves and rearranges the others to hide which it is; identify it by dawn or it tries again.",
+          "detail": "THE SHELL GAME — Exactly one artifact moves. It rearranges all the others to disguise which one it is. The display cards are correct except for one, and that one changes by the hour. If the player can identify the moving piece by dawn, it stops. If they cannot, it spends another night studying their habits and tries again tomorrow."
+        },
+        {
+          "id": "the-building-is-alive",
+          "name": "The Building Is Alive",
+          "description": "The exhibits aren't moving — the rooms are. The museum is breathing, and the night staff are its first witnesses.",
+          "detail": "THE BUILDING IS ALIVE — The exhibits are not moving. The rooms are. The Egyptian wing is where the medieval armor was. The mastodon is in a hallway that did not exist on Tuesday. The museum is breathing, slowly, and the player is inside the lung. The building wants to be seen. The night staff are its first witnesses."
+        },
+        {
+          "id": "the-curators-grief",
+          "name": "The Curator's Grief",
+          "description": "The curator lost someone; the museum is their cathedral now and the collection their congregation. They are in the building tonight, preparing a service.",
+          "detail": "THE CURATOR'S GRIEF — The curator buried someone they loved, and somewhere in the after-hours building they built a private altar to them. The ritual worked, or it worked in the worst way: the museum is a cathedral now and the collection is the congregation. The curator is here tonight with the player — not angry, not hunting, simply preparing a service, and gently certain the player has arrived to attend it. The horror is sympathy: stopping them means refusing a grieving person the only comfort they have left."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "The museum",
@@ -27,6 +63,10 @@
         {
           "name": "The Founders' Gallery",
           "description": "You recognize the people in the photographs. The diorama of the founding has somebody new in it this week, standing at the back of the founders' group, looking at the front of the case. The donor wall in the lobby has your last name on it, in a gift-tier you cannot afford, and you do not remember anyone in your family being asked."
+        },
+        {
+          "name": "The Trophy Hall",
+          "description": "Mounted animals posed as in life: the elk mid-stride, the wolf at the edge of a painted treeline, the mountain lion gathered to spring. By daylight they are glass-eyed and still. After hours they remember they were alive — and the manner in which they stopped being so, and the hunter each was bound for. The curator knows every one by catalog number and by the rifle that brought it down, and the night staff who mounted them know exactly which seams will not hold."
         }
       ]
     },
@@ -51,5 +91,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 297,
+    "setup_detail": 121,
+    "forks": 319,
+    "total": 1565
+  }
 }

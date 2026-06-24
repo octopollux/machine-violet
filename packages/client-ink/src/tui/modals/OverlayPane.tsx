@@ -22,6 +22,7 @@ import { wrapNodes, toPlainText } from "../formatting.js";
 import { renderNodes } from "../render-nodes.js";
 import { useScrollHandle } from "../hooks/useScrollHandle.js";
 import type { ScrollHandle } from "../hooks/useScrollHandle.js";
+import { useRegisterOcclusion } from "../image/occlusion.js";
 
 export type OverlayPaneHandle = ScrollHandle;
 
@@ -104,6 +105,9 @@ export const OverlayPane = forwardRef<OverlayPaneHandle, OverlayPaneProps>(
   // Max content rows = narrative height minus themed borders (2 * borderHeight)
   const maxContentRows = Math.max(3, narrativeHeight - 2 * borderHeight);
   const visibleRows = Math.min(lineCount, maxContentRows);
+
+  // Report our row-span so inline images hide only when actually occluded.
+  useRegisterOcclusion({ top: topOffset, rows: visibleRows + 2 * borderHeight });
 
   // Position: right-aligned inside the narrative area
   const leftMargin = Math.max(0, narrativeWidth - clampedWidth);

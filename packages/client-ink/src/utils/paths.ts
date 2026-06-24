@@ -3,12 +3,12 @@ import { dirname, join, resolve } from "node:path";
 import { defaultConfigDir } from "./platform.js";
 
 /** Normalize a path to use forward slashes (cross-platform). */
-export function norm(p: string): string {
+function norm(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
 /** True when running inside a compiled standalone executable (Node SEA). */
-export function isCompiled(): boolean {
+function isCompiled(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sea = require("node:sea");
@@ -87,22 +87,3 @@ function findConfigDirUpward(start: string): string {
   return start;
 }
 
-/** Reset the configDir cache (for tests). */
-export function resetConfigDir(): void {
-  _configDir = undefined;
-}
-
-/**
- * Resolve a relative path within a campaign root, rejecting traversal.
- * Normalizes backslashes to forward slashes and strips leading slashes.
- * Throws if any path component is `..`.
- */
-export function resolveCampaignPath(campaignRoot: string, relative: string): string {
-  const normalized = relative.replace(/\\/g, "/").replace(/^\/+/, "");
-  const parts = normalized.split("/").filter((p) => p && p !== ".");
-  if (parts.some((p) => p === "..")) {
-    throw new Error("Path traversal not allowed");
-  }
-  const root = norm(campaignRoot).replace(/\/+$/, "");
-  return parts.length === 0 ? root : root + "/" + parts.join("/");
-}

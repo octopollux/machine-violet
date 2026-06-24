@@ -200,18 +200,18 @@ describe("EntityStore CRUD roundtrip", () => {
 });
 
 describe("EntityStore type safety", () => {
-  it("pins type to the directory category on create even if patch tries to override", async () => {
+  it("blocks relabeling as a different category on create (type: location → character)", async () => {
     const io = inMemoryFileIO();
     const store = new EntityStore(ROOT, io);
     const rec = await store.create("character", {
       displayName: "Arvid",
-      // Adversarial patch trying to mislabel the entity.
+      // Adversarial patch trying to mislabel the entity as another category.
       frontMatter: { type: "location" },
     });
     expect(rec.frontMatter.type).toBe("character");
   });
 
-  it("pins type on update even when patch tries to delete or change it", async () => {
+  it("backfills a missing/cleared type to the directory category on update", async () => {
     const io = inMemoryFileIO({
       "/root/characters/arvid.md": character("Arvid"),
     });
@@ -219,6 +219,68 @@ describe("EntityStore type safety", () => {
     await store.update("character", "arvid", { frontMatter: { type: null } });
     const rec = await store.read("character", "arvid");
     expect(rec.frontMatter.type).toBe("character");
+  });
+
+  it("preserves the PC/NPC role on a character's type field (the PC-swap case)", async () => {
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+
+    // Promote to PC — must stick, not get rewritten back to "character".
+    const promoted = await store.update("character", "arvid", { frontMatter: { type: "PC" } });
+    expect(promoted.frontMatter.type).toBe("PC");
+    expect(promoted.raw).toContain("**Type:** PC");
+
+    // Demote to NPC — also a legitimate role value.
+    const demoted = await store.update("character", "arvid", { frontMatter: { type: "NPC" } });
+    expect(demoted.frontMatter.type).toBe("NPC");
+
+    // A brand-new sheet created straight as a PC keeps the role.
+    const created = await store.create("character", {
+      displayName: "Heura Ketelsen",
+      frontMatter: { type: "PC" },
+    });
+    expect(created.frontMatter.type).toBe("PC");
+  });
+
+  it("still blocks relabeling a character as another category on update (type: item → character)", async () => {
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("character", "arvid", { frontMatter: { type: "item" } });
+    expect(rec.frontMatter.type).toBe("character");
+  });
+
+  it("normalizes display-cased patch keys so the role lands and no duplicate lines appear", async () => {
+    // Agents echo the casing they see on disk (`**Type:**`, `**Display
+    // Resources:**`). Those must map to the storage keys the parser produces,
+    // or they shadow the canonical field and serialize duplicate lines.
+    const io = inMemoryFileIO({
+      "/root/characters/arvid.md": character("Arvid"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("character", "arvid", {
+      frontMatter: { Type: "PC", "Display Resources": "HP, Memory", Player: "Beep" },
+    });
+
+    expect(rec.frontMatter.type).toBe("PC");
+    expect(rec.frontMatter.display_resources).toBe("HP, Memory");
+    expect(rec.frontMatter.player).toBe("Beep");
+    // Exactly one Type line, holding the role — not a stale "character" too.
+    expect(rec.raw.match(/^\*\*Type:\*\*/gm)).toHaveLength(1);
+    expect(rec.raw).toContain("**Type:** PC");
+    expect(rec.raw).not.toContain("**Type:** character");
+  });
+
+  it("keeps type pinned for non-character entities (a location ignores a stray role)", async () => {
+    const io = inMemoryFileIO({
+      "/root/locations/north-keep/index.md": location("North Keep"),
+    });
+    const store = new EntityStore(ROOT, io);
+    const rec = await store.update("location", "north-keep", { frontMatter: { type: "PC" } });
+    expect(rec.frontMatter.type).toBe("location");
   });
 
   it("repairs malformed `**Type:** character` keys via sanitizeFrontMatter", async () => {

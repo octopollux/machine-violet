@@ -81,6 +81,16 @@ export interface ClientState {
   /** Latest provider usage snapshot. Null until a provider with a usage
    *  concept (currently only openai-chatgpt) has reported one. */
   usageStatus: UsageStatus | null;
+  /** Summary text from a completed rollback, carried so app.tsx can raise the
+   *  RollbackSummaryModal when the (expected) session:ended arrives instead of
+   *  silently bouncing to the menu. Null until the engine emits
+   *  show_rollback_summary; cleared on the full reset in returnToMenu. */
+  rollbackSummary: string | null;
+  /** Monotonic counter bumped whenever the engine signals a scribe rewrote an
+   *  entity sheet (`tui:character_sheet_changed`). The character pane clears
+   *  its cached sheet and refetches when this changes, so a detached scribe's
+   *  late write repaints an open pane instead of waiting for the next open. */
+  sheetEpoch: number;
 }
 
 export function initialClientState(): ClientState {
@@ -103,6 +113,8 @@ export function initialClientState(): ClientState {
     displayResources: {},
     resourceValues: {},
     usageStatus: null,
+    rollbackSummary: null,
+    sheetEpoch: 0,
   };
 }
 
@@ -273,7 +285,10 @@ function withTurnSeparators(
 
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
-  const lineKind = (kind ?? "dm") as NarrativeLine["kind"];
+  // Narrative chunks never carry image lines — those arrive whole via the
+  // `display_image` TUI command (see below). Excluding "image" from the
+  // cast matches appendDelta's StreamableKind requirement.
+  const lineKind = (kind ?? "dm") as Exclude<NarrativeLine["kind"], "image">;
 
   update((prev) => {
     let lines = prev.narrativeLines;
@@ -448,6 +463,36 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
         const prevValues = next.resourceValues[character] ?? {};
         next = { ...next, resourceValues: { ...next.resourceValues, [character]: { ...prevValues, ...values } } };
       }
+    } else if (tuiType === "display_image") {
+      // Inline image emitted by the DM via generate_image. Per spec, push
+      // ONE separator above the image (we add this one); the existing
+      // turn-end separator at the bottom of the DM's turn provides the
+      // other side of the wrap naturally. Failed image generations never
+      // produce a display_image command, so this path is always success.
+      const filename = data.filename as string | undefined;
+      const rawIntent = data.intent as string | undefined;
+      const intent: Extract<NarrativeLine, { kind: "image" }>["intent"] | undefined =
+        rawIntent === "scene_snapshot" || rawIntent === "player_request" || rawIntent === "character_portrait"
+          ? rawIntent
+          : undefined;
+      if (filename && intent) {
+        next = {
+          ...next,
+          narrativeLines: [
+            ...next.narrativeLines,
+            { kind: "separator" as const, text: "" },
+            { kind: "image" as const, text: filename, intent },
+          ],
+        };
+      }
+    } else if (tuiType === "show_rollback_summary") {
+      // Stash the summary; app.tsx raises the modal when session:ended lands.
+      const summary = data.summary as string | undefined;
+      if (summary) next = { ...next, rollbackSummary: summary };
+    } else if (tuiType === "character_sheet_changed") {
+      // A (now-detached) scribe rewrote a PC sheet after the turn ended. Bump
+      // the epoch so an open character pane drops its cache and refetches.
+      next = { ...next, sheetEpoch: next.sheetEpoch + 1 };
     }
 
     return next;

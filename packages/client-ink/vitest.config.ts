@@ -13,14 +13,10 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: [
-      // Monolith vestiges — these test modules that have engine-only imports
-      // (campaignPaths, campaign-archive, updater, content pipeline).
-      // They'll be fixed or removed during Phase 5 cleanup.
-      "src/commands/slash-commands.test.ts",
+      // AddContentPhase imports engine-only modules (content pipeline,
+      // config/systems) that haven't been migrated into client-ink yet, so
+      // its test can't run here. Re-enable once the feature is migrated.
       "src/phases/AddContentPhase.test.tsx",
-      "src/phases/ArchivedCampaignsPhase.test.tsx",
-      "src/phases/UpdatePhase.test.tsx",
-      "src/tui/modals/DeleteCampaignModal.test.tsx",
     ],
   },
 });

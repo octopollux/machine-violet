@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "NurseryWatercolor"
+rating: "D"
+description: "Vintage nursery spot illustration: a lone figure in living dip-pen line and faded washes floating on a wide white page"
+tags: [illustration, painterly, muted, tender, intimate, scene-coupled]
+made-for-model: gpt-image-2
+tokens: 361
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, keep the *subject itself* deliberately spare: this is a white-page spot illustration, not a full scene. Describe a single figure (or a small, close group) and only the one or two objects they are actually holding or touching — give it no landscape, sky, horizon, room, or filled-in background, because the wide bare paper around the subject is the whole point of the style. Then render in this visual style:
+
+# Style
+
+`Rendered in the manner of a vintage children's storybook spot illustration: a small picture set alone in the centre of a large sheet of clean white paper, with a wide plain-paper margin all around it. The drawing is carried first and foremost by an expressive dip-pen ink line of living, varying weight — fine and broken in the lights, thicker where forms turn, with the gentle wobble of a real nib — describing most of the form by line alone. Over that line lay only a few transparent watercolour washes, wet-on-dry, touched in here and there in a soft, limited, faded palette — pale ochre, sage and moss green, dove grey, a little dusty rose and faded blue — letting the pigment granulate at the wet edges. Hold strict watercolour discipline: there is no white paint; every highlight is the bare paper, reserved by painting around it. Let the line and washes concentrate on the figure and the few things she touches and fade out softly within a hand's breadth, so the image reads as a gentle floating vignette on the open page. Airy, line-forward, tender, faintly naive, with the quiet of a single storybook page. Finish with a caption as a short line of looping handwritten ink lettering beneath the picture, fully legible.`
+
+# Notes
+
+Append the style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. THIS VARIANT IS SCENE-COUPLED — the first one whose intro prose steers the DM's scene brief, not just the paint. The airy white page is achieved by STARVING the subject (one figure + a prop or two, no environment): hand this style a normal rich establishing shot and gpt-image-2 paints it edge-to-edge and you get [Storybook](./Storybook.mvstyle) with a torn border instead (confirmed the hard way on the first take). The style line's vignette / reserved-white clauses cannot rescue an already-overloaded brief — by the time the image model reads them the full scene is already described — so the load-bearing fix lives in the DM-FACING intro above. (The `%%` note and the style line are both read too late or not by the DM at all: `stripComments` deletes `%%` before the DM ever sees it, and the style line is appended after the brief.) "No white paint; highlights are bare paper" and "a small picture on a large sheet" are positive material/structural facts, NOT negations. This is the tender A. A. Milne / classic-storybook white-page register; the [Storybook](./Storybook.mvstyle) sibling is the FULL edge-to-edge scene. Technique described generically — name no illustrator or named work in a shipped prompt (see docs/seed-authoring.md on no artist imitation). Keep the spare-subject intro, the spot-illustration-on-a-large-sheet framing, and the reserved-white discipline.
+
+# Example
+
+![NurseryWatercolor](../ImageStyleExample/NurseryWatercolor.example.png)

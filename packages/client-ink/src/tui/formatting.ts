@@ -1,15 +1,22 @@
-import type { FormattingNode, FormattingTag, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
+import type { FormattingNode, FormattingTag, ImageIntent, NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
+import { stringWidth } from "./frames/string-width.js";
+import { normalizeDialect } from "./narrative/normalize.js";
+import { layoutRuns, QUOTE_PREFIX_COLS } from "./narrative/layout.js";
 
 /**
  * Parse DM text with inline formatting tags into a tree of FormattingNodes.
  *
- * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <color=#hex>,
- * <wikilink slug=foo>...</wikilink> (render-only — emitted by the colorizer, not LLMs)
- * Unrecognized tags are stripped. Malformed tags render as plain text.
- * Orphan close tags (e.g. `</i>` with no matching open in scope) are stripped
- * silently — they're nearly always a leak from healing across paragraph
- * boundaries, never something the user intended to display literally.
- * Tags can be nested: <b><i>bold italic</i></b>
+ * Supported tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>,
+ * <quote>, <color=#hex>, <br> (a contentless line-break leaf), and the
+ * render-only <wikilink slug=foo>...</wikilink> (emitted by the colorizer, not LLMs).
+ * Tags can nest: <b><i>bold italic</i></b>.
+ *
+ * Anything tag-SHAPED but outside this vocabulary — unknown tags (<strong>,
+ * <table>), attribute-laden variants (<b class="x">), or an orphan close left
+ * by healing across a paragraph boundary (#454) — is STRIPPED to its content;
+ * it never renders as literal markup (the INV-NO-LEAK guarantee). A bare '<'
+ * that isn't tag-shaped (math `3 < 5`, an emoticon `<3`) stays literal.
+ * Dialect synonyms and markdown are mapped upstream in `narrative/normalize.ts`.
  */
 export function parseFormatting(input: string): FormattingNode[] {
   const result: FormattingNode[] = [];
@@ -33,18 +40,25 @@ export function parseFormatting(input: string): FormattingNode[] {
     // Try to parse an opening tag
     const parsed = parseOpenTag(input, tagStart);
     if (!parsed) {
-      // Orphan close tag (e.g. `</i>` with no matching open in this scope):
-      // strip it silently. Healing leaves these behind when an open tag is
-      // reset by a paragraph boundary before its close arrives — without this,
-      // the close would render as literal `</tagname>` text (issue #454).
-      const orphanClose = input.slice(tagStart).match(KNOWN_CLOSE_TAG_RE);
-      if (orphanClose) {
-        i = tagStart + orphanClose[0].length;
+      // Tag-shaped but outside our vocabulary (unknown tag like <strong>, an
+      // attribute-laden <b class="x">, or an orphan </i> left by healing across
+      // a paragraph boundary, #454): strip the delimiter and keep any inner
+      // content. Unknown markup never renders literally (INV-NO-LEAK).
+      const generic = input.slice(tagStart).match(GENERIC_TAG_RE);
+      if (generic) {
+        i = tagStart + generic[0].length;
         continue;
       }
-      // Not a recognized tag at all — treat the < as plain text
+      // A bare '<' that isn't tag-shaped (math `3 < 5`, emoticon `<3`) is literal.
       pushText(result, "<");
       i = tagStart + 1;
+      continue;
+    }
+
+    // Void tags (<br>) are contentless leaves — emit and move on (no close tag).
+    if (parsed.void) {
+      result.push({ type: "linebreak" });
+      i = parsed.end;
       continue;
     }
 
@@ -84,6 +98,8 @@ export function toPlainText(nodes: FormattingNode[]): string {
   return nodes
     .map((node) => {
       if (typeof node === "string") return node;
+      // A linebreak is structural (handled at layout) and carries no text.
+      if (node.type === "linebreak") return "";
       return toPlainText(node.content);
     })
     .join("");
@@ -100,10 +116,21 @@ export function stripLeadingBullet(input: string): string {
 }
 
 /**
- * Compute the visible length of a FormattingNode array (strip all tags).
+ * Visible LENGTH of a FormattingNode array in code units (strip all tags).
+ * Legacy measure retained for the modal `wrapNodes` callers. For terminal
+ * layout prefer {@link nodeDisplayWidth} — code units overflow on wide glyphs.
  */
 export function nodeVisibleLength(nodes: FormattingNode[]): number {
   return toPlainText(nodes).length;
+}
+
+/**
+ * Visible DISPLAY WIDTH of a FormattingNode array in terminal columns, via the
+ * real `string-width` oracle (CJK/wide = 2, combining/zero-width = 0, emoji by
+ * rendered width). This is the measure the narrative layout engine wraps by.
+ */
+export function nodeDisplayWidth(nodes: FormattingNode[]): number {
+  return stringWidth(toPlainText(nodes));
 }
 
 /**
@@ -168,8 +195,12 @@ export function wrapNodes(nodes: FormattingNode[], width: number): FormattingNod
  * Flatten a FormattingNode[] into word tokens, splitting text at spaces.
  * Each word token carries structurally well-formed node fragments.
  * Returns true if the last text ended with a space (trailing word break).
+ *
+ * Exported for the narrative layout engine (`narrative/layout.ts`), which reuses
+ * this proven tokenizer (spacing + wikilink atomicity) but re-measures each word
+ * by display width and adds overlong-token breaking.
  */
-function flattenToWords(
+export function flattenToWords(
   nodes: FormattingNode[],
   words: { nodes: FormattingNode[]; visible: number }[],
 ): boolean {
@@ -217,6 +248,12 @@ function flattenToWords(
         words.push({ nodes: [node], visible });
       }
       wordBreak = false;
+    } else if (node.type === "linebreak") {
+      // wrapNodes is the legacy single-line wrapper (modal callers); hard breaks
+      // don't occur on that path. If one ever appears, treat it as a word
+      // boundary so adjacent text doesn't fuse. The narrative path handles
+      // linebreaks structurally in the layout engine, not here.
+      wordBreak = true;
     } else {
       // Tag node — recurse into children, wrapping fragments in the same tag type
       const childWords: { nodes: FormattingNode[]; visible: number }[] = [];
@@ -270,6 +307,85 @@ export function splitTrailingHorizontalRule(text: string): string | null {
 }
 
 /**
+ * Recognize a Markdown list item: a line whose first non-space content is an
+ * unordered marker (`-`/`*`) or an ordered marker (`N.`/`N)`) followed by at
+ * least one space and non-empty content. Horizontal rules (`---`, `* * *`) are
+ * rejected explicitly so they stay separators, not bullets. Returns the resolved
+ * display marker, the hanging-indent width (marker + one space, in display
+ * columns), whether it's ordered, and the remaining content text.
+ *
+ * Nesting is deliberately flattened — leading indent is ignored (no sub-lists),
+ * matching what real DM narration emits (notebooks, itineraries, sign readouts).
+ */
+export function matchListItem(
+  text: string,
+): { marker: string; indent: number; ordered: boolean; content: string } | null {
+  if (isHorizontalRule(text)) return null;
+  const m = text.match(/^\s*([-*]|\d{1,9}[.)])\s+(\S.*)$/);
+  if (!m) return null;
+  const raw = m[1];
+  const ordered = /\d/.test(raw);
+  // Unordered → a single bullet glyph; ordered → the literal number normalized to
+  // `N.` form (we preserve the DM's number rather than renumbering).
+  const marker = ordered ? `${raw.replace(/[.)]$/, "")}.` : "•";
+  const indent = stringWidth(marker) + 1; // marker + one space
+  return { marker, indent, ordered, content: m[2] };
+}
+
+/**
+ * Close any tags left open within a single self-contained line (a list item's
+ * content), so an unclosed `<b>` closes at the item end instead of leaking. No
+ * prefix — nothing is open before a standalone unit. Reuses {@link scanTagChanges}.
+ */
+function healStandalone(text: string): string {
+  const stack: string[] = [];
+  for (const c of scanTagChanges(text)) {
+    if (c.kind === "open") {
+      stack.push(c.name);
+    } else {
+      for (let j = stack.length - 1; j >= 0; j--) {
+        if (stack[j] === c.name) { stack.splice(j, 1); break; }
+      }
+    }
+  }
+  const suffix = stack.reverse().map((n) => `</${n}>`).join("");
+  return text + suffix;
+}
+
+/**
+ * Drop the visual `spacer` that `appendDelta` inserts between two consecutive
+ * list items, so a list renders tight (bulleted) rather than double-spaced. Only
+ * a spacer flanked by two list items is removed; the spacers framing the list as
+ * a whole are left in place. A list run never contains a blank DM line, so it
+ * never straddles the incremental cache's frozen-prefix split — this stays
+ * transparent to INV-DETERMINISM.
+ */
+function collapseListSpacers(lines: NarrativeLine[]): NarrativeLine[] {
+  const isItem = (l: NarrativeLine | undefined): boolean =>
+    l !== undefined && l.kind === "dm" && matchListItem(l.text) !== null;
+  const out: NarrativeLine[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.kind === "spacer" && isItem(out[out.length - 1]) && isItem(lines[i + 1])) {
+      continue;
+    }
+    out.push(l);
+  }
+  return out;
+}
+
+/** One line threaded through the processing pipeline. Carries the parsed AST plus
+ *  the block decoration (image intent, list marker/indent) accumulated per phase. */
+interface PipelineLine {
+  kind: ProcessedLine["kind"];
+  nodes: FormattingNode[];
+  isSourceBoundary: boolean;
+  intent?: ImageIntent;
+  listMarker?: string;
+  listIndent?: number;
+}
+
+/**
  * Unified processing pipeline for NarrativeLines.
  * Heal → parse → wrap → pad alignment → quote highlight.
  * Returns ProcessedLine[] ready for direct rendering.
@@ -288,8 +404,19 @@ export function processNarrativeLines(
   // (e.g. on session resume, the disk's "---" markers are streamed as DM
   // chunks AND the client injects a separator before the first DM chunk
   // after a player line).
+  // Pre-pass: rewrite each DM line's dialect (semantic HTML, attribute variants,
+  // inline markdown) into the canonical vocabulary before healing/parsing, so the
+  // heal and parse stages only ever see the closed tag set.
+  const normLines: NarrativeLine[] = lines.map((l) =>
+    l.kind === "dm" && l.text !== "" ? { ...l, text: normalizeDialect(l.text) } : l,
+  );
+
+  // Tighten lists: drop the appendDelta spacer between adjacent list items so a
+  // list renders bulleted/contiguous rather than double-spaced.
+  const tightLines = collapseListSpacers(normLines);
+
   const expandedLines: NarrativeLine[] = [];
-  for (const srcLine of lines) {
+  for (const srcLine of tightLines) {
     if (srcLine.kind === "dm" && srcLine.text.trim() !== "") {
       if (isHorizontalRule(srcLine.text)) {
         pushSeparator(expandedLines);
@@ -314,14 +441,38 @@ export function processNarrativeLines(
   // Phase 1: Heal cross-line tags on raw strings, then parse into AST.
   // Healing must happen before parsing because parseFormatting treats
   // unclosed tags as plain text.
-  const parsed: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  const parsed: PipelineLine[] = [];
 
   // Track open tags across DM source lines for cross-line healing
   const openStack: { raw: string; name: string }[] = [];
 
   for (const srcLine of expandedLines) {
     if (srcLine.kind !== "dm") {
-      parsed.push({ kind: srcLine.kind, nodes: [srcLine.text], isSourceBoundary: true });
+      parsed.push({
+        kind: srcLine.kind,
+        nodes: [srcLine.text],
+        isSourceBoundary: true,
+        // Carry image framing intent through the pipeline (only image lines have it).
+        ...(srcLine.kind === "image" ? { intent: srcLine.intent } : {}),
+      });
+      continue;
+    }
+
+    // List item? Lift the marker to metadata and treat the item as a
+    // self-contained, paragraph-like unit: the content is healed on its own (so
+    // an unclosed tag closes at the item end), and the cross-line heal stack is
+    // reset so prior formatting doesn't bleed into the marker or the item.
+    const item = srcLine.text.trim() === "" ? null : matchListItem(srcLine.text);
+    if (item) {
+      openStack.length = 0;
+      const nodes = parseFormatting(healStandalone(item.content));
+      parsed.push({
+        kind: "list",
+        nodes,
+        isSourceBoundary: true,
+        listMarker: item.marker,
+        listIndent: item.indent,
+      });
       continue;
     }
 
@@ -366,41 +517,84 @@ export function processNarrativeLines(
     parsed.push({ kind: "dm", nodes, isSourceBoundary: true });
   }
 
-  // Phase 2: Wrap each line
-  const wrapped: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  // Phase 2: Lay out each line into physical rows by DISPLAY width. Aligned
+  // blocks wrap their inner content and split on <br> into independent rows, each
+  // emitted as its own single-tag aligned line; every row fits `width` (INV-WIDTH).
+  const wrapped: PipelineLine[] = [];
   for (const line of parsed) {
-    if (line.kind === "dm" || line.kind === "player") {
-      const wLines = wrapNodes(line.nodes, width);
-      for (let j = 0; j < wLines.length; j++) {
-        if (line.kind === "player") {
-          // Player nodes are always plain strings — re-join after wrapping
-          // so the renderer can still read nodes[0] as the full line text.
-          wrapped.push({ kind: "player", nodes: [toPlainText(wLines[j])], isSourceBoundary: j === 0 });
-        } else {
-          wrapped.push({ kind: "dm", nodes: wLines[j], isSourceBoundary: j === 0 });
-        }
+    const first = line.nodes[0];
+    if (line.kind === "dm" && line.nodes.length === 1 && typeof first !== "string"
+        && (first.type === "center" || first.type === "right")) {
+      // Aligned block: wrap + split-on-<br> the inner content; re-wrap each row
+      // in the alignment tag so it stays a single-node aligned line.
+      const rows = layoutRuns(first.content, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: [{ ...first, content: rows[j] }], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "dm" && line.nodes.length === 1 && typeof first !== "string"
+        && first.type === "quote") {
+      // Blockquote: reserve columns for the renderer's left rule, then wrap +
+      // split-on-<br>; each row stays a single quote tag so the rule prefix plus
+      // the wrapped content fits `width` (INV-WIDTH, proven at render level).
+      const inner = width > 0 ? Math.max(1, width - QUOTE_PREFIX_COLS) : width;
+      const rows = layoutRuns(first.content, inner);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: [{ ...first, content: rows[j] }], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "dm") {
+      const rows = layoutRuns(line.nodes, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "dm", nodes: rows[j], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "player") {
+      // Player nodes are always plain strings — re-join after wrapping so the
+      // renderer can still read nodes[0] as the full line text.
+      const rows = layoutRuns(line.nodes, width);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({ kind: "player", nodes: [toPlainText(rows[j])], isSourceBoundary: j === 0 });
+      }
+    } else if (line.kind === "list") {
+      // List item: wrap the content to the column budget left after the marker /
+      // hanging indent, so marker + content fits `width`. The marker rides only
+      // on the first physical row; continuation rows carry the indent alone.
+      const indent = line.listIndent ?? 0;
+      const inner = width > 0 ? Math.max(1, width - indent) : width;
+      const rows = layoutRuns(line.nodes, inner);
+      for (let j = 0; j < rows.length; j++) {
+        wrapped.push({
+          kind: "list",
+          nodes: rows[j],
+          isSourceBoundary: j === 0,
+          listIndent: indent,
+          ...(j === 0 ? { listMarker: line.listMarker } : {}),
+        });
       }
     } else {
       wrapped.push(line);
     }
   }
 
-  // Phase 3: Pad alignment lines
-  const padded: { kind: NarrativeLine["kind"]; nodes: FormattingNode[]; isSourceBoundary: boolean }[] = [];
+  // Phase 3: Frame block rows (alignment + blockquote) with a blank line before
+  // and after the GROUP, but keep the rows within a group tight.
+  const padded: PipelineLine[] = [];
   for (let i = 0; i < wrapped.length; i++) {
     const line = wrapped[i];
-    const isAlign = line.kind === "dm" && isAlignmentNode(line.nodes);
+    const isBlock = line.kind === "dm" && isBlockTagNode(line.nodes);
 
-    if (isAlign) {
-      // Blank line before if previous is non-empty
+    if (isBlock) {
+      // Blank line before the GROUP if the previous line is non-empty and not
+      // itself a block row (consecutive block rows — e.g. a multi-line <br> sign
+      // or a wrapped blockquote — must not get blanks between them).
       const prev = padded[padded.length - 1];
-      if (prev !== undefined && !isEmptyNodes(prev.nodes)) {
+      const prevBlock = prev !== undefined && prev.kind === "dm" && isBlockTagNode(prev.nodes);
+      if (prev !== undefined && !isEmptyNodes(prev.nodes) && !prevBlock) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
       padded.push(line);
-      // Blank line after if next is non-empty
+      // Blank line after if the next line is non-empty and not a block row.
       const next = wrapped[i + 1];
-      if (next !== undefined && !isEmptyNodes(next.nodes)) {
+      const nextBlock = next !== undefined && next.kind === "dm" && isBlockTagNode(next.nodes);
+      if (next !== undefined && !isEmptyNodes(next.nodes) && !nextBlock) {
         padded.push({ kind: "dm", nodes: [], isSourceBoundary: false });
       }
     } else {
@@ -436,9 +630,15 @@ export function processNarrativeLines(
         alignment = line.nodes[0].type;
       }
 
-      result.push({ kind: "dm", nodes, alignment });
+      result.push({ kind: "dm", nodes, alignment, ...(alignment ? { padWidth: width } : {}) });
     } else {
-      result.push({ kind: line.kind, nodes: line.nodes });
+      result.push({
+        kind: line.kind,
+        nodes: line.nodes,
+        ...(line.intent ? { intent: line.intent } : {}),
+        ...(line.listMarker !== undefined ? { listMarker: line.listMarker } : {}),
+        ...(line.listIndent !== undefined ? { listIndent: line.listIndent } : {}),
+      });
     }
   }
 
@@ -446,12 +646,12 @@ export function processNarrativeLines(
 }
 
 /**
- * Split a raw text line so that <center>...</center> and <right>...</right>
- * blocks each end up on their own line. Text before/after is preserved as
- * separate lines. If the line has no inline alignment blocks, returns [text].
+ * Split a raw text line so that <center>...</center>, <right>...</right>, and
+ * <quote>...</quote> blocks each end up on their own line. Text before/after is
+ * preserved as separate lines. If the line has no inline block tags, returns [text].
  */
 function splitAlignmentBlocks(text: string): string[] {
-  const pattern = /(<(?:center|right)>[\s\S]*?<\/(?:center|right)>)/;
+  const pattern = /(<(?:center|right|quote)>[\s\S]*?<\/(?:center|right|quote)>)/;
   const parts = text.split(pattern);
   const result: string[] = [];
   for (const part of parts) {
@@ -479,9 +679,11 @@ function pushSeparator(lines: NarrativeLine[], source?: NarrativeLine): void {
   lines.push(source && source.kind === "separator" ? source : { kind: "separator", text: "" });
 }
 
-function isAlignmentNode(nodes: FormattingNode[]): boolean {
+/** A row that is a single block tag (alignment or blockquote). These are framed
+ *  with a blank line before/after the group but stay tight against each other. */
+function isBlockTagNode(nodes: FormattingNode[]): boolean {
   return nodes.length === 1 && typeof nodes[0] !== "string"
-    && (nodes[0].type === "center" || nodes[0].type === "right");
+    && (nodes[0].type === "center" || nodes[0].type === "right" || nodes[0].type === "quote");
 }
 
 function isEmptyNodes(nodes: FormattingNode[]): boolean {
@@ -546,6 +748,8 @@ export function highlightQuotesWithState(
       result.push(...expanded);
       // Update state: count quotes in this text
       for (const ch of node) if (ch === '"') inQuote = !inQuote;
+    } else if (node.type === "linebreak") {
+      result.push(node); // contentless leaf — no quote state to thread
     } else {
       const newContent = highlightQuotesWithState(node.content, color, inQuote);
       result.push({ ...node, content: newContent } as FormattingTag);
@@ -578,7 +782,7 @@ function scanTagChanges(line: string): TagChange[] {
     if (tagStart === -1) break;
 
     // Try close tag first: </tagname>
-    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink)>/);
+    const closeMatch = line.slice(tagStart).match(/^<\/(b|i|u|sub|sup|center|right|color|wikilink|code|quote)>/);
     if (closeMatch) {
       changes.push({ kind: "close", name: closeMatch[1], raw: closeMatch[0] });
       i = tagStart + closeMatch[0].length;
@@ -588,6 +792,13 @@ function scanTagChanges(line: string): TagChange[] {
     // Try open tag via parseOpenTag (reuses existing logic)
     const parsed = parseOpenTag(line, tagStart);
     if (parsed) {
+      // Void tags (<br>) are self-contained — they never open a span, so they
+      // must not push onto the heal stack (else healing would emit a bogus
+      // </br> closer).
+      if (parsed.void) {
+        i = parsed.end;
+        continue;
+      }
       changes.push({ kind: "open", name: parsed.tagName, raw: line.slice(tagStart, parsed.end) });
       i = parsed.end;
       continue;
@@ -653,10 +864,17 @@ interface ParsedTag {
   type: string;
   color?: string;
   target?: string;
+  void?: boolean; // self-contained leaf (e.g. <br>) — no closing tag
   end: number; // index after the closing >
 }
 
-const KNOWN_CLOSE_TAG_RE = /^<\/(?:b|i|u|sub|sup|center|right|color|wikilink)>/;
+// A tag-shaped run to strip: `<name>`, `</name>`, `<name/>`, or an attributed
+// `<name key="v" …>` (an attribute section is required to contain `=`). Matches
+// unknown opens (<strong>, <h2>, <b class="x">, <span style="…">) and any close
+// (</foo>). Deliberately does NOT match prose that merely contains angle
+// brackets — `3 < 5` (space after `<`), `<3` (digit), or `i<j and j>k`
+// (bareword "attributes" with no `=`) all stay literal.
+const GENERIC_TAG_RE = /^<\/?[a-zA-Z][a-zA-Z0-9]*\s*(?:\/?>|[^<>]*=[^<>]*>)/;
 
 const SIMPLE_TAGS: Record<string, string> = {
   b: "bold",
@@ -666,14 +884,16 @@ const SIMPLE_TAGS: Record<string, string> = {
   sup: "superscript",
   center: "center",
   right: "right",
+  code: "code",
+  quote: "quote",
 };
 
 function parseOpenTag(input: string, start: number): ParsedTag | null {
   // Match <tagname> or <color=#hex>
   const remaining = input.slice(start);
 
-  // Simple tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>
-  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right)>/);
+  // Simple paired tags: <b>, <i>, <u>, <sub>, <sup>, <center>, <right>, <code>, <quote>
+  const simpleMatch = remaining.match(/^<(b|i|u|sub|sup|center|right|code|quote)>/);
   if (simpleMatch) {
     const tagName = simpleMatch[1];
     return {
@@ -681,6 +901,12 @@ function parseOpenTag(input: string, start: number): ParsedTag | null {
       type: SIMPLE_TAGS[tagName],
       end: start + simpleMatch[0].length,
     };
+  }
+
+  // Void tag: <br> / <br/> / <br /> → a hard line-break leaf.
+  const brMatch = remaining.match(/^<br\s*\/?>/);
+  if (brMatch) {
+    return { tagName: "br", type: "linebreak", void: true, end: start + brMatch[0].length };
   }
 
   // Color tag: <color=#hex>
@@ -725,6 +951,16 @@ function findClosingTag(input: string, startAfter: number, tagName: string): num
     while (searchPos < nextClose) {
       const nextOpen = input.indexOf(openTag, searchPos);
       if (nextOpen === -1 || nextOpen >= nextClose) break;
+      // The match is a real nested open of THIS tag only if the char after the
+      // name is a tag terminator. Without this, counting `<b>` would treat the
+      // unrelated `<br>` as a nested open (the "<b" prefix matches) and never
+      // balance — leaking the `<b>` as literal text.
+      const after = input[nextOpen + openTag.length];
+      const isRealOpen = after === ">" || after === " " || after === "/" || after === "=";
+      if (!isRealOpen) {
+        searchPos = nextOpen + openTag.length;
+        continue;
+      }
       // Verify it's a complete open tag (ends with >)
       const afterOpen = input.indexOf(">", nextOpen);
       if (afterOpen !== -1 && afterOpen < nextClose) {
@@ -756,6 +992,8 @@ function buildNode(
       return { type: "italic", content: children };
     case "underline":
       return { type: "underline", content: children };
+    case "code":
+      return { type: "code", content: children };
     case "subscript":
       return { type: "subscript", content: children };
     case "superscript":
@@ -764,6 +1002,8 @@ function buildNode(
       return { type: "center", content: children };
     case "right":
       return { type: "right", content: children };
+    case "quote":
+      return { type: "quote", content: children };
     case "color":
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- color is set when tag === "color"
       return { type: "color", color: color!, content: children };

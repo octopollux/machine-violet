@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Congregation"
+rating: "?"
+description: "Congregation campaign look: PainterlyGame by default, PaperbackCover for the opening scene / episode-introduction title card"
+tags: [game-render, painterly, vintage, muted, epic]
+made-for-model: gpt-image-2
+tokens: 456
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** painterly look below. The **opening scene of an episode** uses the paperback-cover look — a title-card establishing image.
+
+# Style
+
+Default (most scenes) — `Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+Opening scene / episode introduction — `Painted as a vintage 1970s science-fiction paperback cover in the tradition of hand-airbrushed gouache matte painting, with strict process discipline. Work from a tightly restrained palette of roughly four or five muted period hues only — admit no other colors. Build the whole image from a few large, simple value masses: group shadow into broad unmodulated dark shapes, and let most of the subject dissolve into soft atmospheric falloff and lost-and-found edges. Reserve fine brushwork and detail for ONE focal element and the lit silhouette edges only; every other surface stays broad, flat, soft, and economical, with no rendered panel or surface detail. Keep large passages of the background calm and near-empty — resist filling negative space. The only fine texture anywhere is the flat, uniform offset-printing rosette grain and paper tooth laid evenly over the finished painting, never rendered surface detail. Close with a cover-style caption integrated like real paperback typography: a bold engraved-serif title treatment naming the place or moment, with one short evocative tagline beneath it, set in elegant period type.`
+
+# Notes
+
+Campaign composite for the **congregation** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [PainterlyGame](./PainterlyGame.mvstyle) (hand-painted stylised game render on a 20mm wide lens — the campaign-wide workhorse). EPISODE INTRO = [PaperbackCover](./PaperbackCover.mvstyle) (1970s airbrushed-gouache cover; its bold serif title + tagline caption is a natural episode title-card). Both `# Style` lines are verbatim from the parents — keep them intact (PaperbackCover's economy clauses are load-bearing anti-tic, don't trim); the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![PainterlyGame](../ImageStyleExample/PainterlyGame.example.png)
+
+![PaperbackCover](../ImageStyleExample/PaperbackCover.example.png)

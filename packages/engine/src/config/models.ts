@@ -82,7 +82,7 @@ const DEFAULTS: ModelConfig = {
   small: "claude-haiku-4-5-20251001",
   effort: {
     "default": null,
-    "dm": "high",
+    "dm": "low",
     "ooc": "high",
     "setup": "high",
     "dev-mode": "high",

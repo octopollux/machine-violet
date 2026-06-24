@@ -19,7 +19,8 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
-import { logInputEvent, bytesToHex, getInputDebugLogPath } from "./tui/hooks/inputDebugLog.js";
+import { compositePainters, setIncrementalRendering } from "./tui/image/painterRegistry.js";
+import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
 import { getAgentClientState } from "./agent-state-ref.js";
 
 export interface StartClientOptions {
@@ -87,8 +88,10 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const unlockRawMode = installRawModeGuard(activeStdin);
 
   // Combine Ink's separate BSU/content/ESU writes into single atomic stdout
-  // writes so the terminal never displays intermediate states.
-  const removeCombiner = installSyncWriteCombiner(process.stdout);
+  // writes so the terminal never displays intermediate states. The pre-ESU
+  // injector re-blits inline-image graphics (sixel/iTerm2) inside the same
+  // atomic frame Ink just drew — see tui/image/painterRegistry.ts.
+  const removeCombiner = installSyncWriteCombiner(process.stdout, compositePainters);
 
   // Install the stdin filter chain — a single read() wrapper that runs
   // all registered filters (kitty, mouse) in order.
@@ -100,25 +103,22 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const hasKitty = !mockStdin && activeStdin.isTTY
     ? await detectKittySupport({ stdin: activeStdin, stdout: process.stdout })
     : false;
-  logInputEvent("start-client", {
-    hasKitty,
-    isTTY: !!activeStdin.isTTY,
-    mockStdin: !!mockStdin,
-    logPath: getInputDebugLogPath(),
-  });
   if (hasKitty) {
     enableKittyProtocol(process.stdout);
     filterChain.add(createKittyFilter((key) => {
       // Re-emit as legacy bytes so Ink's useInput picks them up.
       const legacy = kittyKeyToLegacy(key);
-      logInputEvent("kitty-legacy-push", {
-        key: key.key,
-        legacy: legacy === null ? null : bytesToHex(legacy),
-        legacyLen: legacy?.length ?? 0,
-      });
       if (legacy !== null) activeStdin.push(legacy);
     }));
   }
+
+  // Probe terminal graphics-protocol support (kitty/iTerm2/sixel) + cell-pixel
+  // size for the inline-image renderer. Sequenced AFTER the kitty-keyboard
+  // probe so the two don't race on stdin, and before render() so Ink isn't yet
+  // consuming stdin. Non-TTY / agent mode resolves to no graphics.
+  const graphicsCaps = !mockStdin && activeStdin.isTTY
+    ? await detectGraphicsCapabilities(activeStdin, process.stdout)
+    : { kitty: false, iterm2: false, sixel: false, cellPixels: null, sixelColorRegisters: null };
 
   // alternateScreen: TUI renders in the alt buffer so exit restores whatever
   // the terminal showed before launch instead of leaving the final frame
@@ -126,7 +126,16 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   // so alt-screen escape codes don't leak into redirected output, pipes, or
   // CI logs.
   const alternateScreen = !mockStdin && Boolean(process.stdout.isTTY) && Boolean(activeStdin.isTTY);
-  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen };
+  // Incremental rendering: Ink rewrites only the lines whose text changed
+  // instead of erasing + redrawing the whole frame. This is what lets the
+  // inline-image painter skip re-blitting on unrelated re-renders (the
+  // once-a-second activity counter, an accumulating tool glyph): those frames
+  // no longer clobber the image's unchanged slot rows, so its (up to MB-sized
+  // sixel/iTerm2) payload isn't re-pushed to the terminal every tick. The
+  // painter's skip is GATED on this being on — keep the two in lock-step.
+  const incrementalRendering = true;
+  setIncrementalRendering(incrementalRendering);
+  const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen, incrementalRendering };
   if (mockStdin) {
     renderOpts.stdin = mockStdin;
     // Force Ink interactive mode in headless agent mode. Without this, Ink's
@@ -155,7 +164,7 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   }
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
-    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain }),
+    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain, graphicsCaps }),
     renderOpts,
   );
 

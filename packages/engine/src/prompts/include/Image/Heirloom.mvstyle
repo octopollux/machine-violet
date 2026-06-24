@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Heirloom"
+rating: "?"
+description: "Heirloom campaign look: CinematicFilm prestige film-still by default, CandlelitNatural warm natural-candlelight glow for interior scenes inside the house"
+tags: [motion-picture, photoreal, warm, intimate, muted]
+made-for-model: gpt-image-2
+tokens: 354
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** cinematic film-still look below. Scenes set **inside the house** use the warm natural-candlelight interior look.
+
+# Style
+
+Default (most scenes) — `Rendered as a still frame from a prestige cinematic film, shot on 35mm anamorphic film — NOT a game render and NOT a digital illustration. Cinematic photography: a wide anamorphic frame with gentle horizontal lens flares, a shallow depth of field with creamy bokeh and oval out-of-focus highlights, and natural filmic sharpness on the subject. Real photochemical 35mm character — fine organic film grain, soft highlight roll-off, deep but detailed shadows, and a restrained cinematic colour grade (teal shadows, warm skin tones, muted saturation). Dramatic, motivated practical lighting with an atmospheric haze catching the light. The composed, intentional look of a single frame lifted from a beautifully shot film. Close with a small caption in an elegant film-title font set within a subtle letterbox bar.`
+
+Inside the house — `Rendered as a frame from a film shot ENTIRELY BY NATURAL CANDLELIGHT on specially-made ultra-fast large-aperture lenses — NOT artificially lit. The technique's signature: a soft, warm, low-light interior glow with light falling off naturally into gentle shadow; an extremely SHALLOW depth of field with a delicate focus plane and creamy soft backgrounds (the cost of the wide-open fast lens); a painterly old-master composition like a period oil portrait; warm candle-amber colour, fine grain, and a still, quiet, contemplative atmosphere. Natural, painterly, intimate, luminous. Close with a small caption in an elegant period font.`
+
+# Notes
+
+Campaign composite for the **heirloom** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [CinematicFilm](./CinematicFilm.mvstyle) (prestige 35mm anamorphic film still — the campaign-wide workhorse). INSIDE THE HOUSE = [CandlelitNatural](./CandlelitNatural.mvstyle) (natural-candlelight glow, ultra-shallow focus, painterly old-master interior tableau; its scene affinity is exactly warm low-lit interiors). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![CinematicFilm](../ImageStyleExample/CinematicFilm.example.png)
+
+![CandlelitNatural](../ImageStyleExample/CandlelitNatural.example.png)

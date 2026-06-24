@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "ThermalGrain"
+rating: "?"
+description: "Degraded analog thermal feed: ironbow heat-blobs over heavy interlacing, crawling sensor grain, low-res smear, thermal HUD"
+tags: [surveillance, lo-fi, high-saturation, dread, tense]
+made-for-model: gpt-image-2
+tokens: 303
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from real degraded thermal infrared footage — an old, low-resolution thermal sensor read out over interlaced analog video. The image is a false-colour HEAT MAP in the ironbow palette: warm bodies and machinery glow hot in white, yellow, orange and red, while everything cool falls away into deep purple and cold black. THE MEDIUM RESOLVES ONLY HEAT, NOT DETAIL: no fine texture or sharp edge anywhere, only soft smoothly-graded blobs of temperature with bleeding edges. THE FEED IS HEAVILY DEGRADED: coarse, restless thermal sensor grain and fixed-pattern noise crawl over the whole frame; heavy visible interlacing combs every edge into offset horizontal fields and tears on the warm subject; the resolution is low and a little blocky, with smeared ghosting on any motion and a faint analog video roll. Cold surfaces read as featureless dark; the hot subject is the only bright thing in the frame. Fixed camera, angled down from a high corner. Overlay the thermal HUD as a thin white monospace readout: a small central crosshair reticle with a spot-temperature figure beside it, a vertical temperature scale bar along one edge, and in a top corner a short camera-and-zone identifier above a 24-hour clock TIME in HH:MM:SS — show a time only, never a calendar date. Cold, clinical, and badly degraded.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Degraded analog sibling of [ThermalCam](./ThermalCam.mvstyle) (clean FLIR) — the same false-colour ironbow thermal + heat-not-detail lever, pushed through an OLD low-resolution thermal sensor on INTERLACED ANALOG VIDEO. Added levers (the user asked for interlacing + grain): heavy visible INTERLACING (horizontal field-lines structuring the whole frame and combing the hot figure's edges into horizontal steps — zoom-verified) + coarse crawling sensor GRAIN / fixed-pattern noise + low blocky resolution + smeared motion. These read as a real degraded "found feed" — grungier and creepier than the clean [ThermalCam](./ThermalCam.mvstyle), good for horror / found-footage menace. NB this contrasts with the [NightVisionCam](./NightVisionCam.mvstyle) low-bitrate finding (where naming chunky macroblocking FAILED): naming interlacing + grain DID render, because interlace field-lines and sensor grain are regular structural patterns the model can lay down, where chunky DCT macroblocks are not. Same thermal-HUD caption + time-only OSD (held: "00:19:42", no date). Validated landscape on the SAME stairwell scene as [ThermalCam](./ThermalCam.mvstyle) — a clean clean-vs-degraded pair, and a literal demo of two thermal lenses on one moment (the menu concept). Keep the interlacing + grain degradation, the heat-not-detail lever, and the thermal-HUD time-only caption.
+
+# Example
+
+![ThermalGrain](../ImageStyleExample/ThermalGrain.example.png)

@@ -38,22 +38,22 @@ describe("gaugeCells", () => {
   });
 
   it("degrades the leftmost cell first", () => {
-    // 96% remaining: 24 ticks → leftmost cell holds 4 (⬢), rest 5 (◆)
+    // 96% remaining: 24 ticks → leftmost cell holds 4 (■), rest 5 (◆)
     const cells = gaugeCells(96);
-    expect(cells.map((c) => c.glyph)).toEqual(["⬢", "◆", "◆", "◆", "◆"]);
+    expect(cells.map((c) => c.glyph)).toEqual(["■", "◆", "◆", "◆", "◆"]);
   });
 
   it("walks the leftmost cell through all states before touching the next", () => {
     expect(gaugeCells(100).map((c) => c.glyph)).toEqual(["◆", "◆", "◆", "◆", "◆"]);
-    expect(gaugeCells(96).map((c) => c.glyph)).toEqual(["⬢", "◆", "◆", "◆", "◆"]);
-    expect(gaugeCells(92).map((c) => c.glyph)).toEqual(["■", "◆", "◆", "◆", "◆"]);
+    expect(gaugeCells(96).map((c) => c.glyph)).toEqual(["■", "◆", "◆", "◆", "◆"]);
+    expect(gaugeCells(92).map((c) => c.glyph)).toEqual(["⬢", "◆", "◆", "◆", "◆"]);
     expect(gaugeCells(88).map((c) => c.glyph)).toEqual(["*", "◆", "◆", "◆", "◆"]);
     // 84% (21 ticks): cell 0 has 1 bucket left → still `*`
     expect(gaugeCells(84).map((c) => c.glyph)).toEqual(["*", "◆", "◆", "◆", "◆"]);
     // 80% (20 ticks): cell 0 fully empty, cell 1 still full
     expect(gaugeCells(80).map((c) => c.glyph)).toEqual([" ", "◆", "◆", "◆", "◆"]);
-    // 76% (19 ticks): cell 1 drops to ⬢
-    expect(gaugeCells(76).map((c) => c.glyph)).toEqual([" ", "⬢", "◆", "◆", "◆"]);
+    // 76% (19 ticks): cell 1 drops to ■
+    expect(gaugeCells(76).map((c) => c.glyph)).toEqual([" ", "■", "◆", "◆", "◆"]);
   });
 
   it("renders only the rightmost cell at very low remaining", () => {

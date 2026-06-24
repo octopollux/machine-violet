@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "PainterlyGame"
+rating: "S"
+description: "Hand-painted stylised game render: visible brushwork in textures, characterful proportions, warm palette, wide 20mm lens"
+tags: [game-render, painterly, warm, whimsical, wide-vista]
+made-for-model: gpt-image-2
+tokens: 193
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an in-game screenshot from a stylised, painterly video game with a hand-painted art direction — NOT photoreal and NOT a digital concept-painting. Shot on a WIDE 20MM LENS — a wide field of view with natural wide-angle perspective that gives the scene room to breathe, big simple foreground shapes, and the composition spread out rather than crammed. Visible painterly brushwork baked directly into the textures and surfaces, slightly exaggerated and characterful proportions and architecture, hand-crafted stylised materials rather than physically-based realism, bold readable shapes, a warm hand-mixed colour palette, and soft painterly lighting. The look of a game world built out of paintings — stylised, textured, artful, immediately recognisable as a painterly game rather than a photoreal one. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. A painterly STYLISED game render (hand-painted world, Dishonored-ish) — visible painterly brushwork in the textures, characterful proportions, warm hand-mixed palette. KEY LEVER (user): a WIDE 20MM LENS is baked in as the anti-tic control — the wide field of view + big simple foreground shapes SPREAD the composition out so the model can't cram (a FOCAL-LENGTH expression of the economy-of-result lever, cf. [ValueBlocked](./ValueBlocked.mvstyle) / [CleanDigital](./CleanDigital.mvstyle); reusable on any cram-prone style). The no-20mm first cut carried a mild tic and converged toward [DigitalPainting](./DigitalPainting.mvstyle) concept-art; the 20mm version breathes and reads more as a painterly GAME. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "it worked"). Keep the 20mm wide lens (the tic-control) + the painterly brushwork.
+
+# Example
+
+![PainterlyGame](../ImageStyleExample/PainterlyGame.example.png)

@@ -13,6 +13,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Look up a subagent's contract | [subagents-catalog.md](subagents-catalog.md) |
 | Understand state shape and persistence | [state-atlas.md](state-atlas.md) |
 | Construct or validate a campaign on disk | [format-spec.md](format-spec.md) |
+| Author or review a bundled campaign seed (`.mvworld`) | [seed-authoring.md](seed-authoring.md) |
 | Understand context window management | [context-management.md](context-management.md) |
 | Understand entity files and wikilinks | [entity-filesystem.md](entity-filesystem.md) |
 | Understand DM text formatting | [tui-design.md](tui-design.md) |
@@ -22,13 +23,18 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand combat and initiative | [multiplayer-and-initiative.md](multiplayer-and-initiative.md) |
 | Understand DM identity and prompting | [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) + [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) |
 | Understand game setup flow | [game-initialization.md](game-initialization.md) |
+| Understand inline image generation | [image-generation.md](image-generation.md) |
+| Add or edit an image-gen visual style | [visual-style-authoring.md](visual-style-authoring.md) |
 | Understand game systems and rule cards | [rules-systems.md](rules-systems.md) |
 | Understand PDF import and content processing | [document-ingestion.md](document-ingestion.md) |
 | Understand error recovery and git | [error-recovery.md](error-recovery.md) |
 | Look up REST API contracts (auto-generated) | `/docs` endpoint (Scalar UI) or `/docs/json` (OpenAPI spec) |
 | Look up WebSocket event contracts | [websocket-api.md](websocket-api.md) |
 | Understand the openai-chatgpt provider (Codex app-server) | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
-| Run an end-to-end smoke test against the full stack | [e2e-harness.md](e2e-harness.md) |
+| Understand the openai-apikey / openrouter provider (Responses API) | [openai-provider.md](openai-provider.md) |
+| Verify a change for regressions (deterministic golden replay) | [golden-tapes.md](golden-tapes.md) |
+| Understand the tape format / record a golden | [tape-format.md](tape-format.md), [golden-tapes.md](golden-tapes.md) |
+| Run the e2e tiers / live smoke against the full stack | [e2e-harness.md](e2e-harness.md) |
 | Cut a release / understand the branch + channel model | [releases.md](releases.md) |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 

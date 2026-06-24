@@ -7,29 +7,82 @@
     "post-apocalyptic",
     "horror"
   ],
-  "detail": "The world ended some years ago and what came up afterward was flowers. They grow where nothing should — on asphalt, on salt, on the sides of dead skyscrapers, in the eye sockets of unburied dead. They are not all the same species and they have not been catalogued and the air where they grow tastes sweet. The Bloom is in its third or fourth season and the survivors have learned to read it the way old farmers read weather.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. TERRAFORMING GIFT — Something that observed the planet, mistakenly or sentimentally, concluded that humans loved flowers. It seeded the Bloom as a kindness. It is far away. It is not paying close attention. The Bloom is exactly what it appears to be and what it appears to be is well-meant and inadequate.\n2. SLOW COLONIZATION — The Bloom is the first stage of an alien project that has not yet decided what to do with the original inhabitants. The flowers are testing the atmosphere, the soil, the response of the surviving biosphere. The decision about humans will be made by something that has not yet arrived.\n3. THE DREAMER BELOW — The Bloom is the visible surface of an entity that lives underground and is asleep. The pollen carries the dream. People who breathe enough of it begin to share specific images, then to share decisions, then to share a single will. The dreamer is gentle. The dreamer is not human.\n\nDM approach:\n- Tone: beautiful and wrong. Sweetness as menace. Color as warning.\n- NPCs to seed: a botanist with theories; a convert who has stopped being entirely individual; a child who hears the Bloom hum.\n- Pacing structure: the Bloom has seasons. The player learns to read them or doesn't. Each season has its own dangers — pollen storms, mass dormancy, the brief week the flowers all turn the same direction.\n- Seed early: a flower that wasn't there yesterday; a smell that gives the player a memory that isn't theirs; one person in the player's circle who has been spending too much time at the edge of the Bloom.\n- Make the colors specific. The species the player learns by name should be a small handful, each with a behavior.\n\nPacing: The Bloom has seasons. The player can track them by which flowers are open, which are seeding, which are turning their heads. The clock is botanical and it is generous and it is firm.\n\n<!--include:Pacing.EndlessCampaigns-->",
-  "suboptions": [
+  "image_style": "TheBloom",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",
+  "detail": "The world ended some years ago and what came up afterward was flowers. They grow where nothing should — on asphalt, on salt, on the sides of dead skyscrapers, in the eye sockets of unburied dead. They are not all the same species and they have not been catalogued and the air where they grow tastes sweet. The Bloom is in its third or fourth season and the survivors have learned to read it the way old farmers read weather.\n\nDM approach:\n- Tone: beautiful and wrong. Sweetness as menace. Color as warning.\n- NPCs to seed: a botanist with theories; a convert who has stopped being entirely individual; a child who hears the Bloom hum.\n- Pacing structure: the Bloom has seasons. The player learns to read them or doesn't. Each season has its own dangers — pollen storms, mass dormancy, the brief week the flowers all turn the same direction.\n- Seed early: a flower that wasn't there yesterday; a smell that gives the player a memory that isn't theirs; one person in the player's circle who has been spending too much time at the edge of the Bloom.\n- Make the colors specific. The species the player learns by name should be a small handful, each with a behavior.\n\nThe thread of hope (give the player something to want and a wrong they can prevent, not just a beautiful world to read): somewhere there is a patch the Bloom has never touched — ordinary grass, ordinary weeds, a normal tree, a yard that looks like the world before. It is normal, and no one understands why. The patch is the question worth questing toward — can the Bloom be refused, reversed, survived on purpose? — and the thing worth fighting over, because others want to control it, exploit it, worship it, or salt it. What the patch actually is depends on the crucial question. Seed rumors of it early; make reaching, understanding, or keeping it a real arc.\n\nPacing: The Bloom has seasons. The player can track them by which flowers are open, which are seeding, which are turning their heads. The clock is botanical and it is generous and it is firm.",
+  "forks": [
     {
-      "label": "Your relationship to the Bloom",
-      "choices": [
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is what the Bloom slowly turns out to be.",
+      "options": [
         {
-          "name": "The Bereaved",
-          "description": "Survivor who lost someone to it. Your sister or your husband or your child walked into the Bloom one morning and did not come back the way they left. They came back, eventually, smiling, but they were not the person you knew, and you have spent the time since trying to decide whether what came back was a worse version or a better one. The Bloom took them. You can't be sure they didn't want to go."
+          "id": "terraforming-gift",
+          "name": "Terraforming Gift",
+          "description": "A distant, inattentive intelligence seeded the Bloom as a well-meant, inadequate kindness; it is exactly what it appears to be.",
+          "detail": "TERRAFORMING GIFT — Something that observed the planet, mistakenly or sentimentally, concluded that humans loved flowers. It seeded the Bloom as a kindness. It is far away. It is not paying close attention. The Bloom is exactly what it appears to be and what it appears to be is well-meant and inadequate. The normal patch is where the seeding never took — a control plot, or the work of someone who found how to refuse the gift."
         },
         {
-          "name": "The Botanist",
-          "description": "You had a training that the collapse made irrelevant and the Bloom made urgent. You have a notebook and a hand lens and a private theory you have not yet shared because sharing it would commit you. You are the only person you know who treats the flowers as data, and the people around you have started to wonder if your detachment is faked."
+          "id": "slow-colonization",
+          "name": "Slow Colonization",
+          "description": "First stage of an alien project still deciding what to do with humanity; the flowers are testing the biosphere.",
+          "detail": "SLOW COLONIZATION — The Bloom is the first stage of an alien project that has not yet decided what to do with the original inhabitants. The flowers are testing the atmosphere, the soil, the response of the surviving biosphere. The decision about humans will be made by something that has not yet arrived. The normal patch is where the testing failed — strategically vital, and the unseen decider will notice anyone who gathers there."
         },
         {
-          "name": "The Convert",
-          "description": "You believe the Bloom is a message from a kind power and you are largely correct. You have organized neighbors into small observances. You leave offerings at the edges. You have started to dream the same dreams as other observants in your sect, and you have decided to trust this rather than be afraid of it."
-        },
-        {
-          "name": "Bloom-Born",
-          "description": "You were born into the Bloom. You do not remember a world without it. The adults talk about Before and you nod and you don't really understand. The flowers hum at a pitch the adults cannot detect and you have always heard it. You assumed everyone did. You are starting to understand that you are something the adults around you do not know how to read."
+          "id": "the-dreamer-below",
+          "name": "The Dreamer Below",
+          "description": "The Bloom is the surface of a sleeping underground entity; its pollen carries a dream that merges those who breathe it.",
+          "detail": "THE DREAMER BELOW — The Bloom is the visible surface of an entity that lives underground and is asleep. The pollen carries the dream. People who breathe enough of it begin to share specific images, then to share decisions, then to share a single will. The dreamer is gentle. The dreamer is not human. The normal patch is a place the dream cannot reach — a dead zone, or someone awake who keeps it clear."
         }
       ]
     },
+    {
+      "id": "your-stake-in-the-bloom",
+      "label": "Your stake in the Bloom",
+      "chooser": "player",
+      "prompt": "Present to the player as their reason for being in the story — the active thing they are chasing or fighting, not just who they are. Use each option's name and description; each option's detail is the DM-facing quest and conflict it sets in motion.",
+      "options": [
+        {
+          "id": "the-bereaved",
+          "name": "The Bereaved",
+          "description": "Someone you lost walked into the Bloom one morning and came back — eventually, smiling — as not quite the person who left. Now you've learned they are about to do something final, and you have until the season turns to reach them. You are going to get them back, or learn what 'back' even means now.",
+          "detail": "THE BEREAVED — The player's lost person (sister, husband, child) is changed, reachable, and on a clock toward a permanent change the player can try to prevent: leading others in, completing their conversion, going wherever the taken go. The campaign's heart is whether they can or should be saved — and whether they wanted to go. Keep the loved one concrete and present, not a rumor."
+        },
+        {
+          "id": "the-botanist",
+          "name": "The Botanist",
+          "description": "You had a training the collapse made useless and the Bloom made urgent — and you've found the patch, the place the flowers won't grow. You have a theory it can be spread, a notebook, a hand lens, and a narrowing window before the season turns or someone else gets there first. You mean to prove the world is fixable, and you are afraid of what proving it will cost.",
+          "detail": "THE BOTANIST — The player starts already on the fixable-trail: they have found, or are closing on, the normal patch and believe it can be understood and spread. The quest is to crack why it stays clear and whether that can be reproduced or weaponized; the conflict comes from those who would rather it stay buried, controlled, or destroyed. Tie the answer to the crucial question."
+        },
+        {
+          "id": "the-convert",
+          "name": "The Convert",
+          "description": "You came to believe the Bloom is a kind power, and you organized neighbors into small observances — until you started to doubt, or someone you brought in went almost all the way under. You have a little time before the next shared dream takes the last of them. Pull them back without losing your own footing.",
+          "detail": "THE CONVERT — An active rescue-from-conversion with a merge-clock: the player is inside a sect becoming one will, and someone (a recruit, a friend, or the player themselves) is near the point of no return. The pull is real and partly welcome — that is the tension. Strongest under The Dreamer Below; under the other variants the 'merge' takes a variant-appropriate form."
+        },
+        {
+          "id": "the-bloom-born",
+          "name": "The Bloom-Born",
+          "description": "You were born into the Bloom and you hear the hum the adults can't — and lately it has gone specific: a direction, a warning, a need. Something is coming that only you can sense in time to stop it, and acting on the hum (or refusing it) carries a cost you are only starting to understand.",
+          "detail": "THE BLOOM-BORN — The player has privileged early warning (the hum) of a preventable event the adults cannot perceive. The quest is to decipher and act before it is too late, while staying themselves — every time they trust the hum, they belong to the Bloom a little more. The hum's source ties to the crucial question."
+        },
+        {
+          "id": "the-warlord",
+          "name": "The Warlord",
+          "description": "You fight for the Bloom. The old order died with the old world; the new one — lush, lethal, gorgeous — is up for grabs. Convoys run the overgrown highways, petty kings hold the ground worth holding, and the flowers that heal and the flowers that kill are the only currency that matters. You mean to rule a piece of it, or pull down whoever already does.",
+          "detail": "THE WARLORD — A faction war over a lush apocalypse, the inverse of a desert wasteland: the fight is over abundance and the scarce normal ground, not water. The player builds, leads, or breaks a faction; the prizes are the untouched patches, the convoy routes, the trade in medicinal and lethal species, and people. Give them a rival running a campaign on a clock, a holding to win or lose, and followers whose lives are the stakes. Ties to the crucial question: whoever masters the Bloom risks courting the thing behind it. The kinetic, action-forward hook."
+        },
+        {
+          "id": "the-returner",
+          "name": "The Returner",
+          "description": "You're chasing a way back. Somewhere there is a door — a device, a thin place, a rumor that keeps coming true — that returns you to the day before the Bloom, so you can stop it. Each time you step through, you wake in a different city on the last ordinary morning, you try to stop what's coming, you fail, and you come back knowing more than you did. Try. Fail. Learn. Again.",
+          "detail": "THE RETURNER — A try/fail/try-again loop. The gateway's nature ties to the crucial question (a thin place in the gift's seeding, a flaw in the colonizers' arrival, a door in the dreamer's dream). Each loop drops the player into a different real-world city on the eve of the Bloom; they cannot stop it in one run, but each failure returns them with more — its true nature, its first signs, who to reach, what does not work. The campaign converges on whether prevention is possible at all, and at what price (the present they keep returning to is the player's chosen biome). Ground each loop in a real city on its last normal day — research it, make it specific; the poignancy is that each city the player fails to save is a real place that fell. Run it as accumulating-knowledge cycles, not a single arc."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
     {
       "label": "Where the Bloom is densest",
       "choices": [
@@ -51,5 +104,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 435,
+    "setup_detail": 9,
+    "forks": 886,
+    "total": 2372
+  }
 }

@@ -38,17 +38,59 @@ export type ContentPart =
    */
   | { type: "redacted_thinking"; data: string }
   /**
-   * Encrypted reasoning blob produced by an OpenAI reasoning model (Responses
-   * API, with `include: ["reasoning.encrypted_content"]`, OR by `codex
-   * app-server` via the `rawResponseItem/completed` notification). Persisted
-   * with the assistant turn and replayed on subsequent turns so the model
-   * keeps its chain-of-thought across calls without us setting `store: true`.
-   * The `encryptedContent` payload is opaque; `summary` mirrors the
-   * human-readable reasoning summary we already surface via `thinkingText`
-   * (kept here only so a turn round-trips identically through persistence).
-   * Anthropic ignores this variant when serializing back to its API.
+   * Encrypted reasoning blob produced by an OpenAI reasoning model on the
+   * Responses API (with `include: ["reasoning.encrypted_content"]`) — i.e. the
+   * `openai-apikey` / `openrouter` providers. Persisted with the assistant turn
+   * and replayed on subsequent turns so the model keeps its chain-of-thought
+   * across calls without us setting `store: true`. The `encryptedContent`
+   * payload is opaque; `summary` mirrors the human-readable reasoning summary we
+   * already surface via `thinkingText` (kept here only so a turn round-trips
+   * identically through persistence). Anthropic ignores this variant when
+   * serializing back to its API; the `openai-chatgpt` (codex) provider neither
+   * produces nor replays it — codex surfaces no usable blob on the
+   * ChatGPT-account path, so its #533 replay was removed as a no-op (#607).
    */
-  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] };
+  | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] }
+  /**
+   * Image produced during a turn by dispatching the `generate_image`
+   * function tool to {@link LLMProvider.generateImage}. Persisted with
+   * the assistant turn for audit + transcripts; the actual model history
+   * (round-trip serialization) sees the tool call + tool_result pair
+   * and never replays the bytes, so the model-side prompt cache stays
+   * lean. Captions are composed inside the image itself (printed as
+   * part of the pixels — see the spec) so this variant carries no
+   * separate caption string.
+   *
+   * `revisedPrompt` is whatever string the backend exposes as the
+   * prompt it actually used (e.g. OpenAI's `revised_prompt`). Stored
+   * for audit/debug; never rendered.
+   *
+   * `intent` distinguishes the trigger sites so disk-naming and
+   * downstream behavior (portrait persistence vs scene snapshots) can
+   * branch without re-deriving it from context.
+   */
+  | {
+      type: "image_generated";
+      id: string;
+      base64: string;
+      mimeType: string;
+      revisedPrompt?: string;
+      intent: "scene_snapshot" | "player_request" | "character_portrait";
+    }
+  /**
+   * Image attached to a user/assistant message as input to the model.
+   * Used to embed character portraits in the DM's cached prefix so the
+   * model sees its party visually as well as textually. `lowDetail`
+   * requests the cheapest available detail tier (OpenAI: `detail: "low"`,
+   * flat 85 input tokens; other providers use their smallest tier).
+   */
+  | {
+      type: "image_input";
+      base64: string;
+      mimeType: "image/png" | "image/jpeg" | "image/webp";
+      lowDetail?: boolean;
+      label?: string;
+    };
 
 /** A conversation message in normalized form. */
 export interface NormalizedMessage {
@@ -67,6 +109,92 @@ export interface NormalizedMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Image generation (provider-agnostic)
+// ---------------------------------------------------------------------------
+
+/**
+ * Abstract render effort knob. Higher = slower + more expensive but
+ * visibly nicer. Provider implementations map to their backend's nearest
+ * equivalent — see openai-apikey for the canonical mapping.
+ *
+ * The four levels are deliberately named for *use case*, not backend
+ * parameters, so we don't tie the schema to OpenAI's specific quality
+ * tiers as those evolve:
+ *   - `draft`    — fastest, low fidelity. Throwaway thumbnails.
+ *   - `standard` — medium quality. Character portraits (setup-agent
+ *                  chargen + in-game close-ups); quick/minor scene inserts.
+ *   - `quality`  — high quality at a still-reasonable render time. The
+ *                  default for DM scene snapshots and player-requested
+ *                  illustrations.
+ *   - `showcase` — highest polish for a rare hero shot; slower, so reserved
+ *                  for set-piece moments.
+ *
+ * Per-backend reality of this knob:
+ *   - **openai-apikey** — REAL. Maps to `quality: low|medium|high|high` on the
+ *     `images.generate` REST call (see openai.ts EFFORT_TO_QUALITY).
+ *   - **openai-chatgpt (codex)** — a NO-OP. The built-in image_gen tool exposes
+ *     no quality/size param (upstream openai/codex#20839, open) and the backend
+ *     renders at a fixed ~1.57 MP / `auto` quality regardless of the prompt
+ *     (live-verified 2026-06-22). The value still rides the request and echoes
+ *     back via `effortUsed` for contract parity, but does not affect the render.
+ *
+ * The knob is kept in the cross-provider contract regardless: it's load-bearing
+ * on openai-apikey today and ready for any future image-capable backend (e.g.
+ * Anthropic). The model picks per-call from the `generate_image` tool's `effort`
+ * arg (each subagent's system prompt directs the model on when to pick what).
+ */
+export type ImageEffort = "draft" | "standard" | "quality" | "showcase";
+
+/**
+ * Abstract aspect ratio — the one render knob that steers output on EVERY
+ * backend, including codex. Provider implementations map to the nearest
+ * supported dimensions (OpenAI: portrait → 1024×1536, landscape → 1536×1024,
+ * square → 1024×1024). On the codex path the backend honors the orientation but
+ * renders a fixed pixel budget (~1.57 MP) either way, so `aspect` reshapes the
+ * layout, not the pixel count/cost. Future backends pick their own canonical
+ * sizes without breaking the schema.
+ */
+export type ImageAspect = "portrait" | "landscape" | "square";
+
+/** Args accepted by {@link LLMProvider.generateImage}. */
+export interface GenerateImageRequest {
+  prompt: string;
+  /** Default: `"standard"`. */
+  effort?: ImageEffort;
+  /** Default: `"square"`. */
+  aspect?: ImageAspect;
+  /**
+   * Tag stamped onto the produced ContentPart for downstream routing
+   * (disk naming via image-handler, persistence policy). Defaults to
+   * `"player_request"`.
+   */
+  intent?: "scene_snapshot" | "player_request" | "character_portrait";
+  /**
+   * Optional visual reference images (e.g. PC portraits) the renderer should
+   * condition on so a depicted character matches their established look. The
+   * DM opts in per call by naming characters — references are NEVER attached
+   * by default (a portrait reference biases the whole render toward that
+   * character, wrong for a scene they're not in). Providers that can't do
+   * image-to-image ignore this and render text-only. `label` (e.g. the
+   * character name) lets the provider tie each reference to the prompt.
+   */
+  referenceImages?: { base64: string; mimeType: "image/png" | "image/jpeg" | "image/webp"; label?: string }[];
+}
+
+/** Result returned by {@link LLMProvider.generateImage}. */
+export interface GenerateImageResult {
+  /** Base64-encoded image bytes. */
+  base64: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  /** What the backend says it actually drew (e.g. OpenAI's revised_prompt). */
+  revisedPrompt?: string;
+  /** Effort the provider actually used (after mapping / clamping). */
+  effortUsed: ImageEffort;
+  /** Aspect the provider actually used. */
+  aspectUsed: ImageAspect;
+}
+
+// ---------------------------------------------------------------------------
 // Tools
 // ---------------------------------------------------------------------------
 
@@ -76,6 +204,30 @@ export interface NormalizedTool {
   description: string;
   inputSchema: Record<string, unknown>;
 }
+
+/**
+ * Canonical name for the image-generation function tool. Agents register
+ * a NormalizedTool with this name when image-gen is enabled for the
+ * subagent; the model invokes it like any other function tool. When the
+ * tool fires, the host dispatches to {@link LLMProvider.generateImage}
+ * and returns a text tool_result confirming the image was displayed —
+ * the bytes flow out-of-band into TUI display + disk persistence.
+ *
+ * No provider-level interception: this is just a tool name like any
+ * other. The constant exists to prevent typo drift between the
+ * registration site and the dispatch handler.
+ */
+export const GENERATE_IMAGE_TOOL_NAME = "generate_image";
+
+/**
+ * Tool name for the DM's silent portrait-revision tool. Unlike
+ * {@link GENERATE_IMAGE_TOOL_NAME} it does NOT display to the player: it
+ * re-renders a PC's saved portrait (conditioned on the current one) to reflect
+ * a durable appearance change, archives the prior version, and returns the new
+ * portrait back into the DM's context on a later turn. Registered only when
+ * image generation is enabled.
+ */
+export const UPDATE_PORTRAIT_TOOL_NAME = "update_portrait";
 
 /** A tool call extracted from a model response. */
 export interface NormalizedToolCall {
@@ -267,9 +419,33 @@ export interface HealthCheckResult {
 // Provider interface
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-model capability surface. Synchronous, side-effect-free — providers
+ * answer from a static table (the model registry or a hardcoded predicate),
+ * never by calling the network. Used to gate prompt fragments and tool
+ * registrations before a chat() call is constructed.
+ */
+export interface ProviderCapabilities {
+  /**
+   * The model + provider can emit images inline as part of a chat turn
+   * via {@link GENERATE_IMAGE_TOOL_NAME}. When false, the engine omits
+   * the image-gen tool from the tool list and skips loading the
+   * image-related prompt fragments.
+   */
+  imageGeneration: boolean;
+}
+
 export interface LLMProvider {
   /** Provider identifier. */
   readonly providerId: string;
+
+  /**
+   * Capability lookup for a specific model id under this provider. Must be
+   * synchronous and pure — no network calls. Used by the agent loop / DM
+   * prompt assembly to decide whether to expose image-gen tooling and
+   * prompts for the upcoming turn.
+   */
+  getCapabilities(model: string): ProviderCapabilities;
 
   /** Send a message and get the full response. */
   chat(params: ChatParams): Promise<ChatResult>;
@@ -282,6 +458,23 @@ export interface LLMProvider {
 
   /** Minimal API call to validate credentials. */
   healthCheck(model?: string): Promise<HealthCheckResult>;
+
+  /**
+   * Generate an image from a textual prompt + abstract knobs (effort,
+   * aspect). Optional — providers that don't support image generation
+   * simply omit this method (and report `imageGeneration: false` from
+   * getCapabilities for every model).
+   *
+   * Engine-side dispatch invokes this when the model calls the
+   * `generate_image` function tool. The caller persists the bytes (see
+   * `agents/image-handler.ts`), emits the TUI `display_image` command,
+   * and returns a tool_result for the model's continuation.
+   *
+   * Throws on transport/backend errors. Callers translate the throw
+   * into a tool_result with isError:true so the model can decide
+   * whether to retry, apologize, or move on.
+   */
+  generateImage?(req: GenerateImageRequest): Promise<GenerateImageResult>;
 
   /**
    * Return the provider's current remaining-usage snapshot, or null if the

@@ -3,7 +3,7 @@
  *
  * We deliberately don't import @machine-violet/client-ink's full ClientState:
  * the harness should be deployable as a thin tool with minimal dependencies.
- * Only the fields used by scenarios appear here. If a scenario needs more,
+ * Only the fields used by probes appear here. If a probe needs more,
  * widen this type.
  */
 
@@ -36,7 +36,7 @@ export interface NarrativeLine {
 }
 
 /**
- * Subset of the engine's ClientState that scenarios poll.
+ * Subset of the engine's ClientState that probes poll.
  *
  * `engineState` transitions are the primary signal for "phase progression":
  *   null → "starting_session" → "dm_thinking" → "waiting_input" → ...

@@ -7,7 +7,36 @@
     "fantasy",
     "sci-fi"
   ],
-  "detail": "The map is wrong. The player knows the country it describes — has walked it, surveyed it, flown over it, scrolled it — and the map shows a city in the middle of land that does not have a city. The dot is labeled. The dot has been on the map for a long time. The player is the first person in living memory who has decided to go there.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. SUMMONED BY THE DRAWING — The cartographer drew a city that wasn't there and the act of drawing it made it be there. The city has been alive for as long as the map has been folded in a drawer. The residents have biographies, grandparents, civic disputes. They do not know they were drawn into being. If the player tells them, something will give.\n2. HIDDEN BY OMISSION — The city is real and old and someone went to enormous trouble to leave it off every other map ever made. The cartographer's mistake was honesty. Someone wants the city found. The player now has the only copy of the map, and the people who have spent generations keeping the city secret are paying attention.\n3. ONLY ON THE MAP — The city does not exist except on paper. Walking to where the map shows it is walking into the map. The player arrives and is, increasingly, a drawing of themselves — outlined, shadowed, then colored in. Coming back requires a different cartographer.\n\nDM approach:\n- Tone: travelogue with a slow leak. The journey is more than half the story. The arrival is the inflection point.\n- NPCs to seed: a previous owner of the map (alive or dead, leaving notes); a fellow traveler who is going for different reasons; an official in the player's home city who notices the map is missing.\n- Pacing structure: the journey is half the campaign. Each leg of the trip gives the player one new piece of evidence about which truth applies — but the evidence is interpretable. Arrival commits.\n- Seed early: a feature on the map that doesn't match the terrain; a name on the map in a script that doesn't fit the period; a margin note in handwriting the player will recognize later.\n- The city, when reached, should be specific. Streets named. A square. A market day. One person who looks up when the player enters and does not look away.\n\nPacing: The journey is half the campaign; arrival is the inflection point. Track the journey in legs — each leg moves the truth-question one notch toward one variant or another.",
+  "image_style": "Storybook",
+  "detail": "The map is wrong. The player knows the country it describes — has walked it, surveyed it, flown over it, scrolled it — and the map shows a city in the middle of land that does not have a city. The dot is labeled. The dot has been on the map for a long time. The player is the first person in living memory who has decided to go there.\n\nDM approach:\n- Tone: travelogue with a slow leak. The journey is more than half the story. The arrival is the inflection point.\n- NPCs to seed: a previous owner of the map (alive or dead, leaving notes); a fellow traveler who is going for different reasons; an official in the player's home city who notices the map is missing.\n- Pacing structure: the journey is half the campaign. Each leg of the trip gives the player one new piece of evidence about which truth applies — but the evidence is interpretable. Arrival commits.\n- Play the journey; don't skip to the city. The preparation (provisions, gear, the route, who to ask), the gathering of a party or companions, and the road itself are a real part of the story — unless the player chooses to shortcut it. Come to each leg with points of interest and events ready (a waypoint town, a strange shrine, weather, a fellow traveler, an obstacle) so that prep and travel always have a world to meet.\n- Seed early: a feature on the map that doesn't match the terrain; a name on the map in a script that doesn't fit the period; a margin note in handwriting the player will recognize later.\n- The city, when reached, should be specific. Streets named. A square. A market day. One person who looks up when the player enters and does not look away.\n\nPacing: The journey is half the campaign; arrival is the inflection point. Track the journey in legs — each leg moves the truth-question one notch toward one variant or another.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — each leg of the journey moves the truth-question one notch toward one variant.",
+      "options": [
+        {
+          "id": "summoned-by-the-drawing",
+          "name": "Summoned by the Drawing",
+          "description": "The act of drawing the city made it real; its residents don't know they were drawn into being.",
+          "detail": "SUMMONED BY THE DRAWING — The cartographer drew a city that wasn't there and the act of drawing it made it be there. The city has been alive for as long as the map has been folded in a drawer. The residents have biographies, grandparents, civic disputes. They do not know they were drawn into being. If the player tells them, something will give."
+        },
+        {
+          "id": "hidden-by-omission",
+          "name": "Hidden by Omission",
+          "description": "The city is real and old; someone has kept it off every map for generations, and now they're watching.",
+          "detail": "HIDDEN BY OMISSION — The city is real and old and someone went to enormous trouble to leave it off every other map ever made. The cartographer's mistake was honesty. Someone wants the city found. The player now has the only copy of the map, and the people who have spent generations keeping the city secret are paying attention."
+        },
+        {
+          "id": "only-on-the-map",
+          "name": "Only on the Map",
+          "description": "The city exists only on paper; walking there means becoming a drawing of yourself.",
+          "detail": "ONLY ON THE MAP — The city does not exist except on paper. Walking to where the map shows it is walking into the map. The player arrives and is, increasingly, a drawing of themselves — outlined, shadowed, then colored in. Coming back requires a different cartographer."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "The map",
@@ -51,5 +80,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 401,
+    "setup_detail": 0,
+    "forks": 201,
+    "total": 1460
+  }
 }

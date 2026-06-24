@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Adventure2000s"
+rating: "D"
+description: "Clean flat 2000s point-and-click adventure art: vector-like cel-shaded shapes, hard flat tones, bright limited palette"
+tags: [game-render, stylized, graphic, color, whimsical]
+made-for-model: gpt-image-2
+tokens: 220
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as clean, flat, simple digital art — the friendly look of a flat cel-shaded character illustration, crisp and graphic like polished vector art. Strict process discipline: build EVERYTHING — the character and the background alike — from clean, simple, confident shapes filled with FLAT colour; do all shading as just a few hard-edged flat tone shapes (cel shading), with no soft gradients, no rendered texture and no painterly detail anywhere. Simplify the whole environment into clean flat shapes and a few flat colour areas — a simple, graphic, stylised setting, not a detailed painted landscape. Crisp clean shape edges and confident outlines; a bright, harmonious, limited flat palette; soft even lighting. Keep a clear focal hierarchy with the character largest and most appealing — a warm, expressive, lightly stylised face — and the flattened background kept simple and calm behind. Cheerful, clean, approachable, uncluttered. Close with a caption as a short line of clean, friendly digital lettering along the bottom.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. The 2000s point-and-click adventure-game register: clean, flat, cel-shaded / vector illustration. Sibling of [Adventure90s](./Adventure90s.mvstyle) (the lush hand-painted 90s point-and-click look) — same point-and-click-adventure family, two console generations apart. This is the scaled-up form of the setup agent's "simple digital art" portrait style (see setup-conversation.ts), which only reads clean/cute because it's a lone figure on a plain black ground — at full scene scale you must FORCE the flatness or it blooms into a painting. WORDING QUIRK (the [InkNoir](./InkNoir.mvstyle) family): the prompt asks to flatten EVERYTHING to hard flat cel shapes; the model reliably flattens the sky and far background into clean graphic colour but keeps the character and near-field semi-rendered — that clean-but-not-totally-flat cel look IS the register, and it's the validated prompt, so don't "fix" it. The flat-cel ask is exactly what stops the detailed-painting bloom (contrast [Adventure90s](./Adventure90s.mvstyle), which leans INTO that bloom). Keep the flat-cel / simplify-the-environment language and the bottom caption.
+
+# Example
+
+![Adventure2000s](../ImageStyleExample/Adventure2000s.example.png)

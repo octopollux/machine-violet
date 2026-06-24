@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "FirstPerson"
+rating: "?"
+description: "First-person immersive-sim/survival-horror render: own gloved hands and gear in frame, diegetic-only HUD, filmic grade"
+tags: [game-render, photoreal, tense, first-person, scene-coupled]
+made-for-model: gpt-image-2
+tokens: 225
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, compose the SUBJECT as a FIRST-PERSON view — describe the scene as seen directly through the character's own eyes, with their gloved hands / forearms and whatever they are holding (a lamp, a tool, a weapon) in the lower foreground, and any interface as a small diegetic readout. Then render in this visual style:
+
+# Style
+
+`Rendered as an authentic first-person in-game screenshot from a modern immersive-sim / survival-horror video game — a real-time first-person render seen directly through the player-character's eyes, NOT a third-person or cinematic shot. The character's own gloved hands and forearms are visible in the lower foreground holding their equipment, exactly as in a first-person game. A restrained DIEGETIC interface only — a faint glowing holographic readout on a wrist or handheld device, no floating arcade HUD. Physically-based materials, atmospheric volumetric lighting, subtle film grain and a filmic colour grade. Grounded, immersive first-person realism. Close with a small caption in a tasteful diegetic font.`
+
+# Notes
+
+Append at the END — style last. A SCENE-COUPLED, FIRST-PERSON in-game framing (immersive-sim / survival-horror, Alien-Isolation feel) — like the splash-art variants, the steering lives in the DM-FACING intro above (the `%%` note is stripped before the DM sees it, and the style line is read by the image model, not the DM). The subject MUST be composed first-person (own gloved hands + held equipment in the lower foreground, diegetic-only HUD) or a normal third-person brief renders a normal third-person shot. The distinct value is the FRAMING (you ARE the character), which escapes the photoreal-convergence the era renders suffer. Style line scrubbed scene-neutral (technique only, cf. [DX9Interior](./DX9Interior.mvstyle)); proofed on the Xera corridor. Caption = small diegetic font. Validated; a keeper (user). Keep the first-person intro + hands-in-frame + diegetic HUD.
+
+# Example
+
+![FirstPerson](../ImageStyleExample/FirstPerson.example.png)

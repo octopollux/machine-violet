@@ -118,7 +118,7 @@ export class ScenePacingInjection implements Injection {
  * connect. If we ever fall back to this, LengthSteeringInjection logs a
  * warning the first time per session.
  */
-export const FALLBACK_TERMINAL_DIMS: TerminalDims = {
+const FALLBACK_TERMINAL_DIMS: TerminalDims = {
   columns: 80,
   rows: 24,
   narrativeRows: 20,

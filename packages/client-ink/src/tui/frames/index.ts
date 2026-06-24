@@ -4,7 +4,6 @@ export {
   renderHorizontalFrameParts,
   renderVerticalFrame,
   renderContentLine,
-  renderStyledContentLine,
   renderTopFrame,
   stringWidth,
   truncateToWidth,

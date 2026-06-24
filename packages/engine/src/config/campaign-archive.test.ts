@@ -1,5 +1,6 @@
 import {
   archiveCampaign,
+  snapshotCampaign,
   unarchiveCampaign,
   listArchivedCampaigns,
   deleteCampaign,
@@ -160,6 +161,134 @@ describe("archiveCampaign", () => {
     expect(result.ok).toBe(true);
     expect(result.zipPath).toContain("Test Campaign (");
     expect(result.zipPath).toContain(").zip");
+  });
+});
+
+describe("archiveCampaign read-back verification", () => {
+  // Force the post-write read-back (the only `.zip` read inside the build) to
+  // misbehave, leaving the rest of the in-memory fs intact.
+  function tamperZipReadBack(
+    io: ReturnType<typeof createMockIO>,
+    handler: (zipReadCount: number) => Uint8Array | "throw" | "passthrough",
+  ): () => number {
+    const realReadBinary = io.readBinary.bind(io);
+    let zipReads = 0;
+    io.readBinary = async (path: string) => {
+      if (norm(path).endsWith(".zip")) {
+        zipReads++;
+        const r = handler(zipReads);
+        if (r === "throw") throw new Error("EBUSY: resource busy or locked");
+        if (r !== "passthrough") return r;
+      }
+      return realReadBinary(path);
+    };
+    return () => zipReads;
+  }
+
+  it("retries once and succeeds when the first read-back is a transient miss", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+    // First read-back returns garbage (transient AV/sync hold); the retry reads
+    // the real bytes.
+    const reads = tamperZipReadBack(io, (n) => (n === 1 ? new Uint8Array([0, 1, 2]) : "passthrough"));
+
+    const result = await archiveCampaign(campaignPath, campaignsDir, io);
+    expect(result.ok).toBe(true);
+    expect(reads()).toBe(2); // proves the retry ran
+    // Source is deleted only on success — the round-trip completed.
+    expect(await io.exists(norm(campaignPath + "/config.json"))).toBe(false);
+  });
+
+  it("fails with both byte lengths after a persistent mismatch", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+    tamperZipReadBack(io, () => new Uint8Array([0, 1, 2])); // always wrong (3 bytes)
+
+    const result = await archiveCampaign(campaignPath, campaignsDir, io);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/expected \d+ bytes, read 3/);
+    // Fail-safe: the source survives a failed archive.
+    expect(await io.exists(norm(campaignPath + "/config.json"))).toBe(true);
+  });
+
+  it("fails clearly when the read-back keeps throwing", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+    tamperZipReadBack(io, () => "throw");
+
+    const result = await archiveCampaign(campaignPath, campaignsDir, io);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("could not read back zip");
+    expect(result.error).toContain("EBUSY");
+    expect(await io.exists(norm(campaignPath + "/config.json"))).toBe(true);
+  });
+});
+
+describe("snapshotCampaign", () => {
+  it("backs up the campaign without deleting the source", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const result = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    expect(result.ok).toBe(true);
+    // Source folder is left intact (unlike archiveCampaign).
+    expect(await io.exists(norm(campaignPath + "/config.json"))).toBe(true);
+    // Zip is always timestamped + labeled, so it's self-describing and unique.
+    expect(result.zipPath).toContain("Test Campaign (pre-rollback ");
+    expect(result.zipPath).toContain(").zip");
+    expect(await io.exists(result.zipPath!)).toBe(true);
+  });
+
+  it("produces distinct files for repeated backups (no clobber)", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const a = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const b = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    expect(a.ok && b.ok).toBe(true);
+    expect(a.zipPath).not.toBe(b.zipPath);
+    expect(await io.exists(a.zipPath!)).toBe(true);
+    expect(await io.exists(b.zipPath!)).toBe(true);
+  });
+
+  it("the backup round-trips through unarchive", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+
+    const snap = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const restored = await unarchiveCampaign(snap.zipPath!, campaignsDir, io);
+    expect(restored.ok).toBe(true);
+    expect(await io.exists(norm(`${restored.zipPath}/config.json`))).toBe(true);
+  });
+
+  it("excludes the regenerable .debug/ dir from the snapshot", async () => {
+    const io = createMockIO();
+    const campaignsDir = "/home/user/campaigns";
+    const campaignPath = `${campaignsDir}/test-campaign`;
+    seedCampaign(io, campaignPath);
+    // Seed a .debug/ dir as the live app would (gitignored context dumps).
+    io.fs[norm(`${campaignPath}/.debug/context/dump-1.txt`)] = "huge context dump";
+    io.fs[norm(`${campaignPath}/.debug/crash-1.txt`)] = "stack trace";
+
+    const snap = await snapshotCampaign(campaignPath, campaignsDir, io, { label: "pre-rollback" });
+    const restored = await unarchiveCampaign(snap.zipPath!, campaignsDir, io);
+    expect(restored.ok).toBe(true);
+    // Real campaign content survives; the .debug/ dir is dropped.
+    expect(await io.exists(norm(`${restored.zipPath}/config.json`))).toBe(true);
+    expect(await io.exists(norm(`${restored.zipPath}/.debug/context/dump-1.txt`))).toBe(false);
+    expect(await io.exists(norm(`${restored.zipPath}/.debug/crash-1.txt`))).toBe(false);
   });
 });
 

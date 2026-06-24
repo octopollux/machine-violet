@@ -359,6 +359,7 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/campaign");
     expect(dirs).toContain("/root/campaign/scenes");
     expect(dirs).toContain("/root/campaign/session-recaps");
+    expect(dirs).toContain("/root/campaign/images");
     expect(dirs).toContain("/root/characters");
     expect(dirs).toContain("/root/locations");
     expect(dirs).toContain("/root/factions");
@@ -367,7 +368,7 @@ describe("campaignDirs", () => {
     expect(dirs).toContain("/root/rules");
     expect(dirs).toContain("/root/state");
     expect(dirs).not.toContain("/root/players");
-    expect(dirs).toHaveLength(11);
+    expect(dirs).toHaveLength(12);
   });
 });
 

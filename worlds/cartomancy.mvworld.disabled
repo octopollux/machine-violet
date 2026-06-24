@@ -1,0 +1,85 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Cartomancy",
+  "summary": "You're a character in a card game. The players keep making bad decisions.",
+  "genres": [
+    "fantasy",
+    "comedy",
+    "meta"
+  ],
+  "image_style": "Cartomancy",
+  "detail": "The player is a card. They have stats. They have flavor text — they can read it, on themselves, in mirrors. They live in a deck, with other cards, and the deck lives in a hand, and the hand belongs to someone. Above the world is a vast warm light, and large fingers, and a voice that is not always paying attention. The player knows they are being played. They can feel the moments they're shuffled.\n\nDM approach:\n- Tone: tilted, claustrophobic, oddly tender. The cards are people, with the limitations of cards. They cannot leave the table.\n- NPCs by variant: a discard-pile veteran who has been played and binned a dozen times and knows the meta (1); the dealer in white gloves who reads the room better than the room reads him (2); the seeker who never quite looks at the card she's holding (3).\n- Seed early: a shuffle that is felt in the body; a discard that takes a friend; the upside-down view of the ceiling fan.\n- Pacing structure: each in-fiction session opens with the next turn of the meta-game. Shuffles are earthquakes. Discards are bereavement. Drawing is rebirth or conscription, depending.\n- The trick is to make the absurdity emotional. The cards love each other. They've been a hand together. They get separated.\n\nPacing: Each session opens with the next turn of the meta-game above. Shuffles are earthquakes the player can feel in the floor; discards are bereavement, sudden, total; the next draw is rebirth or conscription, and never the same one twice in a row.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "two-siblings",
+          "name": "Two Siblings",
+          "description": "A children's TCG played badly on a bedroom floor; house rules, petty sacrifices, a crying younger sibling, chaos a tantrum away.",
+          "detail": "TWO SIBLINGS — A children's TCG played badly by a pair of kids on a bedroom floor. The rules are house rules. The strategies are sloppy. Sacrifices are made for petty reasons. The younger sibling has been losing all afternoon and is starting to cry. The stakes are real on this side of the cards, and the play is a tantrum away from chaos."
+        },
+        {
+          "id": "the-gambling-den",
+          "name": "The Gambling Den",
+          "description": "A high-stakes ritual den where every card is a soul; a sympathetic dealer who knows your name but cannot intervene.",
+          "detail": "THE GAMBLING DEN — A high-stakes ritual den where every card is a soul. The dealer is sympathetic, knows your name, would prefer not to lay you down. He cannot intervene. The house rules are written in something his employer will not let him explain. He pours you a drink, in the brief moment your card is upright on the felt, and asks how you are."
+        },
+        {
+          "id": "the-divination",
+          "name": "The Divination",
+          "description": "A young woman reads hand-painted cards to choose between two suitors; her sincere, half-wrong interpretation decides your day.",
+          "detail": "THE DIVINATION — A young woman is laying cards on her kitchen table to choose between two suitors. The deck is hand-painted and very old. Her interpretation of you decides your day. If she reads you as warning, you spend tomorrow being chased; if she reads you as blessing, the sun rises gently. She is sincere and she is wrong about half of it."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
+    {
+      "label": "Your card type",
+      "choices": [
+        {
+          "name": "The Pawn",
+          "description": "Cheap, expendable, plentiful. There are dozens of you in this deck and across other decks in other rooms. You know the others by face. Some of you have died many times and come back; some of you are mint and have never been played. The common bond is that nobody mourns you when you go to the bin."
+        },
+        {
+          "name": "The Foil",
+          "description": "Powerful but printed in low numbers. Your kin are rare and competitive and territorial. You have not met most of them. When you do, the conversation is brief and barbed. Your owner protects you, displays you, sleeves you carefully, and on the rare turns you are played, the whole table looks up."
+        },
+        {
+          "name": "The Face-Down",
+          "description": "You've been face-down for months. Nobody has activated you. You can hear the games being played over you and you have prepared, again and again, for the moment that does not come. Your effect is specific and devastating. You know it by heart. You wonder, sometimes, if you have been forgotten."
+        },
+        {
+          "name": "The Token",
+          "description": "You did not exist last turn. You may not exist next turn. Tokens are made by other cards' effects and dissolve at the end of phases. Your whole life is a few minutes long. Other tokens nod at you across the field. The veterans pretend not to see you. You have, in your short life, learned more than most cards ever do."
+        }
+      ]
+    },
+    {
+      "label": "The table",
+      "choices": [
+        {
+          "name": "The Bedroom Floor",
+          "description": "The cards are dog-eared and bent and one of them has a chocolate fingerprint. The younger sibling is crying and the older one is pretending not to notice. A Pokemon poster on the wall has been there for years and the sun has bleached half of it. The lamp light is yellow and the rules change every fifteen minutes."
+        },
+        {
+          "name": "The Green Felt",
+          "description": "Low lights. Cigar smoke that has been here longer than anyone in the room. The dealer wears white gloves and shuffles with a precision the cards can feel in their backs. The players do not speak. A man at the bar is watching, and his watching is itself a wager. The chips on the felt are real things, and so are you."
+        },
+        {
+          "name": "The Reader's Kitchen",
+          "description": "The deck is hand-painted, the work of someone who is no longer alive. Tea steams in a chipped cup. The seeker is asking aloud, in a voice that is careful and slightly embarrassed, and she keeps stopping mid-question. The light through the curtain is afternoon. There is a cat under the table. The cards smell faintly of cedar."
+        },
+        {
+          "name": "The Spotlit Stage",
+          "description": "The audience is invisible in the dark, but the cards can feel the breathing. A single spotlight on the play area. The cards know they are being watched and behave accordingly. The cues come from somewhere above; the players, when they reach down, are wearing sleeves that disappear into shadow. This is theatre, and the cards are getting better at their lines."
+        }
+      ]
+    }
+  ]
+}

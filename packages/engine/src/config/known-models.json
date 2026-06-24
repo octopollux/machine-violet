@@ -8,7 +8,7 @@
       "defaultTier": "large",
       "compactionThreshold": 800000,
       "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
     "claude-opus-4-6": {
       "provider": "anthropic",
@@ -17,7 +17,7 @@
       "maxOutput": 128000,
       "defaultTier": "large",
       "pricing": { "input": 5, "output": 25, "cacheWrite": 6.25, "cacheRead": 0.50 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
     "claude-sonnet-4-6": {
       "provider": "anthropic",
@@ -26,7 +26,7 @@
       "maxOutput": 64000,
       "defaultTier": "medium",
       "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
     "claude-sonnet-4-5-20250929": {
       "provider": "anthropic",
@@ -35,7 +35,7 @@
       "maxOutput": 64000,
       "defaultTier": "medium",
       "pricing": { "input": 3, "output": 15, "cacheWrite": 3.75, "cacheRead": 0.30 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
     "claude-haiku-4-5-20251001": {
       "provider": "anthropic",
@@ -44,7 +44,7 @@
       "maxOutput": 64000,
       "defaultTier": "small",
       "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
-      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
     "gpt-5.5": {
       "provider": "openai",
@@ -53,7 +53,7 @@
       "maxOutput": 128000,
       "defaultTier": "large",
       "pricing": { "input": 5, "output": 30, "cacheWrite": 0, "cacheRead": 0.50 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-5.4": {
       "provider": "openai",
@@ -62,7 +62,7 @@
       "maxOutput": 16384,
       "defaultTier": "large",
       "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-5.4-pro": {
       "provider": "openai",
@@ -71,7 +71,7 @@
       "maxOutput": 16384,
       "defaultTier": "large",
       "pricing": { "input": 10, "output": 40, "cacheWrite": 0, "cacheRead": 5 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-5-mini": {
       "provider": "openai",
@@ -80,7 +80,7 @@
       "maxOutput": 16384,
       "defaultTier": "medium",
       "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-5.4-mini": {
       "provider": "openai",
@@ -89,7 +89,7 @@
       "maxOutput": 16384,
       "defaultTier": "medium",
       "pricing": { "input": 0.4, "output": 1.6, "cacheWrite": 0, "cacheRead": 0.2 },
-      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-5-nano": {
       "provider": "openai",
@@ -98,7 +98,7 @@
       "maxOutput": 16384,
       "defaultTier": "small",
       "pricing": { "input": 0.1, "output": 0.4, "cacheWrite": 0, "cacheRead": 0.05 },
-      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-4o": {
       "provider": "openai",
@@ -107,7 +107,7 @@
       "maxOutput": 16384,
       "defaultTier": "medium",
       "pricing": { "input": 2.5, "output": 10, "cacheWrite": 0, "cacheRead": 1.25 },
-      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-4o-mini": {
       "provider": "openai",
@@ -116,7 +116,7 @@
       "maxOutput": 16384,
       "defaultTier": "small",
       "pricing": { "input": 0.15, "output": 0.6, "cacheWrite": 0, "cacheRead": 0.075 },
-      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true }
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     }
   },
   "tierDefaults": {

@@ -12,7 +12,11 @@ npm run dev             # launch two-tier (needs ANTHROPIC_API_KEY in .env)
 
 All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `docs/overview.md` for the spec index.
 
+**Authoring or reviewing campaign seeds** (`worlds/*.mvworld`) — the design bars (place + call-to-action, location skeletons, mystery-box, originality/no-imitation, …), the review checklist, and the repeatable catalog-review loop — live in `docs/seed-authoring.md`. (The `.mvworld` *schema* is `docs/format-spec.md §10`; turning a *played campaign* into a seed is the `build-mvworld` skill.)
+
 **Code and docs stay in sync.** Changes to game behavior, APIs, or on-disk formats require corresponding doc updates in the same commit. See `docs/maintenance.md` for what to update when. API schemas (`packages/shared/src/protocol/rest.ts`, `events.ts`) stay in sync with routes and `docs/websocket-api.md`.
+
+**Authoring image-gen visual styles.** The `.mvstyle` style catalog (`packages/engine/src/prompts/include/Image/`, the per-seed art-direction variants behind `generate_image`) has its own end-to-end workflow — the anti-tic levers, the render-and-eyeball loop, and the banking checklist — in `docs/visual-style-authoring.md`. Read it before adding or editing a style variant.
 
 ## Conventions
 
@@ -26,6 +30,9 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **FileIO/GitIO interfaces** abstract all I/O. Never call `fs` directly in game logic.
 - Tool results use `ok(data)` / `err(message)` helpers.
 - Content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. Never import between them.
+
+### TUI modals
+- **Background bleed-through:** new modals tend to "leak" the narrative behind them. Each row must be a **single physical line padded full-width**, rendered via `CenteredModal`'s `styledLines`/`lines` (which pad opaque) — never raw React children. The usual trap: **free-form/user text containing newlines** (e.g. verbatim player-turn commit messages) breaks a row onto a second, unpadded line that Ink's `trimEnd` then exposes. Collapse whitespace (`s.replace(/\s+/g, " ").trim()`) before truncating. See `RollbackPickerModal.tsx`'s `oneLine` and `docs/tui-design.md#modals`.
 
 ### Testing
 - Tests are **co-located** with source (`foo.ts` + `foo.test.ts`).
@@ -41,7 +48,7 @@ Multiple agents often run in parallel against this repo; `npm test` is ~80s CPU/
 
 For mid-iteration validation, prefer targeted vitest over the full suite:
 - **`npx vitest run --changed`** — only tests for files changed since HEAD. ~3s CPU on a clean tree.
-- **`npx vitest run related <files>`** — only tests reachable from the given files.
+- **`npx vitest related --run <files>`** — only tests reachable from the given files. (Note the order: `vitest run related <files>` parses `related` as a name-filter and finds nothing — the `related` command needs `--run`, not `run related`. This is also what the pre-commit hook runs on staged files.)
 
 Reserve `npm run check` for the pre-commit / pre-PR gate. Use your judgement: full suite for risk-sensitive or cross-cutting changes, targeted for routine iteration.
 
@@ -51,47 +58,26 @@ Live API key in `.env` with limited credit. Default dev override uses Sonnet for
 
 ## Validating changes end-to-end
 
-Before reporting any cross-cutting change as done — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or any code path that spans server + client + WebSocket — **run a harness scenario**. Type checks and unit tests do not prove the flow works end-to-end.
+Type checks and unit tests do not prove a cross-cutting flow works — anything touching UI flow, session lifecycle, the setup agent, the DM loop, save/load, or a path that spans server + client + WebSocket. The e2e strategy is **three tiers, deterministic-first** (full picture: [docs/e2e-harness.md](docs/e2e-harness.md), [docs/golden-tapes.md](docs/golden-tapes.md)):
 
-The canonical handle is the **`/smoketest` skill** (`.claude/skills/smoketest/`). Users invoke it as `/smoketest` (or `/smoketest boot-and-quit`); agents invoke it via the Skill tool when validating cross-cutting work. The skill defaults to `golden-path` and follows the parallelization pattern below.
+1. **Tier 1 — component/render:** `ink-testing-library`, co-located in `packages/client-ink`.
+2. **Tier 2 — deterministic golden replay (the regression backbone):** the real `GameEngine` (DM loop) and `createSetupConversation` (setup agent → finalize → handoff) replaying recorded **golden tapes**, offline, ~4s. **This is the everyday "did I break it?" gate.** Touch the DM loop or the setup agent → expect to re-record the matching corpus.
 
-Underneath, the skill calls these npm scripts directly:
+   ```bash
+   npm run golden:verify     # replay goldens offline (no API key)
+   ```
 
-```bash
-npm run e2e:boot           # 10s, no API key — precondition for everything else
-npm run e2e:golden-path    # 5-10 min, real LLM calls — the baseline smoke test
-npm run e2e -- <id>        # any scenario from packages/test-harness/src/scenarios/
-```
+   When a replay fails: decide whether it's a real regression (fix the code) or an intended behavior change (re-record with `npm run golden:record` / the `/record-tape` skill, then review the diff). Never hand-edit a tape. Skills: `/replay-goldens`, `/record-tape`.
+3. **Tier 3 — live smoke (rare):** the real launcher stack against the real API. Only when you specifically need the live flow (setup agent, handoff, boot path).
 
-**The golden path** is the minimum every smoke run does: New Campaign → walk setup-agent → handoff to live campaign → wait for first DM turn (3-5 min, watched via state transitions, not timers) → submit one player turn → receive DM response. Then the harness hard-kills its subprocess — save-on-exit is unit-tested elsewhere and we deliberately skip it to avoid burning a Haiku recap call on every smoke run. Failure prints the screen + state + launcher log so you can diagnose without re-running.
+   ```bash
+   npm run e2e:boot     # 10s, no API key — boots the stack and quits (cheap precondition)
+   npm run smoketest    # 7-12 min, live API — full setup→game walk
+   ```
 
-The harness auto-detects an existing `connections.json` by walking up from the worktree (so any worktree can run the live golden path without copying credentials around).
-
-See [docs/e2e-harness.md](docs/e2e-harness.md) for the full scenario catalogue, harness primitives, and how to add a new scenario. New scenarios get registered in `packages/test-harness/bin/run.ts`.
+For **live exploration** (feel out a personality/world, reproduce a bug by hand, or record a full-stack golden) drive the **`/play` skill** (`mvplay`) yourself turn-for-turn — being in the loop is the point; don't delegate to a subagent or a scripted probe. For a **repeatable live pass/fail** on one path (save/load round-trip, image-gen persisted), write a one-shot `runProbe` under `packages/test-harness/bin/`.
 
 Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
-
-### Parallelize validation: live test in the main thread, lint/tests in a subagent
-
-The golden path is 5-12 minutes of wall-clock waiting. Lint + tests is ~80s. Run them in parallel — but use **different mechanisms**, because subagent Bash has a 10-minute hard cap that breaks live polling.
-
-**Live smoke test** → main thread, `Bash` with `run_in_background: true`:
-
-```
-npm run e2e -- golden-path
-```
-
-Launch it and continue with other work in the same turn (write the commit message, update docs, plan the next change). The harness auto-invokes you when the process exits, with the full output captured to a tasks/ file. No polling, no babysitting. Foreground `timeout` does not apply to background commands.
-
-**Lint + typecheck + tests** → subagent (`general-purpose`):
-
-> Run `npm run check` and `npx tsc -b` from repo root. PASS → one line. FAIL → paste failure verbatim, no commentary.
-
-~80s, returns cleanly.
-
-**Do NOT delegate the live smoke test to a subagent.** The subagent's Bash tool has a 10-minute hard ceiling. A 12-minute golden path hits that ceiling mid-poll, the agent sees the bash timeout, and returns with "the test is making progress, I'll wait for the notification" — but there is no notification, and the test gets orphaned. Burned an entire test run finding this out the hard way. The main-thread background pattern doesn't share that cap.
-
-**Don't tail the background output in subsequent turns.** Just keep working. When the process exits, the harness re-invokes you with a `<task-notification>` containing the final output path. Read the tail of that file then — not before.
 
 ## Release model
 
@@ -101,7 +87,7 @@ Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** 
 
 1. Pick the branch where the bug was reported. A 1.0 user's bug reproduces on `release`, not `main` — `main` may have rewritten the code path, and "can't repro" usually means "looking at the wrong tree."
 2. Fix on a branch from there, PR into that long-lived branch.
-3. Ask whether the *other* long-lived branch has the same code path. If yes, the fix needs to land there too — cherry-pick or re-apply by hand. Do this both directions (release→main *and* main→release as appropriate).
+3. Port the fix to the *other* long-lived branch **only** when the bug was also reported there, or it's a regression in a shipped (released) version — then cherry-pick or re-apply by hand (both directions as appropriate). Otherwise default to the reported branch alone; don't raise porting routinely. When it *is* warranted, just do it and say so rather than asking.
 
 ### Cutting releases
 
@@ -114,7 +100,7 @@ All cuts dispatch GitHub workflows via `gh`. Common commands:
 | Promote RC → stable | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=none` | Tags the version that's been RC'd. Purges that line's RC releases as part of publish. |
 | Cut stable, no RC soak | `gh workflow run cut-release.yml --ref release -f kind=stable -f bump=patch` | For hotfixes / confident small changes. `minor`/`major` also valid. |
 | Force a nightly now | `gh workflow run nightly.yml --ref main` | Useful when you've changed the nightly pipeline and want immediate verification, or to refresh the release-list cleanup. |
-| Test a Windows build without releasing | `gh workflow run test-build.yml -f windows=true` | Run on any PR touching build/installer/signing before merging — the Windows signing path has no other pre-merge coverage. |
+| Test a Windows build without releasing | `gh workflow run test-build.yml -f windows=true` | Run on any PR touching build/installer/signing before merging — the Windows signing path has no other pre-merge coverage. **Without `--ref`, `gh workflow run` targets the default branch (`main`), not your branch.** To validate a feature/Dependabot branch use `gh workflow run test-build.yml --ref <branch> -f windows=true -f sign=false` — Azure Trusted Signing only authenticates from protected refs, so feature branches must pack unsigned, but still run the full pack → replay → install-smoke gate. |
 
 `cut-release.yml` self-aborts if dispatched from any branch but `release` — the `--ref release` arg is mandatory.
 
