@@ -382,8 +382,11 @@ jobs:
             -d @/tmp/api-request.json) || RESPONSE=""
 
           # Select the text block explicitly — with thinking on, content[0] is a
-          # thinking block, so the old .content[0].text returned null.
-          NOTES=$(echo "$RESPONSE" | jq -r 'first(.content[] | select(.type=="text") | .text) // empty') || NOTES=""
+          # thinking block, so the old .content[0].text returned null. The
+          # optional iterator (.content[]?) yields empty rather than a "cannot
+          # iterate over null" error when the API returns a JSON error payload
+          # with no content array — falls through cleanly to the fallback below.
+          NOTES=$(echo "$RESPONSE" | jq -r 'first(.content[]? | select(.type=="text") | .text) // empty') || NOTES=""
           if [ -z "$NOTES" ]; then
             NOTES="Internal improvements and maintenance."
           fi
