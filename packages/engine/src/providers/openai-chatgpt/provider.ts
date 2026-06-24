@@ -45,6 +45,7 @@ import { getAccount, isChatGptAccount, pushChatGptAuthTokens } from "./auth.js";
 import { toUsageStatus, shouldWarn } from "./usage.js";
 import { log } from "./log.js";
 import { logEvent } from "../../context/engine-log.js";
+import { buildReferenceDirective } from "../image-reference-directive.js";
 import { getCodexClientInfo } from "./client-info.js";
 import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 import type {
@@ -1276,19 +1277,7 @@ export function buildImagePromptText(
   aspect: ImageAspect,
   referenceLabels: string[] = [],
 ): string {
-  const refDirective = referenceLabels.length > 0
-    ? ` The attached reference image${referenceLabels.length > 1 ? "s are" : " is"} the established ` +
-      `appearance of ${formatList(referenceLabels)} — match ${referenceLabels.length > 1 ? "their" : "that character's"} ` +
-      `facial features, build, and outfit to the reference, but follow this description for pose, facial expression, setting, and framing (the reference carries only one neutral expression — take the emotion from the description).`
-    : "";
-  return `${ASPECT_GUIDANCE[aspect]} ${prompt}${refDirective}`;
-}
-
-/** Oxford-comma join: ["a"] → "a"; ["a","b"] → "a and b"; ["a","b","c"] → "a, b, and c". */
-function formatList(items: string[]): string {
-  if (items.length <= 1) return items[0] ?? "";
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+  return `${ASPECT_GUIDANCE[aspect]} ${prompt}${buildReferenceDirective(referenceLabels)}`;
 }
 
 /**
