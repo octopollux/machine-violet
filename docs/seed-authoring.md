@@ -16,9 +16,11 @@ happened — you are setting up a space where things can happen.
 
 ## The mechanical truth that bites every time
 
-**The setup agent never sees `world.detail`.** `renderWorldForAgent` shows it
-only `summary`, `forks` (labels/options), and `setup_detail` (§10.4, §10.7). So
-any directive about *how the game opens* — the opening beat, "don't reveal the
+**The setup agent never sees `world.detail`.** Via `load_world` it gets only the
+`forks` (labels/options/ids), the config hints (`system`/`mood`/`difficulty`/`campaign_scope`),
+and `setup_detail` (`renderWorldForAgent`, §10.4/§10.7); the seed's `summary`/`genres`
+reach it separately, in its world list. The DM-only `detail` reaches it by neither
+path. So any directive about *how the game opens* — the opening beat, "don't reveal the
 secret in scene 1", "ground the first scene in the chosen role" — that you write
 into `detail` is **invisible to the agent that composes `opening_scene`**. It
 must live in `setup_detail` as a **pin** (a short "begins in…" hint) or it never
@@ -209,9 +211,12 @@ a player `fork`:
   agent and kept secret (the genre wrapper, the crucial-question); `description`
   is DM-facing guidance.
 - An option's `detail` splices into `campaign_detail` only when selected (§10.6).
-- ⚠️ **Option ids are auto-derived article-stripped + kebab-cased** ("The Gilded
-  Compact" → `gilded-compact`). If you write explicit ids, match that convention —
-  and especially match any **recorded golden tape** (see the landmine below).
+- ⚠️ **Modern fork options take an explicit author-provided `id`** — you write it.
+  (Auto-derivation — article-stripped + kebab-cased via `slugify`, "The Gilded
+  Compact" → `gilded-compact` — happens only when *legacy* `suboptions` are folded
+  into forks by `normalizeForks`.) When you promote a suboption that a **recorded
+  golden tape** selected, write the id to match what the tape recorded (the old
+  slugified form) — a mismatch is a hard fork-resolution failure (see the landmine below).
 
 ### Pacing variants (`setup_detail` includes)
 All live in [`packages/engine/src/prompts/include/Pacing.md`](../packages/engine/src/prompts/include/Pacing.md). Place the include in `setup_detail`, **never `detail`** (in `detail` it would expand into the DM's context and make it re-ask the scope question on turn 1).
