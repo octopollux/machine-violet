@@ -400,11 +400,11 @@ jobs:
             -H "content-type: application/json" \
             -d @/tmp/api-request.json) || RESPONSE=""
 
-          # Select the text block explicitly — with thinking on, content[0] is a
-          # thinking block, so the old .content[0].text returned null. The
-          # optional iterator (.content[]?) yields empty rather than a "cannot
-          # iterate over null" error when the API returns a JSON error payload
-          # with no content array — falls through cleanly to the fallback below.
+          # Select the first text block explicitly (not content[0]): the response
+          # may carry non-text blocks, and the optional iterator (.content[]?)
+          # yields empty rather than a "cannot iterate over null" error when the
+          # API returns a JSON error payload with no content array — flowing
+          # cleanly to the fallback below.
           NOTES=$(echo "$RESPONSE" | jq -r 'first(.content[]? | select(.type=="text") | .text) // empty') || NOTES=""
           if [ -z "$NOTES" ]; then
             NOTES="Internal improvements and maintenance."
