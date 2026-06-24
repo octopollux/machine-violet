@@ -270,12 +270,18 @@ jobs:
           PREV="${{ steps.tags.outputs.prev }}"
 
           if [ -n "$PREV" ]; then
-            # Extract PR numbers from merge commits in the range.
-            # This is deterministic — a commit is in the range or it isn't —
-            # unlike the old timestamp-based gh pr list search which was
-            # off-by-one due to >= and git/GitHub timestamp mismatches.
+            # Extract PR numbers from the range, matching BOTH merge commits
+            # ("Merge pull request #N") and squash-merged commits (GitHub's
+            # default "<subject> (#N)"). Deterministic — a commit is in the
+            # range or it isn't (unlike the old timestamp-based gh pr list).
+            # The squash pattern is essential: with squash merges (the repo
+            # default) or a single-merge promotion, the merge-commit pattern
+            # alone surfaces almost no player-facing PRs — v1.1.0-rc.1 shipped
+            # "Internal improvements and maintenance." for the whole 1.1 line.
+            # Requiring "(#" for the squash form avoids matching bare "#45"
+            # issue mentions; --oneline keeps it to subjects (no body refs).
             PR_NUMBERS=$(git log --oneline "${PREV}..${TAG}" \
-              | grep -oP 'Merge pull request #\K[0-9]+' || true)
+              | grep -oP '(?:Merge pull request #|\(#)\K[0-9]+' || true)
 
             PR_CONTEXT=""
             if [ -n "$PR_NUMBERS" ]; then
@@ -385,9 +391,10 @@ jobs:
           # reasoning channel and spills its planning ("Let me look at these
           # PRs...") into the visible response, polluting the notes. With it on,
           # reasoning goes to separate `thinking` blocks and `content[]` text is
-          # the clean bullet list. max_tokens raised to leave room for both.
+          # the clean bullet list. max_tokens (4096) leaves room for thinking
+          # plus a full release's worth of bullets over a large PR range.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
-            '{model:"claude-sonnet-4-6", max_tokens:2048,
+            '{model:"claude-sonnet-4-6", max_tokens:4096,
               thinking:{type:"adaptive"},
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
