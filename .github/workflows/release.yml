@@ -381,8 +381,14 @@ jobs:
           # Sonnet (not Haiku) — Haiku's player-facing summaries had noticeable
           # intelligence regressions at this prompt size. The cost bump for the
           # few hundred input tokens per release is negligible.
+          # Adaptive thinking ON: without it, Sonnet 4.6 has no dedicated
+          # reasoning channel and spills its planning ("Let me look at these
+          # PRs...") into the visible response, polluting the notes. With it on,
+          # reasoning goes to separate `thinking` blocks and `content[]` text is
+          # the clean bullet list. max_tokens raised to leave room for both.
           jq -n --rawfile prompt /tmp/user-prompt.txt \
-            '{model:"claude-sonnet-4-6", max_tokens:1024,
+            '{model:"claude-sonnet-4-6", max_tokens:2048,
+              thinking:{type:"adaptive"},
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
           RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
@@ -391,7 +397,9 @@ jobs:
             -H "content-type: application/json" \
             -d @/tmp/api-request.json) || RESPONSE=""
 
-          NOTES=$(echo "$RESPONSE" | jq -r '.content[0].text // empty') || NOTES=""
+          # Select the text block explicitly — with thinking on, content[0] is a
+          # thinking block, so the old .content[0].text returned null.
+          NOTES=$(echo "$RESPONSE" | jq -r 'first(.content[] | select(.type=="text") | .text) // empty') || NOTES=""
           if [ -z "$NOTES" ]; then
             NOTES="Internal improvements and maintenance."
           fi

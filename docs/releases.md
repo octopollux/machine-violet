@@ -57,7 +57,7 @@ The workflow:
 1. Bumps `package.json` if requested, commits to `release`.
 2. Computes the tag (failing if a stable tag already exists for the current version).
 3. Pushes branch + tag.
-4. The push of `v*` triggers [release.yml](../.github/workflows/release.yml), which builds Win/macOS/Linux, signs Windows via Velopack + Azure Trusted Signing, **replays the golden corpus against each packaged binary** (the `verify-package` gate), generates AI release notes (Haiku), and creates the GitHub release on the appropriate channel.
+4. The push of `v*` triggers [release.yml](../.github/workflows/release.yml), which builds Win/macOS/Linux, signs Windows via Velopack + Azure Trusted Signing, **replays the golden corpus against each packaged binary** (the `verify-package` gate), generates AI release notes (Sonnet, adaptive thinking), and creates the GitHub release on the appropriate channel.
 
 RC releases are marked `--prerelease` on GitHub, skip Discord, and skip the Homebrew formula bump. Stable releases do all three.
 
