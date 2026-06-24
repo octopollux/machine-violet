@@ -380,15 +380,17 @@ jobs:
           # intelligence regressions at this prompt size. Nightlies are frequent
           # so cost adds up faster than for stable, but the daily-token budget
           # is still small relative to user value.
-          # Adaptive thinking ON: without it, Sonnet 4.6 has no dedicated
-          # reasoning channel and spills its planning ("Let me look at these
-          # PRs...") into the visible response, polluting the notes. With it on,
-          # reasoning goes to separate `thinking` blocks and `content[]` text is
-          # the clean bullet list. max_tokens (4096) leaves room for thinking
-          # plus a full release's worth of bullets over a large PR range.
+          # Thinking is intentionally OFF. This is a bounded summarization, and
+          # on a large PR range adaptive thinking consumes the ENTIRE max_tokens
+          # budget on reasoning (stop_reason=max_tokens, a thinking-only response
+          # with no text block) -> empty extraction -> the "Internal improvements
+          # and maintenance." fallback. That is exactly what shipped on the first
+          # v1.1.0-rc.1 cuts. The "Output ONLY the bullet list" instruction keeps
+          # the response clean without a thinking channel; verified against the
+          # real 112-PR range (a full 1.1-sized changelog was ~730 output tokens,
+          # well within max_tokens 4096).
           jq -n --rawfile prompt /tmp/user-prompt.txt \
             '{model:"claude-sonnet-4-6", max_tokens:4096,
-              thinking:{type:"adaptive"},
               messages:[{role:"user",content:$prompt}]}' > /tmp/api-request.json
 
           # Call the API
