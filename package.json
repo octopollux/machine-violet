@@ -1,6 +1,6 @@
 {
   "name": "machine-violet",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Machine Violet — an agentic AI Dungeon Master that runs any tabletop RPG in a terminal",
   "main": "dist/index.js",
   "type": "module",
@@ -15,12 +15,18 @@
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint packages/shared/src/ packages/engine/src/ packages/client-ink/src/ packages/test-harness/src/ packages/test-harness/bin/",
     "typecheck": "tsc -b",
     "check": "concurrently -n lint,test --kill-others-on-fail \"npm run lint\" \"npm test\"",
-    "e2e": "node --import tsx/esm packages/test-harness/bin/run.ts",
-    "e2e:golden-path": "npm run e2e -- golden-path",
-    "e2e:boot": "npm run e2e -- boot-and-quit",
+    "golden:record": "cross-env RECORD_GOLDENS=1 vitest run golden",
+    "golden:verify": "vitest run golden",
+    "smoketest": "node --import tsx/esm packages/test-harness/bin/smoketest.ts",
+    "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
+    "e2e:replay": "node --import tsx/esm packages/test-harness/bin/replay-golden.ts",
+    "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
+    "tokens": "node --import tsx/esm scripts/content-tokens.ts",
+    "voice-guide": "node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",
-    "theme-editor": "node tools/theme-editor/scripts/dev.js"
+    "theme-editor": "node tools/theme-editor/scripts/dev.js",
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "keywords": [
     "rpg",
@@ -33,9 +39,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
+    "@anthropic-ai/sdk": "^0.104.1",
     "clipboardy": "^5.3.1",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.2",
     "fflate": "^0.8.2",
     "ink": "^7.0.0",
     "ink-scroll-view": "^0.3.6",
@@ -47,18 +53,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^20.11.0",
+    "@types/node": "^25.9.3",
     "@types/react": "^19.2.0",
     "@vitest/coverage-v8": "^4.0.18",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.1",
     "eslint": "^10.0.0",
     "ink-testing-library": "^4.0.0",
+    "js-tiktoken": "^1.0.21",
+    "knip": "^6.15.0",
+    "lefthook": "^2.1.9",
     "rcedit": "^5.0.2",
     "react-devtools-core": "^7.0.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.56.0",
     "vitest": "^4.0.18"
   },
@@ -68,7 +77,7 @@
     "tools/theme-editor"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=25.0.0"
   },
   "overrides": {
     "ink-scroll-view": {

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "TwoStripTechnicolor"
+rating: "?"
+description: "Early two-strip Technicolor: limited red-orange and cyan-green palette with no true blue, chalky pastel flesh, two-tone charm"
+tags: [film-stock, vintage, limited-palette, nostalgic, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 161
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from an early TWO-STRIP TECHNICOLOR motion picture — the limited two-colour process from before full three-strip colour. The signature: a restricted palette built ONLY from red-orange and cyan-green, with NO true blues or pure full-spectrum colour; pale, slightly chalky pastel flesh tones; a muted teal-and-salmon overall cast; soft vintage early-cinema texture; gentle grain; and a quaint, antique, two-tone period charm. Limited-palette, antique, two-tone-by-chemistry. Close with a small caption in an ornate early-cinema font — a scene or place TITLE only; do NOT name the film process, stock, or colour technique in the caption.`
+
+# Notes
+
+Append at the END — style last. EARLY-COLOR / MOTION-PICTURE family — early TWO-STRIP TECHNICOLOR: a limited RED-ORANGE + CYAN-GREEN palette (NO true blue), chalky pastel flesh, teal-and-salmon cast, antique two-tone charm. Distinct from full three-strip [Technicolor](./Technicolor.mvstyle) (the limited palette is the tell). CAPTION FIX (user, the seed of the family-wide no-process-name caption rule): the first cut printed the PROCESS NAME ("in TECHNICOLOR TWO-STRIP"); the v2 demands a scene/place TITLE only — validated clean ("THE VERDANT CLEARING"). Reveal on a colour scene. A keeper (user). Keep the two-colour palette + the no-process caption directive.
+
+# Example
+
+![TwoStripTechnicolor](../ImageStyleExample/TwoStripTechnicolor.example.png)

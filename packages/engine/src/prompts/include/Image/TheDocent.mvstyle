@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Docent"
+rating: "?"
+description: "The Docent campaign look: Sovcolor cool institutional Eastern-bloc film by default, GildedVellum illuminated gold-leaf illustration when the loop ends"
+tags: [film-stock, painting, period, muted, epic]
+made-for-model: gpt-image-2
+tokens: 430
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** cool, muted institutional Sovcolor look below. When the **loop ends** — the moment of release — use the gilded illuminated-vellum look: flat egg-tempera planes under a burnished gold-leaf sky.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame shot on SOVCOLOR / Eastern-bloc colour film stock — the mid-century Soviet colour process. The signature: a cool, muted, slightly sickly palette with desaturated greens, anaemic blues, and a faint cyan-green or jaundiced cast; low contrast and a flat, grey, institutional quality; subdued, washed-out, melancholy colour; visible grain; and the austere, overcast, period Eastern-European atmosphere. Cool, muted, austere, institutional, melancholy. Close with a small caption in a plain period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+The loop ends — `Rendered as a single gilded illustration in the illumination tradition, painted directly onto a sheet of aged vellum — NOT a full manuscript page: no decorative border, no marginalia, no drop-capital, no blackletter text block. Strict process discipline: paint the scene itself in flat, stylized planes of soft egg-tempera color with fine confident ink outlines and no photographic depth or modern shading; keep the painted forms simple and flat. The demanding craft goes into the MATERIAL: lavish, intricate burnished gold leaf for the sky, the light sources and the key accents — raised and tooled, catching the light with a faint crackle and small worn patches — laid over genuine aged vellum with its warm tooth, foxing, faint stains, hair-side freckling and a softly cockled surface. Let the gold leaf and the aged vellum carry the fine detail. A restrained, harmonious palette of a few mineral-pigment hues plus gold. Close with a caption as a short line of elegant gilt or rubricated lettering inked at the foot of the illustration.`
+
+# Notes
+
+Campaign composite for the **the-docent** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [Sovcolor](./Sovcolor.mvstyle) (cool, sickly, institutional Eastern-bloc film stock; the museum-melancholy register is the campaign-wide workhorse). LOOP-END = [GildedVellum](./GildedVellum.mvstyle) (gilded illuminated-vellum illustration; the transcendent gold-leaf release — its gold-sky / vellum / flat-painting levers are load-bearing anti-tic, kept verbatim). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![Sovcolor](../ImageStyleExample/Sovcolor.example.png)
+
+![GildedVellum](../ImageStyleExample/GildedVellum.example.png)

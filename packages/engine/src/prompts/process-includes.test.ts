@@ -211,3 +211,26 @@ describe("applyLayeredOverrides", () => {
     expect(out[1]).toBe("<TOOLS>\nreplacement\n</TOOLS>");
   });
 });
+
+describe("directory-backed .mvstyle include (real disk)", () => {
+  it("resolves Image.Variant from Image/<Variant>.mvstyle, emitting Direction + Style only", () => {
+    const out = processIncludes("<!--include:Image.Velvia-->");
+    // Wrapped in the stem tag (Image), not the variant; one block.
+    expect(out).toMatch(/^<Image>\n[\s\S]*\n<\/Image>$/);
+    expect(out).toContain("render the image in this visual style:");
+    expect(out).toContain("Fujichrome Velvia");
+    // Authoring/selection-only material must never reach the DM.
+    expect(out).not.toContain("%%");
+    expect(out).not.toContain("# Notes");
+    expect(out).not.toContain("# Example");
+    expect(out).not.toContain("made-for-model");
+    expect(out).not.toContain("ImageStyleExample");
+  });
+
+  it("resolves the dotless default Image to Image/Image.mvstyle", () => {
+    const out = processIncludes("<!--include:Image-->");
+    expect(out).toMatch(/^<Image>\n[\s\S]*\n<\/Image>$/);
+    expect(out).toContain("Japanese MMO");
+    expect(out).not.toContain("%%");
+  });
+});

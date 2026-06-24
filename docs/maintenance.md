@@ -39,6 +39,13 @@ This project maintains a closed loop between code and documentation. When you ch
 2. If it's a new modal type, add to [tui-design.md](tui-design.md)
 3. Add to the tui section of [docs/module-map.md](module-map.md)
 
+### Changing the DM formatting pipeline / vocabulary
+
+1. Add/alter the tag in the `FormattingTag` union in `packages/shared/src/types/tui.ts` (the single source of truth) and handle it in both renderers — `render-nodes.tsx` (Ink) and `commands/transcript.ts` (HTML) — plus the node-walkers in `formatting.ts`
+2. Map any dialect/synonym for it in `packages/client-ink/src/tui/narrative/normalize.ts`
+3. Teach it in the `<formatting>` block of `packages/engine/src/prompts/dm-directives.md` and update the tag list + pipeline stages in [tui-design.md](tui-design.md)
+4. Extend the invariant harness (`packages/client-ink/src/tui/narrative/harness/`): add a fixture and, if it's a new construct, a generator production. Run `npx vitest run packages/client-ink/src/tui/narrative/` and the soak (`MV_FORMAT_SOAK=1`, and `MV_LIVE_CORPUS=<dir>` against real campaigns) — zero violations is the gate
+
 ### Changing the scene transition cascade
 
 1. Update step list in [state-atlas.md](state-atlas.md) (section 6)
@@ -81,22 +88,29 @@ This project maintains a closed loop between code and documentation. When you ch
 7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
-### Adding or changing an e2e scenario
+### Changing the tape format (Tier-2 record/replay)
 
-1. Add the scenario file under `packages/test-harness/src/scenarios/`
-2. Register it in `ALL_SCENARIOS` in `packages/test-harness/bin/run.ts`
-3. Append a row to the scenarios table in [e2e-harness.md](e2e-harness.md)
-4. If you change the golden path's contract (what it proves, what it walks through), update the "The golden path" section in both [e2e-harness.md](e2e-harness.md) and the "Validating changes end-to-end" section in [CLAUDE.md](../CLAUDE.md)
-5. If the new scenario is a candidate default (rare), update the `/smoketest` skill description in `.claude/skills/smoketest/SKILL.md`. Most scenarios don't need a skill edit — they're reachable via `/smoketest <id>` without any changes.
+The tape schema (`packages/engine/src/providers/tape.ts`) is the data contract for golden replay. If you change the shape, bucketing, matching, or determinism normalization, update [tape-format.md](tape-format.md) **and** bump `TAPE_VERSION` with a matching re-record of the corpus (`npm run golden:record`). `deserializeTape` rejects version mismatches, so a stale corpus fails loudly rather than mis-replaying.
 
-### Changing harness primitives (wait helpers, input methods, state shape)
+### Changing the golden corpus / record-replay wiring
+
+Two co-located corpora: the DM corpus (`packages/engine/src/testing/corpus.golden.test.ts`) and the setup corpus (`setup-corpus.golden.test.ts`), sharing `goldens/`. Both inject a provider directly (record via `createTapingProvider`, replay via `createReplayProvider`) — the in-process path skips the `wrapForRecording` seam. That seam (`packages/engine/src/providers/tape-mode.ts`, called at `session-manager.ts` / `setup-session.ts`) plus `GET /tape` (`packages/engine/src/server/routes/dev.ts`) + `mvplay record`/`save-tape` is the *full-stack* capture path. Adding a setup scenario = one `SetupScenario` entry + a record run (front-load the player name; `MV_SETUP_TRACE=1` prints the flow). If you change the operating model (record paths, when to re-record, hooks), update [golden-tapes.md](golden-tapes.md) and the `/record-tape` + `/replay-goldens` skills.
+
+### Changing what the live `smoketest` probe walks through
+
+The smoketest is the **Tier-3 live smoke** (not the regression gate — that's Tier-2 golden replay). Its contract — walk setup once, observe two in-game turns — is in [e2e-harness.md](e2e-harness.md) ("What `smoketest` actually does") and [CLAUDE.md](../CLAUDE.md) ("Validating changes end-to-end"). If you change what the probe does, update both. The source is `packages/test-harness/bin/smoketest.ts` (no registry; `npm run smoketest`).
+
+### Changing harness primitives (wait helpers, input methods, state shape, engine-log breadcrumbs)
 
 1. Update the method on `Harness` / re-export from `packages/test-harness/src/index.ts`
 2. Update the "State-driven waiting" table in [e2e-harness.md](e2e-harness.md)
+3. If you added a new engine-log event category, append a row to the "Engine-log breadcrumbs" table in the same doc
 
-### Changing what `/smoketest` does
+> **Engine log vs. span trace.** Flat lifecycle/latency breadcrumbs go to `engine.jsonl` via `logEvent`. *Timing spans* (the per-turn causal tree behind the campaign-explorer Timeline) are a separate stream — `trace.jsonl` via `withSpan` (`packages/engine/src/context/trace.ts`). Add a span only at a genuine nesting boundary (a new agent/tool/loop kind); don't duplicate an `engine.jsonl` breadcrumb as a span. See [state-atlas.md](state-atlas.md) §9.
 
-The skill at `.claude/skills/smoketest/SKILL.md` is the single source of truth for how agents and users invoke the harness. If you change which scenario it defaults to, the argument convention, or the "do/don't delegate to a subagent" guidance, edit that file. The skill's description field is what triggers it for agents — keep it specific about the trigger phrases ("smoke test", "validate end-to-end", "did I break it", etc.) so it fires when it should.
+### Changing what the e2e skills do
+
+The skills are the single source of truth for how agents/users invoke each tier: `.claude/skills/replay-goldens/` (the regression gate), `.claude/skills/record-tape/` (recording), `.claude/skills/smoketest/` (live Tier-3), `.claude/skills/play/` (live-pilot + record substrate). If you change an invocation convention or the tier roles, edit the matching skill — its `description` field is what triggers it, so keep the trigger phrases accurate (e.g. "did I break it" must point at `replay-goldens`, not `smoketest`).
 
 ### Adding a `codex:*` event
 
@@ -104,6 +118,13 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 
 1. Add a helper to `log.ts`
 2. Document the event name and payload in [openai-chatgpt-provider.md](openai-chatgpt-provider.md)
+
+### Adding a seed-authoring design bar or changing the review loop
+
+When a catalog pass surfaces a new "what makes a seed good/bad" bar, or you change
+the review-loop process, record it in [seed-authoring.md](seed-authoring.md) (the
+editorial practice doc). The `.mvworld` **schema** — forks, channels,
+materialization — is separate and lives in [format-spec.md §10](format-spec.md#10-world-files-mvworld); don't duplicate it. Durable design principles should also go to memory so they survive future sessions.
 
 ### Changes that DON'T need doc updates
 
@@ -128,7 +149,11 @@ The openai-chatgpt provider emits its own operational events (subprocess lifecyc
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
-| E2E test harness | [e2e-harness.md](e2e-harness.md) | Golden path, scenario catalogue, harness primitives, how to add scenarios |
+| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
+| E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
+| Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |
+| Tape format | [tape-format.md](tape-format.md) | On-disk tape schema, bucketing, ordinal matching, determinism normalization |
+| Seed authoring | [seed-authoring.md](seed-authoring.md) | Editorial playbook for bundled `.mvworld` seeds: design bars, review checklist, review-pass loop |
 
 ## Principles
 

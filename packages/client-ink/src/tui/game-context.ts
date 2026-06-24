@@ -12,6 +12,7 @@ import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme, StyleVariant } from "./themes/types.js";
 import type { ApiClient } from "../api-client.js";
 import type { StdinFilterChain } from "./hooks/stdinFilterChain.js";
+import type { GraphicsCapabilities } from "./image/capabilities.js";
 
 export interface GameContextValue {
   // Connection
@@ -64,11 +65,17 @@ export interface GameContextValue {
   // Provider remaining-usage snapshot (null when not on a usage-tracking provider).
   usageStatus: UsageStatus | null;
 
+  /** Monotonic sheet-invalidation counter. Bumped when a detached scribe
+   *  rewrites a PC sheet; the character pane refetches when it changes. */
+  sheetEpoch: number;
+
   // Terminal capabilities
   /** Whether the Kitty keyboard protocol is active (affects raw mode guardian). */
   hasKittyProtocol?: boolean;
   /** Stdin filter chain for registering/unregistering input filters. */
   stdinFilterChain?: StdinFilterChain | null;
+  /** Detected terminal graphics-protocol support + cell-pixel size for inline images. */
+  graphicsCaps?: GraphicsCapabilities | null;
 
   // Settings
   devModeEnabled?: boolean;

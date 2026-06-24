@@ -2,35 +2,62 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "The Debt",
-  "summary": "You owe a favor to someone who just called it in.",
+  "summary": "You owe a favor to someone who just called it in",
   "genres": [
     "fantasy",
     "modern",
     "sci-fi"
   ],
-  "detail": "Someone the player cannot refuse is asking for a favor. The player owes them, and they both know it, and the conversation will happen tonight whether the player wants it to or not. The ask, when it comes, will be small. The next ask will be larger. By dawn the player will be doing something they would not have agreed to if asked first.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE CHILDHOOD FRIEND — They pulled the player out of a river, or out of a car, or out of a worse version of their own twenties. They have spent twenty years not asking for anything. Tonight they need the player to do something illegal. They will not say what until the player has said yes. Every hour the player delays, the ask gets bigger, because the situation they're trying to fix is getting worse.\n2. THE FORGOTTEN BARGAIN — When the player was eight, they made a deal with something that came to their bedroom window. They forgot about it. The thing did not. It is calling in the bargain now and the price was named at the time, and the price was a firstborn. The player has a child. The player did not connect these two facts until tonight.\n3. THE FUTURE SELF — The caller is the player, from later. They paid forward a debt that the player has not yet accrued. They are here to ask for something that the player will not understand until they themselves become the caller. They are scared. They will not say of what.\n\nDM approach:\n- Tone: intimate, conversational, the comfort of someone who knows you well asking for a thing they shouldn't ask. The horror is in the relationship, not the request.\n- NPCs to seed: the lender (warm, plausible, with leverage); one witness who can corroborate the debt; one offramp NPC who can take the heat for a price.\n- Pacing structure: a one-night chain of asks, each bigger than the last. Offramps exist and cost specific things — money, reputation, a piece of the player's own future. The player can stop at any point. Each stop has a consequence.\n- Seed early: a small detail that confirms the lender is who they say they are (or doesn't); a phone that keeps buzzing; a clock the player keeps checking.\n- The first ask should be doable. The fourth ask should be obviously the line. The fifth ask is where the campaign lives.\n\nPacing: A single night, scene by scene. Each ask is one scene. Offramps cost specific things. The player can track time by the lender's progress through their own evening — the band playing the last set, the IV bag emptying, the diner closing, the eulogy ending.\n\n<!--include:Pacing.ShortCampaigns-->",
-  "suboptions": [
+  "image_style": "TheDebt",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "Someone the player cannot refuse is asking for a favor. The player owes them, and they both know it, and the conversation will happen tonight whether the player wants it to or not. The ask, when it comes, will be small. The next ask will be larger. By dawn the player will be doing something they would not have agreed to if asked first.\n\nDM approach:\n- Tone: intimate, conversational, the comfort of someone who knows you well asking for a thing they shouldn't ask. The horror is in the relationship, not the request.\n- NPCs to seed: the lender (warm, plausible, with leverage); one witness who can corroborate the debt; one offramp NPC who can take the heat for a price.\n- Pacing structure: a one-night chain of asks, each bigger than the last. Offramps exist and cost specific things — money, reputation, a piece of the player's own future. The player can stop at any point. Each stop has a consequence.\n- Seed early: a small detail that confirms the lender is who they say they are (or doesn't); a phone that keeps buzzing; a clock the player keeps checking.\n- The first ask should be doable. The fourth ask should be obviously the line. The fifth ask is where the campaign lives.\n\nPacing: A single night, scene by scene. Each ask is one scene. Offramps cost specific things. The player can track time by the lender's progress through their own evening — the band playing the last set, the IV bag emptying, the diner closing, the eulogy ending.",
+  "forks": [
     {
-      "label": "Your lender",
-      "choices": [
+      "id": "who-you-owe",
+      "label": "Who you owe",
+      "chooser": "player",
+      "prompt": "Present to the player as who — or what — has come to call in their debt. Use only the short name and description; let them choose on little information. Each option's detail is the rest of the story, for the DM alone.",
+      "options": [
         {
-          "name": "The New Face",
-          "description": "An old friend with a new face. They look like the friend you remember and they don't quite. Same laugh. Same way of leaning on a table. The face has been worked on or the years have done something the years don't usually do. They know things only the friend would know and they don't know one thing the friend definitely would. You haven't decided yet whether to ask."
+          "id": "the-old-friend",
+          "name": "The Old Friend",
+          "description": "Someone who once pulled you out of something and has never asked for a thing since. Tonight they're asking.",
+          "detail": "THE OLD FRIEND — They pulled the player out of a river, or out of a car, or out of a worse version of their own twenties, and in twenty years they have never once asked for anything back. Tonight they need the player to do something illegal, and they will not say what until the player has said yes. Every hour the player delays, the ask gets bigger, because the situation they are trying to fix is getting worse. They are warm and plausible and they know you. (Optional unease for a stranger note: the face is a little wrong — worked-on, or aged the way years don't usually age a face; they know things only your friend would know, and miss one thing your friend definitely would.)"
         },
         {
+          "id": "the-counterparty",
           "name": "The Counterparty",
-          "description": "A demon with paperwork. They have an attaché case and a fountain pen and the contract you signed when you were nineteen and high. The contract is dated and witnessed and the signature is yours. They are polite. They are not in a hurry. They will let you read every clause before they ask you to honor the one they're invoking tonight."
+          "description": "Something inhuman, holding a contract with your signature on it.",
+          "detail": "THE COUNTERPARTY — A demon with paperwork: an attaché case, a fountain pen, and the contract the player signed at nineteen and high. The contract is dated and witnessed and the signature is theirs. The Counterparty is polite and in no hurry; it will let the player read every clause before it asks them to honor the one it is invoking tonight. What it wants escalates through the night — the favor inside the favor inside the favor."
         },
         {
+          "id": "the-forgotten-bargain",
+          "name": "The Forgotten Bargain",
+          "description": "A deal you made so long ago you'd forgotten it. It hasn't.",
+          "detail": "THE FORGOTTEN BARGAIN — When the player was eight, they made a deal with something that came to their bedroom window, and then they forgot. The thing did not. It is calling in the bargain now; the price was named at the time, and the price was a firstborn — and the player has a child. The player did not connect those two facts until tonight. It is patient, and it is owed, and it has all night."
+        },
+        {
+          "id": "the-ledger-keeper",
           "name": "The Ledger-Keeper",
-          "description": "A small god of obligations. Their domain is debt itself — the ledger of what is owed, between mortals, between mortals and gods, between past selves and present ones. They are not large. They are not loud. They are the one who notices when an obligation goes unmet, and they have noticed yours, and they have come because the alternative was sending someone less courteous."
+          "description": "A small, quiet god of debts — who noticed yours.",
+          "detail": "THE LEDGER-KEEPER — A small god whose domain is debt itself: what is owed between mortals, between mortals and gods, between past selves and present ones. Not large, not loud — simply the one who notices when an obligation goes unmet. It has noticed the player's, and it has come in person because the alternative was sending someone far less courteous. Its asks escalate the way interest does: quietly, and then all at once."
         },
         {
-          "name": "The Self Who Comes Later",
-          "description": "Your own future self. Older, thinner, dressed in clothes you don't own yet. They know the room better than you do because they have been in it before, from this seat. They are not threatening. They are exhausted. The thing they need you to do will be hard, and they know it will be hard because they remember doing it, and they remember what it cost."
+          "id": "the-future-self",
+          "name": "The Future Self",
+          "description": "You, from later. Older, thinner, in clothes you don't own yet.",
+          "detail": "THE FUTURE SELF — The caller is the player, from later: older, thinner, in clothes the player does not own yet, who knows this room because they have sat in it before, from this seat. They paid forward a debt the player has not yet accrued, and they have come to collect it early. They are not threatening; they are exhausted. What they need done will be hard — they know exactly how hard, because they remember doing it, and remember what it cost. They are scared, and they will not say of what."
+        },
+        {
+          "id": "the-thing-you-owe",
+          "name": "The Thing You Owe",
+          "description": "Something vast and patient that you owe, though you can't remember agreeing.",
+          "detail": "THE THING YOU OWE — The player owes a debt to something that is not a person, not a demon with paperwork, not a god of any named pantheon — something vast, patient, and indifferent, to which the player is a convenient instrument. The first asks are trivial and merely strange: stand in a certain spot at a certain minute; carry a small wet thing three blocks without looking at it; say one word backwards to a stranger. They escalate. As the night deepens the asks stop making human sense and the places stop being places the player knows — a corridor that was a closet, a tide of something climbing a stairwell, a vast hand-built engine of meat and brass turning in a dark that has weather. Keep the early asks small and almost reasonable; let the wrongness accrete; by the late asks the player should be somewhere their waking self could never have pictured, doing something they cannot fully describe. The debt is real and the creditor is owed, and refusing has a cost the player can feel but not name."
         }
       ]
-    },
+    }
+  ],
+  "suboptions": [
     {
       "label": "Where the call happens",
       "choices": [
@@ -52,5 +79,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 323,
+    "setup_detail": 8,
+    "forks": 747,
+    "total": 1641
+  }
 }

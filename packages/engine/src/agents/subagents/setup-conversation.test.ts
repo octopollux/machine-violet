@@ -13,6 +13,30 @@ vi.mock("../../config/world-loader.js", async (importOriginal) => {
       if (slug === "scoped-seed") {
         return { name: "Scoped Seed", summary: "A seed with a baked-in scope.", genres: ["fantasy"], detail: "Some detail.", campaign_scope: "open-ended" };
       }
+      if (slug === "styled-seed") {
+        // Carries a real .mvstyle stem (Velvia.mvstyle exists on disk) so the
+        // finalize image-include guard resolves it.
+        return { name: "Styled Seed", summary: "A seed with a visual style.", genres: ["fantasy"], detail: "Base premise.", image_style: "Velvia" };
+      }
+      if (slug === "bad-style-seed") {
+        return { name: "Bad Style Seed", summary: "A seed naming a nonexistent style.", genres: ["fantasy"], detail: "Base premise.", image_style: "NoSuchStyle" };
+      }
+      if (slug === "forked-seed") {
+        return {
+          name: "Forked Seed", summary: "A seed with forks.", genres: ["fantasy"],
+          detail: "Base premise.",
+          forks: [
+            { id: "wrapper", label: "Genre wrapper", chooser: "agent", options: [
+              { id: "fantasy", name: "Fantasy", description: "stone", detail: "Temples of stone." },
+              { id: "scifi", name: "Sci-Fi", description: "servers", detail: "Server farms." },
+            ] },
+            { id: "faction", label: "Your faction", chooser: "player", options: [
+              { id: "iron", name: "Iron", description: "military" },
+              { id: "gold", name: "Gold", description: "merchants" },
+            ] },
+          ],
+        };
+      }
       return undefined;
     }),
   };
@@ -35,7 +59,9 @@ vi.mock("../../config/personality-loader.js", async (importOriginal) => {
   };
 });
 
-import { createSetupConversation } from "./setup-conversation.js";
+import { createSetupConversation, renderWorldForAgent, composeChargenPortraitPrompt } from "./setup-conversation.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
+import type { WorldFile } from "@machine-violet/shared/types/world.js";
 
 /** Flatten SystemBlock[] | string to a single string for content assertions. */
 function flattenSystem(sp: string | SystemBlock[]): string {
@@ -117,6 +143,33 @@ const FINALIZE_INPUT = {
 };
 
 const noop = () => {};
+
+describe("renderWorldForAgent setup_detail channel", () => {
+  const base: WorldFile = {
+    format: "machine-violet-world", version: 1, name: "W", summary: "s", genres: ["fantasy"],
+  };
+
+  it("surfaces setup_detail to the agent while excluding the DM-only detail", () => {
+    const out = renderWorldForAgent({ ...base, detail: "DM-SECRET-BASE", setup_detail: "Present the rhythm options." });
+    expect(out).toContain("Setup-only guidance");
+    expect(out).toContain("Present the rhythm options.");
+    // The DM-only base detail must never appear in the agent's view.
+    expect(out).not.toContain("DM-SECRET-BASE");
+  });
+
+  it("expands includes (and dot-variants) inside setup_detail", () => {
+    const out = renderWorldForAgent({ ...base, setup_detail: "<!--include:Pacing.EndlessCampaigns-->" });
+    // The EndlessCampaigns block resolved into the agent's view...
+    expect(out).toContain("Open-Ended");
+    expect(out).toContain("Serialized");
+    // ...and the raw directive is gone.
+    expect(out).not.toContain("<!--include:");
+  });
+
+  it("omits the section entirely when there is no setup_detail", () => {
+    expect(renderWorldForAgent(base)).not.toContain("Setup-only guidance");
+  });
+});
 
 describe("createSetupConversation", () => {
   it("start() returns opening text", async () => {
@@ -282,6 +335,46 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.handoffNote).toBeUndefined();
   });
 
+  it("finalize_setup passes through opening_scene", async () => {
+    const scene = "Open with Kael asleep in a hayloft, woken by a stranger saddling a horse below.";
+    const input = { ...FINALIZE_INPUT, opening_scene: scene };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.openingScene).toBe(scene);
+  });
+
+  it("finalize_setup leaves openingScene undefined when the model omits it", async () => {
+    // Defensive: the schema marks opening_scene required, but handleFinalize
+    // must not crash if the model misbehaves.
+    const provider = mockProvider([
+      finalizeResponse(FINALIZE_INPUT),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.openingScene).toBeUndefined();
+  });
+
+  it("finalize_setup trims whitespace-only opening_scene to undefined", async () => {
+    const input = { ...FINALIZE_INPUT, opening_scene: "   \n  \t  " };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.openingScene).toBeUndefined();
+  });
+
   it("finalize_setup passes through a valid campaign_scope", async () => {
     const input = { ...FINALIZE_INPUT, campaign_scope: "grand-campaign" };
     const provider = mockProvider([
@@ -305,6 +398,33 @@ describe("createSetupConversation", () => {
     const result = await conv.start(noop);
 
     expect(result.finalized!.campaignScope).toBe("few-sessions");
+  });
+
+  it("finalize_setup passes through a valid mechanics_mode", async () => {
+    const input = { ...FINALIZE_INPUT, system: "fate-accelerated", mechanics_mode: "player-facing" };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Onward!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized!.mechanicsMode).toBe("player-facing");
+  });
+
+  it("finalize_setup leaves mechanicsMode undefined when omitted or invalid", async () => {
+    // Omitted (the agent didn't ask — crunchy/pure-narrative) and a garbage
+    // value both resolve to undefined; the DM prefix applies the light-system
+    // default downstream.
+    for (const extra of [{}, { mechanics_mode: "loud" }]) {
+      const provider = mockProvider([
+        finalizeResponse({ ...FINALIZE_INPUT, ...extra }),
+        textResponse("Onward!"),
+      ]);
+      const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+      const result = await conv.start(noop);
+      expect(result.finalized!.mechanicsMode).toBeUndefined();
+    }
   });
 
   it("finalize_setup defaults campaign_scope to few-sessions when given an unknown value", async () => {
@@ -893,5 +1013,170 @@ describe("createSetupConversation", () => {
 
     expect(result.finalized).toBeDefined();
     expect(result.finalized!.campaignDetail).toBeNull();
+  });
+
+  it("finalize_setup assembles campaign_detail from base + selected fork branches", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // Base + the SELECTED wrapper branch's detail. The faction (player fork)
+    // carries no detail, so it adds nothing — and the unchosen "fantasy"
+    // branch ("Temples of stone.") is absent.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.\n\nServer farms.");
+    expect(result.finalized!.campaignDetail).not.toContain("Temples of stone");
+    expect(result.finalized!.forkSelections).toEqual({ wrapper: "scifi", faction: "iron" });
+  });
+
+  it("finalize_setup appends agent-supplied campaign_detail after the seed base", async () => {
+    // The new rule: on a seeded campaign the agent MAY pass its own
+    // campaign_detail (e.g. a setup-time visual-style include); it is appended
+    // after the code-assembled seed base rather than discarded.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked - Iron",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "scifi", faction: "iron" },
+      campaign_detail: "<!--include:Image.Velvia-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\nServer farms.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
+  it("finalize_setup appends the seed's image_style as an Image include", async () => {
+    // A seed declaring image_style gets `<!--include:Image.<style>-->` appended
+    // to campaign_detail (after the assembled base), so the DM renders in-game
+    // art in that style. Resolved at DM-prompt time into an <Image> block.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->",
+    );
+  });
+
+  it("finalize_setup orders the seed style include BEFORE the agent's appended detail", async () => {
+    // The seed's style is the campaign default; an agent-supplied include comes
+    // after it, so a setup-time <Image> choice still wins the in-slot collision.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Styled",
+      world_slug: "styled-seed",
+      campaign_detail: "<!--include:Image.NoirCinema-->",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe(
+      "Base premise.\n\n<!--include:Image.Velvia-->\n\n<!--include:Image.NoirCinema-->",
+    );
+  });
+
+  it("finalize_setup skips the include when the seed names a nonexistent style", async () => {
+    // Defense-in-depth: a bogus image_style must not emit an include that would
+    // throw on every DM turn — it's dropped, leaving the default look.
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Bad Style",
+      world_slug: "bad-style-seed",
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
+  });
+
+  it("finalize_setup drops fork selections that name unknown forks or options", async () => {
+    const input = {
+      ...FINALIZE_INPUT,
+      campaign_name: "Forked",
+      world_slug: "forked-seed",
+      fork_selections: { wrapper: "nonexistent", bogus: "x" },
+    };
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("Your adventure begins!"),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeDefined();
+    // No valid selection → base only, and nothing stored.
+    expect(result.finalized!.campaignDetail).toBe("Base premise.");
+    expect(result.finalized!.forkSelections).toBeUndefined();
+  });
+});
+
+describe("composeChargenPortraitPrompt", () => {
+  // A stand-in for what the setup agent writes: the character + the three-view call.
+  const CHAR = "Mira, a weary station heir in a worn jacket; three views front, front-left, rear-right.";
+
+  it("orders character -> style line -> black-background framing (framing LAST)", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    const styleLine = resolveImageStyleLine("NoirCinema")!;
+    expect(prompt).toContain(CHAR);
+    expect(prompt).toContain(styleLine);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+    // The ordering IS the fix: character first, style line next, framing last —
+    // so the framing wins the background composition over a scene-coupled style.
+    expect(prompt.indexOf(styleLine)).toBeGreaterThan(prompt.indexOf(CHAR));
+    expect(prompt.indexOf("REFERENCE SHEET")).toBeGreaterThan(prompt.indexOf(styleLine));
+  });
+
+  it("instructs the model to keep one-sided features on the SAME side across all three views", () => {
+    // Guards the cross-angle consistency fix: an ambiguous lateral feature (a
+    // robot arm, an eyepatch) must not drift to a different side per angle.
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoirCinema");
+    expect(prompt).toMatch(/SAME side of the body in all three views/);
+  });
+
+  it("falls back to the CinematicFilm default when no style is given", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, undefined);
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
+    expect(prompt).toContain("REFERENCE SHEET, not a scene");
+  });
+
+  it("falls back to the default when the seed names an unknown style", () => {
+    const prompt = composeChargenPortraitPrompt(CHAR, "NoSuchStyle");
+    expect(prompt).toContain(resolveImageStyleLine("CinematicFilm")!);
   });
 });

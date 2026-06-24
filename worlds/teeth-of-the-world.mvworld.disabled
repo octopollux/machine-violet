@@ -1,0 +1,82 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Teeth of the World",
+  "summary": "The mountains are moving. Slowly, but they are moving.",
+  "genres": [
+    "fantasy"
+  ],
+  "detail": "The mountains are moving. Slowly — a hand's breadth a day, a span a week, the height of a man over a season — but unmistakably. Stones that marked the boundary of a village's grazing have walked themselves into the next valley. The shadow of the great peak no longer falls where the temple was oriented to receive it. The roads through the passes are subtly wrong, and the old men who walked them in their youth are the first to notice.\n\nDM approach:\n- Tone: geologic, patient, awed. Scenes are long, and the world is older than the campaign.\n- NPCs by variant: a hermit who has stopped sleeping because he can hear the summons in his teeth (1); a court astrologer whose ancient texts have suddenly become operational manuals (2); a child born in a valley the mountain left, who does not cry (3).\n- Seed early: a survey marker the player remembers, in a new place; the way the prevailing wind has shifted; a temple's sunrise alignment off by a finger's width.\n- Pacing structure: each session is a season or a generation, depending on scale chosen. The world is slow and the player's life is fast.\n- Resist the urge to make this an action setting. The drama is the realization, the choice to stay or go, the inheritance of the news.\n\nPacing: Each in-game beat is a season or a generation. Settlements measure their lives against landmarks that no longer exist — the stone the bride was kissed on, the rock where the priest stood. Players can track the clock by what has stopped being where it was.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "the-summons",
+          "name": "The Summons",
+          "description": "The mountains are sleeping titans answering a call only they can hear; the going may take a generation.",
+          "detail": "THE SUMMONS — The mountains are sleeping titans, and something has called them. They are answering at the only speed they remember. The summons is loud only to them; no human ear can catch it, but the dogs are restless and the birds have changed their routes. Whatever called them will be where they are going, and the going may take a generation."
+        },
+        {
+          "id": "the-migration",
+          "name": "The Migration",
+          "description": "These are continent-scale stone organisms doing what they do once an age; the older orders' scripture is the record.",
+          "detail": "THE MIGRATION — These are not titans but stone organisms, continent-scale, with a season. This has happened before, very long ago, and the records of it are scripture in the older orders. The mountains are doing what mountains do once every age. The species is just larger than the species that has been watching it."
+        },
+        {
+          "id": "the-leaving",
+          "name": "The Leaving",
+          "description": "The mountains are leaving and the land they vacate turns uninhabitable; a glacier-slow apocalypse they are silently sorry for.",
+          "detail": "THE LEAVING — The mountains are leaving, and where they walked becomes uninhabitable. The land they vacate is wrong in ways that take a year to manifest — the soil refuses, the water turns, the children born there are quiet. A glacier-slow apocalypse. The mountains know. They are sorry, in the way mountains are sorry, which is silent."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
+    {
+      "label": "Your scale",
+      "choices": [
+        {
+          "name": "The Shadow of One Stone",
+          "description": "A single village under one mountain's shadow. You have weeks. The mountain is leaning, and at the rate it is leaning it will pass through your fields by harvest. The elder has called a meeting. The decision is whether to move, and if so where, and with what. The cemetery cannot be moved. The decision is also about who you are willing to leave behind."
+        },
+        {
+          "name": "The King's Astrologer",
+          "description": "A kingdom's court astrologer with political weight. You have a year. You have the king's ear and the difficult job of telling him what your charts show. The court does not yet believe you. The neighboring courts are beginning to notice the same data. Your political weight is exactly the weight of the next conversation, and after that you will be a heretic or a saint."
+        },
+        {
+          "name": "The Pilgrim of the Spine",
+          "description": "A pilgrim walking the spine of the world to ask why. You have a lifetime, which may not be enough. You set out from the southernmost peak with a staff and a question. The mountains move ahead of you, and you adjust. You meet others on the spine. None of them have an answer yet. The walking is itself a kind of asking."
+        },
+        {
+          "name": "The Keeper of Notes",
+          "description": "A long-lived being who has seen this before and has notes. You remember the previous time, or you have notes from the predecessor who did. Either way you are the only one in the room who is not surprised, and you carry the responsibility of explaining what is happening to people who will not live to see the end of it. The notes were written for a different age and you are constantly translating."
+        }
+      ]
+    },
+    {
+      "label": "The mountain range",
+      "choices": [
+        {
+          "name": "The Wall Between",
+          "description": "A long alpine chain dividing two civilizations. Snow above the treeline year-round, and a handful of passes that have been the only routes between the two great cultures for as long as anyone has been counting. The passes are the first to close. Diplomacy slows; trade ends; the two civilizations are about to discover what they sound like when they can't hear each other."
+        },
+        {
+          "name": "The Lone Argument",
+          "description": "A single great solitary peak. It rises from the plain like an argument. Visible from the whole continent — the navigators set their charts by it. Four religions hold it sacred and have for so long that none of them remembers which was first. Now it is taking small steps westward. All four orders are convening. None of their liturgies covers this."
+        },
+        {
+          "name": "The Smiling Arc",
+          "description": "A volcanic arc. A line of cones spaced like teeth in a smile, smoking gently into a sky that never fully clears. The eruptions correlate with the walking — when one moves, another vents — and the relationship is not yet understood. The villages downwind have always lived with ash; now they are learning to live with the rumor of larger plans."
+        },
+        {
+          "name": "The Soft Shoulders",
+          "description": "An ancient eroded range, low and old. Almost hills now, soft-shouldered, forested to the summits. They have been still for so long that no living tradition imagines them otherwise. The walking is the first new thing they have done in a million years. The locals do not have a word for it. They are inventing one."
+        }
+      ]
+    }
+  ]
+}

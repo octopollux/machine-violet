@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "VectorBrush"
+rating: "?"
+description: "Crisp digital illustration drawn with deliberate even-weight vector-like brush strokes and large clean shapes"
+tags: [illustration, graphic, limited-palette, any-scene]
+made-for-model: gpt-image-2
+tokens: 138
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean modern digital illustration drawn with disciplined VECTOR-LIKE BRUSHES. Strict process discipline: render every form with confident, deliberate, even-weight brush strokes; clean hard-edged and soft brush shapes used intentionally, each stroke placed with purpose, no noodling, no reflexive micro-texture, no fussy rendered detail. The brush economy keeps the image crisp, smooth and graphic; large clean shapes carry the forms and detail is spent only where it counts. A harmonious limited palette, a clear focal hierarchy. Clean, modern, confident. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Tic-controlled digital-illustration workhorse, family of [CleanDigital](./CleanDigital.mvstyle). The lever: deliberate, even-weight VECTOR-LIKE BRUSH economy — confident purposeful strokes, no noodling, large clean shapes carrying the forms, detail spent only where it counts. (My own read rated this the weakest of the four, but the USER's eye judged it tic-free and clean — the human eye is the comparator, see [[show-renders-before-banking]] — so it's banked; the brush-economy framing reads as deliberate rather than reflexive even when detail is present.) Caption = tasteful clean type.
+
+# Example
+
+![VectorBrush](../ImageStyleExample/VectorBrush.example.png)

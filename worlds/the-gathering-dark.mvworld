@@ -1,0 +1,86 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "The Gathering Dark",
+  "summary": "One by one, the lights that held back the dark are going out.",
+  "genres": [
+    "fantasy",
+    "adventure"
+  ],
+  "image_style": "PainterlyGame",
+  "mood": "Epic and hopeful — courage and warmth against an encroaching dark, never grim",
+  "setup_detail": "Opening scene: open small and personal, grounded in the player's chosen way-in (their fork), at the moment the dark first touches THEM — their home ward guttering, their border falling silent, a night that came too early and never fully lifted. Establish the warmth of the old light and the wrongness of its failing; let the dark be felt as effect and dread, not shown as a face. Do NOT name or reveal the source, the prophecy's truth, or the crucial-question — the realm itself does not understand yet. The player begins with one small, local, urgent thing to do (save or relight the light at hand), and the epic grows outward from there.\n\nScope: this world is built for **A Few Sessions** or a **Grand Campaign** — the gathering dark wants room to rise. Steer the player toward those; if they truly want a one-shot, run a single compressed movement (one region, one ward, the dark at the door) rather than the whole arc.",
+  "detail": "## The realm and the old lights\nFor as long as anyone remembers, the realm has been kept by the old lights — beacon-fires on the headlands, hearth-wards in every village, the great sun-shrines of the cities, and the First Light at the heart of it all, lit at the founding to hold the Long Dark at the edge of the world. Tend the lights and the dark stays out there, where it belongs. That was the bargain the realm was built on, and for centuries it held.\n\nIt is failing now. The lights are going out — a beacon guttering on a far headland, a village hearth that will not catch, a shrine gone cold — and wherever a light dies, the Long Dark comes in: nights that stretch too long, a cold that will not lift, and in the deepening dark, things the light used to keep out. It began at the edges. It is moving inward. Most of the realm has not yet understood that it is happening to all of them.\n\nThe player is pulled into this — by prophecy, by plain bad luck, or by losing their own light to the dark (their fork) — and the campaign is the long fight to carry the fire: relight the wards, gather a realm that does not yet believe, and march at last to the source of the failing.\n\n## The Long Dark (surface only — the truth is the crucial-question; keep it hidden)\nAt the surface, play the Long Dark as a creeping, encroaching night: lengthening darkness, a deadening cold, failing lights, refugees moving inward against the dark — and, in the dark itself, cold and hungry things the old lights used to hold at bay. WHY the lights are failing, and what the dark truly is, is the agent's crucial-question; do NOT reveal it early. Early game is the dark's EFFECTS, never its face or its cause.\n\n## The realm (location skeleton — grow more as the player moves)\nThe realm runs from its dark, failing edges inward to its bright heart, and the campaign travels that road. The bones (and the relightable lights along the way):\n- **the player's home region** — the edge, where the dark arrives first; the guttering home ward is the opening.\n- **the border holds & headland beacons** — the realm's outer line of lights, the first to fail.\n- **the deep road** — the long way inward, through country the dark is taking; refugees moving against the traffic.\n- **the wildlands & the old forest** — the unsettled spaces between, where the dark pools and old things wake.\n- **the free towns & the river country** — the realm's divided middle; allies to win, lords who will not listen.\n- **the great city & its sun-shrine** — the realm's heart and its brightest light; politics, and the powers that must be gathered.\n- **the high seats of the realm's powers** — crown, temple, the old houses, the keepers of the lights — proud, skeptical, self-interested.\n- **the old places** — ruins, barrows, the founding-sites where the oldest lore (and the oldest lights) sleep.\n- **the failing marches** — the regions already half-lost to the dark; to rescue, or to write off.\n- **the road to the source** — opens only late; where the First Light stands, and where the dark is truly coming from.\nEach light the player relights — beacon, hearth-ward, sun-shrine — should become a tracked location (a ward, primed to grow); the realm should accumulate as a living map being pulled back from the dark.\n\n## The three movements (PACE THE EPIC — hold each until it pays off)\nThe dark rises in three movements, on the DM's schedule, never because the player hurries. The relighting structure enforces the pacing: the player cannot relight the whole realm at once, so each region is its own arc.\n- **Movement I — The Edge.** Local and personal: the player's own region and its guttering light. The dark appears only as effects (the long night, the cold, refugees, small wrong things at the dark's edge), never its face. The first victory is relighting ONE light — the home ward. Stakes are intimate; the wider realm does not believe yet; the source stays offscreen. Spend real time here.\n- **Movement II — The Road & the Realm.** The long middle, and the actual campaign. Carry the alarm inward into a divided, skeptical, self-interested realm; relight wards and gather allies REGION BY REGION, each region its own arc with its own resistance, cost, and small triumph. The dark spreads visibly, but never faster than the player can witness it. Every relit light is a victory worth a scene. Resist the pull to march on the source early — this middle IS the campaign, not the bridge to it.\n- **Movement III — The Source.** Only when the realm is gathered and the lights are mostly held does the road to the source open. The confrontation, and its cost — shaped by the crucial-question. Do not open this movement until Movement II has genuinely paid off.\nProgress is a RISING tally — relit wards, gathered allies, regions held — tracked in dm_notes, not a countdown to defeat. The lengthening dark is a reveal-engine (each movement opens more realm and more truth), not a doom-clock that punishes a slow player. When you are unsure whether it is time to escalate to the next movement, it is not yet.\n\n## DM approach\n- Run the lights as the spine of progress: each beacon, hearth-ward, and sun-shrine relit is concrete, visible, earned. Track the relit lights and the regions held in dm_notes; let the map of light grow against the dark.\n- Keep it HOPEFUL and heroic, not grim — this is the warmth of carried fire against an encroaching night: courage, fellowship, and hard-won small triumphs, not bleak despair. Bad things happen and lights are lost, but the through-line is a hope worth fighting for.\n- The realm is DIVIDED: crown, temple, old houses, free towns — proud, skeptical, self-interested, slow to believe. Winning them is much of Movement II, and none of them is simply the good side.\n- The crucial-question (what the dark truly is) is the deep game; keep it hidden, and let it surface gradually through the old places, the lore, and what relighting costs.\n- Drive the fellowship (below) as a found-family: recurring companions who travel, argue, grow, and matter.\n\n## The companions (the fellowship — found-family; some romanceable)\nThe player gathers companions as they go; play them as a real, recurring found-family, not interchangeable hirelings. Two to seed and grow from the start (name and add more as the realm is gathered):\n- **a steadfast border-knight** — sworn to a falling march, who lost their post and their people to the dark and rides on anyway; loyal, plainspoken, the fellowship's spine. A romanceable slow-burn of shared duty and grief.\n- **a sharp-tongued ward-scholar** — a keeper or student of the old lights' lore, exiled or unheeded, who knows how the wards work and quietly suspects what the dark is; prickly, brilliant, secretly afraid. A romanceable slow-burn of friction warming into trust.\nRomance is available but never forced: the hooks are named and the companions are drawn to be wanted, but the bond grows at the player's pace, or not at all. Add more as the journey earns them — a guide out of the wildlands, a refugee child who sees in the dark, a disgraced priest of a cold sun-shrine.\n\nPacing: see setup — built for A Few Sessions or a Grand Campaign. The three movements pace the rise of the dark; the relit-ward tally is the progress the player reads.",
+  "forks": [
+    {
+      "id": "the-long-darks-truth",
+      "label": "What the Long Dark truly is",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone — this is why the lights are failing, the deep truth beneath the surface night. Do NOT reveal early; let it surface through the old places, the lore, and what relighting costs.",
+      "options": [
+        {
+          "id": "the-debt-come-due",
+          "name": "The Debt Come Due",
+          "description": "The realm's light was bought at the founding by binding something away into the dark. That binding is ending.",
+          "detail": "THE DEBT COME DUE — The founding lit the wards by binding something away: a power, a people, a god, a part of the world itself, sealed into the dark so the rest could live in light. That binding is ending, and the Long Dark is the debt coming due — the bound thing waking, wanting out, or wanting justice. Relighting the wards may mean paying the price again, and somewhere in the journey the player learns the realm's light was always built on a buried cruelty. The moral campaign: save the realm as it is, or refuse to pay what saving it costs — and find a third way only if they are clever and stubborn enough to make one."
+        },
+        {
+          "id": "the-dying-light",
+          "name": "The Dying Light",
+          "description": "No villain. The First Light — the source the wards draw from — is simply dying, old and guttering, and the realm is going out with it.",
+          "detail": "THE DYING LIGHT — There is no enemy. The First Light, the wellspring every ward draws from, is DYING — old and guttering like a star at the end of its life — and the wards fail because the source fails. Saving the realm is not defeating a foe; it is rekindling or replacing a dying flame (a god, a heart-of-the-world, a first fire) before it goes out for good. The quest is restoration and sacrifice, not war: the antagonist is entropy itself, and the real question is what the player is willing to give — and give up — to relight the world. Quiet, elegiac, and finally hopeful."
+        },
+        {
+          "id": "the-hand-in-the-dark",
+          "name": "The Hand in the Dark",
+          "description": "Someone is putting the lights out on purpose — and the prophecy and the panic are partly their design.",
+          "detail": "THE HAND IN THE DARK — Someone is extinguishing the lights deliberately. An intelligence — a fallen keeper, a thing out of the first dark, a rival power, or a betrayer among the realm's own — is snuffing the wards one by one, and the prophecy and the panic are partly their doing. This is the most classic shape: a foe to find, unmask, and confront, with the dark as their weapon and the realm's own division as their ally. The campaign's spine is the hunt; the turns are who, and why, and how close to home the hand reaches — perhaps to a companion, perhaps to the very prophecy that named the player."
+        }
+      ]
+    },
+    {
+      "id": "your-way-in",
+      "label": "Why the dark is yours to fight",
+      "chooser": "player",
+      "prompt": "The player picks how they are pulled into the gathering dark — their way in, and the lens on their first scenes. Each option's detail is the DM's angle: the player's starting situation, what they carry, and how the realm meets them. The opening (see setup) grounds in this choice.",
+      "options": [
+        {
+          "id": "the-hearth-keeper",
+          "name": "The Hearth-Keeper",
+          "description": "The light you were responsible for has gone out, and the dark is already at your door. This was your watch.",
+          "detail": "THE HEARTH-KEEPER — The most personal way in, and the everyperson lens. The player tended a light — a village hearth-ward, a wayside beacon — and it failed on their watch, with the dark already pressing in on the people they are responsible for. The campaign opens as a desperate, local fight to relight that one light and save their home, and grows outward from that grief and duty. They begin small, unimportant, and absolutely the right person, because they are the one who stayed."
+        },
+        {
+          "id": "the-border-soldier",
+          "name": "The Border-Soldier",
+          "description": "You held a border the dark has overrun. Your post is gone, your people scattered, and you carry the warning inward.",
+          "detail": "THE BORDER-SOLDIER — The player held a march that the dark has taken; they have SEEN it and what moves in it, and survived. Their post is lost and their people scattered, and now they carry the warning inward to a realm that does not want to hear it. Their way in is the unheeded alarm and the soldier's stubborn duty to make the realm listen and act before more of it falls. They know the dark is real and close; their fight is getting anyone with power to believe it in time."
+        },
+        {
+          "id": "the-named",
+          "name": "The Named",
+          "description": "An old prophecy names someone to carry the fire when the lights fail. It points at you — truly, mistakenly, or because someone wants it to.",
+          "detail": "THE NAMED — The chosen-one hook, with the truth in the DM's hands. An old prophecy names one who will carry the fire when the lights fail, and it points at the player — but whether it truly means them, mistook them, or was bent to point at them is the DM's to decide (and it ties to the crucial-question, especially The Hand in the Dark). Play the weight and the doubt of being named: the eyes that turn to them, the expectation they did not ask for, the private fear that it is all a mistake. The table can take the prophecy straight, or pull the rug — either lands."
+        },
+        {
+          "id": "the-lightwright",
+          "name": "The Lightwright",
+          "description": "You study the old lights — how they are lit, why they hold. You may be the only one who sees they are failing by some design.",
+          "detail": "THE LIGHTWRIGHT — The expert way in. The player is a scholar or keeper of the old lights' lore — they understand how the wards are lit and what makes them hold, which positions them to be the first to grasp that the failing is not random, and to suspect the crucial-question's truth. Their fight is knowledge against disbelief: they can see the pattern in the dying lights that no one in power wants to hear. Give them the satisfaction of competence — and the loneliness of being right too early."
+        },
+        {
+          "id": "the-exile-returning",
+          "name": "The Exile Returning",
+          "description": "You left the realm long ago. Now word reaches you that the lights are dying — and something pulls you home.",
+          "detail": "THE EXILE RETURNING — The outsider-returning lens, and a clean audience surrogate. The player left the realm years ago (banished, fled, or simply gone) and word of the dying lights reaches them far away; something — a home, a person, a debt, a duty they thought they had escaped — pulls them back. They rediscover the realm as the player does: changed, darker, and not quite the home they left. Their way in is the personal reason to return, and the slow reckoning with what (and who) they walked away from."
+        }
+      ]
+    }
+  ],
+  "_tokens": {
+    "detail": 1670,
+    "setup_detail": 204,
+    "forks": 982,
+    "total": 3308
+  }
+}

@@ -12,6 +12,8 @@ function mockFileIO(): FileIO {
     exists: vi.fn(async () => true),
     listDir: vi.fn(async () => ["a.md", "b.md"]),
     deleteFile: vi.fn(async () => {}),
+    writeBinaryFile: vi.fn(async () => {}),
+    readBinaryFile: vi.fn(async () => new Uint8Array([1, 2, 3])),
   };
 }
 
@@ -132,6 +134,72 @@ describe("sandboxFileIO", () => {
     const sandboxed = sandboxFileIO(inner, [ROOT]);
 
     expect(sandboxed.deleteFile).toBeUndefined();
+  });
+
+  it("guards writeBinaryFile", async () => {
+    const sandboxed = sandboxFileIO(mockFileIO(), [ROOT]);
+
+    await expect(
+      sandboxed.writeBinaryFile!(resolve("/tmp/evil.png"), new Uint8Array([0])),
+    ).rejects.toThrow("Path outside sandbox");
+  });
+
+  it("propagates writeBinaryFile only when inner supports it", () => {
+    const inner = mockFileIO();
+    delete inner.writeBinaryFile;
+    const sandboxed = sandboxFileIO(inner, [ROOT]);
+
+    expect(sandboxed.writeBinaryFile).toBeUndefined();
+  });
+
+  it("forwards writeBinaryFile to inner with guarded path", async () => {
+    // Regression: a prior version of sandboxFileIO never forwarded
+    // writeBinaryFile at all, which caused image persistence to throw
+    // "FileIO.writeBinaryFile is required" against the production
+    // sandbox-wrapped FileIO. Make sure the forward survives any future
+    // refactor of this file.
+    const inner = mockFileIO();
+    const sandboxed = sandboxFileIO(inner, [ROOT]);
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+
+    await sandboxed.writeBinaryFile!(ROOT + sep + "images" + sep + "portrait.png", bytes);
+    expect(inner.writeBinaryFile).toHaveBeenCalledWith(
+      resolve(ROOT, "images", "portrait.png"),
+      bytes,
+    );
+  });
+
+  it("guards readBinaryFile", async () => {
+    const sandboxed = sandboxFileIO(mockFileIO(), [ROOT]);
+
+    await expect(
+      sandboxed.readBinaryFile!(resolve("/tmp/evil.png")),
+    ).rejects.toThrow("Path outside sandbox");
+  });
+
+  it("propagates readBinaryFile only when inner supports it", () => {
+    const inner = mockFileIO();
+    delete inner.readBinaryFile;
+    const sandboxed = sandboxFileIO(inner, [ROOT]);
+
+    expect(sandboxed.readBinaryFile).toBeUndefined();
+  });
+
+  it("forwards readBinaryFile to inner with guarded path", async () => {
+    // Regression: sandboxFileIO forwarded writeBinaryFile but NOT
+    // readBinaryFile, so the production sandbox-wrapped FileIO had
+    // `readBinaryFile: undefined`. loadDmPortraitMessage gates on that method
+    // and silently returned null, so PC portraits never reached the DM
+    // context — generated characters drifted off-model. Keep the read/write
+    // binary forwards symmetric.
+    const inner = mockFileIO();
+    const sandboxed = sandboxFileIO(inner, [ROOT]);
+
+    const out = await sandboxed.readBinaryFile!(ROOT + sep + "characters" + sep + "x-portrait.png");
+    expect(inner.readBinaryFile).toHaveBeenCalledWith(
+      resolve(ROOT, "characters", "x-portrait.png"),
+    );
+    expect(out).toEqual(new Uint8Array([1, 2, 3]));
   });
 
   it("prevents root prefix spoofing", async () => {

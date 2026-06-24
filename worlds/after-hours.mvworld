@@ -1,0 +1,86 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "After Hours",
+  "summary": "An asteroid where the sun never rises, the jazz never stops, and the bodies keep turning up.",
+  "genres": [
+    "mystery",
+    "sci-fi",
+    "thriller"
+  ],
+  "image_style": "AfterHours",
+  "setup_detail": "<!--include:Pacing.EndlessCampaigns-->\n\nOpening scene: open inside the glamour, not the crime. Begin in the Blue Hour or a club like it — the band mid-number, the long bar, neon and the blue hum of mercury-vapor, the nebula turning slow and violet in the dome overhead, the colony out late because there is no morning to send it home. Establish that it is always evening here and that Vesper is alive and stylish and a little dangerous BEFORE the first hook lands (a body in a booth, a marker that can't be paid, a reading that's too accurate, a whisper from the tunnels). Ground the player in their role (their fork) and the city. Do NOT reveal the crucial-question — let the surface drama start, and the real shape surface later.",
+  "detail": "## Vesper, the asteroid where the sun never rises\nVesper is a medium-sized colony bored into and built atop an asteroid, and the sun never rises here — the sky in the great dome is all nebula, slow banks of violet and rose and electric green, and the colony lives in a permanent, glamorous evening. It is the 1920s in every way that matters: hot jazz pouring out of clubs that never close, neon and the blue-white buzz of mercury-vapor lamps, showgirls and speakeasies and fortune-tellers, swells in the high tiers and mobsters in the low ones. The sci-fi is mostly the set — play Vesper as a Jazz Age boomtown that happens to sit on a rock in space, and let the rest follow.\n\n## Tone (read this twice)\nAtmospheric, glamorous, ALIVE — **not grim, and deliberately not noir.** The crime is real and the danger is real, but the register is brass and velvet and neon and the thrill of a city that never sleeps — not bleakness, not despair, not the bottom of a bottle. People here are sharp and stylish and having a wonderful time at the edge of trouble. Murders happen in bars; the response is intrigue and adrenaline and a good story to tell, not nihilism. Keep it dark-and-delicious, never dark-and-hopeless.\n\n## The sci-fi is set dressing — until you want it\nBy default Vesper is a 1920s city and the asteroid is flavor: the dome, the lighter step in the outer tiers, the recycled air with its faint tin taste, the ore-money that built the place. But the space-colony nature is fair game whenever a hook wants it — above all the air (finite, owned), the docks (the only way on or off this rock), and whatever Vesper is really orbiting out there in the dark. The crucial-question sets how far the sci-fi leans in. Don't let it swamp the jazz; let it season it.\n\n## Vesper (location skeleton — a vertical city; grow more as the player moves)\nVesper is built in tiers, the swells at the top and the works at the bottom, threaded top to bottom by access tunnels and maintenance warrens where the mob moves unseen. Lit throughout by neon and the blue hum of mercury-vapor. The bones:\n- **the dome promenade** — where the colony strolls under the nebula and pretends it's a sky; the closest thing Vesper has to an outdoors.\n- **the Blue Hour** — the signature jazz club and speakeasy: the band, the long bar, and the back room where the real deals are cut.\n- **the high tiers** — the swells' quarter; penthouses, the grand hotel, old ore-money and new manners.\n- **the mid-tiers** — the working colony; tenements, all-night diners, the honest jobs.\n- **the lower works** — the ore-processing and foundries that built Vesper, now running on a skeleton crew; the bottom of the social drop.\n- **the access tunnels & maintenance warrens** — the vertical guts of the colony, where the outfits move bodies and booze unseen; everyone knows they're there and nobody decent goes in.\n- **the revue** — the theater; showgirls, sequins, the chorus line; glamour and gossip in equal measure.\n- **the casino** — the gambling hall, the house's edge, the markers that quietly ruin people.\n- **the parlor** — the fortune-teller's, the medium's; secrets bought and sold as readings (real or faked — see the crucial-question).\n- **the precinct** — colony security; the law, such as it is, bought in places and stubborn in others.\n- **the docks & the spaceport** — the only way on or off Vesper; arrivals, contraband, and the long dark outside the airlocks.\n- **the grand hotel** — where the out-of-towners and the kept and the hiding all take rooms.\n- **the alleyways** — the dim neon back-streets between the clubs, where the things the promenade doesn't see happen.\n- **the air plant & the reservoir** — life-support and water; Vesper breathes and drinks at someone's sufferance (fair game for a hook).\n- **the boss's club** — a legitimate front for one of the outfits, with a velvet office in the back.\n- **the radio tower** — Vesper's voice: the late broadcasts, the band on the air, the news that gets managed.\n- **the morgue & the cold rooms** — where the bodies go, and the coroner who can sometimes be persuaded.\n- **the boneyard** — what passes for a cemetery on a rock you can't dig graves in; how Vesper buries its dead is its own small glamour and its own small horror.\n\n## DM approach\n- Run a living city. Recurring faces the player learns and the city remembers — a bandleader, a boss, a beat cop, a torch singer, a tout, a cigarette girl who hears everything. Cases and troubles come and go; Vesper stays.\n- The player's role (their fork) is their way in — play the colony through that lens, and let the other tiers feel like a different world a few floors away.\n- Seed early: a body in a booth, a marker someone can't pay, a reading that lands too true, a tip whispered up from the tunnels.\n- The crucial-question is the deep game beneath the week-to-week. Don't reveal it early; let the surface crime-and-glamour play, and let the real shape of Vesper surface as the player pulls threads.",
+  "forks": [
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone — this is the deep game beneath the jazz-and-crime surface, and it sets how far the sci-fi leans in. Do NOT reveal early; let it surface through play.",
+      "options": [
+        {
+          "id": "the-mob-war",
+          "name": "The Mob War",
+          "description": "Two outfits ran Vesper's rackets between them for years. The peace just broke — and the murders are the opening shots.",
+          "detail": "THE MOB WAR — Two outfits have split Vesper's rackets between them for years, and the peace just broke. The murders are the opening shots of an escalation toward open war over the booze, the docks, the casino, and the tunnels. The sci-fi stays pure set dressing here; this is a Jazz Age crime drama of loyalty, leverage, and who ends up holding the rock. The player is caught between the two — courted, threatened, and used by both — and Vesper will be remade by whoever wins."
+        },
+        {
+          "id": "the-air-racket",
+          "name": "The Air Racket",
+          "description": "Someone has a hand on the colony's air, metered tier by tier. The perfect protection racket: pay, or your tier stops breathing.",
+          "detail": "THE AIR RACKET — Someone has their hand on Vesper's throat: the life-support and the air itself, routed and metered tier by tier. It is the perfect protection racket — pay, or your tier stops breathing — and the murders are about who controls it and who found out. This is where the colony's sci-fi nature becomes the engine: the air is finite, the docks are the only way off, and a city in a dome can be held hostage by whoever owns the plant. Still play it glamorous — the menace wears a beautiful suit and buys the first round — but underneath, the stakes are everyone's next breath."
+        },
+        {
+          "id": "the-long-night",
+          "name": "The Long Night",
+          "description": "The sun never rises here, and that isn't only orbital mechanics. The fortune-tellers aren't all frauds. Something is reaching in.",
+          "detail": "THE LONG NIGHT — The sun never rises on Vesper, and that is not only orbital mechanics. Something is off about the rock, or the nebula it hangs in, or the dark it is really orbiting — and the fortune-tellers are not all frauds. Readings come true. The dead are sometimes seen on the promenade, dressed for a night that ended years ago. Whatever Vesper circles out there has begun, very politely, to reach in. Keep it eerie-glamorous, never grim: an uncanny shimmer under the neon, a wrongness that's almost beautiful, a mystery the band keeps playing over. The player pulls the one thread the colony has spent a long time carefully not pulling."
+        }
+      ]
+    },
+    {
+      "id": "who-you-are",
+      "label": "Who you are on the rock",
+      "chooser": "player",
+      "prompt": "The player picks their place in Vesper — their way into the city. Each option's detail is the DM's angle on that role: their access, their leverage, their trouble, and how the colony comes to them.",
+      "options": [
+        {
+          "id": "the-gumshoe",
+          "name": "The Gumshoe",
+          "description": "A private investigator who works the cases the precinct won't. An office with your name on the frosted glass, a bottle in the drawer, and a reputation for finding things people would rather stayed lost.",
+          "detail": "THE GUMSHOE — the classic lead and thread-puller. A license, contacts in both the precinct and the clubs, and just enough enemies to be interesting. Their way in is the case: someone hires them, or a body lands in their lap. Give them leads to pull and let the city open one case at a time; the danger is how far each thread runs up the tiers."
+        },
+        {
+          "id": "the-canary",
+          "name": "The Canary",
+          "description": "The headliner at a club — a torch singer the whole colony knows by her first name. From the stage you see everyone: the swells, the bosses, who's sitting with whom. And everyone tells the singer their troubles.",
+          "detail": "THE CANARY — glamour and total access. The player is the colony's confidante and its mirror, adored by swells and mob alike and beholden to the club that books her. Their way in is what they overhear from the stage and the dressing room, and who would prefer them quiet. Their leverage is being adored and badly underestimated; their trouble is that everyone assumes the singer is only a singer."
+        },
+        {
+          "id": "the-fortune-teller",
+          "name": "The Fortune-Teller",
+          "description": "You read fortunes in a neon parlor. Whether the sight is real or the cleverest cold-read on the rock is your business — either way you know everyone's secrets, because people tell the cards what they'd never tell a cop.",
+          "detail": "THE FORTUNE-TELLER — the keeper of secrets. Everyone passes through the parlor and everyone leaves something behind. Their way in is what a client lets slip, a debt repaid in confidences, or a reading that lands too true (and under The Long Night, may genuinely BE true — let the player wonder which). Useful, a little feared, and never quite trusted by anyone whose secret they hold."
+        },
+        {
+          "id": "the-fixer",
+          "name": "The Fixer",
+          "description": "You work for one of the outfits — the one who cleans things up, moves what needs moving, makes problems disappear. You're good at it. You're in deeper than you meant to be.",
+          "detail": "THE FIXER — inside the underworld. Deniable jobs, a boss who owns the player's time and maybe their debts, and a conscience that's beginning to cost. Their way in is the work they're handed and the lines they decide not to cross. The campaign is as much about getting out clean as getting ahead — and the mob war or the air racket runs straight through their employer."
+        },
+        {
+          "id": "the-greenhorn",
+          "name": "The Greenhorn",
+          "description": "You came in on the last boat with a suitcase and a plan that's already falling apart. Vesper is dazzling and bewildering and faster than you are, and you're learning the rules the hard way — in real time, in public.",
+          "detail": "THE GREENHORN — the audience surrogate. Learns the colony as the player does: no built-in contacts, every faction a fresh first impression, the city's habit of chewing up the new. Their way in is need — money, a job, or someone they came all this way to find — and the discovery is the point. Let Vesper dazzle and bewilder before it endangers."
+        }
+      ]
+    }
+  ],
+  "_tokens": {
+    "detail": 1179,
+    "setup_detail": 161,
+    "forks": 785,
+    "total": 2624
+  }
+}

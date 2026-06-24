@@ -6,6 +6,13 @@
  * Git is invisible infrastructure; the player never interacts with it.
  */
 
+import { dirname } from "node:path";
+import {
+  snapshotCampaign,
+  createArchiveFileIO,
+  type ArchiveFileIO,
+} from "../../config/campaign-archive.js";
+
 // --- Types ---
 
 export type CommitType = "auto" | "scene" | "session" | "checkpoint" | "character";
@@ -75,7 +82,7 @@ export class CampaignRepo {
     this.dir = params.dir;
     this.git = params.git;
     this.enabled = params.enabled ?? true;
-    this.autoCommitInterval = params.autoCommitInterval ?? 3;
+    this.autoCommitInterval = params.autoCommitInterval ?? 1;
     this.maxCommits = params.maxCommits ?? 500;
   }
 
@@ -369,18 +376,35 @@ interface PruneFileIO {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   rmdir?(path: string): Promise<void>;
+  /** Real directory check, used when available in place of a name heuristic. */
+  isDirectory?(path: string): Promise<boolean>;
 }
 
 /**
- * Canonical rollback: git restore + ghost-dir cleanup.
+ * Canonical rollback: pre-rollback backup → git restore → ghost-dir cleanup.
  * All callsites must use this — callers handle process.exit themselves.
+ *
+ * Before touching git, the entire campaign (including `.git`) is snapshotted to
+ * a `pre-rollback` zip in archivedcampaigns/, so the turns about to be discarded
+ * remain recoverable from the Archived Campaigns list. This is the single
+ * chokepoint every rollback entry point funnels through (command, DM tool,
+ * OOC, dev), so the backup is guaranteed without per-callsite wiring. If the
+ * backup fails we abort rather than perform a destructive reset with no safety
+ * net. `archiveIO`/`campaignsDir` default to the production fs factory and the
+ * campaign's parent dir; tests inject in-memory mocks.
  */
 export async function performRollback(
   repo: CampaignRepo,
   target: string,
   campaignRoot: string,
   fileIO: PruneFileIO,
+  archiveIO: ArchiveFileIO = createArchiveFileIO(),
+  campaignsDir: string = dirname(campaignRoot),
 ): Promise<RollbackResult> {
+  const backup = await snapshotCampaign(campaignRoot, campaignsDir, archiveIO, { label: "pre-rollback" });
+  if (!backup.ok) {
+    throw new Error(`Rollback aborted — pre-rollback backup failed: ${backup.error}`);
+  }
   const result = await repo.rollback(target);
   await pruneEmptyDirs(campaignRoot, fileIO);
   return result;
@@ -418,8 +442,14 @@ export async function pruneEmptyDirs(root: string, io: PruneFileIO): Promise<num
       const child = norm(dir) + "/" + entry;
       // Skip dotfiles/dirs (e.g. .git)
       if (entry.startsWith(".")) continue;
-      // Heuristic: entries without a dot extension are likely directories
-      if (!entry.includes(".")) {
+      // Prefer a real directory check; fall back to a name heuristic (entries
+      // without a dot extension). The heuristic is safe for campaign data —
+      // all directory names are slugified, hence dot-free — but a real check
+      // is used whenever the IO exposes one.
+      const isDir = io.isDirectory
+        ? await io.isDirectory(child)
+        : !entry.includes(".");
+      if (isDir) {
         await walk(child);
       }
     }

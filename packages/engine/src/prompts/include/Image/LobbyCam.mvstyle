@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "LobbyCam"
+rating: "C"
+description: "Cheap ancient lobby CCTV still: upscaled macro-pixel blocks, soft out-of-focus blur, fisheye, washed colour, crude time OSD"
+tags: [surveillance, lo-fi, muted, grim, interior-friendly]
+made-for-model: gpt-image-2
+tokens: 266
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a cheap, ancient lobby/entrance security camera — a low-end colour CCTV multiplexer feed. THE FEED IS TINY, HEAVILY UPSCALED AND SOFT: it is captured at a very low resolution and blown up to fill the frame, so the image is built from large blocky macro-pixels, but it is also genuinely SOFT and out of focus, never crisp — cheap blurry optics slightly out of focus, a soft smeary low-pass blur over everything, motion blur, blooming highlights, and crunchy low-bitrate compression smearing the blocks together. Washed, slightly oversaturated cheap colour with an off colour-balance cast, low dynamic range, heavy noise and a soft haze. WIDE fisheye lens, mounted high in a corner over a small drab interior. Nothing in the frame is sharp — the whole image is soft, blurry, low-resolution and degraded. Burn a blocky low-resolution on-screen display into a corner in a crude monospace font: a short camera/zone label and a 24-hour clock TIME in HH:MM:SS — show a time only, never a calendar date. Cheap, soft, ugly, faintly menacing.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Surveillance-cluster member — the CHEAP INDOOR garbage-feed lens (the grubbiest of the cluster). THREE load-bearing levers: (1) the structural "TINY feed HEAVILY UPSCALED → large visible SQUARE macro-pixel blocks" lever DID produce real square blocks (zoom-verified) where naming chunky 8x8 macroblocking failed on [NightVisionCam](./NightVisionCam.mvstyle) — forcing the low base resolution structurally is what the NightVisionCam note predicted would be needed (cf. the structural-pattern-vs-blocky-compression lesson); it lands only moderately, the model still wants detail; (2) SOFTNESS / BLUR is load-bearing and was the USER'S FIX — real low-res CCTV is SOFT not crisp; the first cut read too clean/sharp, so "genuinely soft, out of focus, low-pass blur, nothing sharp" is what makes it read as authentic cheap CCTV, and the blur also smears the blocks together believably; (3) grounding-by-degradation (cf. [TrafficCam](./TrafficCam.mvstyle)) + fisheye + washed off-colour-balance. Caption = the OSD (camera/zone label + time-only HH:MM:SS clock; the [NightVisionCam](./NightVisionCam.mvstyle) codification). The softness dissolves fine likeness, so it leans anonymous like the other degraded lenses (Xera reads only softly). Validated landscape. Keep the tiny-upscaled-blocks lever, the SOFTNESS / out-of-focus blur (do NOT let it render crisp), the washed cheap colour, and the time-only OSD.
+
+# Example
+
+![LobbyCam](../ImageStyleExample/LobbyCam.example.png)

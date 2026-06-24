@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DeferredDX11"
+rating: "D"
+description: "2011 DirectX 11 game render: deferred shading, overdone SSAO, FXAA smear, pre-PBR gloss, teal-and-orange grade"
+tags: [game-render, stylized, muted, nostalgic]
+made-for-model: gpt-image-2
+tokens: 262
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an authentic in-game screenshot from a 2011-era DirectX 11 AAA game engine — an early-DX11 real-time render, NOT a modern engine and NOT pre-rendered. Period rendering tech, pushed so it reads as 2011 and not newer: a DEFERRED-SHADING look with many dynamic lights, slightly overdone screen-space ambient occlusion drawing dark contact-shadow halos in every crevice, TESSELLATED surfaces, and cascaded shadow maps that are soft but still a little low-resolution. Anti-aliasing is early post-process FXAA — so edges are smooth but slightly SMEARY and blurred, with a faint loss of fine texture detail (no crisp modern temporal anti-aliasing). Materials are improved but still PRE-physically-based: a slightly plasticky, ad-hoc specular-and-gloss look. A glossy Hollywood colour grade — teal-and-orange, lifted blacks, lens dirt and mild bloom on the highlights. Higher detail than the previous console generation but still clearly dated geometry and texture resolution. The look of a flagship game of 2011 — slick for its day, a touch soft and plasticky. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. Game-render ERA LADDER, the 2011 DX11 rung (deferred shading, overdone SSAO, tessellation, FXAA smear, pre-PBR speculars, teal-orange grade). HONEST: 2011 and [RayTracedAAA](./RayTracedAAA.mvstyle) (2019) CONVERGE to essentially the same modern look (the whole upper ladder collapses to modern — also covered by [DX9Interior](./DX9Interior.mvstyle) / [WesternRPG](./WesternRPG.mvstyle)); banked as a distinct era LABEL by user call, not because it looks meaningfully different from 2019. Reach for it when you want the named-era vibe. Scene-neutral. Caption overlaid. Validated on the Xera corridor; a keeper (user, "just manages to be a keep").
+
+# Example
+
+![DeferredDX11](../ImageStyleExample/DeferredDX11.example.png)

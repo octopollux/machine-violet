@@ -1,0 +1,85 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Mise en Place",
+  "summary": "A restaurant where the food is memories. Tonight's special is someone else's childhood.",
+  "genres": [
+    "modern",
+    "fantasy",
+    "mystery"
+  ],
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->",
+  "detail": "There is a restaurant. The food is memories. Not flavored with them, not inspired by them — made of them. A bite of the lamb is the afternoon a stranger spent learning to ride a bicycle. The amuse-bouche is a first kiss. The dessert, tonight, is the memory of the player's grandmother's hands. The kitchen runs on a supply chain the diners do not ask about. The chef is famous in circles that do not write reviews.\n\nDM approach:\n- Tone: hushed, reverent, candle-lit. The waitstaff move like surgeons. Each dish is announced quietly and at length.\n- NPCs by variant: the chef, who eats nothing she serves, and a regular diner who has been thinning year by year (1); the maître d' whose handshake is unusually long (2); a sommelier who pairs memory to wine and laughs at her own jokes about provenance (3).\n- Seed early: a diner weeps at a dish, smiles, cannot say why; a menu without prices; an old photograph in the foyer the player half-recognizes.\n- Pacing structure: a single service. Five courses. Each one moves the player's understanding by exactly one notch.\n- The maître d' explains the price of each dish once, exactly clearly, when it is set down. The diners are warned. The diners eat anyway.\n\nPacing: One in-fiction evening. Five courses paced like courses — small, larger, the main, the cheese, the dessert — with the breaks between for conversation, observation, and small disasters in the kitchen. The check arrives when it does, and what is on it depends on what the player ate.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is what the campaign slowly turns on.",
+      "options": [
+        {
+          "id": "willing-donors",
+          "name": "Willing Donors",
+          "description": "The chef buys memories from people who sell them; gray ethics, meticulous bookkeeping.",
+          "detail": "WILLING DONORS — The chef harvests memories from people who sell them. A fading aristocrat has sold her debut for the price of a season's stay at a clinic. A widower sold the last argument with his wife and now remembers her only as kind. The donations are catalogued in a back office and the prices are negotiated humanely. The ethics are gray and the bookkeeping is meticulous."
+        },
+        {
+          "id": "unwilling",
+          "name": "Unwilling",
+          "description": "The chef takes memories without the donors' knowledge; someone in the room is being eaten tonight.",
+          "detail": "UNWILLING — The chef takes them, and the donors don't know. The maître d' shakes a hand at the door and a year is gone by the second course. Tonight, somewhere in this room, someone is being eaten in small careful spoonfuls. The player's job is to figure out who, before dessert."
+        },
+        {
+          "id": "invention",
+          "name": "Invention",
+          "description": "The kitchen fabricates memories from scratch; diners can't tell borrowed childhoods from real ones.",
+          "detail": "INVENTION — The kitchen invents memories from raw ingredients. The diners cannot tell their borrowed childhoods from their real ones. The chef is a fabulist of the highest order. People have walked out of this restaurant remembering siblings they never had, and they have loved those siblings for the rest of their lives."
+        }
+      ]
+    }
+  ],
+  "suboptions": [
+    {
+      "label": "Your seat",
+      "choices": [
+        {
+          "name": "The Critic",
+          "description": "Sent by a publication that doesn't know what this place is. You were sent to write a feature. The editor cleared the spread. You have a small notebook and a fork and a job to do. You will be asked, in writing, what you ate, and you do not yet have a vocabulary for the truth. You are not the first critic to walk in and the previous one's career is now nothing anyone talks about."
+        },
+        {
+          "name": "The Donor",
+          "description": "Tonight's special is yours. You sat in the back office last week and you signed a paper. Tonight your debut, your first heartbreak, the smell of your father's hands — whichever — will be served to a room full of strangers. You came to watch. The maître d' has seated you well. You are about to lose something specific and irreversible and you have already been paid."
+        },
+        {
+          "name": "The Returning Guest",
+          "description": "You came a year ago and you ate something you have not stopped thinking about. You don't quite remember what it was. You don't remember what you traded for it, either, and the not-remembering is itself the clue. The maître d' greets you by name and you can't quite hear yourself when you answer."
+        },
+        {
+          "name": "Behind the Pass",
+          "description": "Line cook, sous, dishwasher — you work the line. You handle the ingredients before they become dinner. The supply truck comes at four in the morning and the cargo is in pale glass jars without labels. The chef trained you and you owe her, and you have been beginning, lately, to want to know more than you have been told."
+        }
+      ]
+    },
+    {
+      "label": "The restaurant",
+      "choices": [
+        {
+          "name": "Sixteen Seats",
+          "description": "Sixteen seats and an open kitchen. The chef cooks at you, the way a pianist plays at an audience. The plates are warmed in advance. The cocktail menu is hand-lettered and the room smells, faintly, of caramelized onion and something you can't name. Reservations are taken six months out and refused for no reason anyone can tell you."
+        },
+        {
+          "name": "The Password",
+          "description": "No signage. The address is texted the day of, and it is a different basement each season. The password is a feeling, not a word — you have to remember something specific at the door, and the door knows whether you did. There are people here you recognize from the news and people you do not recognize from anywhere."
+        },
+        {
+          "name": "The Traveling Service",
+          "description": "The staff travels. The equipment is in a truck. The menu changes by the geography — a tasting in Lisbon is not a tasting in Tokyo — and the chef writes each city's menu on the long drive in. The diners are flown in and home. The truck never sleeps in the same parking lot twice."
+        },
+        {
+          "name": "Table for One",
+          "description": "The building is on a street that doesn't appear on the map. The door opens when you remember it does. Inside, the dining room is laid for exactly one party — yours — and the staff greet you as if expected, which they were. The other tables are set for nobody. The candles are lit."
+        }
+      ]
+    }
+  ]
+}

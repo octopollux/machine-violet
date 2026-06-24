@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "TealOrange"
+rating: "D"
+description: "Modern blockbuster frame with the teal-and-orange grade: cool teal shadows, warm orange skin, glossy digital sheen"
+tags: [motion-picture, stylized, color, cool, warm, glamorous]
+made-for-model: gpt-image-2
+tokens: 117
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a glossy modern blockbuster film with the signature TEAL-AND-ORANGE Hollywood colour grade. Its signature: cool TEAL and cyan pushed into the shadows and backgrounds, warm ORANGE skin tones and highlights, a polished high-contrast digital-cinema sheen, shallow depth of field, anamorphic framing, lens flares, and a slick, expensive, contemporary popcorn-movie look. Glossy, punchy, cinematic. Close with a small caption in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family — the modern blockbuster TEAL-AND-ORANGE grade: cool teal shadows, warm orange skin / highlights, glossy high-contrast digital-cinema sheen, anamorphic + flares. NOTE: the closest of the motion-picture set to the existing modern polished cinematic look ([CinematicFilm](./CinematicFilm.mvstyle) / the modern game renders), but the teal / orange split is a distinct, recognisable GRADE. Caption overlaid. Validated on the corridor; an instant take (user). Keep the teal-shadow / orange-skin grade.
+
+# Example
+
+![TealOrange](../ImageStyleExample/TealOrange.example.png)

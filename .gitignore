@@ -147,5 +147,12 @@ vite.config.ts.timestamp-*
 api-keys.json
 discord-settings.json
 connections.json
+
+# Voice-guide generator output (regenerable via `npm run voice-guide all`)
+voice-guides/
+
+# style-probe.ts scratch output (sample PNGs + engine-log breadcrumbs)
+.style-samples/
+/.debug/
 client-settings.json
 machine-settings.json

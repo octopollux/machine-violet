@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Super8"
+rating: "C"
+description: "Super-8 home-movie frame: heavy grain, warm faded colour, corner vignette, gate-weave jitter, dust and orange light leaks"
+tags: [motion-picture, lo-fi, vintage, warm, nostalgic, intimate, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 153
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a SUPER-8 / 8MM home movie — the nostalgic amateur small-gauge film technique. The signature: heavy visible film GRAIN, warm faded slightly-yellowed colour, soft low resolution, a vignette darkening the corners, GATE-WEAVE jitter and frame wobble, dust and scratches, occasional LIGHT LEAKS flaring orange-red across the frame, and a warm, nostalgic, decayed-memory quality. Grainy, warm, faded, intimate, amateur. Close with a small caption in a casual handwritten or period font — a scene or place title only; do NOT print the film format or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family, TECHNIQUE-SPECIFIED — SUPER-8 / 8MM home movie: heavy grain, warm faded colour, corner vignette, gate-weave, dust / scratches, orange LIGHT LEAKS, decayed-memory nostalgia. The intimate amateur-film register. Caption = casual / handwritten. Validated on the clearing; an instant bank (user). Keep the grain + light leaks + faded warmth.
+
+# Example
+
+![Super8](../ImageStyleExample/Super8.example.png)

@@ -47,11 +47,11 @@ describe("model config", () => {
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("defaults effort with dev high", () => {
+  it("defaults effort map (dm low; ooc/setup/dev-mode high)", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
       "default": null,
-      "dm": "high",
+      "dm": "low",
       "ooc": "high",
       "setup": "high",
       "dev-mode": "high",
@@ -79,7 +79,7 @@ describe("model config", () => {
       JSON.stringify({ effort: { dm: "turbo", ooc: "low" } }),
     );
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.effort.dm).toBe("high"); // invalid "turbo" rejected, default preserved
+    expect(config.effort.dm).toBe("low"); // invalid "turbo" rejected, default preserved
     expect(config.effort.ooc).toBe("low");
   });
 
@@ -129,7 +129,7 @@ describe("model config", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort).toEqual({
       "default": null,
-      "dm": "high",
+      "dm": "low",
       "ooc": "high",
       "setup": "high",
       "dev-mode": "high",

@@ -137,14 +137,43 @@ describe("buildHardStats", () => {
     });
     expect(result).toBe("Turn: Aldric\nResources:\n  Aldric: HP=24/30");
   });
+
+  it("renders the active system as the first line", () => {
+    const result = buildHardStats({
+      activeSystem: "FATE Accelerated",
+      turnHolder: "Aldric",
+      resourceValues: { Aldric: { HP: "24/30" } },
+    });
+    expect(result).toBe("System: FATE Accelerated\nTurn: Aldric\nResources:\n  Aldric: HP=24/30");
+  });
+
+  it("emits the system line even with no turn holder or resources", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated" })).toBe("System: FATE Accelerated");
+  });
+
+  it("omits the system line entirely when there is no active system", () => {
+    expect(buildHardStats({ turnHolder: "Aldric" })).toBe("Turn: Aldric");
+    expect(buildHardStats({ activeSystem: undefined })).toBe("");
+  });
+
+  it("tags the system line when mechanics run silently", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated", mechanicsSilent: true }))
+      .toBe("System: FATE Accelerated · running silently");
+  });
+
+  it("does not tag the system line when mechanics are player-facing", () => {
+    expect(buildHardStats({ activeSystem: "FATE Accelerated", mechanicsSilent: false }))
+      .toBe("System: FATE Accelerated");
+  });
 });
 
 describe("buildDMPrefix cascading entity override", () => {
-  // The three layers (main DM → campaign seed → DM personality) all contribute
-  // top-level XML blocks; when they collide on the same tag, the personality
-  // layer wins. This test plants a unique `<NPCS>` block in each of the three
-  // inline-string layers and proves only the personality's content survives in
-  // the assembled system prompt.
+  // The override stack is five slots, lowest → highest priority: dm-identity →
+  // dm-directives → campaign_detail → personality prompt_fragment → personality
+  // detail. When a top-level tag collides across slots, the latest (highest)
+  // wins. These tests exercise the seed-vs-personality collision (the inline
+  // slots most likely to regress); dm-identity / dm-directives define no
+  // <NPCS>, so there's no base block to assert against here.
   const baseConfig = (overrides: Partial<CampaignConfig>): CampaignConfig => ({
     name: "Test",
     system: "D&D 5e",

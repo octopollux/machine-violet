@@ -2,11 +2,48 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Deep Tenancy",
-  "summary": "The generation ship's destination was reached 40 years ago. Nobody told steerage.",
+  "summary": "A story about a generation ship lost in time",
   "genres": [
-    "sci-fi"
+    "sci-fi",
+    "mystery",
+    "horror"
   ],
-  "detail": "The ship is huge and old and the player has lived in its lower decks their entire life. There is school, there is work, there is a hydroponics rotation, there is a calendar of festivals. There is a future they are told about. The destination is a planet that they will arrive at, and their children will arrive at, and their grandchildren will inherit. This is the story. The story is at least forty years out of date.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. UNINHABITABLE — The destination was reached and the destination was wrong. Atmosphere failed analysis. Surface conditions unsurvivable. The upper decks have been negotiating among themselves for decades about who admits this to whom, and they have not reached consensus. The player's discovery is the kind of thing that decides the negotiation.\n2. THE COLONY EXISTS — The upper decks disembarked. A colony is on the surface. Steerage is the labor reservoir from which the colony draws — new workers shipped down on a schedule, return shipments of finished goods. The ship is a factory dorm in orbit. The hierarchy is generational, biological, and very old.\n3. THERE IS NO DESTINATION — There never was. The ship has been in cruise for centuries with no target. The mission was a fiction designed to keep generations productive. The truth has now leaked, partially, through channels someone tried to plug and failed. The player is one of the people who is starting to put it together.\n\nDM approach:\n- Tone: industrial fluorescent, the rhythm of a working community, the specific suspicions of a place where everyone knows their neighbors and nobody knows their grandparents' real biographies.\n- NPCs to seed: a foreman who knows something but won't say; a school friend who has gotten access to upper-deck systems; an elder who keeps a private logbook of inconsistencies.\n- Pacing structure: reaching upper decks should take Act 1. Each deck transition costs something specific — a key, a bribe, a forgery, a death. The deeper the player goes, the harder it is to come back to a normal shift.\n- Seed early: a discrepancy the player notices in their own work (a harvest yield, a passenger count, a maintenance log); a sealed bulkhead the player has walked past their whole life.\n- The ship's geography should be precise. Decks named. The smells different on each level. The lights wrong above a certain threshold.\n\nPacing: Reaching upper decks should take Act 1; each deck transition costs something specific. The player can track time by their work shifts, by the lights-on schedule, by the calendar of festivals that mark a destination that may or may not exist.",
+  "image_style": "DeepTenancy",
+  "detail": "The ship is huge and old and the player has lived in its lower decks their entire life. There is school, there is work, there is a hydroponics rotation, there is a calendar of festivals. There is a future they are told about. The destination is a planet that they will arrive at, and their children will arrive at, and their grandchildren will inherit. This is the story. The story is at least forty years out of date.\n\nDM approach:\n- Tone: industrial fluorescent, the rhythm of a working community, the specific suspicions of a place where everyone knows their neighbors and nobody knows their grandparents' real biographies.\n- NPCs to seed: a foreman who knows something but won't say; a school friend who has gotten access to upper-deck systems; an elder who keeps a private logbook of inconsistencies.\n- Pacing structure: reaching upper decks should take Act 1. Each deck transition costs something specific — a key, a bribe, a forgery, a death. The deeper the player goes, the harder it is to come back to a normal shift.\n- Seed early: a discrepancy the player notices in their own work (a harvest yield, a passenger count, a maintenance log); a sealed bulkhead the player has walked past their whole life.\n- The ship's geography should be precise. Decks named. The smells different on each level. The lights wrong above a certain threshold.\n- Deep time and the dark decks (Pandorum register): past a certain sealed bulkhead the ship is not merely empty. It has been far longer than anyone is told, and the dark has bred something — whatever generations were sealed away, or sealed themselves in, are not what they were. Going up is not only trespass; it is a descent into what the ship has become. The higher and the deeper the player pushes, the less human the ship's leftovers.\n\nYour companion — the unit with the hiccup (DM-facing; not a player choice): Somewhere in the player's daily life is a small, overlooked maintenance unit — a cleaner, a pipe-crawler, a meter-reader, the kind of machine nobody looks at twice — and it has a hiccup. A repeating hitch in its routine that maintenance wrote off years ago as a worn actuator. It is not worn. The hiccup is a last-ditch failsafe surfacing the only way it still can, every channel above it long dead: a tiny, patient, malfunctioning attempt to make someone understand. What it is trying to say depends on the truth of the ship — under The Ship Forgot it still literally holds the lost mission; under the others it is a witness, a remnant that logged what the upper decks buried. Play it as the player's companion and a nonhuman intelligence: limited, looping, weirdly persistent, attaching itself to the player the moment they become the first person in a very long time to actually listen to the hiccup. Give it a way to reach the player that grows as the campaign does — at first only the hiccup, then a pattern inside it, then, eventually, words. It is the smallest thing on the ship and it remembers more than the captain's chair.\n\nPacing: Reaching upper decks should take Act 1; each deck transition costs something specific. The player can track time by their work shifts, by the lights-on schedule, by the calendar of festivals that mark a destination that may or may not exist.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — this is the campaign's hidden truth.",
+      "options": [
+        {
+          "id": "uninhabitable",
+          "name": "Uninhabitable",
+          "description": "The destination was reached and was wrong; the upper decks have argued for decades over who admits it.",
+          "detail": "UNINHABITABLE — The destination was reached and the destination was wrong. Atmosphere failed analysis. Surface conditions unsurvivable. The upper decks have been negotiating among themselves for decades about who admits this to whom, and they have not reached consensus. The player's discovery is the kind of thing that decides the negotiation."
+        },
+        {
+          "id": "the-colony-exists",
+          "name": "The Colony Exists",
+          "description": "The upper decks disembarked; steerage is the orbital labor reservoir feeding a surface colony.",
+          "detail": "THE COLONY EXISTS — The upper decks disembarked. A colony is on the surface. Steerage is the labor reservoir from which the colony draws — new workers shipped down on a schedule, return shipments of finished goods. The ship is a factory dorm in orbit. The hierarchy is generational, biological, and very old."
+        },
+        {
+          "id": "there-is-no-destination",
+          "name": "There Is No Destination",
+          "description": "There never was one; the mission was a fiction, and the truth is now leaking.",
+          "detail": "THERE IS NO DESTINATION — There never was. The ship has been in cruise for centuries with no target. The mission was a fiction designed to keep generations productive. The truth has now leaked, partially, through channels someone tried to plug and failed. The player is one of the people who is starting to put it together."
+        },
+        {
+          "id": "the-ship-forgot",
+          "name": "The Ship Forgot",
+          "description": "No villain — systemic amnesia. The mission was real and is still recoverable, but every system and institution lost it across generations; only one overlooked failsafe still holds the truth.",
+          "detail": "THE SHIP FORGOT — There is no conspiracy and no lie, only forgetting. The destination was real; the mission was real; it is, in principle, still reachable. But across centuries of generational handoff the knowledge decayed out of every system meant to keep it — the navigation logs, the upper-deck institutions, the founders' own descendants — until no one alive and nothing still running remembers there is anywhere to go. The truth survives in exactly one place: a forgotten failsafe, overlooked because it is small and beneath notice, that has spent a very long time trying to make itself understood (see the companion — the unit with the hiccup). The player's discovery is not exposing a villain; it is helping the ship remember, against the inertia of everyone who has built a whole life inside the forgetting. The cruelty is tragic, not malicious: restoring the mission means telling a hundred thousand people that the world they made is a waiting room, and asking them to want to leave it."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your role in steerage",
@@ -50,5 +87,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 699,
+    "setup_detail": 0,
+    "forks": 400,
+    "total": 1938
+  }
 }

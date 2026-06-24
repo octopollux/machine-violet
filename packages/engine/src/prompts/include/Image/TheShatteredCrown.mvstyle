@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Shattered Crown"
+rating: "?"
+description: "The Shattered Crown campaign look: JRPGCinematic epic anime-JRPG cutscene by default, GildedVellum illuminated gold-leaf illustration for a commemorated history-making event"
+tags: [game-render, painting, stylized, epic, warm]
+made-for-model: gpt-image-2
+tokens: 492
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** epic anime-JRPG cutscene look below. A **key, history-making event being commemorated** is rendered as a gilded illuminated-vellum illustration — the moment set down in the chronicle, flat egg-tempera under a burnished gold-leaf sky.
+
+# Style
+
+Default (most scenes) — `Rendered as a cinematic cutscene still from a high-budget modern Japanese RPG, in photo mode (no HUD) — a polished, dramatic, anime-flavoured real-time cinematic render. Beautiful stylised anime-inflected characters, lush fantastical environments, dramatic cinematic lighting. Strict process discipline to keep it clean: a SHALLOW cinematic DEPTH OF FIELD with the focal character crisp and everything else softening into bokeh, strong VOLUMETRIC LIGHTING (god-rays, atmospheric haze, light shafts) filling the air, and a LONG ATMOSPHERIC DRAW DISTANCE — push all the environmental clutter and detail far back into the distance where aerial perspective and haze dissolve it into soft simple shapes, keeping the near-field clean and uncluttered. A rich saturated palette, bloom, flare, emotional staging. Epic, cinematic, anime-JRPG. Close with a caption overlaid in a tasteful font.`
+
+Commemorated history-making event — `Rendered as a single gilded illustration in the illumination tradition, painted directly onto a sheet of aged vellum — NOT a full manuscript page: no decorative border, no marginalia, no drop-capital, no blackletter text block. Strict process discipline: paint the scene itself in flat, stylized planes of soft egg-tempera color with fine confident ink outlines and no photographic depth or modern shading; keep the painted forms simple and flat. The demanding craft goes into the MATERIAL: lavish, intricate burnished gold leaf for the sky, the light sources and the key accents — raised and tooled, catching the light with a faint crackle and small worn patches — laid over genuine aged vellum with its warm tooth, foxing, faint stains, hair-side freckling and a softly cockled surface. Let the gold leaf and the aged vellum carry the fine detail. A restrained, harmonious palette of a few mineral-pigment hues plus gold. Close with a caption as a short line of elegant gilt or rubricated lettering inked at the foot of the illustration.`
+
+# Notes
+
+Campaign composite for the **the-shattered-crown** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [JRPGCinematic](./JRPGCinematic.mvstyle) (epic anime-JRPG cutscene render; the high-fantasy workhorse — its DoF + volumetric + atmospheric-dissolve is load-bearing anti-tic). COMMEMORATION = [GildedVellum](./GildedVellum.mvstyle) (gilded illuminated-vellum illustration; a history-making moment set down in the chronicle — its gold-sky / vellum / flat-painting levers are load-bearing, kept verbatim). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![JRPGCinematic](../ImageStyleExample/JRPGCinematic.example.png)
+
+![GildedVellum](../ImageStyleExample/GildedVellum.example.png)

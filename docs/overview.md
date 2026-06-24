@@ -143,11 +143,14 @@ The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../
 | [Context Management](context-management.md) | Token economics, retention policy, cost modeling |
 | [Clocks and Alarms](clocks-and-alarms.md) | Calendar, combat rounds, alarm system |
 | [Game Initialization](game-initialization.md) | Setup flow, campaign seeds, DM personalities |
+| [Image Generation](image-generation.md) | Inline DM-generated images: capability + consent, dispatch, knobs, transcript embedding |
 | [Multiplayer and Initiative](multiplayer-and-initiative.md) | Hot-seat, AI players, turn order |
 | [Error Recovery](error-recovery.md) | Git snapshots, rollback, validation |
 | [TUI Design](tui-design.md) | Layout, themes, responsive design, DM formatting |
-| [Tools Catalog](tools-catalog.md) | All 41 tools by domain, signatures, tiers |
-| [Subagents Catalog](subagents-catalog.md) | All 14 subagent patterns, models, visibility |
+| [OpenAI Provider](openai-provider.md) | `openai.ts` adapter: Responses API vs Chat Completions routing, streaming-reasoning workaround, encrypted-reasoning replay |
+| [Tools Catalog](tools-catalog.md) | Tools by domain, signatures, tiers |
+| [Subagents Catalog](subagents-catalog.md) | Subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |
 | [Campaign Format Spec](format-spec.md) | On-disk format for campaigns: directory layout, file schemas, entity format |
+| [Seed Authoring](seed-authoring.md) | Editorial playbook for bundled `.mvworld` seeds: design bars, review checklist, the catalog-review loop |

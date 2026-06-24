@@ -59,3 +59,18 @@ describe("renderNodes sub/sup", () => {
     expect(renderToString("x<sup><b>2</b></sup>")).toBe("x²");
   });
 });
+
+describe("renderNodes code + linebreak", () => {
+  it("renders inline <code> content without leaking the tag", () => {
+    const frame = renderToString("run <code>npm test</code> now");
+    expect(frame).toContain("npm test");
+    expect(frame).not.toContain("<code>");
+    expect(frame).not.toContain("</code>");
+  });
+
+  it("renders a <br> as a newline, not literal text", () => {
+    const frame = renderToString("alpha<br>beta");
+    expect(frame).not.toContain("<br>");
+    expect(frame.split("\n").map((l) => l.trim())).toEqual(["alpha", "beta"]);
+  });
+});

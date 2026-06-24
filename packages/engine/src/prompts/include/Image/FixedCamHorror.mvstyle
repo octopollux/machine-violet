@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "FixedCamHorror"
+rating: "B"
+description: "Fixed-camera survival-horror render: single static canted dramatic angle, character dwarfed and vulnerable, crushed blacks"
+tags: [game-render, stylized, horror, dread, scene-coupled]
+made-for-model: gpt-image-2
+tokens: 170
+---
+
+# Direction
+
+When composing prompts for `generate_image` in this style, compose the SUBJECT for a fixed dramatic camera — describe a single static, high or canted cinematic camera angle looking at the character as a small, vulnerable figure dwarfed by the environment, framed for tension. Then render in this visual style:
+
+# Style
+
+`Rendered as an in-game screenshot from a classic fixed-camera survival-horror video game — a single dramatic STATIC camera angle (a high, canted, cinematic vantage the player does not control), composing the scene for maximum tension and vulnerability, with the character a small figure within a richly detailed, almost pre-rendered-looking environment, dwarfed by the framing. Cinematic, ominous staging; high contrast with crushed blacks; modern game fidelity with a deliberately old-school fixed-cam horror composition. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append at the END — style last. A SCENE-COUPLED fixed-camera survival-horror FRAMING — the steering lives in the DM-FACING intro above (a high / canted static dramatic angle with the character a small, vulnerable figure dwarfed by the environment); a normal brief won't compose the dramatic angle. Distinct value = the fixed-cam COMPOSITION (RE / Dead-Space dread), which escapes the eye-level photoreal-convergence. OVERLAP: shares the dread register with the photographic [SurvivalHorror](./SurvivalHorror.mvstyle) — this is the in-engine fixed-cam cousin. Caption overlaid. Validated on the Xera corridor; "WOW" (user). Keep the fixed-dramatic-angle intro + small-figure composition.
+
+# Example
+
+![FixedCamHorror](../ImageStyleExample/FixedCamHorror.example.png)

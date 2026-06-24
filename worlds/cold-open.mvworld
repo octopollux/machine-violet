@@ -2,13 +2,43 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "Cold Open",
-  "summary": "You wake up in a stranger's apartment with a note in your handwriting: 'Don't trust the police.'",
+  "summary": "You wake up alone in a stranger's apartment. You don't know how you got there - but you left yourself a note.",
   "genres": [
     "mystery",
     "modern",
     "sci-fi"
   ],
-  "detail": "The player has no memory of how they got here. The apartment belongs to someone they've never met. The note is definitely in their handwriting. The campaign is a mystery told backwards — the player is reconstructing what happened to them by following the trail their past self left, while whatever they were running from is still looking.\n\n\n\nWhat the player did (DM only — roll or choose, reveal through play):\n1. THE WITNESS — The player saw something they shouldn't have. They knew they'd be silenced, so they hid themselves first and left a trail only they could follow back to the evidence. The people looking for them need to know what the player knows — or need to make sure no one ever does.\n2. THE DEAL — The player made a bargain with someone dangerous and then broke it. The memory wipe was the price of a head start. The note is the one thing they negotiated keeping. The person they betrayed is methodical and patient.\n3. THE FRAME — The player didn't do anything. Someone else did, and built a perfect case pointing at the player. The past self figured it out just in time to disappear, but not in time to prove innocence. The note means: the people who should help you are the people who were given the frame.\n\nThe trail: The past self left breadcrumbs — but carefully, because whoever they're hiding from is smart. Clues are embedded in mundane objects: a library book with a due date that matters, a coffee shop loyalty card with too many stamps, a coat with someone else's keys in the pocket. Each clue leads to a person or place that reveals one piece of the story. Not every piece is flattering. The player may not like who they were yesterday.\n\nKey tensions:\n- The player must trust their past self's judgment without knowing the reasoning. The note says don't trust the police. Maybe past-self was right. Maybe past-self was wrong. Maybe past-self was the problem.\n- The stranger whose apartment this is — they're involved. They agreed to this. Why? Finding them is an early thread; understanding their role is a mid-game reveal.\n- The player's identity is a weapon. In the present day, it's a name that draws attention. In the near future, it's a biometric profile. In Dickensian England, it's a class position. In 1950s America, it's an association. Someone is using who the player is against them.\n\nPacing: Start in the apartment. Let the player search it. The note, the unfamiliar room, the sounds of an unfamiliar neighborhood — this is the cold open. The first act is the immediate aftermath: where am I, what do I have, who's looking? The second act is the trail: following breadcrumbs, meeting people who know more than the player does about the player's own life. The third act is the confrontation with whatever the past self was running from — and the choice of whether to keep running, fight, or expose the truth.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "image_style": "ColdOpen",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\n<!--include:OpeningScene.DMHandled-->",
+  "detail": "The player has no memory of how they got here. The apartment belongs to someone they've never met. The note is definitely in their handwriting. The campaign is a mystery told backwards — the player is reconstructing what happened to them by following the trail their past self left, while whatever they were running from is still looking.\n\nThe trail: The past self left breadcrumbs — but carefully, because whoever they're hiding from is smart. Clues are embedded in mundane objects: a library book with a due date that matters, a coffee shop loyalty card with too many stamps, a coat with someone else's keys in the pocket. Each clue leads to a person or place that reveals one piece of the story. Not every piece is flattering. The player may not like who they were yesterday.\n\nKey tensions:\n- The player must trust their past self's judgment without knowing the reasoning. The note says don't trust the police. Maybe past-self was right. Maybe past-self was wrong. Maybe past-self was the problem.\n- The stranger whose apartment this is — they're involved. They agreed to this. Why? Finding them is an early thread; understanding their role is a mid-game reveal.\n- The player's identity is a weapon. In the present day, it's a name that draws attention. In the near future, it's a biometric profile. In Dickensian England, it's a class position. In 1950s America, it's an association. Someone is using who the player is against them.\n\nPacing: Start in the apartment. Let the player search it. The note, the unfamiliar room, the sounds of an unfamiliar neighborhood — this is the cold open. The first act is the immediate aftermath: where am I, what do I have, who's looking? The second act is the trail: following breadcrumbs, meeting people who know more than the player does about the player's own life. The third act is the confrontation with whatever the past self was running from — and the choice of whether to keep running, fight, or expose the truth.",
+  "forks": [
+    {
+      "id": "what-the-player-did",
+      "label": "What the player did",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early — let it surface through play as the player reconstructs the trail.",
+      "options": [
+        {
+          "id": "the-witness",
+          "name": "The Witness",
+          "description": "The player saw something they shouldn't have and hid themselves before they could be silenced.",
+          "detail": "THE WITNESS — The player saw something they shouldn't have. They knew they'd be silenced, so they hid themselves first and left a trail only they could follow back to the evidence. The people looking for them need to know what the player knows — or need to make sure no one ever does."
+        },
+        {
+          "id": "the-deal",
+          "name": "The Deal",
+          "description": "The player broke a bargain with someone dangerous; the memory wipe was the price of a head start.",
+          "detail": "THE DEAL — The player made a bargain with someone dangerous and then broke it. The memory wipe was the price of a head start. The note is the one thing they negotiated keeping. The person they betrayed is methodical and patient."
+        },
+        {
+          "id": "the-frame",
+          "name": "The Frame",
+          "description": "The player is innocent; someone built a perfect case against them and the people who should help were given the frame.",
+          "detail": "THE FRAME — The player didn't do anything. Someone else did, and built a perfect case pointing at the player. The past self figured it out just in time to disappear, but not in time to prove innocence. The note means: the people who should help you are the people who were given the frame."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "The city",
@@ -31,5 +61,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 404,
+    "setup_detail": 17,
+    "forks": 170,
+    "total": 1084
+  }
 }

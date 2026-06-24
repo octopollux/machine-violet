@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Blackwater Bay"
+rating: "?"
+description: "Blackwater Bay campaign look: Adventure2000s by default, DiffusionGlamour when the PC is intoxicated, GraphicNovel for player-requested images"
+tags: [game-render, stylized, comic, color, glamorous]
+made-for-model: gpt-image-2
+tokens: 508
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** look below. When the player character is **intoxicated**, use the soft-focus glamour look. When the **player explicitly requests** an image, default to the painted graphic-novel look.
+
+# Style
+
+Default (most scenes) — `Rendered as clean, flat, simple digital art — the friendly look of a flat cel-shaded character illustration, crisp and graphic like polished vector art. Strict process discipline: build EVERYTHING — the character and the background alike — from clean, simple, confident shapes filled with FLAT colour; do all shading as just a few hard-edged flat tone shapes (cel shading), with no soft gradients, no rendered texture and no painterly detail anywhere. Simplify the whole environment into clean flat shapes and a few flat colour areas — a simple, graphic, stylised setting, not a detailed painted landscape. Crisp clean shape edges and confident outlines; a bright, harmonious, limited flat palette; soft even lighting. Keep a clear focal hierarchy with the character largest and most appealing — a warm, expressive, lightly stylised face — and the flattened background kept simple and calm behind. Cheerful, clean, approachable, uncluttered. Close with a caption as a short line of clean, friendly digital lettering along the bottom.`
+
+When the PC is intoxicated — `Rendered as a frame shot through a heavy DIFFUSION / soft-focus filter — the dreamy old-Hollywood-and-1970s glamour technique. The signature: a soft, glowing, slightly hazy image where the highlights BLOOM and halate into a romantic gauzy glow; gentle low contrast with lifted milky blacks; a flattering, wrinkle-softening softness on the subject; a warm pastel pearlescent palette; and a nostalgic, dreamy, luminous quality, as if the lens were breathed upon. Soft, glowing, romantic, hazy. Close with a small caption in an elegant font.`
+
+When the player requests an image — `Rendered as a modern painted graphic-novel illustration — confident ink line work under rich painted colour, in the tradition of a high-end European bande-dessinee album. Clean varied ink contour lines holding fully painted, atmospheric colour with soft modelling and a harmonious limited palette; a clear focal hierarchy with the figure crisply inked and rendered and the background looser and more atmospheric. Cinematic lighting, mature and polished. Close with a small tasteful caption in clean type, like an album plate.`
+
+# Notes
+
+Campaign composite for the **blackwater-bay** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [Adventure2000s](./Adventure2000s.mvstyle) (clean flat cel-shaded 2000s point-and-click look). INTOXICATED = [DiffusionGlamour](./DiffusionGlamour.mvstyle) (soft-focus bloom — the PC's altered perception). PLAYER-REQUESTED = [GraphicNovel](./GraphicNovel.mvstyle) (painted bande-dessinée — the look for images the player asks for). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![Adventure2000s](../ImageStyleExample/Adventure2000s.example.png)
+![DiffusionGlamour](../ImageStyleExample/DiffusionGlamour.example.png)
+![GraphicNovel](../ImageStyleExample/GraphicNovel.example.png)

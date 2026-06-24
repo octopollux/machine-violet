@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Middle Management of Doom"
+rating: "?"
+description: "Middle Management of Doom campaign look: SilentFilm early-1920s monochrome by default, DyeTransfer lush Technicolor for scenes in the Mortal Realm"
+tags: [motion-picture, period, black-and-white, high-saturation, vintage]
+made-for-model: gpt-image-2
+tokens: 325
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** early-1920s silent-film look below. Scenes set in the **Mortal Realm** — the world of the living — use the lush dye-transfer Technicolor look, bursting into rich saturated colour against the monochrome beyond.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame from an early 1920s SILENT MOTION PICTURE — vintage black-and-white film. Its signature: high-contrast orthochromatic black-and-white with bright skin and dark skies, a soft IRIS vignette darkening the corners, visible film damage (dust, scratches, flicker, frame jitter and emulsion mottling), a slightly fast under-cranked motion feel, and a nostalgic, ghostly, archival quality. Close with a caption styled as a silent-film INTERTITLE card in an ornate period font.`
+
+Mortal Realm — `Rendered as a print made by the DYE-TRANSFER (imbibition Technicolor) process — the lush, archival, ultra-rich colour-print technique. The signature: deep, saturated, velvety colour with gorgeous dense blacks and luminous highlights; rich, smooth, glowing dye-saturated reds, greens and blues; an extremely fine, almost grainless texture; superb tonal separation; and a sumptuous, glamorous, glowing classic-Hollywood-print quality. Lush, velvety, saturated, glamorous. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the print process or technique name in the caption.`
+
+# Notes
+
+Campaign composite for the **middle-management-of-doom** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [SilentFilm](./SilentFilm.mvstyle) (early-1920s silent black-and-white with iris vignette, film damage, intertitle caption — the ghostly, archival afterlife-bureaucracy register). MORTAL REALM = [DyeTransfer](./DyeTransfer.mvstyle) (lush imbibition-Technicolor print; the living world bursts into rich saturated colour against the monochrome beyond). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![SilentFilm](../ImageStyleExample/SilentFilm.example.png)
+
+![DyeTransfer](../ImageStyleExample/DyeTransfer.example.png)

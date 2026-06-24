@@ -52,6 +52,40 @@ All T1. All called by DM.
 
 ---
 
+## Objectives Tools → [state-atlas.md](state-atlas.md) (schema, persistence), [format-spec.md](format-spec.md#45-objectives-stateobjectivesjson) (JSON schema)
+
+All T1. Called by DM. Objectives are long-lifecycle, player-facing goals (quests, missions) that span scenes and surface in game context.
+
+| Tool | Signature | Effect |
+|---|---|---|
+| `manage_objectives` | `({ action, id?, title?, description? })` | Manage long-term objectives. Actions: `create`, `update`, `complete`, `fail`, `abandon`, `list`. Pair with `alarm` for deadlines; for hidden DM goals use DM notes + alarms instead. |
+
+### Lifecycle semantics
+
+Every objective starts `active`. `create` requires both `title` and `description`. Terminal transitions, each of which sets `resolved_scene` to the current scene number:
+
+- `complete` — the party achieved the goal (status → `completed`).
+- `fail` — the goal became unachievable by circumstances (NPC died, time ran out, etc.) (status → `failed`).
+- `abandon` — the DM deliberately drops the goal (retcon, narrative pivot) (status → `abandoned`).
+
+Once an objective leaves `active`, it is immutable: `update`, `complete`, `fail`, and `abandon` all return an error if the objective is not currently `active`. `update` additionally requires at least one of `title` or `description`.
+
+### Context injection
+
+Active objectives (status `active`) are automatically included in the DM's cached-prefix "Active state" block on every turn — no tool call needed. The block is assembled by `buildActiveState()` in `agents/dm-prompt.ts`, which renders an `Objectives:` list; the entries are produced by `GameEngine.getActiveObjectives()` in `agents/game-engine.ts`, which filters to active-only and formats each as `obj-N: title — description`. Because the DM always has the current objectives in view, `list` is mainly useful for confirming IDs or reviewing already-resolved objectives.
+
+### ID scheme
+
+IDs are auto-assigned as `obj-1`, `obj-2`, … from the auto-incrementing `next_id` counter in `ObjectivesState`. IDs are stable across scenes and sessions. `current_scene` is kept in sync by the scene manager, not by the tool.
+
+### Usage patterns
+
+- **Player-facing quests and missions:** use `manage_objectives` — they surface in DM context automatically.
+- **Hidden DM goals, secrets, internal tracking:** use DM notes (entity files) + `alarm`, not objectives. Objectives are always visible to the DM in context and represent goals the characters are actively pursuing.
+- **Deadlines:** set an `alarm` when you create the objective; on alarm fire, call `fail` if the party hasn't completed it.
+
+---
+
 ## Combat / Initiative Tools → [multiplayer-and-initiative.md](multiplayer-and-initiative.md)
 
 All T1 (initiative rolling may delegate to T2 for complex systems). Called by DM.
@@ -98,8 +132,7 @@ Dev Mode additionally exposes `raw_entity_io` (`read`/`write`/`delete` against a
 |---|---|---|---|---|
 | `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity`, and `rename_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs, and placeholder rename. |
 | `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search across all campaign files — entities, scene summaries, transcripts, session recaps, logs. Spawns Haiku subagent with `grep_campaign` and `read_campaign_file` tools. Returns terse excerpts with `[[wikilinks]]` and source references. |
-
-Note: `promote_character` is not a registered tool — it's a subagent function called internally. See [subagents-catalog.md](subagents-catalog.md) #7.
+| `search_content` | T2 (Haiku) | DM | `({ query })` | Search the game system's ingested content library — monsters, spells, equipment, rules — by mechanical criteria (CR, level, type, rarity). Spawns a search subagent that queries faceted indexes and returns matching entities with key stats. Async-dispatched (the handler delegates to the game engine). Requires ingested system content. |
 
 ---
 
@@ -109,7 +142,8 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `update_modeline` | T1 | DM | `({ text })` | Set modeline content. Freeform text string. |
+| `update_modeline` | T1 | DM | `({ text, character? })` | Set modeline content for the named character. `character` defaults to the active character (`config.players[activePlayerIndex].character`). Freeform text string (supports inline `<b>`, `<i>`, `<u>`, `<color=#hex>` tags). |
+| `promote_character` | T2 (Haiku) | DM | `({ character, context })` | Level up or update a character sheet. Queues a deferred `_tui` payload; after the DM turn completes, GameEngine spawns the character-promotion Haiku subagent to read the current sheet and rules, then write an updated sheet with changelog. If the sheet already carries `sheet_status: complete` (set by post-setup sheet building), the promotion is skipped and the flag is cleared. See [subagents-catalog.md](subagents-catalog.md) #7 and [entity-filesystem.md](entity-filesystem.md). |
 | `style_scene` | T1 + T2 | DM, Engine | `({ description?, key_color?, variant?, save_to_location?, location? })` | Style UI to match scene mood. `description` triggers Haiku stylist subagent; `key_color` is direct. Optionally persist to location entity. |
 | `set_display_resources` | T1 | DM, Setup | `({ character, resources[] })` | Update which resource keys appear in the top frame for a character. Also stores keys on `GameState.displayResources`. |
 | `set_resource_values` | T1 | DM | `({ character, values: Record<string,string> })` | Set current values for a character's tracked resources (e.g. `{ "HP": "24/30" }`). Merges into `GameState.resourceValues`. |
@@ -122,7 +156,29 @@ TUI tools are **fire-and-forget**: their results drive engine/UI state but the D
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `switch_player` | T1 | DM | `({ player })` | Switch the active player character during free play (outside combat). During combat, initiative controls turn order automatically. |
+| `switch_player` | T1 | DM | `({ player })` | Pass the turn between characters **already in the roster** during free play (outside combat). During combat, initiative controls turn order automatically. Rejects a name not in `config.players` — handing control to a new/existing character is a PC swap, done via `swap_pc` on the OOC surface (the DM hands off to OOC to perform it). |
+| `swap_pc` | T1 | OOC, Dev | `({ character, replaces?, color?, player_name? })` | Reassign a roster slot to `character` and make it the active PC (a "PC swap" / handoff). The only tool that edits `config.players`, and it persists `config.json` so the new PC survives reload. Moves the pointer only — pair with `howto_swap_pc` to also fix sheets, party.md, resources, modeline, theme. |
+
+---
+
+## DM Personality Tools → [game-initialization.md](game-initialization.md#dm-personalities)
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `list_dm_personalities` | T1 | OOC, Dev | `({})` | List the personas available to swap to (bundled `.mvdm` presets + user additions), each with name + description, plus which is current. Borrows the setup agent's persona catalog (`loadAllPersonalities`) — the in-game agent doesn't otherwise have it in context. |
+| `swap_dm_personality` | T1 | OOC, Dev | `({ name, prompt_fragment?, detail?, description? })` | Change the DM's narrative voice for the rest of the campaign. `name` matches a preset, or names a custom persona when `prompt_fragment` is supplied. The only tool that edits `config.dm_personality`; persists `config.json`. Read live each DM turn, so it takes effect next turn (no reload). Pair with `howto_swap_dm_personality` — the new voice must open with an in-fiction handoff. |
+
+---
+
+## How-To / Knowledge Tools ("skills")
+
+`howto_*` tools take an empty arguments object and change nothing. They load a procedure into context — call one before a multi-step operation so you touch every piece of state.
+
+| Tool | Tier | Caller | Signature | Effect |
+|---|---|---|---|---|
+| `howto_swap_pc` | T1 | OOC, Dev | `({})` | Returns the step-by-step playbook for swapping the player character with a new or existing character (roster, character sheets, party.md, resources, modeline, theme). Backed by `prompts/howto-swap-pc.md`. |
+| `howto_swap_dm_personality` | T1 | OOC, Dev | `({})` | Returns the playbook for changing the DM personality mid-campaign (list → present → swap → required in-fiction voice handoff). Backed by `prompts/howto-swap-dm-personality.md`. |
+| `howto_campaign_state` | T1 | OOC, Dev | `({})` | Catch-all: returns a map of campaign on-disk state and **which tool edits which thing** — the fallback when no dedicated tool obviously fits a change (routes to the right tool, or flags that the edit needs Dev mode). Distilled from [format-spec.md](format-spec.md); backed by `prompts/howto-campaign-state.md`. |
 
 ---
 

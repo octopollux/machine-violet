@@ -15,14 +15,13 @@
  *
  * The harness owns one child process. It always cleans up: shutdown() kills
  * the process tree and removes any temporary campaigns dir if `cleanup` was
- * requested. Long scenarios should put shutdown() in a `finally` block.
+ * requested. Long probes should put shutdown() in a `finally` block.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   pollUntil,
@@ -30,11 +29,19 @@ import {
   DEFAULT_SHORT_TIMEOUT_MS,
   DEFAULT_LONG_TIMEOUT_MS,
 } from "./wait.js";
+import {
+  buildLaunchEnv,
+  pickEphemeralPort,
+  LAUNCHER_NODE_ARGS,
+} from "./launch-env.js";
 import type { ClientStateSnapshot, ActiveChoices } from "./client-state.js";
 import { choiceLabel } from "./client-state.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, "../../..");
+import {
+  readEngineLog,
+  waitForEngineEvent,
+  formatEngineEvent,
+  type EngineLogEvent,
+} from "./engine-log.js";
 
 export interface HarnessOptions {
   /** Port for the engine REST + WS server. Default: ephemeral high port. */
@@ -67,6 +74,14 @@ export interface HarnessOptions {
   env?: Record<string, string>;
   /** Max time to wait for the sidecar to become reachable. Default 30s. */
   launchTimeoutMs?: number;
+  /**
+   * Spawn this executable instead of running scripts/launcher.ts under tsx.
+   * Used to drive the PACKAGED binary (the SEA exe) in the packaged-artifact
+   * replay gate — the env (sidecar port, MV_E2E, replay, config dir) is built
+   * the same way; only the spawned command changes. When omitted, the harness
+   * runs the from-source launcher as before.
+   */
+  executable?: { command: string; args?: string[] };
 }
 
 export interface ShutdownOptions {
@@ -78,19 +93,40 @@ export class Harness {
   /** Captured combined stdout/stderr from the child when stdio: "buffer". */
   readonly childLog: string[] = [];
 
+  /**
+   * Engine log start cutoff (ms since epoch). All readEngineLog /
+   * waitForEngineEvent reads filter to events with `t >= launchedAt`
+   * so stale entries from prior runs don't leak in.
+   *
+   * Why this matters: the engine log lives at
+   * `dirname(campaignsDir)/.debug/engine.jsonl`. With the harness's
+   * default ephemeral campaignsDir under `os.tmpdir()`, that resolves
+   * to a SHARED `tmpdir/.debug/engine.jsonl` across every harness run.
+   * Without the cutoff, a probe could "pass" by finding an
+   * image_gen:completed event left over from yesterday's run.
+   */
+  readonly launchedAt: number;
+
   private constructor(
     private readonly child: ChildProcess,
     readonly serverPort: number,
     readonly agentPort: number,
     readonly campaignsDir: string,
     readonly ownsCampaignsDir: boolean,
-  ) {}
+    launchedAt: number,
+  ) {
+    this.launchedAt = launchedAt;
+  }
 
   // -------------------------------------------------------------------------
   // Launch + shutdown
   // -------------------------------------------------------------------------
 
   static async launch(opts: HarnessOptions = {}): Promise<Harness> {
+    // Capture the cutoff BEFORE we spawn so engine events emitted by the
+    // child are guaranteed to have `t >= launchedAt`. (Capturing later
+    // would race with the engine's startup events.)
+    const launchedAt = Date.now();
     const serverPort = opts.serverPort ?? pickEphemeralPort();
     const agentPort = opts.agentPort ?? pickEphemeralPort();
     const launchTimeoutMs = opts.launchTimeoutMs ?? 30_000;
@@ -105,34 +141,25 @@ export class Harness {
       ownsCampaignsDir = true;
     }
 
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      MV_PORT: String(serverPort),
-      MV_AGENT_PORT: String(agentPort),
-      MV_CAMPAIGNS: campaignsDir,
-      MV_PLAYER: opts.player ?? "TestPlayer",
-      NODE_ENV: process.env.NODE_ENV ?? "development",
-      ...opts.env,
-    };
-    if (opts.campaign) env.MV_CAMPAIGN = opts.campaign;
-
-    // Some embedded shells (Claude Code) pre-set sensitive env vars like
-    // ANTHROPIC_API_KEY="" as an empty string to sandbox subprocesses. The
-    // engine uses dotenv without override:true, so an empty value blocks
-    // .env from populating the real key. Here we treat empty as "unset" and
-    // explicitly load any *_API_KEY from the configDir's .env so the
-    // harness can run live scenarios from inside such shells.
-
-    const launcherPath = join(REPO_ROOT, "scripts", "launcher.ts");
-    const args = ["--max-semi-space-size=16", "--import", "tsx/esm", launcherPath];
-    // configDir() in dev = process.cwd(); pick the nearest dir that actually
-    // has connections so the spawned launcher finds an API key without us
-    // having to materialize one in the worktree.
-    const cwd = opts.cwd ?? findConfigDir(REPO_ROOT);
-    injectApiKeysFromEnvFile(env, join(cwd, ".env"));
+    // buildLaunchEnv handles the env assembly, the worktree-credential
+    // walk-up (configDir() == process.cwd() in dev), and the empty-env-var
+    // dotenv workaround for embedded shells. See launch-env.ts.
+    const { env, cwd } = buildLaunchEnv({
+      serverPort,
+      agentPort,
+      campaignsDir,
+      player: opts.player,
+      campaign: opts.campaign,
+      cwd: opts.cwd,
+      extraEnv: opts.env,
+    });
+    // Default: run the from-source launcher under node+tsx. With `executable`,
+    // spawn the packaged binary directly (it reads the same MV_* env vars).
+    const command = opts.executable?.command ?? process.execPath;
+    const args = opts.executable ? (opts.executable.args ?? []) : [...LAUNCHER_NODE_ARGS];
 
     const childLog: string[] = [];
-    const child = spawn(process.execPath, args, {
+    const child = spawn(command, args, {
       env,
       cwd,
       stdio: stdio === "inherit" ? "inherit" : ["ignore", "pipe", "pipe"],
@@ -192,7 +219,7 @@ export class Harness {
       throw err;
     }
 
-    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir);
+    const harness = new Harness(child, serverPort, agentPort, campaignsDir, ownsCampaignsDir, launchedAt);
     // Pipe captured log into the harness instance.
     if (stdio === "buffer") {
       for (const line of childLog) harness.childLog.push(line);
@@ -295,7 +322,7 @@ export class Harness {
    * no choice is currently presented or no candidate matches.
    *
    * Implementation: assumes the overlay opens with selection at index 0.
-   * If your scenario navigates choices between presentations, drive arrow
+   * If your probe navigates choices between presentations, drive arrow
    * keys directly with sendKey.
    */
   async selectChoice(query: string | { index: number }): Promise<void> {
@@ -418,7 +445,7 @@ export class Harness {
    * scene to disk, creates a git checkpoint, generates the session recap,
    * and broadcasts `session:ended`. Equivalent to selecting "Save & Exit"
    * in the in-game menu, minus the keystroke navigation. Use this when
-   * your scenario isn't specifically testing menu nav.
+   * your probe isn't specifically testing menu nav.
    */
   async endSession(): Promise<void> {
     const res = await fetch(`http://127.0.0.1:${this.serverPort}/session/end`, {
@@ -428,6 +455,109 @@ export class Harness {
       const body = await res.text().catch(() => "");
       throw new Error(`endSession failed: ${res.status} ${body}`);
     }
+  }
+
+  /**
+   * Fetch the session tape recorded so far via the engine's dev-only
+   * `GET /tape` route. Only meaningful when the launcher was spawned with
+   * `env: { MV_TAPE_MODE: "record", MV_TAPE_SCENARIO: "<name>" }`; otherwise
+   * the route 404s and this throws. Returned verbatim (engine-owned `Tape`
+   * shape) so the caller can serialize it as a golden without test-harness
+   * taking a dependency on the engine package. Call before `shutdown()` —
+   * the force-kill teardown skips the engine's exit handlers, so the tape
+   * must be pulled while the process is still alive.
+   */
+  async fetchTape(): Promise<unknown> {
+    const res = await fetch(`http://127.0.0.1:${this.serverPort}/tape`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `fetchTape failed: ${res.status} ${body} ` +
+        `(was the launcher spawned with MV_TAPE_MODE=record?)`,
+      );
+    }
+    return await res.json();
+  }
+
+  // -------------------------------------------------------------------------
+  // Engine log + filesystem inspection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Read structured events the engine has written to `.debug/engine.jsonl`
+   * since this harness instance was launched. Events from prior harness
+   * runs (the log file is shared across all runs that share a campaigns
+   * parent, including all e2e runs under `os.tmpdir()`) are filtered out
+   * via the {@link launchedAt} cutoff. Returns [] if the engine hasn't
+   * written anything yet.
+   *
+   * Use this when you need a punctual snapshot. For "wait until event X
+   * appears" use {@link waitForEngineEvent}.
+   */
+  readEngineLog(): EngineLogEvent[] {
+    return readEngineLog(this.campaignsDir).filter((e) => e.t >= this.launchedAt);
+  }
+
+  /**
+   * Wait until the engine log contains at least one event matching `match`
+   * AND emitted after this harness instance launched. `match` is either an
+   * event name (`"image_gen:completed"`) or a predicate. Resolves with the
+   * first matching event.
+   *
+   * Probes that drive a slow async path (image generation, DM turn) should
+   * use this instead of poking at ClientState — the engine log carries
+   * intent + payload, not just "narrative grew."
+   */
+  async waitForEngineEvent(
+    match: string | ((e: EngineLogEvent) => boolean),
+    opts: Omit<WaitOptions, "description"> & { description?: string } = {},
+  ): Promise<EngineLogEvent> {
+    const namePredicate = typeof match === "function" ? match : (e: EngineLogEvent) => e.event === match;
+    const scopedPredicate = (e: EngineLogEvent) => e.t >= this.launchedAt && namePredicate(e);
+    return waitForEngineEvent(this.campaignsDir, scopedPredicate, opts);
+  }
+
+  /**
+   * Resolve the absolute path of a campaign on disk. `__setup__` is the
+   * synthetic scratch campaign used during new-campaign setup.
+   */
+  campaignPath(campaignId: string): string {
+    return join(this.campaignsDir, campaignId);
+  }
+
+  /**
+   * List files inside a campaign subdirectory (e.g. `"campaign/images"`,
+   * `"characters"`). Returns absolute paths, sorted. Returns [] if the
+   * directory doesn't exist.
+   *
+   * Useful for asserting "the image actually landed on disk" after a
+   * portrait-loop turn completes.
+   */
+  listCampaignFiles(campaignId: string, subdir: string): string[] {
+    const root = join(this.campaignPath(campaignId), ...subdir.split(/[\\/]/));
+    if (!existsSync(root)) return [];
+    try {
+      return readdirSync(root)
+        .filter((name) => {
+          try {
+            return statSync(join(root, name)).isFile();
+          } catch {
+            return false;
+          }
+        })
+        .sort()
+        .map((name) => join(root, name));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Pretty-print the engine log tail. Useful in failure paths so the
+   * probe runner dumps something diagnostic alongside /screen + /state.
+   */
+  engineLogTail(n = 50): string {
+    return this.readEngineLog().slice(-n).map(formatEngineEvent).join("\n");
   }
 
   // -------------------------------------------------------------------------
@@ -453,63 +583,6 @@ function findChoiceIndex(choices: ActiveChoices, query: string): number {
     if (labels[i].toLowerCase().includes(lower)) return i;
   }
   return -1;
-}
-
-function pickEphemeralPort(): number {
-  // Pick a port in the 30000-39999 range; we re-check after spawn via the
-  // sidecar-ready probe, so collisions just look like a launch timeout.
-  return 30000 + Math.floor(Math.random() * 10000);
-}
-
-/**
- * Pull `*_API_KEY` and `*_BASE_URL` values out of the .env file and stuff
- * them into `env` if the corresponding key is missing or empty. We don't
- * use dotenv because dotenv refuses to overwrite already-present empty
- * keys without `override: true`, and we don't want to modify the engine's
- * loadEnv() to set override:true globally — that'd surprise normal users
- * whose .env values should *not* clobber explicitly-set process env vars.
- */
-function injectApiKeysFromEnvFile(env: NodeJS.ProcessEnv, envPath: string): void {
-  if (!existsSync(envPath)) return;
-  const content = readFileSync(envPath, "utf8");
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    let value = line.slice(eq + 1).trim();
-    // Strip surrounding quotes per common .env conventions.
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    // Only inject API keys and base URLs — those are what the engine cares
-    // about for provider connections. Don't dump arbitrary .env contents
-    // into the spawn env.
-    if (!/^[A-Z0-9_]+_(API_KEY|BASE_URL)$/.test(key)) continue;
-    if (!env[key]) env[key] = value;
-  }
-}
-
-/**
- * Walk up from `start` looking for the first directory that contains a
- * `connections.json`. Falls back to `start` if none is found in 12 levels.
- *
- * Background: in dev mode, the engine's `configDir()` returns `process.cwd()`
- * — so when a worktree spawns the launcher with cwd=worktree, the launcher
- * reads connections from the worktree (which is empty), then refuses to
- * start a campaign. Walking up lets a worktree pick up the main repo's
- * existing credentials without copies.
- */
-function findConfigDir(start: string): string {
-  let dir = resolve(start);
-  for (let i = 0; i < 12; i++) {
-    if (existsSync(join(dir, "connections.json"))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return start;
 }
 
 async function terminateChild(child: ChildProcess): Promise<void> {
@@ -539,5 +612,5 @@ async function terminateChild(child: ChildProcess): Promise<void> {
   }
 }
 
-// Convenient default-timeout constants for scenarios.
+// Convenient default-timeout constants for probes.
 export { DEFAULT_SHORT_TIMEOUT_MS, DEFAULT_LONG_TIMEOUT_MS };

@@ -59,6 +59,17 @@ Files are automatically categorized in the sidebar:
 - **JSON** — syntax-colored, collapsible objects/arrays, color swatches
 - **Context Dump** — system prompt as markdown, messages as colored blocks by role, `_thinking_trace` entries in italics, collapsible tool definitions
 
+## Timeline (flame chart)
+
+The **Timeline** nav item (top of the sidebar) is a *time-based* view, not a file view. It reads the engine's span trace (`../.debug/trace.jsonl`) and renders every turn of the selected campaign as a segmented flame chart, left→right in chronological order:
+
+- Each turn is a column whose width is proportional to its wall-clock duration; within it, spans are laid out as a time-ordered icicle (x = time offset, y = nesting depth).
+- Colours encode span kind: `turn` / `agent` / `api_call` / `tool` / `image_gen` / `background`. Parallel tool calls show as overlapping sibling bars; a subagent shows as a nested `agent → api_call` subtree. Errors are tinted red.
+- Hover any bar for duration, model, token counts, stop reason, retry attempts, and image effort/aspect.
+- `−` / `+` zoom the time scale; the view refreshes on SSE `trace.jsonl` changes with a slow poll backstop.
+
+This answers "what took the time in this two-minute turn?" — see [state-atlas.md](../../docs/state-atlas.md) §9 (Span Trace) for the on-disk model. Served by `GET /api/engine-log/spans?campaign=<slug>&limit=<n>`.
+
 ## Features
 
 - **Update dots** — green indicator on files/categories/campaigns that changed since last viewed

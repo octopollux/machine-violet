@@ -63,6 +63,8 @@ export interface AppProps {
   hasKittyProtocol?: boolean;
   /** Stdin filter chain for registering/unregistering input filters. */
   stdinFilterChain?: import("./tui/hooks/stdinFilterChain.js").StdinFilterChain | null;
+  /** Detected terminal graphics-protocol support + cell-pixel size for inline images. */
+  graphicsCaps?: import("./tui/image/capabilities.js").GraphicsCapabilities | null;
 }
 
 type AppPhase =
@@ -89,7 +91,7 @@ function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToM
 
 // --- Main App ---
 
-export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain }: AppProps) {
+export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain, graphicsCaps }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("connecting");
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
@@ -138,6 +140,21 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     saveClientSettings({ showVerbose, dmTurnLengthPctDefault }).catch(() => { /* best-effort */ });
   }, [showVerbose, dmTurnLengthPctDefault]);
   const [archiveStatus, setArchiveStatus] = useState("");
+  // Campaign ids with an archive POST in flight. Blocks a second trigger for the
+  // same campaign (a double-fire used to race the server and corrupt the zip;
+  // the server enforces the same guard, but defeating it here would still flash
+  // a spurious 409 and let the loser's .finally() clear the indicator mid-archive).
+  // The REF is the authoritative source of truth: it's mutated synchronously, so
+  // two Enter presses in one render batch can't both pass the guard. `archivingIds`
+  // mirrors it purely to drive the reactive "Archiving…" UI.
+  const archivingIdsRef = useRef<Set<string>>(new Set());
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
+  // Same pattern for restore (keyed by zip path): the archived-campaigns screen
+  // doesn't move on Enter, so a mashed Enter would otherwise fire N concurrent
+  // restores of one archive. Ref = synchronous source of truth; state mirrors it
+  // to drive the reactive "Restoring…" UI.
+  const restoringPathsRef = useRef<Set<string>>(new Set());
+  const [restoringPaths, setRestoringPaths] = useState<Set<string>>(() => new Set());
   const [deleteModal, setDeleteModal] = useState<CampaignDeleteInfo | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
@@ -200,9 +217,19 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       setErrorMessage("This session was saved and exited.");
       returnToMenu();
     } else if (clientState.sessionEnded) {
-      returnToMenu();
+      // A rollback ends the session too, but here we want the player to see
+      // what was restored before leaving play. The show_rollback_summary
+      // activity:update arrives before session:ended over the ordered socket,
+      // so rollbackSummary is already set. Raise the modal and stay in the
+      // playing phase; its onDismiss runs returnToMenu (re-entry then loads
+      // the restored state via session_resume).
+      if (clientState.rollbackSummary) {
+        setActiveModal({ kind: "rollback", summary: clientState.rollbackSummary });
+      } else {
+        returnToMenu();
+      }
     }
-  }, [clientState.sessionStale, clientState.sessionEnded, phase]);
+  }, [clientState.sessionStale, clientState.sessionEnded, clientState.rollbackSummary, phase]);
 
   // Session-fatal-recoverable (issue #529): the active session is dead
   // (auth expired, model not found, classifier refusal) but the player can
@@ -490,12 +517,24 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           });
         }}
         onResumeCampaign={(entry) => startCampaign(entry.id ?? entry.name)}
+        archivingIds={archivingIds}
         onArchiveCampaign={(entry) => {
           const id = entry.id ?? entry.name;
+          // Ignore a duplicate trigger while this campaign's archive is in
+          // flight — the source folder isn't deleted until the first POST
+          // succeeds, so the entry is still selectable until then.
+          // Synchronous guard off the ref — immune to React's deferred state
+          // commit, so a rapid repeat Enter can't slip a second POST through.
+          if (archivingIdsRef.current.has(id)) return;
+          archivingIdsRef.current.add(id);
+          setArchivingIds(new Set(archivingIdsRef.current));
           apiClientRef.current.archiveCampaign(id).then(() => {
             refreshCampaigns();
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
+          }).finally(() => {
+            archivingIdsRef.current.delete(id);
+            setArchivingIds(new Set(archivingIdsRef.current));
           });
         }}
         onDeleteCampaign={(entry) => {
@@ -602,7 +641,13 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         theme={theme}
         archives={archivedCampaigns}
         statusMessage={archiveStatus}
+        restoringPaths={restoringPaths}
         onUnarchive={(entry) => {
+          // Synchronous guard off the ref — a mashed Enter can't fire a second
+          // restore of the same archive before the state commits.
+          if (restoringPathsRef.current.has(entry.zipPath)) return;
+          restoringPathsRef.current.add(entry.zipPath);
+          setRestoringPaths(new Set(restoringPathsRef.current));
           apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
             setArchiveStatus(`Restored "${entry.name}"`);
             refreshCampaigns();
@@ -610,6 +655,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
             apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
           }).catch((err) => {
             setErrorMessage(err instanceof Error ? err.message : String(err));
+          }).finally(() => {
+            restoringPathsRef.current.delete(entry.zipPath);
+            setRestoringPaths(new Set(restoringPathsRef.current));
           });
         }}
         onBack={() => { setArchiveStatus(""); setPhase("settings"); }}
@@ -686,14 +734,22 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       mode: clientState.mode,
       stateSnapshot,
       usageStatus: clientState.usageStatus,
+      sheetEpoch: clientState.sheetEpoch,
       hasKittyProtocol,
       stdinFilterChain,
+      graphicsCaps,
       devModeEnabled,
       showVerbose,
       dmTurnLengthPctDefault,
       onReturnToMenu: returnToMenu,
       reportViewport,
     }}>
+      {/*
+        Terminal graphics capabilities are detected once at startup
+        (start-client.ts) and threaded through GameContext.graphicsCaps; the
+        inline-image renderer in NarrativeArea reads them to pick a protocol
+        (kitty / iTerm2 / sixel) or render nothing. No provider needed.
+      */}
       <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
     </GameProvider>
   );

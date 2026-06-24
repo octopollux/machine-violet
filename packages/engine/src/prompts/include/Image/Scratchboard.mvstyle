@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Scratchboard"
+rating: "?"
+description: "Black-and-white scratchboard: firm white lines scraped from a solid black ground, deep black dominates, hard single light"
+tags: [printmaking, graphic, black-and-white, dread, horror]
+made-for-model: gpt-image-2
+tokens: 289
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a black-and-white scratchboard (scraperboard) illustration — the image scratched in firm white lines out of a solid black ink ground, the way a scratchboard artist works from black to light. THE GROUND IS BLACK: the board begins completely black, and every lit form is made by scraping away the black to reveal white, so darkness is the default and light is the laborious exception — most of the image stays deep solid black, and form appears only where it is scratched out. Strict process discipline: build all tone and modelling from firm, confident, CONTINUOUS white scratched lines and clean linear cross-hatching that follow the form — long decisive strokes of the blade, the white lines firm, flowing and unbroken, like white-line wood engraving; dense parallel line-work for the brightest areas, fewer clean lines for half-light, and untouched solid black for shadow. Keep every mark LINEAR, not dotted — firm scraped lines, no pointillist stippling, speckle or dot texture. High drama and high contrast, a single light source, deep enveloping black. No grey wash and no colour — only solid black and firm scratched white line. Tense, stark, ominous. Close with a caption as a short line of fine white scratched or engraved lettering beneath the image, scratched out of the black lower border.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. A black-and-white scratchboard / scraperboard illustration — fine white lines scratched out of a solid black ink ground. LOAD-BEARING LEVER (structural, the strongest in the catalog for this): "THE GROUND IS BLACK — the board begins completely black, light is scraped out, so darkness is the DEFAULT and light the laborious exception; most of the image stays deep solid black." This is finally the genuinely-sparse HEAVY-BLACK register [InkNoir](./InkNoir.mvstyle) reached for and missed: because the medium is black-by-construction the model cannot cram — there is nothing to fill, the black dominates for free (the ultimate form of the [TrinitronCRT](./TrinitronCRT.mvstyle) "deep black gives rest" lever, baked into the medium itself rather than asked for). Its dramatic darkness is INTRINSIC to the medium (the black ground), not bolted-on content like [Blockbook](./Blockbook.mvstyle)'s former hell, so the "stark / ominous" lean is medium-honest — but it is a dramatic register, so reach for it on cosmic / dread / horror subjects, not cheerful ones. Restraint horror: tiny figure, immense wrong thing, overwhelming dark. Completes the horror corner with [Woodcut](./Woodcut.mvstyle)/[Blockbook](./Blockbook.mvstyle) (folk) and [LandCamera](./LandCamera.mvstyle)/[SurvivalHorror](./SurvivalHorror.mvstyle) (photographic). White scratched caption in the black border. Validated cosmic-horror on the Cenotaph (Xera), landscape for gameplay. FIRMNESS MATTERS: a first cut with "fine flecks / slightly nervous" wording rendered pointillist / stippled; "firm, continuous, unbroken, linear, no stippling" fixed it — the user's eye caught the pointillism (see [[show-renders-before-banking]]). Keep "the ground is black / light is scraped out", the FIRM continuous linear scratched lines, the deep-black dominance, and the scratched caption.
+
+# Example
+
+![Scratchboard](../ImageStyleExample/Scratchboard.example.png)

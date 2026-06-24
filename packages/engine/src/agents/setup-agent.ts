@@ -1,4 +1,4 @@
-import type { CampaignConfig, PlayerConfig, CampaignScope } from "@machine-violet/shared/types/config.js";
+import type { CampaignConfig, PlayerConfig, CampaignScope, MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 import type { DMPersonality } from "@machine-violet/shared/types/config.js";
 import { createDefaultConfig as defaultCombatConfig } from "../tools/combat/index.js";
@@ -31,6 +31,22 @@ export interface SetupResult {
   /** Freeform content preferences captured during setup (one per line). */
   contentPreferences?: string;
   /**
+   * Player's answer to the image-generation consent question. Only set
+   * when the question was actually asked (provider+model supports image
+   * generation). Omitted when image gen is unsupported by the active
+   * tier, in which case the buildCampaignConfig leaves the field unset
+   * — the ESC-menu toggle can flip it later.
+   */
+  imageGeneration?: "on" | "off";
+  /**
+   * How the player wants the active light system's mechanics surfaced. Only
+   * set when a light/ultra-light system was chosen and the setup agent asked
+   * the question; omitted for crunchy systems and systemless campaigns. When
+   * a light system is run without an explicit choice, the DM prefix falls back
+   * to MECHANICS_MODE_DEFAULT.
+   */
+  mechanicsMode?: MechanicsMode;
+  /**
    * Handoff postcard for the DM's first turn. Written by the setup agent
    * as free-form prose summarising what the player actually said (character
    * in their own words, freeform world/tone notes, anything else useful),
@@ -39,6 +55,32 @@ export interface SetupResult {
    * survives a mid-first-turn crash and restart.
    */
   handoffNote?: string;
+  /**
+   * One-sentence opening-scene directive the setup agent composes at finalize,
+   * telling the DM where/how to open turn 1 (a character-grounded entry beat,
+   * not the main objective). Persisted to CampaignConfig.opening_scene and
+   * injected once into the DM's first-turn priming. Optional for back-compat
+   * (replayed pre-feature tapes won't carry it).
+   */
+  openingScene?: string;
+  /**
+   * Slug of the `.mvworld` seed this campaign was built from, when the player
+   * chose a bundled/imported world (vs. a fully custom premise). Set only when
+   * the setup agent passed an explicit `world_slug` to `finalize_setup` — never
+   * derived from the campaign name. `buildCampaignWorld` re-loads the world by
+   * this slug to materialize its inline content (NPCs, locations, factions,
+   * lore, items, maps, rules, calendar) directly to disk, bypassing the setup
+   * agent's context entirely. Omitted for custom campaigns.
+   */
+  worldSlug?: string;
+  /**
+   * How the seed's forks were resolved during setup, as `forkId → optionId`.
+   * Every fork (player-facing and agent-decided) is collapsed to one option by
+   * the time setup finalizes; this records the chosen branches. Drives scoped
+   * content materialization and `campaign_detail` assembly. Omitted for custom
+   * campaigns and seeds without forks.
+   */
+  forkSelections?: Record<string, string>;
 }
 
 /**
@@ -62,9 +104,15 @@ export function buildCampaignConfig(result: SetupResult): CampaignConfig {
     mood: result.mood,
     difficulty: result.difficulty,
     campaign_scope: result.campaignScope,
+    image_generation: result.imageGeneration,
+    mechanics_mode: result.mechanicsMode,
     premise: result.campaignPremise,
     campaign_detail: result.campaignDetail ?? undefined,
+    fork_selections: result.forkSelections && Object.keys(result.forkSelections).length > 0
+      ? result.forkSelections
+      : undefined,
     setup_handoff: result.handoffNote ?? undefined,
+    opening_scene: result.openingScene ?? undefined,
     dm_personality: result.personality,
     players: [player],
     combat: defaultCombatConfig(),

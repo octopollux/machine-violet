@@ -9,8 +9,17 @@ import type { MapData } from "@machine-violet/shared/types/maps.js";
 import type { SceneState } from "../agents/scene-manager.js";
 import type { ConversationExchange } from "./conversation.js";
 import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
+import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import type { TokenBreakdown } from "./cost-tracker.js";
 import { tailLines } from "./display-log.js";
+
+/**
+ * Campaign config file, at the campaign root (NOT under `state/`).
+ * Deliberately kept out of `STATE_FILES` — that set is contractually the
+ * `state/` directory the Campaign Explorer categorizes, and config.json is a
+ * different category (campaign manifest, normally written only at creation).
+ */
+export const CONFIG_FILE = "config.json";
 
 /** Paths within campaign root for persisted state files */
 export const STATE_FILES = {
@@ -185,6 +194,20 @@ export class StatePersister {
     this.enqueueWrite(STATE_FILES.usage, JSON.stringify(breakdown, null, 2));
   }
 
+  /**
+   * Write the campaign config back to `config.json`.
+   *
+   * `config.json` is normally treated as read-only after creation — it's the
+   * source of truth loaded fresh at every session start. The one mutation we
+   * support in-session is the PC roster (`players[]`): swapping which character
+   * a player controls. That change has to round-trip to disk or the next load
+   * resurrects the old PC. `state.config` is the full parsed object, so
+   * stringifying it preserves every field (premise, dm_personality, etc.).
+   */
+  persistConfig(config: CampaignConfig): void {
+    this.enqueueWrite(CONFIG_FILE, JSON.stringify(config, null, 2));
+  }
+
   /** Append text to the rolling display log (human-readable, never cleared). */
   appendDisplayLog(text: string): void {
     this.enqueueAppend(STATE_FILES.displayLog, text);
@@ -242,4 +265,39 @@ export class StatePersister {
 
     return { combat, clocks, maps, decks, objectives, scene, conversation, ui, usage, resources };
   }
+}
+
+/**
+ * True when a campaign shows durable evidence of prior play, independent of any
+ * single scene's transcript. `conversation.json` (the DM's persisted memory) and
+ * `display-log.md` (the human scrollback) outlast individual scene files: either
+ * being non-empty means the campaign has been played and must be RESUMED, never
+ * reopened as a fresh game over existing data.
+ *
+ * The resume decision otherwise keys solely on the *current* scene's transcript
+ * (`detectSceneState`), which a crash between opening narration and the first
+ * transcript flush — or a hand-checked-out commit, or a missing scene dir — can
+ * leave empty while the campaign plainly has history. Treating those as new
+ * games silently grafts a fresh opening onto the existing campaign, which
+ * players experience as a "completely missing narrative log." This is the
+ * durable backstop against that whole class of failure.
+ *
+ * Best-effort: missing / unreadable / malformed files read as "no prior play".
+ */
+export async function hasPriorPlay(campaignRoot: string, io: FileIO): Promise<boolean> {
+  // conversation.json — a non-empty JSON array of exchanges is the strongest
+  // signal (it's literally what the DM resumes from).
+  try {
+    const raw = await io.readFile(norm(join(campaignRoot, STATE_FILES.conversation)));
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length > 0) return true;
+  } catch { /* missing / unreadable / invalid JSON — fall through */ }
+
+  // display-log.md — any non-whitespace scrollback means turns were narrated.
+  try {
+    const raw = await io.readFile(norm(join(campaignRoot, STATE_FILES.displayLog)));
+    if (raw && raw.trim().length > 0) return true;
+  } catch { /* missing / unreadable — fall through */ }
+
+  return false;
 }

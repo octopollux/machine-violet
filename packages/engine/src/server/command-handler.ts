@@ -81,8 +81,15 @@ async function handleLog(args: string, engine: GameEngine): Promise<CommandResul
 }
 
 async function handleRollback(args: string, engine: GameEngine, gameState: GameState): Promise<CommandResult> {
-  const n = parseInt(args.trim(), 10);
-  if (!args.trim() || isNaN(n) || n < 1) {
+  const trimmed = args.trim();
+  // Two argument shapes: an integer N of exchanges to undo (`/rollback N`, the
+  // human-typed form) or a commit oid (from the Roll Back Game picker). Detect
+  // the count first — an all-digit string is always a count, never an oid — so
+  // values like "1000" aren't misread as a hex oid and routed to repo.rollback.
+  const isCount = /^[0-9]+$/.test(trimmed);
+  const isOid = !isCount && /^[0-9a-f]{4,40}$/i.test(trimmed);
+  const n = parseInt(trimmed, 10);
+  if (!trimmed || (!isOid && (isNaN(n) || n < 1))) {
     return { message: "Usage: /rollback <N> — N = number of exchanges to undo", error: true };
   }
   const repo = engine.getRepo();
@@ -90,9 +97,11 @@ async function handleRollback(args: string, engine: GameEngine, gameState: GameS
     return { message: "Rollback unavailable — git is disabled." };
   }
   const fileIO = engine.getSceneManager().getFileIO();
-  const result = await performRollback(repo, `exchanges_ago:${n}`, gameState.campaignRoot, fileIO);
+  const target = isOid ? trimmed : `exchanges_ago:${n}`;
+  const result = await performRollback(repo, target, gameState.campaignRoot, fileIO);
+  const what = isOid ? `to ${trimmed.slice(0, 7)}` : `${n} exchange(s)`;
   return {
-    message: `Rolled back ${n} exchange(s): ${result.summary}`,
+    message: `Rolled back ${what}: ${result.summary}`,
     endSession: true,
     endSessionReason: "rollback",
   };

@@ -9,10 +9,6 @@
     ".": {
       "source": "./src/index.ts",
       "default": "./dist/index.js"
-    },
-    "./scenarios/*.js": {
-      "source": "./src/scenarios/*.ts",
-      "default": "./dist/scenarios/*.js"
     }
   },
   "scripts": {

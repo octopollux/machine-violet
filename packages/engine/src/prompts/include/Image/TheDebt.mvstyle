@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "The Debt"
+rating: "?"
+description: "The Debt campaign look: ModernIllustration clean warm illustration by default, LandCamera harsh-flash instant snapshot when the PC gives in to guilt, breaks the rules, or betrays a friend"
+tags: [illustration, photographic, stylized, black-and-white, gritty]
+made-for-model: gpt-image-2
+tokens: 446
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** clean, warm contemporary-illustration look below. When the **player does something shameful** — gives in to guilt, breaks a societal rule, betrays a friend — switch to the harsh-flash black-and-white instant-snapshot look: the warmth drops away into a bleak, clinical, evidentiary photograph.
+
+# Style
+
+Default (most scenes) — `Rendered as a clean, friendly contemporary digital illustration — the warm, approachable look of modern book covers and editorial art. Build forms from clean confident shapes with soft cel-like shading (a few smooth tonal steps, not heavy rendering), a warm harmonious limited palette, and gentle appealing stylisation. Light, even, attractive lighting; a clear focal subject with a calmer, simpler background; a subtle soft grain or paper texture over the colour so it reads handcrafted, not sterile. Modern, clean, inviting, versatile. Close with a small tasteful caption in clean contemporary type.`
+
+Guilt, breaking the rules, betrayal — `Rendered as a low-key black-and-white instant photograph taken on a vintage Land camera — a real silver-halide instant print, not a digital image. Strict process discipline: expose it low-key and underlit, with a single harsh on-camera flash as the only light. The flash blasts the nearest subject into hard, slightly blown highlights and then falls off fast into deep, depthless black, so most of the frame is pure shadow with detail crushed away — let the darkness swallow everything the flash does not directly hit. Render it in cold, near-monochrome silver-gelatin tones with visible photographic silver grain, a slightly soft plastic-lens focus, heavy corner vignetting, and the chemical character of instant film: uneven development, faint blotches and emulsion streaks, a milky lift in the deepest blacks, and the thick white instant-film border framing the image. Snapshot framing, a little crooked and accidental, as if grabbed in a hurry. Bleak, clinical, dreadful. Close with a caption as a short line of hurried handwritten ballpoint along the white lower border, like a note scrawled on the print.`
+
+# Notes
+
+Campaign composite for the **the-debt** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [ModernIllustration](./ModernIllustration.mvstyle) (clean, warm, friendly contemporary illustration — the campaign-wide workhorse). SHAME/BETRAYAL = [LandCamera](./LandCamera.mvstyle) (harsh-flash-into-black silver-gelatin instant snapshot; the warmth drops to a clinical, evidentiary photo — restraint = dread, its load-bearing levers kept verbatim). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![ModernIllustration](../ImageStyleExample/ModernIllustration.example.png)
+
+![LandCamera](../ImageStyleExample/LandCamera.example.png)

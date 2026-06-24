@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "RetroDX9"
+rating: "?"
+description: "Unmistakably-period 2004 PC game render: visibly low-poly, low-res blocky textures, hard penumbra-less shadows, no GI"
+tags: [game-render, retro, lo-fi, nostalgic]
+made-for-model: gpt-image-2
+tokens: 267
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a real in-game screenshot from a 2004 PC game running on DirectX 9 hardware of the time — low fidelity by today's standards, NOT a modern render and NOT cinematic. Make the period limitations VISIBLE and obvious: visibly LOW-POLYGON models with hard faceted silhouettes (chunky hands, blocky shoulders, angular environment geometry), LOW-RESOLUTION textures that look soft and slightly blurry up close with obvious blocky DXT compression artefacts, and a limited material palette of a few repeated tiling textures. Lighting is simple and HARD: per-pixel lighting from a few strong light sources with HARD-EDGED stencil-volume shadows that have NO soft penumbra and NO ambient occlusion — unlit areas fall to a flat, evenly-dark ambient fill with no bounced light or global illumination. Tight plasticky specular highlights on the normal-mapped surfaces, an over-eager early-HDR BLOOM blowing out around the brightest lights, mild colour banding in the gradients, and a slightly low-resolution, faintly soft image. The look of a game that was technically impressive FOR 2004 — clearly dated, clean, simple, a little stiff. Close with a caption overlaid in a period game font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([Image](./Image.mvstyle) / [BakedAAA](./BakedAAA.mvstyle) / [DX9Interior](./DX9Interior.mvstyle) / [RetroPSX](./RetroPSX.mvstyle)) — the UNMISTAKABLY-PERIOD, hard-degraded 2004 DX9 take, and the intended BOTTOM RUNG of a game-render ERA LADDER (2004 → 2007 → 2011 → 2016 → 2019). Where [BakedAAA](./BakedAAA.mvstyle) / [DX9Interior](./DX9Interior.mvstyle) CONVERGE to near-modern fidelity (the in-game-render prior gravitates ~2018), this one is forced genuinely down to 2004 by STRUCTURAL DEGRADATION doing real work — the [RetroPSX](./RetroPSX.mvstyle) lesson: visibly LOW-POLY faceted geometry, LOW-RES + chunky DXT-blocked textures, HARD penumbra-less stencil shadows with NO ambient occlusion / NO GI (unlit areas fall to a flat even dark — the period no-SSAO look), over-eager early-HDR BLOOM, mild colour banding, a faintly soft low-res image — plus DROPPING the modern-pulling words ("AAA / atmospheric / cinematic"). The soft tech callouts alone do NOT shift the era (they got steamrolled, like "NOT modern"); the visible LOW-FIDELITY degradation is what lands 2004. Pairs with [RetroPSX](./RetroPSX.mvstyle) as the low-fi retro-GAME register (RetroPSX = PS1/PS2 jank, RetroDX9 = 2004 PC). It even gave itself a period in-game DIALOGUE SUBTITLE caption (mid-2000s survival-horror / adventure UI). SCENE-NEUTRAL by design (rendering technique only, same rule as [DX9Interior](./DX9Interior.mvstyle)); proofed on the indoor corridor OURSELVES, not commanded in the prompt. Caption = an overlaid period game font / dialogue subtitle. Validated on the Xera station-corridor scene; "PERFECT, we keep that" (user). Keep the visible low-poly / low-res / DXT / hard-shadow degradation (the era-lander) and the period caption.
+
+# Example
+
+![RetroDX9](../ImageStyleExample/RetroDX9.example.png)

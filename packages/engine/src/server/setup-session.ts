@@ -25,6 +25,7 @@ import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { loadConnectionStore, buildEffectiveConnections } from "../config/connections.js";
 import { buildTierProvidersWithCache } from "../config/tier-resolver.js";
+import { wrapForRecording, buildReplayTierProviders } from "../providers/tape-mode.js";
 import { createAnthropicProvider } from "../providers/index.js";
 import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "../config/models.js";
@@ -75,17 +76,25 @@ export class SetupSession {
     // incremental cost over medium is small and the quality of the handoff
     // note + world framing benefits meaningfully.
     const appConfigDir = configDir();
-    const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
-    // configDir must be forwarded so openai-chatgpt connections get a
-    // token store backed by connections.json — without it the codex
-    // subprocess never sees the persisted ChatGPT tokens and the very
-    // first setup turn throws "no active ChatGPT login" before any
-    // model call. Game sessions (session-manager) already pass this;
-    // setup was missing it, breaking any campaign whose large tier
-    // resolves to an openai-chatgpt connection.
-    const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
-    this.tierProviders = resolution.tiers;
-    this.providersByConnectionId = resolution.byConnectionId;
+    const replayTiers = buildReplayTierProviders();
+    if (replayTiers) {
+      // Full-stack replay (E2E): tiers served from the tape, no connection/key.
+      this.tierProviders = replayTiers;
+      this.providersByConnectionId = new Map();
+    } else {
+      const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
+      // configDir must be forwarded so openai-chatgpt connections get a
+      // token store backed by connections.json — without it the codex
+      // subprocess never sees the persisted ChatGPT tokens and the very
+      // first setup turn throws "no active ChatGPT login" before any
+      // model call. Game sessions (session-manager) already pass this;
+      // setup was missing it, breaking any campaign whose large tier
+      // resolves to an openai-chatgpt connection.
+      const resolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
+      // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
+      this.tierProviders = wrapForRecording(resolution.tiers);
+      this.providersByConnectionId = resolution.byConnectionId;
+    }
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
   }
@@ -151,6 +160,13 @@ export class SetupSession {
   async start(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     const paths = machinePaths(this.homeDir);
+    // The __setup__ scratch campaign is materialized by SessionManager
+    // before startSetup() is called. createSetupConversation uses it as
+    // the on-disk root for portrait drafts (__setup__/campaign/images/)
+    // and the confirmed portrait (__setup__/characters/<slug>-portrait.png),
+    // which world-builder picks up at finalize and ports into the new
+    // campaign.
+    const setupRoot = join(this.campaignsDir, "__setup__");
     this.conversation = createSetupConversation(this.provider, this.model, knownPlayers, (status, delayMs) => {
       this.broadcast({
         type: "error",
@@ -162,7 +178,7 @@ export class SetupSession {
           category: "retryable",
         },
       });
-    }, paths.worldsDir, paths.personalitiesDir);
+    }, paths.worldsDir, paths.personalitiesDir, this.fileIO, setupRoot);
     this.started = true;
 
     this.emitThinking();
@@ -231,6 +247,29 @@ export class SetupSession {
 
   private async handleResult(result: SetupTurnResult): Promise<{ finalized?: string; campaignName?: string }> {
     this.broadcast({ type: "narrative:complete", data: { text: result.text } });
+
+    // Portrait drafts: broadcast a display_image TUI command for each so
+    // the client renders the draft inline. Same wire shape as the DM
+    // playing-phase emits — the existing event-handler in client-ink
+    // handles it identically.
+    if (result.imageDisplays) {
+      for (const display of result.imageDisplays) {
+        // Same wire shape as bridge.ts uses for the DM-emitted display_image
+        // TuiCommand. Spreading a typed object literal sidesteps excess-property
+        // checks against ActivityUpdateEvent's strict data shape — the client's
+        // event-handler reads filename/intent off the resulting payload either
+        // way. Matching bridge.ts is what keeps both paths rendering identically.
+        const cmd = {
+          type: "display_image" as const,
+          filename: display.filename,
+          intent: display.intent,
+        };
+        this.broadcast({
+          type: "activity:update",
+          data: { engineState: `tui:${cmd.type}`, ...cmd },
+        });
+      }
+    }
 
     // Present choices to the client
     if (result.pendingChoices) {

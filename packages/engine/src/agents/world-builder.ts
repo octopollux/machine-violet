@@ -7,6 +7,9 @@ import { norm } from "../utils/paths.js";
 import { slugify } from "../utils/slug.js";
 import { findSystem, readBundledRuleCard } from "../config/systems.js";
 import { processingPaths } from "../config/processing-paths.js";
+import { loadWorldBySlug } from "../config/world-loader.js";
+import type { WorldFile, WorldEntity } from "@machine-violet/shared/types/world.js";
+import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
 
 /**
  * Build the entire campaign directory from setup results.
@@ -126,7 +129,172 @@ export async function buildCampaignWorld(
     }
   }
 
+  // 8b. Materialize inline world content from the chosen seed, if the campaign
+  // was built from a rich .mvworld. This runs entirely in code — the entity
+  // tree, maps, rules, and calendar never pass through the setup agent's
+  // context. NPCs/locations/factions/lore/items become entity files (the DM
+  // picks them up via the entity registry, which is scanned from disk at
+  // session start); maps and calendar seed runtime state. The player-facing
+  // compendium and the PC sheet are deliberately left unseeded — see
+  // materializeWorldContent.
+  if (result.worldSlug) {
+    const userWorldsDir = homeDir ? machinePaths(homeDir).worldsDir : undefined;
+    const world = loadWorldBySlug(result.worldSlug, userWorldsDir);
+    if (world) {
+      await materializeWorldContent(root, world, fileIO, result.forkSelections);
+    }
+  }
+
+  // 9. Copy the confirmed character portrait (if any) from the __setup__
+  // scratch campaign into the new campaign's characters/ dir. The setup
+  // agent's set_portrait tool wrote it to
+  // <campaignsDir>/__setup__/characters/<slug>-portrait.png. Missing file
+  // is the no-portraits case — proceed silently.
+  if (fileIO.readBinaryFile && fileIO.writeBinaryFile) {
+    const setupPortraitPath = norm(`${campaignsDir}/__setup__/characters/${charSlug}-portrait.png`);
+    const targetPortraitPath = norm(paths.characterPortrait(result.characterName));
+    if (await fileIO.exists(setupPortraitPath)) {
+      try {
+        const bytes = await fileIO.readBinaryFile(setupPortraitPath);
+        await fileIO.writeBinaryFile(targetPortraitPath, bytes);
+      } catch {
+        // Non-fatal: campaign succeeds without a portrait, DM context
+        // injection skips this PC, life goes on.
+      }
+    }
+  }
+
   return root;
+}
+
+/**
+ * Write a seed's inline world content into a freshly scaffolded campaign.
+ *
+ * Pure serialization — no model in the loop. Maps the .mvworld inline content
+ * (format-spec.md §10) onto the on-disk campaign format (format-spec.md §6, §4):
+ *
+ *  - entities.characters → characters/<slug>.md  (NPCs only; the PC is created
+ *    during chargen, so any seed entity flagged `type: PC` is skipped to avoid
+ *    duplicating / colliding with the live character)
+ *  - entities.locations  → locations/<slug>/index.md
+ *  - entities.factions   → factions/<slug>.md
+ *  - entities.lore       → lore/<slug>.md
+ *  - entities.items      → items/<slug>.md
+ *  - rules               → rules/<slug>.md  (verbatim rule-card content)
+ *  - maps                → state/maps.json   (authoritative runtime copy)
+ *  - calendar            → state/clocks.json (world time + epoch, idle clocks)
+ *
+ * Deliberately NOT seeded:
+ *  - campaign/compendium.json — the compendium is the *player-facing* knowledge
+ *    base ("what the player has learned"). A fresh seed's player knows nothing,
+ *    so it must start empty: pre-filling it both spoils the player's discovery
+ *    and misinforms the DM about what the party already knows.
+ *  - the PC character sheet — created live during chargen.
+ *  - campaign/log.json entries — a seed carries no prior episodic record.
+ *
+ * Entity filenames come from the canonical `campaignPaths` helpers, which
+ * slugify the entity title — so a correctly authored seed (record key ==
+ * slugify(title)) round-trips, and a mismatched key still lands on the
+ * engine-canonical path rather than a parallel orphan file.
+ *
+ * `selections` (the campaign's resolved `fork_selections`) gates fork-scoped
+ * entities: one carrying `appliesWhen` is written only if its fork resolved to
+ * its option. Entities without `appliesWhen` are universal and always written.
+ */
+export async function materializeWorldContent(
+  root: string,
+  world: WorldFile,
+  fileIO: FileIO,
+  selections?: Record<string, string>,
+): Promise<void> {
+  const paths = campaignPaths(root);
+  const ents = world.entities;
+
+  // A scoped entity (appliesWhen) is materialized only if its fork resolved to
+  // its option; universal entities (no appliesWhen) always are. This keeps a
+  // branch-specific NPC/location out of campaigns that took a different fork.
+  const applies = (e: WorldEntity): boolean =>
+    !e.appliesWhen || selections?.[e.appliesWhen.fork] === e.appliesWhen.option;
+
+  if (ents) {
+    for (const entity of Object.values(ents.characters ?? {})) {
+      // The PC comes from chargen — never materialize one from the seed.
+      if (String(entity.frontMatter?.type ?? "").toLowerCase() === "pc") continue;
+      if (!applies(entity)) continue;
+      await fileIO.writeFile(
+        norm(paths.character(entity.title)),
+        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
+      );
+    }
+
+    for (const entity of Object.values(ents.locations ?? {})) {
+      if (!applies(entity)) continue;
+      // Locations live in their own subdirectory (index.md) — mkdir first.
+      const locPath = norm(paths.location(entity.title));
+      await fileIO.mkdir(locPath.replace(/\/index\.md$/, ""));
+      await fileIO.writeFile(
+        locPath,
+        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
+      );
+    }
+
+    for (const entity of Object.values(ents.factions ?? {})) {
+      if (!applies(entity)) continue;
+      await fileIO.writeFile(
+        norm(paths.faction(entity.title)),
+        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
+      );
+    }
+    for (const entity of Object.values(ents.lore ?? {})) {
+      if (!applies(entity)) continue;
+      await fileIO.writeFile(
+        norm(paths.lore(entity.title)),
+        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
+      );
+    }
+    for (const entity of Object.values(ents.items ?? {})) {
+      if (!applies(entity)) continue;
+      await fileIO.writeFile(
+        norm(paths.item(entity.title)),
+        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
+      );
+    }
+  }
+
+  // Rule cards → the campaign's rules/ dir, written verbatim.
+  for (const [slug, content] of Object.entries(world.rules ?? {})) {
+    if (typeof content === "string" && content.trim()) {
+      await fileIO.writeFile(norm(paths.rule(slug)), content);
+    }
+  }
+
+  // Maps → authoritative runtime store. The engine hydrates maps from
+  // state/maps.json on load; per-location JSON copies aren't reconstructable
+  // from the flat, location-agnostic world.maps map, so we seed only the store.
+  if (world.maps && Object.keys(world.maps).length > 0) {
+    await fileIO.writeFile(
+      norm(`${root}/state/maps.json`),
+      JSON.stringify(world.maps, null, 2) + "\n",
+    );
+  }
+
+  // Calendar → state/clocks.json. The world carries calendar time + epoch but
+  // no alarms; pair it with an idle combat clock.
+  if (world.calendar) {
+    const clocks: ClocksState = {
+      calendar: {
+        current: world.calendar.current,
+        epoch: world.calendar.epoch,
+        display_format: world.calendar.display_format,
+        alarms: [],
+      },
+      combat: { current: 0, active: false, alarms: [] },
+    };
+    await fileIO.writeFile(
+      norm(`${root}/state/clocks.json`),
+      JSON.stringify(clocks, null, 2) + "\n",
+    );
+  }
 }
 
 /**

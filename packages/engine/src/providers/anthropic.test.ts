@@ -176,6 +176,30 @@ describe("toAnthropicParams: thinking-block round-trip (issue #533)", () => {
   });
 });
 
+describe("toAnthropicParams: image_input parts", () => {
+  it("converts image_input into a base64 image block so portraits reach the model", () => {
+    // Previously dropped — the DM ran portrait-blind on the Anthropic path.
+    // The party-portrait prefix message is the real-world shape.
+    const messages: NormalizedMessage[] = [
+      {
+        role: "user",
+        ephemeral: false,
+        content: [
+          { type: "text", text: "Party portraits (visual reference for the player characters):" },
+          { type: "image_input", base64: "QUJDREVG", mimeType: "image/webp", lowDetail: true, label: "Xera" },
+        ],
+      },
+    ];
+    const out = toAnthropicParams(baseParams({ messages, cacheHints: [] }));
+    const content = out.messages[0].content as Record<string, unknown>[];
+    const image = content.find((b) => b.type === "image");
+    expect(image).toMatchObject({
+      type: "image",
+      source: { type: "base64", media_type: "image/webp", data: "QUJDREVG" },
+    });
+  });
+});
+
 describe("toAnthropicParams: orphan-patch wiring", () => {
   it("inserts a synthetic tool_result user message and lands the BP4 stamp on it", () => {
     // End-to-end: an orphan-trailing history with no clean stable tail.

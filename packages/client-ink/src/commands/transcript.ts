@@ -5,6 +5,8 @@
  * matches the TUI output. The HTML is self-contained (inlined CSS,
  * no external dependencies) and opens cleanly in any browser.
  */
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 import type { NarrativeLine, FormattingNode, FormattingTag, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import type { ThemeAsset } from "../tui/themes/types.js";
 import { processNarrativeLines } from "../tui/formatting.js";
@@ -32,6 +34,7 @@ function nodeToHtml(node: FormattingNode): string {
 }
 
 function tagToHtml(tag: FormattingTag): string {
+  if (tag.type === "linebreak") return "<br>";
   const inner = tag.content.map(nodeToHtml).join("");
   switch (tag.type) {
     case "bold":
@@ -40,6 +43,8 @@ function tagToHtml(tag: FormattingTag): string {
       return `<i>${inner}</i>`;
     case "underline":
       return `<u>${inner}</u>`;
+    case "code":
+      return `<code>${inner}</code>`;
     case "subscript":
       return `<sub>${inner}</sub>`;
     case "superscript":
@@ -52,7 +57,8 @@ function tagToHtml(tag: FormattingTag): string {
       return inner;
     case "center":
     case "right":
-      // Alignment handled at line level; if nested, just render inline
+    case "quote":
+      // Block tags handled at line level; if nested, just render inline
       return inner;
   }
 }
@@ -67,7 +73,12 @@ function nodesToHtml(nodes: FormattingNode[]): string {
 
 function lineToHtml(
   line: ProcessedLine,
-  opts: { separatorText: string; separatorColor: string; playerColor: string },
+  opts: {
+    separatorText: string;
+    separatorColor: string;
+    playerColor: string;
+    imageBytes?: Record<string, { mimeType: string; base64: string }>;
+  },
 ): string {
   const isEmpty =
     line.nodes.length === 0 ||
@@ -79,6 +90,22 @@ function lineToHtml(
 
     case "separator":
       return `<div class="separator" style="color:${esc(opts.separatorColor)}">${esc(opts.separatorText)}</div>`;
+
+    case "image": {
+      // Image lines carry the absolute filesystem path in nodes[0]. The
+      // export caller pre-loads bytes (keyed by that path) and passes
+      // them in opts.imageBytes so the exported HTML is self-contained —
+      // a single .html file with base64 data: URIs, openable without
+      // any sibling files. Missing bytes for a path mean the file was
+      // unreadable at export time; we emit a small placeholder rather
+      // than a broken <img>.
+      const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+      const bytes = path && opts.imageBytes ? opts.imageBytes[path] : undefined;
+      if (!bytes) {
+        return `<div class="image-missing" style="text-align:center;opacity:0.4;font-style:italic">[image unavailable]</div>`;
+      }
+      return `<div class="image" style="text-align:center;margin:1em 0"><img src="data:${bytes.mimeType};base64,${bytes.base64}" alt="" class="zoomable" role="button" tabindex="0" aria-label="View image full screen" style="max-width:100%;height:auto;cursor:zoom-in"/></div>`;
+    }
 
     case "dev":
       return ""; // dev lines omitted from export
@@ -96,12 +123,27 @@ function lineToHtml(
       return `<div class="player" style="color:${esc(opts.playerColor)}">${esc(text)}</div>`;
     }
 
+    case "list": {
+      // Each ProcessedLine is one physical row. The first row carries the marker
+      // and a hanging indent (negative text-indent); continuation rows just pad.
+      const indent = line.listIndent ?? 0;
+      if (line.listMarker !== undefined) {
+        return `<div class="list-item" style="padding-left:${indent}ch;text-indent:-${indent}ch">${esc(line.listMarker)} ${nodesToHtml(line.nodes)}</div>`;
+      }
+      return `<div class="list-item" style="padding-left:${indent}ch">${nodesToHtml(line.nodes)}</div>`;
+    }
+
     case "dm": {
       if (isEmpty) return `<div class="dm">&nbsp;</div>`;
+      // Blockquote row: a bordered, indented passage.
+      const sole = line.nodes.length === 1 && typeof line.nodes[0] !== "string" ? line.nodes[0] : undefined;
+      if (sole && sole.type === "quote") {
+        return `<blockquote class="dm-quote">${nodesToHtml(sole.content)}</blockquote>`;
+      }
       if (line.alignment) {
         const align = line.alignment === "center" ? "center" : "right";
         const inner =
-          line.nodes.length === 1 && typeof line.nodes[0] !== "string"
+          line.nodes.length === 1 && typeof line.nodes[0] !== "string" && "content" in line.nodes[0]
             ? line.nodes[0].content
             : line.nodes;
         return `<div class="dm" style="text-align:${align}">${nodesToHtml(inner)}</div>`;
@@ -125,19 +167,66 @@ export interface TranscriptOptions {
   separatorColor: string;
   playerColor: string;
   quoteColor: string;
+  /**
+   * Pre-loaded image bytes keyed by the absolute path each image
+   * NarrativeLine carries in `text`. Caller is responsible for the
+   * disk reads (keeping buildTranscriptHtml synchronous + pure). Any
+   * image line whose path isn't present in this map renders as a
+   * small "[image unavailable]" placeholder — sometimes the file's
+   * been moved or deleted by the time the export runs.
+   */
+  imageBytes?: Record<string, { mimeType: string; base64: string }>;
+}
+
+/**
+ * Read every image-line PNG referenced by `narrativeLines` and return a
+ * map keyed by the same absolute paths the lines carry in `text`. Hands
+ * the result to {@link buildTranscriptHtml} via `opts.imageBytes` so the
+ * generated HTML can inline them as `data:` URIs and be a single
+ * shareable file.
+ *
+ * Unreadable files (moved, deleted, permission denied) are omitted from
+ * the map silently — the HTML renderer emits an "[image unavailable]"
+ * placeholder when an image line's path isn't in the map.
+ */
+export async function loadImageBytes(
+  narrativeLines: NarrativeLine[],
+): Promise<Record<string, { mimeType: string; base64: string }>> {
+  const paths = new Set<string>();
+  for (const line of narrativeLines) {
+    if (line.kind === "image" && line.text) paths.add(line.text);
+  }
+  const result: Record<string, { mimeType: string; base64: string }> = {};
+  await Promise.all([...paths].map(async (p) => {
+    try {
+      const buf = await readFile(p);
+      result[p] = { mimeType: mimeFromExt(p), base64: buf.toString("base64") };
+    } catch { /* skip unreadable */ }
+  }));
+  return result;
+}
+
+function mimeFromExt(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case ".png": return "image/png";
+    case ".jpg":
+    case ".jpeg": return "image/jpeg";
+    case ".webp": return "image/webp";
+    default: return "application/octet-stream";
+  }
 }
 
 export function buildTranscriptHtml(opts: TranscriptOptions): string {
   const {
     narrativeLines, width, campaignName,
-    themeAsset, separatorColor, playerColor, quoteColor,
+    themeAsset, separatorColor, playerColor, quoteColor, imageBytes,
   } = opts;
 
   const processed = processNarrativeLines(narrativeLines, width, quoteColor);
   const separatorText = composeTurnSeparator(themeAsset, width);
 
   const bodyLines = processed
-    .map((line) => lineToHtml(line, { separatorText, separatorColor, playerColor }))
+    .map((line) => lineToHtml(line, { separatorText, separatorColor, playerColor, imageBytes }))
     .filter(Boolean)
     .join("\n");
 
@@ -168,10 +257,71 @@ div {
 b { font-weight: bold; }
 i { font-style: italic; }
 u { text-decoration: underline; }
+.dm-quote {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  border-left: 2px solid #666;
+  margin: 0;
+  padding-left: 1ch;
+  opacity: 0.9;
+  font-style: italic;
+  min-height: 1.4em;
+}
+.list-item { white-space: pre-wrap; word-wrap: break-word; }
+/* Image shadowbox: clicking a narrative image fills the viewport on black. */
+#shadowbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  cursor: zoom-out;
+  align-items: center;
+  justify-content: center;
+}
+#shadowbox.open { display: flex; }
+#shadowbox img {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: default;
+}
+.zoomable:focus { outline: 2px solid #888; outline-offset: 2px; }
 </style>
 </head>
 <body>
 ${bodyLines}
+<div id="shadowbox"><img alt=""></div>
+<script>
+(function () {
+  var box = document.getElementById('shadowbox');
+  var boxImg = box.querySelector('img');
+  function open(src) { boxImg.src = src; box.classList.add('open'); }
+  function close() { box.classList.remove('open'); boxImg.removeAttribute('src'); }
+  // Open on click of any narrative image.
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('zoomable')) open(t.getAttribute('src'));
+  });
+  // Click the black backdrop closes; clicks/right-clicks ON the image are
+  // left to the browser (save image, open in new tab, etc.).
+  box.addEventListener('click', function (e) {
+    if (e.target !== boxImg) close();
+  });
+  // Keyboard: Esc closes the shadowbox; Enter/Space opens it when a zoomable
+  // image is focused (the images carry tabindex + role="button").
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && box.classList.contains('open')) { close(); return; }
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t && t.classList && t.classList.contains('zoomable')) {
+      e.preventDefault();
+      open(t.getAttribute('src'));
+    }
+  });
+})();
+</script>
 </body>
 </html>`;
 }

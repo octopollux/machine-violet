@@ -56,6 +56,33 @@ mkdirSync(DIST, { recursive: true });
 // --- Step 1: esbuild bundle ---
 console.log("  Bundling with esbuild...");
 
+// `sixel/upng.js` opens with `module.exports = UPNG = {};` — an assignment to
+// an *undeclared* `UPNG`, i.e. an implicit global. Node loads that file as a
+// sloppy-mode CommonJS module in dev, where implicit globals are legal, so it
+// works. But esbuild emits this whole bundle as a single ESM module
+// (`format: "esm"`), and ESM is always strict mode — strictness propagates into
+// esbuild's CJS module wrappers, so the implicit-global assignment throws
+// `ReferenceError: UPNG is not defined` the moment the packaged binary touches
+// sixel (i.e. on first image render). Declare `UPNG` so the assignment binds a
+// module-scoped local instead. Fails loudly if upstream sixel changes the line,
+// so we re-check the shim rather than silently ship a broken binary.
+const fixSixelUpngGlobal = {
+  name: "fix-sixel-upng-global",
+  setup(b) {
+    b.onLoad({ filter: /[\\/]sixel[\\/]upng\.js$/ }, (args) => {
+      const original = readFileSync(args.path, "utf-8");
+      const needle = "module.exports = UPNG = {};";
+      if (!original.includes(needle)) {
+        throw new Error(
+          `fix-sixel-upng-global: expected "${needle}" in ${args.path}. ` +
+            `sixel upstream changed — re-verify whether this shim is still needed.`,
+        );
+      }
+      return { contents: original.replace(needle, `var UPNG;\n${needle}`), loader: "js" };
+    });
+  },
+};
+
 await build({
   entryPoints: [join(ROOT, "scripts/launcher.ts")],
   bundle: true,
@@ -65,6 +92,7 @@ await build({
   format: "esm",
   jsx: "automatic",
   external: ["node:*"],
+  plugins: [fixSixelUpngGlobal],
   define: {
     "process.env.MV_VERSION": JSON.stringify(version),
     "process.env.MV_RELEASE_DATE": JSON.stringify(releaseDate),
@@ -187,7 +215,11 @@ rmSync(join(DIST, "bundle.js"), { force: true });
 
 // --- Step 3: Copy assets ---
 const assets = [
-  { src: "packages/engine/src/prompts", dest: "prompts" },
+  // `exclude` drops a subtree from the copy (returning false for a directory
+  // skips its whole contents). ImageStyleExample/ holds full-res worked sample
+  // images for each `.mvstyle` style variant — an authoring aid for assigning
+  // styles to seeds, never read at runtime — so it must NOT ship in the SEA.
+  { src: "packages/engine/src/prompts", dest: "prompts", exclude: /[\\/]ImageStyleExample(?:[\\/]|$)/ },
   { src: "packages/client-ink/src/tui/themes/assets", dest: "themes" },
   { src: "systems", dest: "systems" },
   { src: "worlds", dest: "worlds", filter: /\.mvworld$/ },
@@ -198,12 +230,19 @@ const assets = [
   { src: "packages/engine/src/assets", dest: "assets", filter: /(?:\.json$|(?:^|[\\/])(?:LICENSE|README\.md)$)/ },
 ];
 
-for (const { src, dest, filter } of assets) {
+for (const { src, dest, filter, exclude } of assets) {
   const srcDir = join(ROOT, src);
   const destDir = join(DIST, dest);
   console.log(`  Copying ${dest}/...`);
-  if (filter) {
-    cpSync(srcDir, destDir, { recursive: true, filter: (s) => statSync(s).isDirectory() || filter.test(s) });
+  if (filter || exclude) {
+    cpSync(srcDir, destDir, {
+      recursive: true,
+      filter: (s) => {
+        if (exclude && exclude.test(s)) return false;
+        if (filter) return statSync(s).isDirectory() || filter.test(s);
+        return true;
+      },
+    });
   } else {
     cpSync(srcDir, destDir, { recursive: true });
   }
@@ -232,6 +271,16 @@ for (const { src, dest, filter } of assets) {
 // platform package — we copy whatever's present rather than enumerate.
 console.log("  Vendoring codex runtime...");
 vendorCodex(ROOT, DIST);
+
+// Vendor sharp's per-platform native prebuild (libvips DLLs + .node) so
+// inline image rendering works in the SEA binary. esbuild bundles sharp's
+// JS wrapper into bundle.js, but the wrapper's `require('@img/sharp-...')`
+// resolves at runtime through Node's standard module search — which only
+// finds the package if it sits at `node_modules/@img/sharp-{triple}/`
+// somewhere Node can walk up to from cwd. We mirror it under
+// `dist/node_modules/` so an installed user has it next to the binary.
+console.log("  Vendoring sharp prebuild...");
+vendorSharp(ROOT, DIST);
 
 // Copy license
 const licensePath = join(ROOT, "LICENSE");
@@ -314,6 +363,52 @@ function vendorCodex(rootDir, distDir) {
   // Log a size summary so build output makes the ~250MB Rust binary visible.
   const bytes = dirSizeBytes(destRoot);
   console.log(`    codex/ vendored: ${(bytes / 1024 / 1024).toFixed(1)} MB (${entry.triple})`);
+}
+
+/**
+ * Copy the platform-matching `@img/sharp-*` prebuild into
+ * `dist/node_modules/@img/`.
+ *
+ * Sharp resolves its native binary via its wrapper's
+ * `require('@img/sharp-{platform}-{arch}/sharp.node')`. esbuild inlines
+ * the wrapper into bundle.js, but the require call is preserved and
+ * Node's standard resolver runs at runtime — climbing up from cwd
+ * looking for `node_modules/`. We colocate the prebuild under
+ * `dist/node_modules/` so an installed user (Velopack runs the app
+ * from `%LOCALAPPDATA%\MachineViolet\current\` or platform equivalent)
+ * has cwd somewhere the resolver can find it.
+ *
+ * The package directory carries libvips DLLs/dylibs/.so next to the
+ * `.node` file; copy the whole tree (with `package.json`'s exports map
+ * intact, which is what sharp's `require` honors).
+ *
+ * We don't hardcode the platform→package map — `npm install` only fetches
+ * the optional-dep package matching the current platform, so whatever
+ * `@img/sharp-*` directory is present on the build runner is the one we
+ * want. Throws if nothing is present (optional deps got skipped).
+ */
+function vendorSharp(rootDir, distDir) {
+  const imgDir = join(rootDir, "node_modules", "@img");
+  if (!existsSync(imgDir)) {
+    throw new Error(
+      `vendorSharp: ${imgDir} not found — install ink-picture / sharp first.`,
+    );
+  }
+  const sharpPkgs = readdirSync(imgDir).filter((e) => e.startsWith("sharp-"));
+  if (sharpPkgs.length === 0) {
+    throw new Error(
+      `vendorSharp: no @img/sharp-* prebuild found in ${imgDir}. ` +
+      `Optional deps may have been skipped — re-run \`npm install\` without --no-optional.`,
+    );
+  }
+  for (const pkg of sharpPkgs) {
+    const src = join(imgDir, pkg);
+    const dest = join(distDir, "node_modules", "@img", pkg);
+    mkdirSync(dirname(dest), { recursive: true });
+    cpSync(src, dest, { recursive: true });
+    const bytes = dirSizeBytes(dest);
+    console.log(`    @img/${pkg} vendored: ${(bytes / 1024 / 1024).toFixed(1)} MB`);
+  }
 }
 
 /** Recursive byte-count for a directory tree. */

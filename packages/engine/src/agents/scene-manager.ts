@@ -1,4 +1,4 @@
-import type { LLMProvider, TierProvider } from "../providers/types.js";
+import type { ContentPart, LLMProvider, NormalizedMessage, TierProvider } from "../providers/types.js";
 import { getModel, type ModelTier } from "../config/models.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
@@ -23,6 +23,7 @@ import { sceneDir, campaignPaths, machinePaths, parseFrontMatter, extractSection
 import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
+import { findSystem, effectiveMechanicsMode } from "../config/systems.js";
 import type { UsageStats } from "./agent-loop.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { norm } from "../utils/paths.js";
@@ -86,6 +87,22 @@ export interface FileIO {
   deleteFile?(path: string): Promise<void>;
   /** Remove an empty directory. Rejects if the directory is not empty. */
   rmdir?(path: string): Promise<void>;
+  /**
+   * Write raw bytes (e.g. a generated PNG). Optional so existing test
+   * mocks that only need text I/O don't have to change; production
+   * implementations always provide this. The image-handler errors
+   * loudly if it's absent at runtime — better than silently dropping
+   * the image bytes.
+   */
+  writeBinaryFile?(path: string, bytes: Uint8Array): Promise<void>;
+  /**
+   * Read raw bytes (e.g. a character portrait PNG to embed in the DM's
+   * cached prefix as an image_input ContentPart). Optional for the same
+   * reason as writeBinaryFile; production fileIO always provides it.
+   * Callers that need bytes for an optional feature (portraits in DM
+   * context) should skip gracefully when absent rather than throwing.
+   */
+  readBinaryFile?(path: string): Promise<Uint8Array>;
 }
 
 /** Ordered cascade steps for scene transitions. Used for resume logic. */
@@ -94,6 +111,15 @@ const STEP_ORDER: PendingStep[] = [
   "advance_calendar", "check_alarms", "validate",
   "reset_precis", "prune_context", "checkpoint", "done",
 ];
+
+/** Join the text blocks of a message's content (string content passes through). */
+function narrationText(content: NormalizedMessage["content"]): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((b: ContentPart): b is Extract<ContentPart, { type: "text" }> => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+}
 
 // --- Scene Manager ---
 
@@ -108,8 +134,14 @@ export class SceneManager {
   private pcSummaries: string[];
   private aliasContext = "";
   private entityTree: EntityTree;
-  /** Rendered entity tree snapshot — refreshed at session start and scene transitions only. */
+  /**
+   * Rendered entity-registry snapshot fed to the DM (via `entityIndex`).
+   * Recomputed lazily: a tree mutation marks it dirty and the next read
+   * re-renders once — so a scribe turn applying many deltas doesn't re-sort
+   * and re-render the whole registry per delta.
+   */
   private entityTreeSnapshot: string | undefined;
+  private entityTreeDirty = false;
   /** Content boundaries snapshot — refreshed at scene transitions only. */
   private contentBoundariesSnapshot: string | undefined;
   /**
@@ -157,6 +189,22 @@ export class SceneManager {
     return this.tierProviders?.[tier] ?? { provider: fallbackProvider, model: getModel(tier) };
   }
 
+  /**
+   * Build the volatile `[stats]` string for the current state. Shared by
+   * getSystemPrompt and contextRefresh so the system/silent line and resources
+   * stay consistent — contextRefresh runs after scene transitions, and must not
+   * drop the active-system reminder from the hard-stats cadence.
+   */
+  private buildCurrentHardStats(turnHolder?: string): string {
+    const system = this.state.config.system;
+    return buildHardStats({
+      turnHolder,
+      resourceValues: this.state.resourceValues,
+      activeSystem: system ? (findSystem(system)?.name ?? system) : undefined,
+      mechanicsSilent: effectiveMechanicsMode(this.state.config) === "dm-managed",
+    });
+  }
+
   /** Get the current system prompt (cached prefix) and volatile context. */
   getSystemPrompt(opts?: { turnHolder?: string }): CachedPrefixResult {
     this.state.objectives.current_scene = this.scene.sceneNumber;
@@ -165,13 +213,10 @@ export class SceneManager {
       pendingAlarms: [],
       activeObjectives: this.getActiveObjectives(),
     });
-    this.sessionState.hardStats = buildHardStats({
-      turnHolder: opts?.turnHolder,
-      resourceValues: this.state.resourceValues,
-    });
+    this.sessionState.hardStats = this.buildCurrentHardStats(opts?.turnHolder);
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
-    this.sessionState.entityIndex = this.entityTreeSnapshot;
+    this.sessionState.entityIndex = this.entityRegistrySnapshot();
     this.sessionState.contentBoundaries = this.contentBoundariesSnapshot;
     // Use the runtime tier-resolved model for prompt conditionals
     // (`<!--if:gpt-->` etc.) so the DM prompt branches match the provider
@@ -206,13 +251,13 @@ export class SceneManager {
     provider: LLMProvider,
     dropped: DroppedExchange,
   ): Promise<UsageStats> {
-    // Format the dropped exchange as text
+    // Format the dropped exchange as text. The stored assistant message is the
+    // canonical turn's final message, whose content is an array of blocks, so
+    // pull the narration out of its text block(s).
     const userContent = typeof dropped.exchange.user.content === "string"
       ? dropped.exchange.user.content
-      : "[complex content]";
-    const assistantContent = typeof dropped.exchange.assistant.content === "string"
-      ? dropped.exchange.assistant.content
-      : "[complex content]";
+      : narrationText(dropped.exchange.user.content);
+    const assistantContent = narrationText(dropped.exchange.assistant.content);
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
     const pcIdent = this.state.config.players
@@ -569,9 +614,7 @@ export class SceneManager {
       pendingAlarms,
       activeObjectives: this.getActiveObjectives(),
     });
-    this.sessionState.hardStats = buildHardStats({
-      resourceValues: this.state.resourceValues,
-    });
+    this.sessionState.hardStats = this.buildCurrentHardStats();
 
     // Sync precis and player read
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
@@ -611,12 +654,33 @@ export class SceneManager {
       type: entry.type,
       path: entry.path,
     };
+    this.entityTreeDirty = true;
   }
 
   /** Remove an entry from the entity tree (e.g. after rename). */
   removeEntity(slug: string): void {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete this.entityTree[slug];
+    this.entityTreeDirty = true;
+  }
+
+  /**
+   * Current entity-registry snapshot string that feeds the DM's "Entity
+   * Registry" context (via `sessionState.entityIndex` in `getSystemPrompt`).
+   * Recomputes only when the tree changed since the last render. This has to
+   * pick up mid-scene mutations: a previous version rendered only at
+   * construction / scene reset, so entities the scribe created or renamed
+   * mid-scene never reached the DM — it kept seeing the stale placeholder and
+   * re-issued the same rename every turn, wasting a whole DM reasoning round
+   * each time. Marking dirty (rather than rendering per mutation) keeps a
+   * many-delta scribe turn to a single re-render; `renderEntityTree` sorts keys.
+   */
+  private entityRegistrySnapshot(): string {
+    if (this.entityTreeDirty || this.entityTreeSnapshot === undefined) {
+      this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+      this.entityTreeDirty = false;
+    }
+    return this.entityTreeSnapshot ?? "";
   }
 
   /** Get the current entity tree (for passing to subagents). */
@@ -862,8 +926,8 @@ export class SceneManager {
     this.scene.openThreads = "";
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
-    // Refresh entity tree snapshot for the new scene
-    this.entityTreeSnapshot = renderEntityTree(this.entityTree);
+    // Entity registry may have changed during the scene; refresh on next read.
+    this.entityTreeDirty = true;
     // Refresh content boundaries snapshot (picks up any Scribe updates)
     await this.refreshContentBoundaries();
   }

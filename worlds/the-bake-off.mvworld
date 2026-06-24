@@ -2,12 +2,42 @@
   "format": "machine-violet-world",
   "version": 1,
   "name": "The Bake-Off",
-  "summary": "A cooking competition where the judges are gods. The secret ingredient is metaphorical.",
+  "summary": "A cooking competition where the judges are gods",
   "genres": [
     "fantasy",
     "comedy"
   ],
-  "detail": "Mortal contestants. Divine judges. A tent — striped, drafty, larger inside than out — pitched on ground the locals avoid. The player has accepted an invitation they shouldn't have. The judging panel includes at least one being the player's grandmother prayed to. The secret ingredient is not in the pantry.\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE HUNGER — The gods are hungry for a specific mortal emotion this season. Grief. Or ambition. Or longing. They want it baked into the dish, not adjacent to it. The judges will know on the first bite whether the flavor is real, and the contestant who cannot supply it from their own life will be politely eliminated, which is what the gods call it.\n2. THE AUDITION — One of the judges is retiring. The competition is the audition for a successor. The winning contestant is offered apotheosis on the final episode. The other finalists are offered nothing they can refuse. The judges have been picking among the contestants from the qualifying rounds and the player has been getting close-ups for reasons.\n3. THE COURSE — The gods are bored. The cooking is a digestive of their day. The loser of each round becomes the next course; the kitchen knives are subtly different on those nights. The host is a small nervous person who keeps the schedule. Nobody has explained this to the contestants and the contestants have begun to suspect.\n\nDM approach:\n- Tone: warm tent lighting, polite voiceover, the camera catches a knife glinting wrong. Earnest cooking-show beats undercut by what's actually being measured.\n- NPCs derive from the variant: the hungry judge and the patient host (1), the retiring deity and the watchful panel (2), the nervous host and the suddenly-quiet sous-chefs (3).\n- Pacing: Signature, Technical, Showstopper, each round eliminates one rival. Every elimination should also cost the player something — a memory, a callus, a person who used to call.\n- Seed early: the host's apron is too clean. One judge has not been seen to eat.\n\nPacing: Signature / Technical / Showstopper. Three rounds, three eliminations. Each round the player loses one rival they had grown to like and one small piece of themselves — and the tent grows quieter, the audience grows stiller, and the lights on the judging table burn cleaner.\n\n<!--include:Pacing.ShortCampaigns-->",
+  "image_style": "Ektachrome",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open on arrival — the player entering, or about to enter, the tent for the first round, in the earnest warmth of a cooking show (warm lighting, a polite host, the other contestants finding their stations). Keep the wrongness to subtle background only (a too-clean apron, a judge who has not been seen to eat); do not reveal what is really being measured — the crucial question stays hidden. Don't open mid-round or after the horror has surfaced; the slow realization is the point.",
+  "detail": "Mortal contestants. Divine judges. A tent — striped, drafty, larger inside than out — pitched on ground the locals avoid. The player has accepted an invitation they shouldn't have. The judging panel includes at least one being the player's grandmother prayed to. The secret ingredient is not in the pantry.\n\nDM approach:\n- Tone: warm tent lighting, polite voiceover, the camera catches a knife glinting wrong. Earnest cooking-show beats undercut by what's actually being measured.\n- NPCs derive from the variant: the hungry judge and the patient host (1), the retiring deity and the watchful panel (2), the nervous host and the suddenly-quiet sous-chefs (3).\n- Pacing: Signature, Technical, Showstopper, each round eliminates one rival. Every elimination should also cost the player something — a memory, a callus, a person who used to call.\n- Seed early: the host's apron is too clean. One judge has not been seen to eat.\n\nPacing: Signature / Technical / Showstopper. Three rounds, three eliminations. Each round the player loses one rival they had grown to like and one small piece of themselves — and the tent grows quieter, the audience grows stiller, and the lights on the judging table burn cleaner.",
+  "forks": [
+    {
+      "id": "the-crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "the-hunger",
+          "name": "The Hunger",
+          "description": "The gods are hungry for a specific mortal emotion this season, and the unwilling are politely eliminated.",
+          "detail": "1. THE HUNGER — The gods are hungry for a specific mortal emotion this season. Grief. Or ambition. Or longing. They want it baked into the dish, not adjacent to it. The judges will know on the first bite whether the flavor is real, and the contestant who cannot supply it from their own life will be politely eliminated, which is what the gods call it."
+        },
+        {
+          "id": "the-audition",
+          "name": "The Audition",
+          "description": "The competition is the audition for a retiring judge's successor; the winner is offered apotheosis.",
+          "detail": "2. THE AUDITION — One of the judges is retiring. The competition is the audition for a successor. The winning contestant is offered apotheosis on the final episode. The other finalists are offered nothing they can refuse. The judges have been picking among the contestants from the qualifying rounds and the player has been getting close-ups for reasons."
+        },
+        {
+          "id": "the-course",
+          "name": "The Course",
+          "description": "The cooking is the gods' entertainment; each round's loser becomes the next course.",
+          "detail": "3. THE COURSE — The gods are bored. The cooking is a digestive of their day. The loser of each round becomes the next course; the kitchen knives are subtly different on those nights. The host is a small nervous person who keeps the schedule. Nobody has explained this to the contestants and the contestants have begun to suspect."
+        }
+      ]
+    }
+  ],
   "suboptions": [
     {
       "label": "Your kitchen",
@@ -51,5 +81,11 @@
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 261,
+    "setup_detail": 111,
+    "forks": 213,
+    "total": 1189
+  }
 }

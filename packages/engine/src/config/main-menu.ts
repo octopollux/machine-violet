@@ -3,8 +3,6 @@ import { join } from "node:path";
 /**
  * Main menu options and campaign listing.
  */
-export type MenuChoice = "new_campaign" | "continue_campaign" | "just_jump_in";
-
 export interface CampaignEntry {
   name: string;
   path: string;

@@ -11,7 +11,8 @@ import type {
   NormalizedMessage, NormalizedToolCall,
   NormalizedUsage, ContentPart, StopReason, CacheDiagnostics,
 } from "./types.js";
-import { getKnownModel } from "../config/model-registry.js";
+import type { UsageStatus, UsageSegment, UsageSegmentStatus } from "@machine-violet/shared";
+import { getKnownModel, supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
 import { patchOrphanedToolUses, reorderAssistantToolUseBlocksLast } from "./orphan-patch.js";
 
@@ -43,11 +44,26 @@ export function createAnthropicProvider(apiKey?: string): LLMProvider {
    */
   const previousIdByConversation = new Map<string, string>();
 
+  /**
+   * Most-recent rate-limit snapshot, parsed from the `anthropic-ratelimit-*`
+   * response headers on every chat/stream call (see {@link captureRateLimits}).
+   * Surfaced via getUsageStatus() so the Connections UI can show remaining
+   * request/token quota for an active session. Null until the first response
+   * carrying the headers lands — which is why getUsageStatus reports usage
+   * only "after at least one request", per issue #464.
+   */
+  const rateLimitState: RateLimitState = { limits: null, capturedAt: 0 };
+
   return {
     providerId: "anthropic",
-    chat: (params) => anthropicChat(client, params, false, undefined, previousIdByConversation),
-    stream: (params, onDelta) => anthropicChat(client, params, true, onDelta, previousIdByConversation),
+    getCapabilities: (model) => ({ imageGeneration: supportsImageGeneration(model) }),
+    chat: (params) => anthropicChat(client, params, false, undefined, previousIdByConversation, rateLimitState),
+    stream: (params, onDelta) => anthropicChat(client, params, true, onDelta, previousIdByConversation, rateLimitState),
     healthCheck: (model) => anthropicHealthCheck(client, model),
+    getUsageStatus: () =>
+      rateLimitState.limits
+        ? rateLimitsToUsageStatus(rateLimitState.limits, rateLimitState.capturedAt)
+        : null,
   };
 }
 
@@ -61,6 +77,7 @@ async function anthropicChat(
   streaming: boolean,
   onDelta: ((text: string) => void) | undefined,
   previousIdByConversation: Map<string, string>,
+  rateLimitState: RateLimitState,
 ): Promise<ChatResult> {
   const apiParams = toAnthropicParams(params);
 
@@ -93,8 +110,19 @@ async function anthropicChat(
     const stream = client.messages.stream(streamParams, requestOptions);
     stream.on("text", (delta) => onDelta(delta));
     response = await stream.finalMessage();
+    // Rate-limit headers ride on the raw HTTP response, available on the
+    // stream once it has connected — long settled by the time finalMessage
+    // resolves.
+    captureRateLimits(stream.response?.headers, rateLimitState);
   } else {
-    response = await client.messages.create(createParams, requestOptions);
+    // withResponse() surfaces the raw HTTP response alongside the parsed
+    // Message so we can read the `anthropic-ratelimit-*` headers; awaiting it
+    // is otherwise identical to awaiting create() directly.
+    const { data, response: httpResponse } = await client.messages
+      .create(createParams, requestOptions)
+      .withResponse();
+    response = data;
+    captureRateLimits(httpResponse.headers, rateLimitState);
   }
 
   // Cursor advances on success only — a thrown error leaves the prior id in
@@ -264,6 +292,7 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
   // See https://platform.claude.com/docs/en/docs/build-with-claude/extended-thinking
   const content: (
     | Anthropic.TextBlockParam
+    | Anthropic.ImageBlockParam
     | Anthropic.ToolUseBlockParam
     | Anthropic.ToolResultBlockParam
     | Anthropic.ThinkingBlockParam
@@ -272,6 +301,16 @@ function toAnthropicMessage(msg: NormalizedMessage): Anthropic.MessageParam {
   for (const part of msg.content) {
     if (part.type === "text") {
       content.push({ type: "text", text: part.text });
+    } else if (part.type === "image_input") {
+      // Party portraits (and any other input image) — embed as a base64
+      // image block so the model sees the PC's likeness, not just its text
+      // description. Anthropic has no per-image detail tier like OpenAI's
+      // `lowDetail`, so the flag is ignored here; it auto-downsamples and
+      // bills by pixel area, which is why dm-portraits ships a ≤512px WebP.
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: part.mimeType, data: part.base64 },
+      });
     } else if (part.type === "tool_use") {
       content.push({
         type: "tool_use",
@@ -425,6 +464,141 @@ export function extractCacheDiagnostics(response: Anthropic.Message): CacheDiagn
 }
 
 // ---------------------------------------------------------------------------
+// Rate-limit usage tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * A parsed `anthropic-ratelimit-*` snapshot. Anthropic returns these headers
+ * on every Messages response; we keep the most recent set on the provider and
+ * expose it via getUsageStatus() so the Connections UI can show remaining
+ * request/token quota. Shape matches `HealthCheckResult.rateLimits` so the
+ * health-check path can reuse the same parse.
+ */
+export interface AnthropicRateLimits {
+  requestsRemaining: number;
+  requestsLimit: number;
+  tokensRemaining: number;
+  tokensLimit: number;
+}
+
+/** Mutable provider-scoped holder for the latest snapshot + when it landed. */
+interface RateLimitState {
+  limits: AnthropicRateLimits | null;
+  /** Epoch ms when `limits` was observed (used as the UsageStatus snapshotAt). */
+  capturedAt: number;
+}
+
+// Usage thresholds — mirror the openai-chatgpt provider (see openai-chatgpt/usage.ts)
+// so the Connections UI colours every provider's segments on one scale.
+const RATE_LIMIT_WARNING_THRESHOLD = 80;
+const RATE_LIMIT_CRITICAL_THRESHOLD = 95;
+
+function rateLimitSegmentStatus(usedPercent: number): UsageSegmentStatus {
+  if (usedPercent >= 100) return "exceeded";
+  if (usedPercent >= RATE_LIMIT_CRITICAL_THRESHOLD) return "critical";
+  if (usedPercent >= RATE_LIMIT_WARNING_THRESHOLD) return "warning";
+  return "ok";
+}
+
+/**
+ * Parse the four `anthropic-ratelimit-*` headers into a snapshot, or null when
+ * none are present (the API omits them on some error responses, and a mocked
+ * client may not set any). A partial header set fills the missing values with
+ * 0 — a 0 limit later suppresses that segment rather than showing a bogus 0%.
+ *
+ * Accepts any `{ get }` so both a fetch `Headers` and a test stub work.
+ * Exported for tests.
+ */
+export function parseAnthropicRateLimits(
+  headers: { get(name: string): string | null },
+): AnthropicRateLimits | null {
+  const reqRemaining = headers.get("anthropic-ratelimit-requests-remaining");
+  const reqLimit = headers.get("anthropic-ratelimit-requests-limit");
+  const tokRemaining = headers.get("anthropic-ratelimit-tokens-remaining");
+  const tokLimit = headers.get("anthropic-ratelimit-tokens-limit");
+  if (reqRemaining == null && reqLimit == null && tokRemaining == null && tokLimit == null) {
+    return null;
+  }
+  return {
+    requestsRemaining: Number(reqRemaining ?? 0),
+    requestsLimit: Number(reqLimit ?? 0),
+    tokensRemaining: Number(tokRemaining ?? 0),
+    tokensLimit: Number(tokLimit ?? 0),
+  };
+}
+
+/**
+ * A `remaining`/`limit` pair is renderable only with a finite positive limit
+ * and a finite remaining. Guards against a malformed/partial header set (e.g.
+ * a `*-remaining` with no `*-limit`, or a non-numeric value that `Number()`
+ * turned into NaN) producing a misleading 0% / NaN segment.
+ */
+function isRenderableLimit(remaining: number, limit: number): boolean {
+  return Number.isFinite(limit) && limit > 0 && Number.isFinite(remaining);
+}
+
+/** True when a snapshot has at least one renderable segment. */
+function hasRenderableLimits(l: AnthropicRateLimits): boolean {
+  return isRenderableLimit(l.requestsRemaining, l.requestsLimit)
+    || isRenderableLimit(l.tokensRemaining, l.tokensLimit);
+}
+
+/**
+ * Store the parsed snapshot when a response carries *usable* rate-limit headers.
+ * A response without them (parse returns null) — or one whose parse yields no
+ * renderable limit (a partial/garbage header set) — leaves the prior snapshot
+ * intact. This is the missing-header fallback: a stray header-less or malformed
+ * response must not blank the UI (or overwrite a good snapshot with junk)
+ * between turns.
+ */
+function captureRateLimits(
+  headers: { get(name: string): string | null } | null | undefined,
+  state: RateLimitState,
+): void {
+  if (!headers) return;
+  const parsed = parseAnthropicRateLimits(headers);
+  if (parsed && hasRenderableLimits(parsed)) {
+    state.limits = parsed;
+    state.capturedAt = Date.now();
+  }
+}
+
+/**
+ * Build the generic {@link UsageStatus} from a rate-limit snapshot: up to two
+ * `percentage` segments (requests, tokens). A segment without a finite positive
+ * limit and finite remaining (header absent/partial/garbage) is skipped rather
+ * than rendered as a misleading 0% / NaN; if neither is usable the result is
+ * null so the UI shows no usage line. Exported for tests.
+ */
+export function rateLimitsToUsageStatus(
+  limits: AnthropicRateLimits,
+  snapshotAtMs: number,
+): UsageStatus | null {
+  const segments: UsageSegment[] = [];
+  const addSegment = (id: string, label: string, remaining: number, limit: number): void => {
+    if (!isRenderableLimit(remaining, limit)) return;
+    const used = Math.max(0, limit - remaining);
+    const usedPercent = Math.max(0, Math.min(100, (used / limit) * 100));
+    segments.push({
+      id,
+      label,
+      kind: "percentage",
+      usedPercent,
+      status: rateLimitSegmentStatus(usedPercent),
+      detail: `${Math.max(0, remaining).toLocaleString()} of ${limit.toLocaleString()} remaining`,
+      // Captured per-response (poll-style), not pushed — so the UI knows not
+      // to expect live updates between its 30s refreshes.
+      liveUpdates: false,
+      source: "request-header",
+    });
+  };
+  addSegment("requests", "Requests", limits.requestsRemaining, limits.requestsLimit);
+  addSegment("tokens", "Tokens", limits.tokensRemaining, limits.tokensLimit);
+  if (segments.length === 0) return null;
+  return { segments, snapshotAt: snapshotAtMs, fresh: true };
+}
+
+// ---------------------------------------------------------------------------
 // Health check
 // ---------------------------------------------------------------------------
 
@@ -436,12 +610,8 @@ async function anthropicHealthCheck(client: Anthropic, model?: string): Promise<
       messages: [{ role: "user", content: "." }],
     }).withResponse();
 
-    const headers = result.response.headers;
-    const rateLimits = {
-      requestsRemaining: Number(headers.get("anthropic-ratelimit-requests-remaining") ?? 0),
-      requestsLimit: Number(headers.get("anthropic-ratelimit-requests-limit") ?? 0),
-      tokensRemaining: Number(headers.get("anthropic-ratelimit-tokens-remaining") ?? 0),
-      tokensLimit: Number(headers.get("anthropic-ratelimit-tokens-limit") ?? 0),
+    const rateLimits = parseAnthropicRateLimits(result.response.headers) ?? {
+      requestsRemaining: 0, requestsLimit: 0, tokensRemaining: 0, tokensLimit: 0,
     };
 
     return { status: "valid", message: "Valid", rateLimits };

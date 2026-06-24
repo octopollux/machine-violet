@@ -904,3 +904,12 @@ describe("runProviderLoop round-boundary rollback", () => {
     expect(onRollback).toHaveBeenCalledTimes(2);
   });
 });
+
+// onImageGenerated tests removed: under function-tool dispatch the model
+// invokes generate_image as a regular function tool, and the host's
+// asyncToolHandler (GameEngine.dispatchGenerateImage / setup-conversation's
+// dispatchGenerateImage) handles persistence + display. The provider never
+// surfaces image_generated ContentParts anymore, so there's no bridge-level
+// callback to test. Coverage lives in:
+//   - openai.test.ts → provider.generateImage unit tests
+//   - ad-hoc test-harness probe → end-to-end

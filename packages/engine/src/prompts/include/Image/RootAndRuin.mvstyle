@@ -1,0 +1,31 @@
+---
+type: visual-style
+title: "Root and Ruin"
+rating: "?"
+description: "Root and Ruin campaign look: GraphicNovel painted bande-dessinée by default, Autochrome dreamy early-colour plate for scenes near the tree"
+tags: [comic, painterly, muted, dreamy, vintage]
+made-for-model: gpt-image-2
+tokens: 317
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** painted graphic-novel look below. Scenes **near the tree** use the dreamy early-colour Autochrome look — its soft pointillist antique glow sets the tree apart.
+
+# Style
+
+Default (most scenes) — `Rendered as a modern painted graphic-novel illustration — confident ink line work under rich painted colour, in the tradition of a high-end European bande-dessinee album. Clean varied ink contour lines holding fully painted, atmospheric colour with soft modelling and a harmonious limited palette; a clear focal hierarchy with the figure crisply inked and rendered and the background looser and more atmospheric. Cinematic lighting, mature and polished. Close with a small tasteful caption in clean type, like an album plate.`
+
+Near the tree — `Rendered as a photograph on an AUTOCHROME plate — the earliest practical colour photography (circa 1907), an additive potato-starch-grain process. The signature: soft, dreamy, slightly muted and desaturated colour with a gentle warm cast; a delicate POINTILLIST grain texture from the dyed starch grains, like a fine colour stipple; a soft, painterly, low-contrast, almost impressionist quality; gentle vignetting; and the fragile, luminous, antique atmosphere of a turn-of-the-century colour plate. Dreamy, painterly, muted, antique. Close with a small caption in an elegant period font — a scene or place title only; do NOT print the photographic process or plate name in the caption.`
+
+# Notes
+
+Campaign composite for the **root-and-ruin** seed — two already-validated catalog styles bundled into one include (no new render). DEFAULT = [GraphicNovel](./GraphicNovel.mvstyle) (painted European bande-dessinée with ink contours over atmospheric colour — the campaign-wide workhorse). NEAR THE TREE = [Autochrome](./Autochrome.mvstyle) (earliest-colour Autochrome plate; its dreamy pointillist antique glow sets the tree apart). Both `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from two banked styles — see their worked samples:
+
+![GraphicNovel](../ImageStyleExample/GraphicNovel.example.png)
+
+![Autochrome](../ImageStyleExample/Autochrome.example.png)

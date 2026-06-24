@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "Portra"
+rating: "C"
+description: "Kodak Portra 400 negative film: gentle natural skin tones, low contrast, creamy highlights, warm muted pastel palette"
+tags: [film-stock, photoreal, warm, muted, tender, portrait, caption-title-only]
+made-for-model: gpt-image-2
+tokens: 130
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a photograph shot on Kodak Portra 400 — the beloved soft colour negative portrait film. Portra's signature: gentle, natural, true-to-life SKIN TONES, low contrast with soft creamy highlights and open shadows, a slightly warm pastel colour palette, muted-but-pleasing saturation, fine grain, and a gentle, flattering, naturalistic look. Soft, warm, timeless, editorial. Close with a small caption in a clean photographic font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+# Notes
+
+Append at the END — style last. FILM-STOCK family ([Velvia](./Velvia.mvstyle) / [Kodachrome](./Kodachrome.mvstyle)) — PORTRA 400, the SOFT colour-negative portrait film: gentle natural skin tones, LOW contrast, creamy highlights, warm pastel palette, muted-pleasing saturation. The soft / flattering register vs the punchy slides. Photorealism lever (see [Kodachrome](./Kodachrome.mvstyle)). Caption = clean photographic font. Validated on the clearing; a keeper (user, kept the whole set). Keep the soft low-contrast pastel skin-tone look.
+
+# Example
+
+![Portra](../ImageStyleExample/Portra.example.png)

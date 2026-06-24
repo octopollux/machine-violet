@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "CleanDigital"
+rating: "?"
+description: "Clean modern digital illustration with disciplined swatch palette, big value shapes, and economical vector-like brushwork"
+tags: [illustration, graphic, limited-palette, any-scene]
+made-for-model: gpt-image-2
+tokens: 150
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean modern digital illustration made with disciplined digital-painting craft. Strict process discipline: work from a strict coordinated colour-swatch palette of a few harmonious colours; construct in clean layers (flat fills, one soft shading pass, a sparing light pass); design around a few big simple value shapes with a strong silhouette read; and render with confident, deliberate vector-like brush strokes, with no noodling and no reflexive micro-detail. The discipline keeps the whole image clean, flat, unified and economical, with detail spent only on the focal point. Modern, crisp, graphic, uncluttered. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. FLAGSHIP of the TIC-CONTROLLED digital-illustration workhorses (with [ValueBlocked](./ValueBlocked.mvstyle), [SwatchPalette](./SwatchPalette.mvstyle), [VectorBrush](./VectorBrush.mvstyle)) — the everyday clean-digital default with the bored-model tic actually SUPPRESSED, upgrading the round-1 [DigitalPainting](./DigitalPainting.mvstyle) / [ModernIllustration](./ModernIllustration.mvstyle) family (which keep the forgivable-but-present tic). THE FINDING (big, reusable): to kill the tic on clean digital art, mandate ECONOMY OF THE RESULT, not WORKFLOW VOCABULARY. Primitives that constrain the OUTPUT's complexity WORK — big simple value shapes / notan (the strongest, see [ValueBlocked](./ValueBlocked.mvstyle)), a coordinated limited colour-SWATCH set ([SwatchPalette](./SwatchPalette.mvstyle)), deliberate vector-brush economy ([VectorBrush](./VectorBrush.mvstyle)) — because they force fewer, larger elements, so the tic has nowhere to go. Primitives that only NAME the process FAIL: "build in LAYERS" was cheap talk (the model claims it while still cramming), and that gp-layers cut was REJECTED. This combo stacks the working levers and was the STRONGEST result; it is the TEMPLATE to reuse for ANY new clean-digital style (user: "do whatever you did there"). NB the combo prompt still contains the "construct in clean layers" clause — inert/harmless, kept because it is the exact validated prompt; the shape + swatch + brush economy is what actually works. Same anti-cram family as [PaperbackCover](./PaperbackCover.mvstyle) (flat value masses) / [Risograph](./Risograph.mvstyle) (limited inks), expressed digitally — and unlike the REJECTED material-constraint approach (photo-of-a-real-painting etc.), this stays clean-digital and GENERIC, with no foreign canvas/paper/print look. Caption = tasteful clean type. Validated on ONE Xera dusk scene; genre stress-testing (fantasy/horror/modern) still pending. Keep the big-shape + swatch + brush-economy discipline.
+
+# Example
+
+![CleanDigital](../ImageStyleExample/CleanDigital.example.png)

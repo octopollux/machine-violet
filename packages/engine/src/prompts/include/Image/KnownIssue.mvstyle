@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Known Issue"
+rating: "?"
+description: "Known Issue campaign look: BakedAAA mid-2000s game render when things are normal, Anscochrome faded slide film when things have gotten weird, ConceptPoster key art for a dramatic High Strangeness shot"
+tags: [game-render, warm, nostalgic, muted, epic]
+made-for-model: gpt-image-2
+tokens: 681
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. While **things are normal**, use the **default** mid-2000s baked-lighting game look below. When **things have gotten weird**, switch to the faded, off-balance 1950s slide-film look — its colour wrongness signals that reality has slipped. For a **dramatic shot of High Strangeness**, use the cinematic concept-poster key-art look.
+
+# Style
+
+Default (things are normal) — `Rendered as an authentic in-game screenshot from a flagship 2004-era AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period fidelity is the whole point: moderate polygon counts with honestly faceted geometry on curved surfaces, DXT-compressed textures with their characteristic mild blocking, and crisp clean polygon edges from heavy 8x multisample anti-aliasing (no jaggies anywhere). Lighting is BAKED — precomputed lightmaps and radiosity give soft, warm, completely static global illumination, with gentle baked ambient occlusion pooling in the corners and soft contact shadows under objects; no real-time dynamic shadows. Early-HDR touches of the era: a restrained warm bloom off the brightest surfaces, slightly crushed near-black shadows, and a mild filmic colour grade. The intrinsic asset economy of the period is the discipline: honest game-asset budgeting, clean simple shapes, a limited set of repeated materials, no needless clutter — a technically confident game built within a 2004 hardware budget. Atmospheric, clean, nostalgic. Close with a caption overlaid in a tasteful font.`
+
+Things have gotten weird — `Rendered as a photograph on 1950s ANSCOCHROME colour slide film — an amateur mid-century colour-transparency stock. The signature: warm but slightly off-balance vintage colour with a tendency to shift toward magenta-pink and amber; gently faded, slightly low-contrast tones; a nostalgic mid-century snapshot quality; fine grain; soft highlights; and the cosy, faded, family-album atmosphere of a 1950s colour slide. Faded, warm, nostalgic, mid-century. Close with a small caption in a casual period font — a scene or place title only; do NOT print the film stock or process name in the caption.`
+
+Dramatic shot of High Strangeness — `Rendered as a contemporary editorial illustration — the kind of smart, stylised spot art that runs with a magazine feature or op-ed. Strict process discipline: build the whole image from flat, confident shapes filled with FLAT colour from a restrained, sophisticated limited palette of a few harmonious hues only — bold, slightly muted, considered colours, no photographic rendering, no smooth gradients, no rendered surface detail. Simplify every form to its essentials with clean geometric stylisation and a strong graphic composition; do all modelling as a few flat shapes of light and shadow, never blends. Lay a subtle, even texture over the flat colour — a fine soft grain or a light halftone/screenprint tooth — so the flat areas read as printed, not digital. Reduce the scene to a single clear, confident graphic idea, intentionally composed. Modern, intelligent, clean. Close with a caption set in clean contemporary sans-serif type, like an article's title or kicker.`
+
+# Notes
+
+Campaign composite for the **known-issue** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [BakedAAA](./BakedAAA.mvstyle) (mid-2000s baked-lightmap AAA game render — the campaign-wide "everything's normal" workhorse). WEIRD = [Anscochrome](./Anscochrome.mvstyle) (faded, magenta-shifting 1950s amateur slide film; the off-balance colour cast is the tell that reality has slipped). HIGH STRANGENESS = [ConceptPoster](./ConceptPoster.mvstyle) (cinematic concept-poster key art; renders richly painterly, the validated quirk). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses which per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![BakedAAA](../ImageStyleExample/BakedAAA.example.png)
+![Anscochrome](../ImageStyleExample/Anscochrome.example.png)
+![ConceptPoster](../ImageStyleExample/ConceptPoster.example.png)

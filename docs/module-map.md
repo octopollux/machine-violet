@@ -5,7 +5,7 @@ The codebase is split across four packages:
 - **`packages/engine/`** — Game engine, AI agents, tools, state, prompts, Fastify server
 - **`packages/client-ink/`** — Ink TUI, themes, modals, formatting, phases, Discord IPC
 - **`packages/shared/`** — Shared types and protocol schemas
-- **`packages/test-harness/`** — End-to-end smoke harness (state-driven scenarios over the real WebSocket). See [e2e-harness.md](e2e-harness.md).
+- **`packages/test-harness/`** — Tier-3 live harness + interactive driver (`mvplay`) + full-stack tape recorder. The deterministic Tier-2 backbone lives in `engine` (golden tapes). See [e2e-harness.md](e2e-harness.md) and [golden-tapes.md](golden-tapes.md).
 
 Most directories have `index.ts` barrel exports — check those before reaching into subdirectories. Paths below are relative to their package root (e.g. `agents/game-engine.ts` = `packages/engine/src/agents/game-engine.ts`).
 
@@ -22,6 +22,7 @@ The game loop, state management, and AI session handling.
 |---|---|
 | `game-state.ts` | `GameState` interface — the single mutable state object |
 | `game-engine.ts` | Main orchestrator: callbacks, turn management, scene transitions |
+| `deferred-work.ts` | `DeferredWork` registry — detached background lanes (scribe, scene-tracker) flushed at consistency barriers via `settle()`; blocked settles emit `barrier_wait` spans |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
@@ -30,6 +31,8 @@ The game loop, state management, and AI session handling.
 | `world-builder.ts` | Campaign scaffolding, entity creation helpers |
 | `player-manager.ts` | Turn switching, active player tracking |
 | `subagent.ts` | `spawnSubagent()`, `oneShot()` — subagent spawning infrastructure |
+| `injections.ts` | `InjectionRegistry` + per-turn `Injection`s (`BehaviorInjection`, `ScenePacingInjection`, `LengthSteeringInjection`, `HardStatsInjection`) — synthetic per-turn DM context steering |
+| `name-inspiration.ts` | `buildNameInspiration()` — entropy injection seeding NPC/place name variety |
 
 ### Engine: agents/subagents/ — Specialized agents
 
@@ -46,6 +49,8 @@ Each file is an isolated Claude conversation for a specific task. All use `spawn
 | `character-promotion.ts` | Haiku | Expand minimal NPC → full character sheet |
 | `scribe.ts` | Haiku | Autonomous entity file manager (list/read/write tools, 8 rounds) |
 | `search-campaign.ts` | Haiku | Agentic campaign search (grep/read tools, 5 rounds) |
+| `search-content.ts` | Haiku | Agentic game system content search (list/search/read facet tools, 5 rounds) |
+| `discord-status.ts` | Haiku | Generate ≤40-char Discord Rich Presence status string from latest DM narrative; degrades to `"Adventuring..."` on failure |
 | `narrative-recap.ts` | Haiku | Bullet recap → prose for "Previously on..." modal |
 | `repair-state.ts` | Haiku | Scan transcripts, generate missing entity files |
 | `theme-styler.ts` | Haiku | Natural-language theme description → theme commands |
@@ -85,7 +90,24 @@ Token tracking, conversation window, prompt caching, state persistence.
 | `token-counter.ts` | `estimateTokens()` — tiktoken-based estimation |
 | `usage-helpers.ts` | `accumulateUsage()` — merge Anthropic Usage objects |
 | `display-log.ts` | Narrative line ↔ markdown conversion |
-| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Non-blocking fire-and-forget |
+| `engine-log.ts` | Structured append-only JSONL event log at `../.debug/engine.jsonl` (relative to campaigns dir): server/session/turn lifecycle, API calls, errors. Synchronous `appendFileSync` for live-tail visibility |
+| `trace.ts` | Span trace at `../.debug/trace.jsonl` — a causal tree of `turn → agent → api_call/tool` spans (AsyncLocalStorage `withSpan`), correlated by `parentId`/`turnId`. Backs the campaign-explorer Timeline flame chart |
+
+## Engine: providers/ — LLM Provider Adapters
+
+Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
+
+| File | Purpose |
+|---|---|
+| `index.ts` | `createProviderFromConnection()` — factory that constructs the right provider from a stored `AIConnection` record |
+| `types.ts` | `LLMProvider` and `TierProvider` interfaces, `ChatParams`, `GenerateImageRequest`/`GenerateImageResult`, `ImageEffort` (`draft`/`standard`/`quality`/`showcase`), `ImageAspect` (`portrait`/`landscape`/`square`) |
+| `anthropic.ts` | `createAnthropicProvider()` — Anthropic SDK adapter; streaming, tool use, prompt caching, thinking blocks, rate-limit usage tracking (`anthropic-ratelimit-*` response headers → `getUsageStatus()`) |
+| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, image generation (text-to-image + `images.edit` reference conditioning + empty-render retry), rate-limit usage tracking (`x-ratelimit-*` response headers → `getUsageStatus()`) — see [openai-provider.md](openai-provider.md) |
+| `agent-loop-bridge.ts` | `runProviderLoop()` — provider-agnostic version of the agent turn loop: concurrent tool dispatch, TUI broadcast, deferred-sentinel logic, `cacheHints` for tool-definition cache_control. Returns normalized (not Anthropic-specific) types |
+| `image-reference-directive.ts` | `buildReferenceDirective()` — the shared "match the reference for identity, take pose/expression from the description" text appended to a reference-conditioned image prompt; used by both the `openai` (`images.edit`) and `openai-chatgpt` (codex) backends |
+| `orphan-patch.ts` | Heals conversation history with orphaned `tool_use` blocks by inserting deterministic synthetic `tool_result` stubs before replay 400s — see [error-recovery.md](error-recovery.md) |
+| `image-coerce.ts` | `normalizeImageEffort()` / `normalizeImageAspect()` — defensive coercion of the model's `generate_image` tool args into valid `ImageEffort` / `ImageAspect` values |
+| `openai-chatgpt/` | Codex app-server integration (OAuth, subprocess lifecycle, internal tool dispatch, usage tracking) — see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) |
 
 ## Client: agent-sidecar.ts — Dev-only Agent API
 
@@ -103,7 +125,7 @@ Ink (React for CLI) components, formatting pipeline, theme system.
 | `responsive.ts` | Terminal size detection and layout tier selection |
 | `activity.ts` | Activity/status bar state management |
 | `game-context.ts` | React context for game engine callbacks |
-| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame` |
+| `components/` | Reusable: `Modeline`, `InputLine`, `NarrativeArea`, `PlayerSelector`, `ActivityLine`, `FrameBorder`, `FullScreenFrame`, `KeyHints` (hotkey indicator, active = yellow / inactive = dim gray), `UsageGauge` (5-cell gem provider-usage indicator, bottom-right of conversation pane) |
 | `modals/` | `CenteredModal`, `ChoiceModal`, `CharacterSheetModal`, `CompendiumModal`, `DiceRollModal`, `SessionRecapModal`, `GameMenu`, `ApiErrorModal`, `SwatchModal`, `CampaignSettingsModal`, `RollbackSummaryModal`, `PlayerNotesModal`, `DeleteCampaignModal`, `CharacterPane` (right-side overlay for active character stats/inventory, lazy-fetched), `OverlayPane` (reusable right-aligned overlay base with themed borders, scrolling, word-wrap) |
 | `themes/` | Theme parser, loader, resolver. Built-in themes in `themes/assets/` |
 | `color/` | OKLCH color space utilities, gradient generation |
@@ -127,7 +149,6 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | `main-menu.ts` | Campaign listing and selection |
 | `tokens.ts` | `TOKEN_LIMITS` — model token capacity constants |
 | `machine-settings.ts` | Machine-scoped settings persistence (`machine-settings.json`) — feature flags like `devModeEnabled` |
-| `file-io-logger.ts` | FileIO wrapper for debug read/write/append logging |
 
 ## Shared: types/ — Type Definitions
 
@@ -161,7 +182,7 @@ PDF ingestion and content processing. **Completely separate from the rest of the
 
 ## Client: phases/ — App Lifecycle
 
-State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
+State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). The main menu also branches into settings and its sub-phases (api_keys, discord_settings, archived_campaigns). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
 
 | File | Purpose |
 |---|---|
@@ -169,6 +190,9 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
+| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Five items: API Keys (→ ConnectionsPhase), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
+| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small tier picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
+| `DiscordSettingsPhase.tsx` | Full-screen Discord Rich Presence Enable/Disable toggle (title: "Discord"). Saves the choice to `discord-settings.json`; ESC returns without saving |
 
 ## Engine: prompts/ — Prompt Templates
 
@@ -211,7 +235,7 @@ Reusable prompt fragments live in `packages/engine/src/prompts/include/` and are
 - Dotless includes look for a section named the same as the file stem (`<NPCS>` inside `NPCS.md`) as the conventional default. A file with no top-level XML sections is treated as one implicit default section.
 - Pipeline order: model conditionals → process includes → strip comments. Includes are HTML-comment-shaped, so they have to be expanded before comment stripping, but after conditionals (so a conditional can gate whether an include happens).
 
-When the same top-level `<TAG>` block appears across the DM's three prompt layers — main DM (`dm-identity` + `dm-directives`) → campaign seed (`campaign_detail`) → DM personality (`prompt_fragment` + `detail`) — the latest layer wins. Earlier occurrences are stripped entirely. This lets a personality template redefine the `<NPCS>` block established by the main prompt without editing the main file. Implemented by `applyLayeredOverrides` in `process-includes.ts`, invoked from `buildDMPrefix`.
+When the same top-level `<TAG>` block appears in more than one override slot, the latest slot wins and earlier occurrences are stripped entirely. `buildDMPrefix` passes **five slots**, lowest → highest priority: `dm-identity` → `dm-directives` → `campaign_detail` → DM-personality `prompt_fragment` → DM-personality `detail` (three conceptual sources — main DM, campaign seed, DM personality — but five distinct slots, and precedence is slot-by-slot). The `campaign_detail` slot holds the seed's assembled detail followed by any setup-agent-appended detail, so a colliding tag the agent appended overrides the seed's — by design. This also lets a personality template redefine the `<NPCS>` block established by the main prompt without editing the main file. Implemented by `applyLayeredOverrides` in `process-includes.ts`, invoked from `buildDMPrefix`.
 
 Inline `<TAG>...</TAG>` blocks (written literally in a prompt, no include directive) participate in the override too — they're the same kind of entity. Indented or inline-style XML like the narration formatters (`<b>`, `<color=...>`, `<center>`) is never matched because top-level requires the open tag at column 0.
 
@@ -248,16 +272,22 @@ Platform abstractions and helpers that don't belong to any single domain.
 
 ## Test Harness Package (`packages/test-harness/`)
 
-End-to-end smoke testing. Boots the real engine as a subprocess, drives it over the WebSocket, and asserts against observable state (no timer-based waits).
+The **Tier-3 live** harness (the regression backbone is Tier-2 golden replay — see below). Boots the real engine as a subprocess, drives it over the WebSocket, asserts against observable state (no timer-based waits). Also hosts the interactive driver (`mvplay`) and the full-stack tape recorder.
 
 | Path | Purpose |
 |---|---|
-| `bin/run.ts` | CLI entry. `ALL_SCENARIOS` registers each scenario. Run via `npm run e2e -- <id>`. |
-| `src/harness.ts` | `Harness` class — process lifecycle, WS connect, `waitForEngineState`, `waitForTurnSeq`, input helpers. |
+| `bin/smoketest.ts` | Live smoke probe — walk setup + two in-game turns. `npm run smoketest`. |
+| `bin/boot-and-quit.ts` | Precondition probe — main menu renders. `npm run e2e:boot`. |
+| `bin/mvplay.ts` | Interactive turn-for-turn driver + tape recorder (`record`/`save-tape`). `npm run play`. |
+| `src/session-driver.ts` | `mvplay` backend — persistent detached session, record-mode start, `saveTape` (pulls `GET /tape`). |
+| `src/run-probe.ts` | `runProbe(opts)` helper — launches harness, runs body, dumps diagnostics on failure, cleans up. |
+| `src/harness.ts` | `Harness` class — process lifecycle, WS connect, `waitFor*`, input helpers, `endSession`, `fetchTape`. |
+| `src/engine-log.ts` | Engine-log breadcrumb reader (`image_gen:*`, `subagent:*`, `api:call`, ...). |
 | `src/client-state.ts` | Mirror of client-side state for assertion. |
-| `src/scenarios/` | Individual scenarios (`golden-path`, `boot`, etc.). |
 
-See [e2e-harness.md](e2e-harness.md) for the full primitives table and golden-path contract.
+The **Tier-2 record/replay** code lives in `engine`, not here: `packages/engine/src/providers/{tape,tape-provider,tape-mode}.ts` (format + record/replay shims + record wiring), `packages/engine/src/server/routes/dev.ts` (`GET /tape` readback), and the corpora at `packages/engine/src/testing/{corpus,setup-corpus}.golden.test.ts` (DM loop + setup agent; shared `goldens/`).
+
+See [e2e-harness.md](e2e-harness.md) (three-tier strategy, live harness), [golden-tapes.md](golden-tapes.md) (record/replay model), and [tape-format.md](tape-format.md) (tape schema).
 
 ## Client Entry Points
 

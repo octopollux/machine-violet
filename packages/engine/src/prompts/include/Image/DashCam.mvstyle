@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "DashCam"
+rating: "C"
+description: "Forward-facing night dashcam still: hood edge across the bottom, headlight cone into dark, washed feed with bloom, OSD"
+tags: [surveillance, lo-fi, cool, tense, action, first-person]
+made-for-model: gpt-image-2
+tokens: 215
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a single still from a car windshield dash-camera driving at night — a wide-angle forward-facing dashcam view from behind the wheel. The top edge of the dashboard and a sliver of the car's hood sit across the bottom of the frame; ahead, the road is lit only by the car's own headlights carving a cone of light into the dark, with wet asphalt reflecting it and oncoming streetlights and signs flaring into bloom and lens glare. WIDE lens with mild barrel distortion; a cheap, low-resolution automotive feed — washed, slightly cool colour, sensor noise, motion blur, compression softness, faint windshield reflections. Burn the dashcam OSD across the bottom in a blocky monospace font: a 24-hour clock TIME in HH:MM:SS, a SPEED readout (for example "62 km/h"), and a short GPS coordinate string — show a time only and never a calendar date. Banal, in-motion, faintly ominous.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Surveillance-cluster member — the IN-MOTION / vehicular lens. LOAD-BEARING LEVERS: (1) the framing is the tell — the dashboard/hood edge across the bottom + the headlight cone carving into surrounding dark (the dark beyond the cone is the black-gives-rest lever, lots of rest); (2) grounding-by-degradation — a cheap washed low-res automotive feed with headlight bloom, wet-road reflection and lens glare reads real. Caption = the dashcam OSD across the bottom: a time-only HH:MM:SS clock + a SPEED readout + a short GPS coordinate string. NB speed and coordinates are physics/geodesy, NOT calendar-bound, so they sit fine alongside the time-only rule (the rule exists only to keep a DATE from pinning footage to a real year — see [NightVisionCam](./NightVisionCam.mvstyle)). A figure caught full in the high beams is the "someone standing in the road" beat; reference held (Xera recognizable). Validated landscape. Keep the hood-edge + headlight-cone framing, the cheap degradation, and the time-only + speed + coords OSD.
+
+# Example
+
+![DashCam](../ImageStyleExample/DashCam.example.png)

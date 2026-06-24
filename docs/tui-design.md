@@ -98,10 +98,13 @@ The activity line shows what the engine is doing, mapped automatically from in-f
 | `scene_transition` cascade | `Scene transition...` | `⟳` |
 | Waiting for DM API response | `The DM is thinking...` | `◆` |
 | Tool call in flight (`tool_running`) | `The DM is working...` | `◆` |
+| Image render in flight (`generating_image`) | `The DM is creating an image...` | `🎨` |
 | Setup→game handoff in flight | `Preparing your campaign...` | `◆` |
 | Player's turn (idle) | *(hidden)* | *(hidden)* |
 
 The `tool_running` row matters because subagent-backed tools (e.g. `style_scene` → theme-styler) routinely take 20-60s. ActivityLine also renders any accumulated tool glyphs even when the engine state itself has no mapped label, so a transient or unmapped state can never silently wipe the row.
+
+`generating_image` is its own state (not just `tool_running`) because image rendering is the slowest tool by far — minutes — and deserves a clear "creating an image" message with tier escalation. Crucially, image gen runs *concurrently* with faster sibling tools (a scene-snapshot fires alongside `scene_transition` + `style_scene`), so the engine counts in-flight renders and holds `generating_image` until the **last** one finishes — a quick sibling completing first must not drop the indicator back to `dm_thinking`. Its accumulating tool glyph is `❖` (magenta).
 
 The modeline glyph column is used when the activity line has been dropped due to viewport size (see [Responsive Design](#responsive-design)). The glyph appears at the start of the modeline.
 
@@ -120,31 +123,60 @@ Tiers live in `ACTIVITY_MAP` ([packages/client-ink/src/tui/activity.ts](../packa
 The timestamp is set client-side: `engineStateSince` is stamped whenever `engineState` transitions to a new value (`event-handler.ts`), and the `session:transition` handler also sets it so the elapsed counter spans the WS reconnect.
 
 
+## Usage Gauge
+
+A 5-cell gem-themed provider-usage indicator rendered in the bottom-right corner of the Conversation Pane (last row, right-aligned). It shares that row with the narrative scroll indicator and cannot coexist with it — the gauge appears only when the scroll indicator (`scroll (N) more`) is not shown. The gauge renders nothing when the active provider has no usage concept (no `primary` segment in its `UsageStatus`).
+
+The gauge represents remaining capacity as a unary countdown of 25 ticks (4% per tick across the 0–100% remaining range, rounded to the nearest tick). The five cells each hold 5 ticks; the leftmost cell depletes first. Each cell passes through visual states as it drains:
+
+| State | Glyph | Color | Ticks in cell |
+|---|---|---|---|
+| Full | `◆` | Light blue (`#529EAB`) | 5 |
+| Topaz | `■` | Yellow-gold (`#A88912`) | 4 |
+| Ruby | `⬢` | Red (`#781313`) | 3 |
+| Tarnished | `*` | Grey | 1–2 (collapsed) |
+| Empty | (space) | — | 0 |
+
+The middle two states are ordered by perceived brightness rather than gemstone value: the warm topaz reads as "more remaining" to the eye than the dark ruby, so it sits higher in the drain.
+
+Because ticks 1 and 2 within a cell both render as `*`, the bottom 8% of each cell's drain is visually compressed into one state; the gauge still updates on every 4% step. The `primary` segment must be a `percentage` segment carrying a `usedPercent` — currently only the openai-chatgpt provider supplies one (its 5-hour rate-limit window); see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) for the server-side `subscribeUsage` implementation.
+
+**Code:** `packages/client-ink/src/tui/components/UsageGauge.tsx` (`gaugeCells`), rendered in `NarrativeArea.tsx`.
+
+
 ## DM Text Formatting
 
 The DM can use a small set of inline tags in narration for dramatic effect. These are processed through a single AST-based pipeline (`processNarrativeLines`) and rendered as Ink components.
 
 Available tags:
 - `<b>`, `<i>`, `<u>` — bold, italic, underline
+- `<code>` — inline monospace (rendered dim), for diegetic system text / identifiers
 - `<sub>`, `<sup>` — subscript, superscript (rendered via Unicode substitution in `render-nodes.tsx`; chars without a Unicode equivalent pass through unchanged)
-- `<center>`, `<right>` — text justification (default is left)
+- `<center>`, `<right>` — text justification (default is left); the content **wraps** to terminal width
+- `<quote>` — a block-level set-apart passage (letter, inscription, readout): split onto its own line and rendered as an indented block with a left rule (`▏`), content wrapped to width minus the rule. Multi-line via `<br>`. Deliberately **not** Markdown `>` (which collides with the player display-log marker).
+- `<br>` — a hard line break, a contentless `linebreak` leaf; inside an alignment or quote block it splits a multi-line sign into independent rows
 - `<color=#hex>` — hex color (e.g., `<color=#cc0000>The King has died.</color>`)
 
-The DM prompt includes one line: *"You can use `<b>`, `<i>`, `<u>`, `<sub>`, `<sup>`, `<center>`, `<right>`, and `<color=#hex>` tags in your narration for dramatic effect. Use sparingly."*
+The DM contract (`packages/engine/src/prompts/dm-directives.md`, `<formatting>` block) teaches this set. The tag vocabulary is defined once by the `FormattingTag` union in `packages/shared/src/types/tui.ts`.
 
-Unrecognized tags are stripped. Malformed tags render as plain text. This is cosmetic — no tag changes game state.
+**Markdown lists** are a tolerated block construct (not a tag): a line beginning `- `/`* ` or `N.`/`N)` becomes a `kind: "list"` row with a resolved marker (`•` or the literal number) and a hanging indent, content wrapped to width minus the indent. Consecutive items render tight (the `appendDelta` spacer between them is collapsed); nesting is intentionally flattened. Markers/indent are renderer-side decoration carried on `ProcessedLine.listMarker`/`listIndent`.
+
+Anything tag-shaped but outside the vocabulary is **stripped to its content** — it never renders as literal markup (the no-leak guarantee). Dialect synonyms (`<strong>`→`<b>`, `<em>`→`<i>`, `<h1-6>`→bold, `<blockquote>`→`<quote>`, attribute variants, a little inline Markdown) are mapped onto the canonical set first, by `narrative/normalize.ts`. A bare `<` that isn't a tag (`3 < 5`, `<3`) stays literal. None of this changes game state.
 
 ### Formatting Pipeline
 
 All DM text processing flows through `processNarrativeLines(lines, width, quoteColor?) → ProcessedLine[]`:
 
-1. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset)
-2. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
-3. **Wrap** each AST at terminal width via `wrapNodes` (tags never break across lines)
-4. **Pad** alignment lines (`<center>`, `<right>`) with blank lines for breathing room
-5. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
+1. **Normalize** each DM line's dialect into the canonical vocabulary (`narrative/normalize.ts`) before anything else, then **tighten lists** (drop the `appendDelta` spacer between adjacent list items)
+2. **Heal** cross-line tags on raw strings (all formatting tags persist across source lines; only real paragraph boundaries — blank DM lines from `\n\n` — reset the tag stack; visual spacers from single `\n` don't reset; `<br>` is a leaf and does **not** reset the stack). List items are detected here, healed self-contained (marker lifted to metadata), and reset the heal stack.
+3. **Parse** healed text into `FormattingNode[]` AST via `parseFormatting`
+4. **Layout** each line into width-safe physical rows by DISPLAY width via `narrative/layout.ts` (`layoutRuns`): wraps by terminal columns using the real `string-width`, hard-breaks an overlong token, splits a run on `<br>`, and wraps aligned/quote blocks (each to width minus its rule/indent) and list items (to width minus the hanging indent). Tags never break across rows. (The legacy `wrapNodes` measures code units and is retained only for the modals.)
+5. **Frame** block groups (`<center>`, `<right>`, `<quote>`) with blank lines for breathing room (consecutive rows of one block are not split)
+6. **Quote highlight** with paragraph-scoped reset (blank DM lines reset quote state)
 
 Non-DM lines (player, dev, system) pass through without entering the formatting pipeline.
+
+The contract is pinned by an invariant harness (`narrative/harness/`) that runs the real pipeline over synthetic fixtures, a seeded generator of legal documents, and the committed/live campaign corpus, asserting no-leak, width-safety (real display width), content preservation, well-formedness, alignment, and cache-transparent determinism at every width. See [e2e-harness.md](e2e-harness.md).
 
 ### Quote Highlighting
 
@@ -463,9 +495,19 @@ Standard navigation (arrow keys + Enter). "Resume" dismisses the menu. "Return t
 
 ### Campaign Settings
 
-Player-accessible via ESC menu → Settings → Campaign Settings. Modal that shows campaign identity fields (read-only) and editable per-campaign player settings — currently the Choices Frequency slider (←/→ to adjust, Enter to save). Changes round-trip to the engine via REST and persist to `config.json`.
+Player-accessible via ESC menu → Settings → Campaign Settings. The modal shows campaign identity fields (read-only: name, system, genre, mood, difficulty, scope) and three editable per-campaign settings. Rows are organized into colour-tinted groups — **About** (identity), **Preferences** (the editable settings), **Recovery** (Roll Back Game) — mirroring the ESC menu's group-header pattern, with the focused row's label tinted and bold.
 
-**Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`
+| Row | Setting | Controls | Persists to |
+|---|---|---|---|
+| **Choices Frequency** | How often the DM offers suggested responses | ←/→ cycle through Never / Rarely / Sometimes / Often / Always | `config.json` `choices.campaign_default` |
+| **DM Turn Length** | Page-size multiplier reported to the DM each turn. Lower = tighter prose; 100% = actual terminal size. | ←/→ adjust in 5% steps (range 50–150%, default 80%) | `config.json` `dm_turn_length_pct` |
+| **Image Generation** | Whether the DM can illustrate moments inline. Takes effect from the next DM turn; requires a provider/model with image-generation capability. | ←/→ (either arrow toggles On/Off) | `config.json` `image_generation` |
+
+A final row, **Roll Back Game**, is an action rather than a setting: Enter opens a savepoint picker (`RollbackPickerModal`, fed by `GET /session/savepoints`) → confirmation (`RollbackConfirmModal`) → the `/rollback` command with the chosen commit oid. See [error-recovery.md](error-recovery.md#rollback) for the full rollback flow (incl. the pre-rollback backup).
+
+**Navigation:** ↑/↓ move between rows; ←/→ adjust the focused row. Enter commits all dirty changes and returns to the Game Menu. ESC cancels any unsaved changes and returns to the Game Menu. Changes round-trip to the engine via `PATCH /session/settings` and persist to `config.json`.
+
+**Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`, wired in `packages/client-ink/src/phases/PlayingPhase.tsx` (callbacks `onChoicesFrequencyChange`, `onDmTurnLengthPctChange`, `onImageGenerationChange`). The bounds constants `DM_TURN_LENGTH_PCT_MIN` (50), `DM_TURN_LENGTH_PCT_MAX` (150), `DM_TURN_LENGTH_PCT_DEFAULT` (80), and `DM_TURN_LENGTH_PCT_STEP` (5) are exported from `packages/shared/src/types/config.ts`.
 
 ### Player Notes
 
@@ -480,6 +522,50 @@ The editor handles arrow navigation, home/end (Ctrl+A/E), horizontal scroll for 
 The `/swatch` command opens a debug modal showing the full harmony swatch grid, column step indices, row anchor labels (0, 100, 200, ...), and current `colorMap` assignments. Useful for tuning color maps and verifying swatch generation. Dismissed with any key.
 
 **Code:** `src/tui/modals/SwatchModal.tsx`
+
+### API Error Modal
+
+Shown center-screen during API retry backoff. Rendered by `PlayingPhase` whenever a retry overlay is active for the current attempt (`apiErrorModalActive && retryOverlay`).
+
+The modal owns its own countdown timer: a `setInterval` that ticks once per second, decrementing from `overlay.delaySec` down to 0. The timer resets whenever `overlay.status`, `overlay.delaySec`, or `overlay.attemptId` changes — so successive retries with identical backoff durations (the backoff caps at 12s) still reset the visible countdown rather than freezing at 0.
+
+**Body content** (from `ApiErrorModal.tsx`):
+- A human-friendly error-kind label via `retryLabel(overlay.status)` — `Connection lost` (status 0), `Rate limited` (429), `API overloaded` (529), or `API error (N)` for any other status.
+- `Retrying in Ns...` — the live countdown.
+- `Will auto-resume on reconnect.`
+
+**Title:** `Connection Error`. **Footer:** `Esc to dismiss`.
+
+**Dismiss behavior:** Esc sets a `dismissedAttemptId` latch equal to the current `overlay.attemptId`. The modal hides for that attempt but reappears automatically when the next retry fires (each retry bumps `attemptId`). When the parent clears the retry overlay on a successful retry, the modal auto-dismisses and the latch resets to `null`. Retries continue in the background whether or not the modal is visible.
+
+**Code:** `packages/client-ink/src/tui/modals/ApiErrorModal.tsx`, wired in `packages/client-ink/src/phases/PlayingPhase.tsx`. For the retry backoff schedule and error-kind labels, see [error-recovery.md — API Failures](error-recovery.md#api-failures).
+
+### Archiving a campaign
+
+Triggered from the main menu's campaign sub-list by pressing Enter on the Archive column. Unlike resume (which collapses the list) the sub-list **stays expanded**: the triggered row swaps its `Archive`/`Delete` buttons for an inline `Archiving…` label, and the entry drops out of the list on its own when the archive completes and the parent refreshes `campaigns`.
+
+While an archive is in flight, **all actions on that entry are blocked** (resume, re-archive, delete) — the archive deletes the campaign's source folder on success, so acting on it mid-flight would race. This guard is two-layered: the client ignores repeat triggers for an in-flight id (`archivingIds` prop, threaded from `app.tsx`), and the server rejects a concurrent `POST /manage/campaigns/:id/archive` for the same campaign with **409 Conflict** ("Archive already in progress"). The server guard is the authoritative one — two overlapping archives compute the same destination zip path and race each other's source deletion, corrupting the archive ("contents mismatch on disk"). A double-fire from an unguarded UI was the original trigger.
+
+**Code:** `onArchiveCampaign` / `archivingIds` in `packages/client-ink/src/app.tsx` and `packages/client-ink/src/phases/MainMenuPhase.tsx`; the `archivesInProgress` lock in `packages/engine/src/server/routes/management.ts`.
+
+**Restore (the symmetric twin).** Restoring an archive from the Archived Campaigns list (Enter on an entry, ArchivedCampaignsPhase) carries the same two-layer guard, keyed by **zip path** instead of campaign id. The selected row shows an inline `Restoring…` and ignores repeat Enter while in flight (`restoringPaths` prop from `app.tsx`); the server rejects a concurrent `POST /manage/campaigns/archived/:name/restore` for the same zip with **409 Conflict** ("Restore already in progress"), via the `restoresInProgress` lock. Restore is actually the *more* double-fire-prone of the two — the screen doesn't move on Enter — and a duplicate restore races the unique-slot loop (TOCTOU between the `exists` check and `mkdir`), colliding on one dir or spawning duplicate `-2`/`-3` slots. Restore is non-destructive (it never deletes the archive or an existing campaign), so the stakes are lower than archive, but the guard keeps the behavior clean.
+
+The restore route resolves its target **strictly inside `archiveDir()`** (the canonical `archivedcampaigns/` dir — a *sibling* of the campaigns dir, not a child): the client echoes back a `zipPath` from the list endpoint, but the server trusts only its filename component, so a crafted body or `:name` can't traverse out (`..`) or turn the endpoint into an arbitrary-zip reader. A target whose basename isn't a `.zip` is rejected with **400**.
+
+### Delete Campaign Modal
+
+A confirmation modal shown over the full-screen main-menu frame before a campaign is permanently removed. Triggered from the main menu's campaign sub-list when the player presses Enter on the Delete column.
+
+The modal displays three pieces of identifying information sourced from `getCampaignDeleteInfo()` (`packages/engine/src/config/campaign-archive.ts`):
+- Campaign name
+- Character names (comma-separated; `(none)` if the roster is empty)
+- Approximate DM turn count (`~N turn`/`turns`)
+
+A warning line reads "This cannot be undone." beneath the summary.
+
+**Navigation:** Left/Right arrows toggle between the `[Delete]` and `[Cancel]` buttons; Enter confirms the focused button; ESC always cancels. The selection **defaults to Cancel** to prevent accidental deletion — Delete must be explicitly focused before Enter commits.
+
+**Code:** `packages/client-ink/src/tui/modals/DeleteCampaignModal.tsx`, wired in `packages/client-ink/src/phases/MainMenuPhase.tsx` (`deleteModal` prop / `onConfirmDelete` / `onCancelDelete`).
 
 ### Modal behavior
 
@@ -520,6 +606,7 @@ The character pane is a right-side overlay (Tab toggle) that shows the active ch
 
 **Behavior:**
 - Toggled with Tab (or via key hints indicator in the Player Pane top-right)
+- Tab stays available while a choice overlay is on screen — the quick view opens over the narrative and the overlay keeps arrow/Enter for selection, so the two don't conflict (the Tab toggle is handled ahead of the choices input guard)
 - 35-column fixed-width panel, right-aligned over the narrative area
 - Lazy-fetches the character sheet on first open via `GET /session/character/:name` (returns `{ name, content }`)
 - Caches content across toggles; cache invalidates when the active player changes
@@ -529,6 +616,30 @@ The character pane is a right-side overlay (Tab toggle) that shows the active ch
 **OverlayPane** is the base component: themed multi-line borders, word-wrapping, scrolling with scroll indicator, and opacity (paints over narrative text with spaces for full coverage).
 
 **Code:** `packages/client-ink/src/tui/modals/CharacterPane.tsx`, `packages/client-ink/src/tui/modals/OverlayPane.tsx`
+
+
+## Character Sheet Colorization
+
+`colorizeSheetLines()` is the shared entry point for theme-aware auto-colorization of entity markdown content. It is called by CharacterSheetModal, CharacterPane, and the CompendiumModal detail view. The function accepts an array of source lines and a `ColorizeOptions` object and returns `FormattingNode[][]` ready for rendering. The underlying entity markdown is the source of truth and is never mutated — all coloring is render-time only.
+
+**Colorization rules** (applied per line, structural patterns detected before the standard markdown→tag conversion so colored wrappers sit *outside* any bold):
+
+1. **Headings** (`#`…`######`): the whole line is wrapped in the heading color (complement-anchor step 3) plus bold, bypassing `markdownToTags`.
+2. **Front-matter / KV lines** (`**Key:** Value`, also `- **Key:** Value`): the bold key span is colored with the key-label color (complement-anchor step 4); the value runs through `markdownToTags` so inline markdown in values still renders.
+3. **Wikilinks** (`[[Name]]`): transformed before `markdownToTags`, with the display name colored in the entity hue. Two modes:
+   - `"preserve"` — emits a render-only `<wikilink slug=…>` AST tag that retains the slug for Tab-cycle navigation (CharacterSheetModal, CompendiumModal).
+   - `"strip"` — removes the brackets and renders the bare name (CharacterPane, which has no navigation).
+4. **Bare hex strings** (`#rrggbb`): auto-wrapped as `<color=#rrggbb>#rrggbb</color>`. A negative lookbehind prevents re-wrapping a hex string already inside a `<color=…>` attribute.
+
+**Entity hue resolution** — `pickEntityHue()` checks the entity front matter for `color`, then `key_color`, then `theme_color`; if none is a valid hex it falls back to `theme.keyColor`. This hue colors wikilinks so cross-references read in the entity's "own" color.
+
+**`frameAnchor` parameter** controls which harmony-swatch arc the heading/key-label accents are pulled from: the accent arc is the *complement* of the surrounding frame's anchor, so accents visually offset the frame.
+- `frameAnchor: 0` — CharacterPane (its frame uses anchor 0 directly); accents come from anchor 1.
+- `frameAnchor: 1` — CharacterSheetModal and CompendiumModal (their `CenteredModal` wrapper applies `deriveModalTheme()`, i.e. anchor 1); accents swing back to anchor 0.
+
+Authored formatting tags (`<b>`, `<color=#…>`, etc.) in the source pass through unchanged, so Scribe / Compendium-updater emphasis doesn't collide with the auto-coloring rules.
+
+**Code:** `packages/client-ink/src/tui/character-colorization.ts`
 
 
 ## Keyboard Input
@@ -551,21 +662,177 @@ Multiple input preprocessors (Kitty protocol, mouse scroll) need to intercept ra
 
 **Code:** `packages/client-ink/src/tui/hooks/stdinFilterChain.ts`
 
+### Mouse Scroll
+
+On TTY terminals, Machine Violet enables SGR mouse reporting so the mouse wheel scrolls the narrative area.
+
+**Protocol:** Two ANSI escapes are written to `stdout` on mount: `\x1b[?1000h` (basic button-event tracking, includes scroll wheel) and `\x1b[?1006h` (SGR extended encoding — clean ASCII, no 223-column limit). The matching `l` sequences are written on unmount to restore the terminal.
+
+**Input interception:** A `mouse` filter is registered on the stdin filter chain. For each stdin chunk the filter scans for SGR mouse sequences matching `\x1b[<btn;x;yM` / `…m`. Sequences where `btn & 64` is set are scroll events; `btn & 1` distinguishes scroll-down (1) from scroll-up (0). Matched sequences are stripped from the chunk before Ink processes it (preventing garbage in the text input). Scroll deltas are dispatched via `process.nextTick` to avoid re-entrant React updates.
+
+**Scroll amount:** each wheel tick scrolls by `LINES_PER_TICK = 2` lines.
+
+**Non-TTY environments:** the hook checks `process.stdout.isTTY` and `process.stdin.isTTY` before enabling mouse mode, so tests and piped I/O are silently skipped.
+
+**Safety net:** a `process.on("exit", …)` listener disables mouse reporting even if the React unmount path doesn't run (e.g. an uncaught exception after the default handler fires), preventing the terminal from being left in mouse mode after a crash.
+
+**Code:** `packages/client-ink/src/tui/hooks/useMouseScroll.ts`
+
+### ConPTY Raw-Mode Watchdog (Windows)
+
+On Windows, ConPTY can silently re-enable `ENABLE_PROCESSED_INPUT` and `ENABLE_LINE_INPUT` during long-running TUI sessions (upstream issue: [microsoft/terminal#19674](https://github.com/microsoft/terminal/issues/19674)). When this happens, Backspace and other control characters are processed destructively by the console host before the application sees them. Calling `setRawMode(true)` again cannot fix it because libuv caches the raw-mode state internally and short-circuits repeated calls when the cached mode matches the requested mode.
+
+Two cooperating mechanisms defend against this:
+
+**`installRawModeGuard`** (called at startup in `start-client.ts`) intercepts `stdin.setRawMode(false)` and swallows it, preventing Ink's reference-counting from ever disabling raw mode. It also exposes `forceRefreshRawMode()`, which toggles raw mode off then on via the *original* (unpatched) `setRawMode`, bypassing both the intercept and libuv's cache. This forces a real `SetConsoleMode` call that restores correct console flags. The cooked-mode window between the two synchronous native calls is a few microseconds.
+
+**`useRawModeGuardian`** (a React hook called in `PlayingPhase`) periodically calls `forceRefreshRawMode()` on a 500 ms interval to recover from any corruption that occurs mid-session. It is a no-op on non-Windows platforms.
+
+The watchdog is enabled only when the Kitty Keyboard Protocol is inactive (`enabled: !hasKittyProtocol`). When Kitty is active, CSI-u encoding is unambiguous regardless of console mode flags, making periodic correction unnecessary.
+
+**Code:** `packages/client-ink/src/tui/hooks/rawModeGuard.ts`, `packages/client-ink/src/tui/hooks/useRawModeGuardian.ts`
+
+### Triple-ESC Emergency Reset
+
+Pressing ESC three times within a 1500 ms window triggers an emergency reset that forcibly clears all overlay and modal state and exits any active mode. It clears the active choices overlay, any active modal, the game menu, and the character pane. If the current mode is `"ooc"` or `"dev"`, it also fires `apiClient.command("exit_mode")` to end the server-side mode session.
+
+This fires before all other ESC handling in the input chain, so it works even when a modal or overlay is blocking normal ESC dismissal (for example, a choice overlay appearing while OOC mode is active, or a modal stuck due to a WebSocket race). It is the only way to recover from certain stuck-overlay states without restarting the client.
+
+**Implementation:** the `escTimestamps` ref (`useRef<number[]>`) in `packages/client-ink/src/phases/PlayingPhase.tsx`; the window filter keeps presses where `now - t <= 1500` and triggers when at least 3 remain.
+
+### InlineTextInput
+
+`InlineTextInput` is the core uncontrolled text-input primitive used by `InputLine` (the player's main entry field) and by the freeform entry slot inside `ChoiceModal`. It is not the same as the PlayerNotes editor, which has its own independent multi-line `editorReducer`.
+
+**Props:**
+
+| Prop | Type | Description |
+|---|---|---|
+| `defaultValue` | string | Initial text content. Reset by changing the React `key`. |
+| `availableWidth` | number | Fixes the rendered column width. Required for horizontal scroll and wrap modes. |
+| `placeholder` | string | Dim hint shown when the input is empty; the cursor appears before it. |
+| `wrap` | boolean | When true, text wraps to multiple lines instead of scrolling horizontally. Requires `availableWidth`. |
+| `maxLines` | number | Cap on visible wrapped lines. When text wraps past this limit, the render window scrolls vertically to keep the cursor line in view. Only applies in wrap mode. |
+| `isDisabled` | boolean | Disables all input; renders the raw value without a cursor. |
+| `onChange` | function | Fired on every value change (deduplicated). |
+| `onCursorOffsetChange` | function | Fired whenever the cursor position changes. Used by ChoiceModal to mirror cursor state for its own wrap-boundary calculations. |
+| `onSubmit` | function | Fired on Enter. |
+
+**Overflow modes:**
+
+- **Horizontal scroll (default):** when `availableWidth` is set and `value.length + 1 > availableWidth`, a `viewStart` window tracks the cursor left and right inside the fixed-width viewport. The window snaps left when the cursor moves left of the edge and snaps right when the cursor moves right of the edge. The viewport is always filled — no empty space is left on the right after deletion. Implemented in the exported `computeViewStart` function.
+- **Wrap mode (`wrap={true}`):** text wraps at character boundaries at `availableWidth` columns; the cursor line is always visible. With `maxLines`, the vertical window scrolls to keep the cursor in view (tail-anchored: `viewStartLine = max(0, cursorLine - maxLines + 1)`). Used by ChoiceModal's freeform input slot.
+
+**Keybindings:**
+
+| Key | Action |
+|---|---|
+| Left / Right arrow | Move cursor one character |
+| Backspace | Delete character before cursor |
+| Delete | Forward-delete character at cursor |
+| Ctrl+A | Move cursor to start of text |
+| Ctrl+E | Move cursor to end of text |
+| Home / End | Move cursor to start / end (raw escape-sequence matching covers xterm, gnome-terminal, rxvt variants) |
+| Enter | Submit |
+
+**Bracketed paste:** pasted text arrives via Ink's `usePaste` hook. Embedded newline runs are collapsed to a single space and the result is trimmed, so a trailing-newline paste (`"foo\n"`) lands as `"foo"` without a spurious trailing space. This also prevents pasted `\r` characters from triggering a premature submit.
+
+**Cursor rendering:** an inverse-video block cursor is rendered using chalk. The text is segmented around the cursor position so chalk is called O(1) times regardless of text length.
+
+**Code:** `packages/client-ink/src/tui/components/InlineTextInput.tsx`, `packages/client-ink/src/tui/components/InputLine.tsx`
+
+### KeyHints
+
+`KeyHints` is a small hotkey indicator rendered in the top-right of the Player Pane. It is positioned absolutely (`justifyContent: flex-end`) above the modeline content row and is only rendered when at least one hint is present.
+
+**Data model:** the component accepts a `hints: KeyHint[]` prop, where each `KeyHint` has a `label: string` (display text, e.g. `"Tab"`) and `active: boolean` (whether the associated feature is currently active). The component is a `React.memo` pure renderer.
+
+**Color scheme:** inactive hints render dim gray (`color="gray"` with `dimColor`); active hints render yellow (`color="yellow"`). Hints are separated by a single space.
+
+**Current hints:** the Character Pane toggle state drives the only currently wired hint — a `"Tab"` hint that goes yellow when the Character Pane is open.
+
+**Code:** `packages/client-ink/src/tui/components/KeyHints.tsx`; exported from `packages/client-ink/src/tui/components/index.ts`; rendered in `packages/client-ink/src/tui/layout.tsx`.
+
 
 ## Phase Lifecycle
 
 The app phase state machine: main menu → playing → returning_to_menu → main menu (loop). Setup runs as a pseudo-campaign session inside `PlayingPhase` — there is no separate `SetupPhase` component. The engine sends a `session:transition` event when setup completes and the real campaign session begins, prompting the client to reset state and continue on the existing WebSocket connection.
 
+The main menu also branches to a set of out-of-game full-screen phases — `settings` and the sub-phases it reaches (`api_keys` / ConnectionsPhase, `discord_settings` / DiscordSettingsPhase, `archived_campaigns` / ArchivedCampaignsPhase). These are documented below.
+
 **Code:** `packages/client-ink/src/phases/PlayingPhase.tsx`
+
+### Streaming Render Optimization (`useBatchedNarrativeLines`)
+
+During an active DM turn the engine emits `narrative:delta` WebSocket events at per-token frequency (typically 1–3 characters each). Without batching, every delta would trigger `setNarrativeLines` → a full React/Ink component-tree re-render. To avoid this, narrative line state is managed by the `useBatchedNarrativeLines` hook, which the root `App` component uses as the exclusive source of `narrativeLines`.
+
+**How it works:**
+
+- Functional updaters (the streaming append path) are applied eagerly to a mutable *working ref* (`workingRef`) without touching React state. A `setTimeout` is armed on the first dirty update; when it fires (after `FLUSH_INTERVAL_MS = 16 ms`, ≈ one 60 fps frame), a single immutable snapshot of the working copy is committed to React state.
+- Direct (non-functional) sets — used for full replacements such as loading a snapshot or clearing the log — bypass the timer and flush to React state immediately.
+- If the component unmounts while a flush is pending, the timer is cleared in a `useEffect` cleanup.
+
+**Effects:** reduces React re-renders by roughly 10–20× during active streaming turns, and reduces GC pressure because only one immutable array is allocated per flush cycle rather than one per token. The `FLUSH_INTERVAL_MS` constant is the default for the optional `flushInterval` parameter, which tests inject to control timing.
+
+**Code:** `packages/client-ink/src/tui/hooks/useBatchedNarrativeLines.ts`
+
+### Settings Screen
+
+Reachable from the main menu via the Settings entry. A full-screen `FullScreenFrame` page (title "Settings") with five navigable items (arrow keys + Enter, ESC to return):
+
+- **API Keys** — navigates to the connections/provider wizard (ConnectionsPhase).
+- **Discord** — navigates to Discord Rich Presence opt-in (DiscordSettingsPhase).
+- **Archived Campaigns** — navigates to the archived-campaigns list (ArchivedCampaignsPhase).
+- **Enable Dev Mode** — on/off toggle. When ON, the Engine Console entry appears in the in-game ESC menu. State persists to `machine-settings.json`.
+- **Show Debug Info** — on/off toggle. When ON, internal `dev`-tagged narrative lines (e.g. retry and rollback notices) are visible in the conversation pane. Session-scoped (not persisted to disk).
+
+Toggle items display `ON` (green) or `OFF` (dim) as a suffix. The version string (`vX.Y.Z · released DATE UTC`) is shown in the bottom-left corner.
+
+**Code:** `packages/client-ink/src/phases/SettingsPhase.tsx`
+
+### Connections Screen (ConnectionsPhase)
+
+A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM provider connections and model tier assignments, reached from Settings → API Keys. It uses `FullScreenFrame` for all sub-screens. The root menu has four items selectable with arrow keys + Enter; Escape from any sub-screen returns to the parent.
+
+**Connections list** — shows all configured connections. Each row displays a health indicator (`✔` valid / `⚠` rate-limited / `✘` invalid / `?` unchecked, color-coded), the connection label, provider, and model count. When a live usage snapshot is available (an active session backing that connection — Codex's plan rate-limit windows, or an Anthropic key's request/token rate-limit quota parsed from `anthropic-ratelimit-*` response headers), per-connection usage segments appear indented below the row — each segment shows label, value (percentage, balance, or token count), and a relative reset timer when the segment carries a reset time (Codex windows do; the Anthropic header-derived segments don't). Usage is fetched for all connections on mount and refreshed every 30 seconds. Hotkeys: `R` = recheck health, `D` = delete.
+
+**Model Assignments** — shows the three model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks). Each tier displays the currently assigned model and connection label. Enter on a tier enters the model picker, which lists all models from all connections; Enter there assigns the selected model + connection to that tier.
+
+**Add Connection wizard** — a multi-step flow:
+1. Provider selection: Anthropic, OpenAI (API key), OpenRouter, Custom (OpenAI-compatible). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry.
+2. API key entry (text input, Enter to advance).
+3. Label entry (optional friendly name, Enter to advance).
+4. Base URL entry — only shown for the `custom` provider. Escape backs up one step at each stage.
+
+**Sign in with ChatGPT** — initiates OAuth via the codex app-server (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) for the server-side flow). The TUI renders a `CenteredModal` overlay over the menu while authentication is in progress. States:
+- **Starting**: "Starting Codex subprocess and OAuth flow…" (before the server returns the auth URL).
+- **Pending**: shows the auth URL plus the footer `o open in browser · c copy URL · Esc cancel`. `o`/`O` opens the URL via the system browser; `c`/`C` copies it to the clipboard.
+- **Success**: "✔ Signed in [as email] [(planType)]." Returns on Enter or Esc; the connections list is refreshed.
+- **Cancelled / Error**: status message, returns on Enter or Esc.
+- Pressing Escape while pending sends a cancel request to the server before returning.
+The login status poll runs every 2 seconds while the chatgpt-login screen is active.
+
+**Code:** `packages/client-ink/src/phases/ConnectionsPhase.tsx`
+
+### Discord Rich Presence (DiscordSettingsPhase)
+
+Reached from Settings → Discord. A full-screen page (title bar: "Discord", built from the same `ThemedHorizontalBorder` + `ThemedSideFrame` shell as the other phases) that lets the player enable or disable Discord Rich Presence. The description reads: "Show your current adventure on Discord? Your campaign name and a brief AI-generated status will be visible to your Discord friends." Two options are shown with radio-style markers (`◆` selected, `○` unselected): **Enable** and **Disable**, with the option matching the current setting pre-selected on open.
+
+**Keyboard:** Up/Down move the cursor; Enter saves the selection and returns to SettingsPhase; Escape returns without saving.
+
+**Persistence:** on Enter, the client calls `PUT /manage/discord` with `{ enabled }` (api-client.ts `setDiscordSettings`); the value is stored server-side in `discord-settings.json`. On entry, the client fetches the current value via `GET /manage/discord` (`getDiscordSettings`) to initialize the cursor.
+
+**Code:** `packages/client-ink/src/phases/DiscordSettingsPhase.tsx`, entered from SettingsPhase via `onDiscord`.
 
 
 ## DM Tool Interface
 
 The DM controls the UI through these tools:
 
-**`update_modeline`** — Set modeline content. Freeform text string.
+**`update_modeline`** — Set modeline content. `character` names the target character; omit to target the active character (resolved from `config.players[activePlayerIndex]`). Freeform text string (supports inline `<b>`, `<i>`, `<u>`, `<color=#hex>` tags).
 ```
 update_modeline({ text: "HP: 42/42 | Loc: The Shattered Hall | Conditions: Poisoned" })
+update_modeline({ text: "HP: 18/30 | Exhausted", character: "Mira" })
 ```
 
 **`style_scene`** — Style the UI to match the scene mood. Use `description` for natural-language requests (a Haiku stylist subagent picks theme, colors, and effects). Use `key_color` for direct hex-color changes. Optionally persist to a location entity.

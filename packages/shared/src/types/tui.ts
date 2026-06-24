@@ -55,9 +55,27 @@ export type FormattingTag =
       content: FormattingNode[];
       selected?: boolean;
       broken?: boolean;
-    };
+    }
+  // Hard line break (from `<br>`). A contentless leaf — it carries no text and
+  // zero display width. On the narrative path the layout engine splits aligned
+  // rows on these (so a multi-line centered sign becomes N padded rows); it is
+  // structural, NOT a heal-stack tag (a `<br>` never resets open formatting the
+  // way a blank DM line does). Generic node-walkers treat it as empty.
+  | { type: "linebreak" }
+  // Inline monospace (from `<code>` / `` `backtick` ``). Behaves like the other
+  // styling tags for wrapping/quoting; its content is not re-parsed for tags.
+  | { type: "code"; content: FormattingNode[] }
+  // A set-apart quoted passage (from `<quote>` — a letter, inscription, console
+  // readout). Block-level like `center`/`right`: on the narrative path it is
+  // split onto its own line and the layout engine wraps its content to a reduced
+  // width, so each row renders with a left rule. Deliberately NOT markdown `> `,
+  // which collides with the player display-log marker. Multi-line via `<br>`.
+  | { type: "quote"; content: FormattingNode[] };
 
 export type FormattingNode = string | FormattingTag;
+
+/** Framing intent carried by an inline image, chosen by the engine. */
+export type ImageIntent = "scene_snapshot" | "player_request" | "character_portrait";
 
 /** Typed narrative line — only "dm" lines enter the formatting/heal/quote pipeline. */
 export type NarrativeLine =
@@ -66,13 +84,51 @@ export type NarrativeLine =
   | { kind: "dev"; text: string; tag?: string }
   | { kind: "system"; text: string; tag?: string }
   | { kind: "separator"; text: string; tag?: string }
-  | { kind: "spacer"; text: string; tag?: string };
+  | { kind: "spacer"; text: string; tag?: string }
+  /**
+   * Inline-rendered image, pushed when the engine emits a `display_image`
+   * TUI command after persisting a generated PNG. `text` is the absolute
+   * filesystem path the inline-image renderer loads (rendered via the
+   * terminal's graphics protocol, or nothing inline when it has none —
+   * the full-res image still lives in the HTML transcript export). `intent` lets
+   * the renderer choose framing (scene snapshot vs. player-requested vs.
+   * character portrait), though current rendering treats all three the
+   * same. Per spec, exactly one separator NarrativeLine precedes an
+   * image line; failed image generations never produce this kind.
+   */
+  | {
+      kind: "image";
+      text: string;
+      intent: ImageIntent;
+      tag?: string;
+    };
 
-/** A fully processed line ready for rendering — nodes are pre-parsed, healed, wrapped, and quote-highlighted. */
+/**
+ * A fully processed PHYSICAL line ready for rendering — nodes are pre-parsed,
+ * healed, wrapped (by display width), and quote-highlighted. One ProcessedLine
+ * is exactly one terminal row.
+ */
 export interface ProcessedLine {
-  kind: NarrativeLine["kind"];
+  kind: NarrativeLine["kind"] | "list";
   nodes: FormattingNode[];
   alignment?: "center" | "right";
+  /**
+   * Full column width an aligned row pads/centers within. Set on aligned rows
+   * so the Ink (`Box justifyContent`) and HTML (`text-align`) renderers agree on
+   * the same field, and so a wrapped aligned block's rows each pad to `padWidth`.
+   */
+  padWidth?: number;
+  /** First row of a list item: the resolved marker (`•`, `1.`, …). */
+  listMarker?: string;
+  /** Leading indent (columns) for a list row — hanging-indent continuation rows
+   *  carry this without a `listMarker`. */
+  listIndent?: number;
+  /**
+   * Carried through from the source `image` NarrativeLine so the renderer can
+   * pick framing — notably, portrait-aspect character portraits are contained
+   * (fit-to-height, narrow) rather than filling the wide scene footprint.
+   */
+  intent?: ImageIntent;
 }
 
 export interface ActivityIndicator {
@@ -95,6 +151,9 @@ export type ActiveModal =
   | { kind: "compendium"; data: import("./compendium.js").Compendium }
   | { kind: "swatch" }
   | { kind: "rollback"; summary: string }
+  // Roll Back Game flow (client-local): pick a savepoint, then confirm.
+  | { kind: "rollback_picker"; savepoints: import("../protocol/rest.js").Savepoint[]; gitEnabled: boolean }
+  | { kind: "rollback_confirm"; savepoint: import("../protocol/rest.js").Savepoint; discardCount: number }
   | { kind: "notes"; content: string }
   | { kind: "saving" }
   | null;

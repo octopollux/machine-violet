@@ -38,8 +38,10 @@ describe("ToolRegistry", () => {
     // Map (3) + Dice (1) + Deck (1) + Clocks (2) + Combat (4) + TUI (6) + Scene (3)
     //   + Entity-narrative (5: scribe/dm_notes/resolve_turn/promote_character/search)
     //   + Entity-CRUD (6: entity/describe_entity_type/list_entity_types/validate_entity/find_schema_drift/detect_orphans)
-    //   + Objectives (1) + Search (2) + Player (1) = 35
-    expect(reg.size).toBe(35);
+    //   + Objectives (1) + Search (2) + Player (3: switch_player/swap_pc/howto_swap_pc)
+    //   + DM personality (3: list_dm_personalities/swap_dm_personality/howto_swap_dm_personality)
+    //   + Catch-all (1: howto_campaign_state) = 41
+    expect(reg.size).toBe(41);
   });
 
   it("generates API-compatible tool definitions", () => {

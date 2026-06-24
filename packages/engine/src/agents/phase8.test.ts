@@ -65,7 +65,10 @@ function makeConfig(players: PlayerConfig[]): CampaignConfig {
   return {
     name: "Test Campaign",
     dm_personality: { name: "Test", prompt_fragment: "Test DM" },
-    players,
+    // Clone slots so swap_pc (which mutates players in place, mirroring a
+    // freshly-parsed config per session) can't leak into the shared module-
+    // level player constants across tests.
+    players: players.map((p) => ({ ...p })),
     combat: {
       initiative_method: "d20_dex",
       round_structure: "individual",
@@ -437,6 +440,171 @@ describe("new Phase 8 tools", () => {
     expect(result.content).toContain("not found");
   });
 
+  it("switch_player's unknown-player error points at swap_pc", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "switch_player", { player: "Maren" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("swap_pc");
+  });
+
+  it("swap_pc reassigns the active slot to a character not in the roster", () => {
+    const state = makeState([humanPlayer]); // Alex plays Aldric
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren", color: "#b33f5d" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Maren");
+    expect(state.config.players[0].color).toBe("#b33f5d");
+    expect(state.config.players[0].name).toBe("Alex"); // player label unchanged
+    expect(state.activePlayerIndex).toBe(0);
+  });
+
+  it("swap_pc with `replaces` targets the slot controlling that character", () => {
+    const state = makeState([humanPlayer, secondHuman], 0); // Alex/Aldric, Sam/Sable
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Vesper", replaces: "Sable" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Aldric"); // untouched
+    expect(state.config.players[1].character).toBe("Vesper");
+    expect(state.activePlayerIndex).toBe(1); // active follows the swap
+  });
+
+  it("swap_pc errors when `replaces` names no current PC", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren", replaces: "Ghost" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("Ghost");
+  });
+
+  it("swap_pc tolerates an out-of-range activePlayerIndex", () => {
+    const state = makeState([humanPlayer], 5); // index past the end
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_pc", { character: "Maren" });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.players[0].character).toBe("Maren");
+    expect(state.activePlayerIndex).toBe(0);
+  });
+
+  it("swap_pc can relabel the human player", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    registry.dispatch(state, "swap_pc", { character: "Maren", player_name: "Beep" });
+
+    expect(state.config.players[0].name).toBe("Beep");
+    expect(state.config.players[0].character).toBe("Maren");
+  });
+
+  it("howto_swap_pc returns the playbook and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_swap_pc", {});
+
+    expect(result.is_error).toBeFalsy();
+    expect(result.content).toContain("swap_pc");
+    expect(result.content.toLowerCase()).toContain("player character");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
+  it("list_dm_personalities returns the bundled persona catalog", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "list_dm_personalities", {});
+
+    expect(result.is_error).toBeFalsy();
+    const parsed = JSON.parse(result.content);
+    expect(Array.isArray(parsed.personalities)).toBe(true);
+    expect(parsed.personalities.length).toBeGreaterThan(0);
+    expect(parsed.personalities[0]).toHaveProperty("name");
+  });
+
+  it("swap_dm_personality switches to a bundled preset by name", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    // Pull a real preset name from the catalog so the test isn't brittle.
+    const catalog = JSON.parse(
+      registry.dispatch(state, "list_dm_personalities", {}).content,
+    ).personalities as { name: string }[];
+    const target = catalog[0].name;
+
+    const result = registry.dispatch(state, "swap_dm_personality", { name: target });
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.dm_personality.name).toBe(target);
+    expect(state.config.dm_personality.prompt_fragment.length).toBeGreaterThan(0);
+    // Reminds the caller about the required in-fiction handoff.
+    expect(result.content.toLowerCase()).toContain("handoff");
+  });
+
+  it("swap_dm_personality invents a custom persona from a prompt_fragment", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_dm_personality", {
+      name: "The Lighthouse Keeper",
+      prompt_fragment: "You are The Lighthouse Keeper. You narrate in slow, salt-worn sentences.",
+      detail: "Signature: end scenes on a distant light.",
+    });
+
+    expect(result.is_error).toBeFalsy();
+    expect(state.config.dm_personality.name).toBe("The Lighthouse Keeper");
+    expect(state.config.dm_personality.detail).toContain("distant light");
+  });
+
+  it("swap_dm_personality rejects custom fields when name matches a preset", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const preset = (JSON.parse(
+      registry.dispatch(state, "list_dm_personalities", {}).content,
+    ).personalities as { name: string }[])[0].name;
+
+    const result = registry.dispatch(state, "swap_dm_personality", {
+      name: preset,
+      prompt_fragment: "You are something else entirely.",
+    });
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("preset");
+    // The preset was not silently applied.
+    expect(state.config.dm_personality?.name).not.toBe(preset);
+  });
+
+  it("swap_dm_personality errors on an unknown preset with no prompt_fragment", () => {
+    const state = makeState([humanPlayer]);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "swap_dm_personality", { name: "Nobody In The List" });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("prompt_fragment");
+  });
+
+  it("howto_swap_dm_personality returns the playbook and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_swap_dm_personality", {});
+
+    expect(result.is_error).toBeFalsy();
+    expect(result.content.toLowerCase()).toContain("handoff");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
+  it("howto_campaign_state returns the catch-all layout and changes nothing", () => {
+    const state = makeState([humanPlayer]);
+    const before = JSON.stringify(state);
+    const registry = createTestRegistry();
+    const result = registry.dispatch(state, "howto_campaign_state", {});
+
+    expect(result.is_error).toBeFalsy();
+    // Routes to tools and names the state dir — the catch-all's core job.
+    expect(result.content.toLowerCase()).toContain("which tool edits");
+    expect(result.content).toContain("state/");
+    expect(JSON.stringify(state)).toBe(before); // pure knowledge tool
+  });
+
   it("registers resolve_turn tool", () => {
     const registry = createTestRegistry();
     expect(registry.has("resolve_turn")).toBe(true);
@@ -447,10 +615,14 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 35 tools total", () => {
+  it("registry has 41 tools total", () => {
     const registry = createTestRegistry();
     // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
     // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
-    expect(registry.size).toBe(35);
+    // 35 → 37 by the PC-swap work: swap_pc, howto_swap_pc.
+    // 37 → 40 by the DM-personality work: list_dm_personalities,
+    // swap_dm_personality, howto_swap_dm_personality.
+    // 40 → 41 by the catch-all: howto_campaign_state.
+    expect(registry.size).toBe(41);
   });
 });

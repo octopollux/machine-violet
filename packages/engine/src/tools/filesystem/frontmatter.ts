@@ -169,6 +169,13 @@ const DISPLAY_NAMES: Record<string, string> = Object.assign(Object.create(null),
  * the supplied value duplicates the trailing fragment. `null` values are
  * preserved as the deletion sentinel even when the malformed key carries
  * a value fragment.
+ *
+ * Also normalizes ordinary display-cased keys (`Type`, `Display Resources`)
+ * to storage form (`type`, `display_resources`) via {@link normalizeKey}.
+ * Agents naturally echo the casing they see on disk (`**Type:**`), and
+ * without this those keys would merge as distinct entries — serializing
+ * duplicate `**Type:**`/`**Display Resources:**` lines and shadowing the
+ * canonical field (e.g. a `Type: PC` patch leaving the real `type` intact).
  */
 export function sanitizeFrontMatter(
   raw: Record<string, unknown>,
@@ -178,7 +185,11 @@ export function sanitizeFrontMatter(
   for (const [rawKey, rawValue] of Object.entries(raw)) {
     const m = KEY_RE.exec(rawKey);
     if (!m) {
-      out[rawKey] = rawValue;
+      // Plain key — normalize casing/spacing so display-cased input lands on
+      // the same storage key the parser produces. Don't clobber a value
+      // already recovered from a malformed key earlier in the loop.
+      const key = normalizeKey(rawKey);
+      if (!(key in out)) out[key] = rawValue;
       continue;
     }
     const recoveredKey = m[1].trim().toLowerCase().replace(/\s+/g, "_");

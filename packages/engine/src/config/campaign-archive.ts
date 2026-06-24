@@ -9,6 +9,7 @@
  */
 
 import { join, basename } from "node:path";
+import { readFile, writeFile, mkdir, access, readdir, unlink, rmdir, stat } from "node:fs/promises";
 import { norm } from "../utils/paths.js";
 import { zipBinaryFiles, unzipBinaryFiles } from "../utils/archive.js";
 import type { BinaryFileMap } from "../utils/archive.js";
@@ -81,7 +82,7 @@ function sanitizeFilename(name: string): string {
  * Recursively walk a directory, returning relative paths and binary contents.
  * Reads all files as raw bytes to preserve git objects and other binary data.
  */
-export async function walkAllBinary(
+async function walkAllBinary(
   io: ArchiveFileIO,
   root: string,
   prefix: string,
@@ -95,6 +96,12 @@ export async function walkAllBinary(
   }
 
   for (const entry of entries) {
+    // Skip the regenerable `.debug/` dir at the campaign root — gitignored
+    // context dumps + crash traces that bloat the (synchronous, rollback-
+    // blocking) snapshot and aren't part of the campaign. Unarchive simply
+    // omits it; the engine recreates it on demand. The /diagnostics bundler
+    // has its own walk (server/diagnostics.ts) and still captures it.
+    if (prefix === "" && entry === ".debug") continue;
     const abs = norm(join(root, entry));
     const rel = prefix ? `${prefix}/${entry}` : entry;
     if (await io.isDirectory(abs)) {
@@ -140,6 +147,101 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+/** Filename-safe timestamp at second resolution: `2026-06-01T20-35-34`. */
+function fileStamp(): string {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
+/** Pause before the read-back retry — long enough to outlast a transient hold. */
+const READBACK_RETRY_MS = 50;
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Read the just-written zip back and confirm it's byte-identical to what we
+ * wrote. A *transient* external hold on the file — an antivirus real-time scan,
+ * a cloud-sync client briefly re-writing it — can make the immediate read-back
+ * come back short, differ, or throw, then resolve a moment later. So on a first
+ * mismatch or read error we wait briefly and re-read once before declaring the
+ * write corrupt. The failure names both byte lengths (or the read error) so a
+ * genuine corruption is self-diagnosing rather than an opaque "mismatch".
+ */
+async function verifyWrittenZip(
+  io: ArchiveFileIO,
+  zipPath: string,
+  expected: Uint8Array,
+): Promise<ArchiveResult> {
+  const check = async (): Promise<{ ok: true } | { ok: false; detail: string }> => {
+    try {
+      const readBack = await io.readBinary(zipPath);
+      if (bytesEqual(readBack, expected)) return { ok: true };
+      return {
+        ok: false,
+        detail: `zip file contents mismatch on disk (expected ${expected.length} bytes, read ${readBack.length})`,
+      };
+    } catch (e) {
+      return { ok: false, detail: `could not read back zip (${e instanceof Error ? e.message : String(e)})` };
+    }
+  };
+
+  let result = await check();
+  if (!result.ok) {
+    await delay(READBACK_RETRY_MS);
+    result = await check();
+  }
+  if (!result.ok) return { ok: false, error: `Write verification failed: ${result.detail}` };
+  return { ok: true, zipPath };
+}
+
+/**
+ * Walk → zip → verify-in-memory → write → read-back-verify. Does NOT modify the
+ * source folder. Shared by `archiveCampaign` (which then deletes the source)
+ * and `snapshotCampaign` (which leaves it in place). `.git` is included, so a
+ * round-tripped zip restores the full repo history; the regenerable `.debug/`
+ * dir is excluded (see `walkAllBinary`).
+ */
+async function buildAndWriteVerifiedZip(
+  campaignPath: string,
+  zipPath: string,
+  archDir: string,
+  io: ArchiveFileIO,
+): Promise<ArchiveResult> {
+  // Step 1: Walk all files as binary
+  const files = await walkAllBinary(io, campaignPath, "");
+  const fileCount = files.length;
+  if (fileCount === 0) {
+    return { ok: false, error: "Campaign folder is empty or unreadable" };
+  }
+  const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
+
+  const fileMap: BinaryFileMap = {};
+  for (const f of files) fileMap[f.relativePath] = f.content;
+
+  // Step 2: Zip
+  const zipped = zipBinaryFiles(fileMap);
+  if (!zipped) return { ok: false, error: "Failed to create zip archive" };
+
+  // Step 3: Verify by round-tripping in memory
+  const roundTrip = unzipBinaryFiles(zipped);
+  if (!roundTrip) return { ok: false, error: "Zip verification failed: could not unzip in memory" };
+  const rtCount = Object.keys(roundTrip).length;
+  const rtSize = Object.values(roundTrip).reduce((sum, c) => sum + c.length, 0);
+  if (rtCount !== fileCount) {
+    return { ok: false, error: `Zip verification failed: file count mismatch (expected ${fileCount}, got ${rtCount})` };
+  }
+  if (rtSize !== totalSize) {
+    return { ok: false, error: `Zip verification failed: total size mismatch (expected ${totalSize}, got ${rtSize})` };
+  }
+
+  // Step 4: Write
+  await io.mkdir(archDir);
+  await io.writeBinary(zipPath, zipped);
+
+  // Step 5: Read back and verify byte-level equality, retrying once to ride out
+  // a transient antivirus/sync hold on the freshly written file.
+  return await verifyWrittenZip(io, zipPath, zipped);
 }
 
 // --- Core operations ---
@@ -221,68 +323,61 @@ export async function archiveCampaign(
 ): Promise<ArchiveResult> {
   try {
     const normalizedPath = norm(campaignPath);
-
-    // Step 1: Walk all files as binary
-    const files = await walkAllBinary(io, normalizedPath, "");
-    const fileCount = files.length;
-    if (fileCount === 0) {
-      return { ok: false, error: "Campaign folder is empty or unreadable" };
-    }
-    const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
-
-    // Build BinaryFileMap
-    const fileMap: BinaryFileMap = {};
-    for (const f of files) {
-      fileMap[f.relativePath] = f.content;
-    }
-
-    // Step 2: Zip
-    const zipped = zipBinaryFiles(fileMap);
-    if (!zipped) {
-      return { ok: false, error: "Failed to create zip archive" };
-    }
-
-    // Step 3: Verify by round-tripping in memory
-    const roundTrip = unzipBinaryFiles(zipped);
-    if (!roundTrip) {
-      return { ok: false, error: "Zip verification failed: could not unzip in memory" };
-    }
-    const rtCount = Object.keys(roundTrip).length;
-    const rtSize = Object.values(roundTrip).reduce((sum, c) => sum + c.length, 0);
-    if (rtCount !== fileCount) {
-      return { ok: false, error: `Zip verification failed: file count mismatch (expected ${fileCount}, got ${rtCount})` };
-    }
-    if (rtSize !== totalSize) {
-      return { ok: false, error: `Zip verification failed: total size mismatch (expected ${totalSize}, got ${rtSize})` };
-    }
-
-    // Step 4: Write zip to archivedcampaigns/
     const campaignName = await readCampaignName(normalizedPath, io);
     const safeName = sanitizeFilename(campaignName);
     const archDir = archiveDir(campaignsDir);
-    await io.mkdir(archDir);
 
     let zipPath = norm(join(archDir, `${safeName}.zip`));
-
-    // Avoid overwriting an existing archive
+    // Avoid overwriting an existing archive.
     if (await io.exists(zipPath)) {
-      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      zipPath = norm(join(archDir, `${safeName} (${ts}).zip`));
+      zipPath = norm(join(archDir, `${safeName} (${fileStamp()}).zip`));
     }
 
-    await io.writeBinary(zipPath, zipped);
+    const built = await buildAndWriteVerifiedZip(normalizedPath, zipPath, archDir, io);
+    if (!built.ok) return built;
 
-    // Step 5: Read back and verify byte-level equality
-    const readBack = await io.readBinary(zipPath);
-    if (!bytesEqual(readBack, zipped)) {
-      return { ok: false, error: "Write verification failed: zip file contents mismatch on disk" };
-    }
-
-    // Step 6: Delete source
+    // Step 6: Delete source — archive moves the campaign to cold storage.
     await rmRecursive(io, normalizedPath);
-    return { ok: true, zipPath };
+    return built;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Archive failed" };
+  }
+}
+
+/**
+ * Back up a campaign *without* removing it — a verified zip written to
+ * archivedcampaigns/, leaving the live campaign in place. Used before a
+ * rollback so the turns about to be discarded stay recoverable from the
+ * Archived Campaigns list (the zip includes `.git`, so the full pre-rollback
+ * history restores via the normal unarchive path).
+ *
+ * Unlike `archiveCampaign`, the filename is *always* timestamped (and label-
+ * prefixed, default `pre-rollback`) with a counter guard, so repeated backups
+ * of a single campaign never collide — even two within the same second.
+ */
+export async function snapshotCampaign(
+  campaignPath: string,
+  campaignsDir: string,
+  io: ArchiveFileIO,
+  opts: { label?: string } = {},
+): Promise<ArchiveResult> {
+  try {
+    const normalizedPath = norm(campaignPath);
+    const campaignName = await readCampaignName(normalizedPath, io);
+    const safeName = sanitizeFilename(campaignName);
+    const archDir = archiveDir(campaignsDir);
+    const labelPrefix = opts.label ? `${opts.label} ` : "";
+    const base = `${safeName} (${labelPrefix}${fileStamp()})`;
+
+    let zipPath = norm(join(archDir, `${base}.zip`));
+    // Counter guard for the (rare) same-second second backup.
+    for (let n = 2; await io.exists(zipPath); n++) {
+      zipPath = norm(join(archDir, `${base} (${n}).zip`));
+    }
+
+    return await buildAndWriteVerifiedZip(normalizedPath, zipPath, archDir, io);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Snapshot failed" };
   }
 }
 
@@ -414,4 +509,34 @@ export async function deleteCampaign(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to delete campaign" };
   }
+}
+
+// --- Production I/O factory ---
+
+/**
+ * Node-backed `ArchiveFileIO` (adds binary + stat to the base FileIO). Lives
+ * here, next to the archive operations, so engine-layer callers (e.g. the
+ * rollback chokepoint in tools/git) can construct it without importing the
+ * server layer. Tests inject in-memory mocks instead.
+ */
+export function createArchiveFileIO(): ArchiveFileIO {
+  return {
+    readFile: (path: string) => readFile(path, "utf-8"),
+    readBinary: (path: string) => readFile(path).then((buf) => new Uint8Array(buf)),
+    writeFile: (path: string, content: string) => writeFile(path, content, "utf-8"),
+    writeBinary: (path: string, data: Uint8Array) => writeFile(path, data),
+    mkdir: (path: string) => mkdir(path, { recursive: true }).then(() => { /* void */ }),
+    exists: async (path: string) => {
+      try { await access(path); return true; } catch { return false; }
+    },
+    listDir: (path: string) => readdir(path),
+    deleteFile: (path: string) => unlink(path),
+    rmdir: (path: string) => rmdir(path),
+    fileMtime: async (path: string) => {
+      try { return (await stat(path)).mtime.toISOString(); } catch { return null; }
+    },
+    isDirectory: async (path: string) => {
+      try { return (await stat(path)).isDirectory(); } catch { return false; }
+    },
+  };
 }

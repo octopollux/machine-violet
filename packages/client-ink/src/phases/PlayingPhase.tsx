@@ -20,18 +20,21 @@ import { scrollAmount, TerminalTooSmall } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS, getViewportTier, getVisibleElements, narrativeRows, choiceRowBudget } from "../tui/responsive.js";
 import { useRawModeGuardian } from "../tui/hooks/useRawModeGuardian.js";
 import { Layout } from "../tui/layout.js";
+import { OcclusionProvider } from "../tui/image/occlusion.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
   SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
+  RollbackSummaryModal, RollbackPickerModal, RollbackConfirmModal,
 } from "../tui/modals/index.js";
 import type { MenuGroup, MenuItem } from "../tui/modals/index.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
-import { buildTranscriptHtml } from "../commands/transcript.js";
+import { buildTranscriptHtml, loadImageBytes } from "../commands/transcript.js";
 import { openPath, revealInExplorer } from "../commands/open-path.js";
+import { routePlayingPhaseKey } from "./playing-input.js";
 
 export function PlayingPhase() {
   const {
@@ -45,6 +48,7 @@ export function PlayingPhase() {
     activeModal, setActiveModal,
     mode, stateSnapshot,
     usageStatus,
+    sheetEpoch,
     hasKittyProtocol,
     devModeEnabled,
     showVerbose,
@@ -70,6 +74,7 @@ export function PlayingPhase() {
   const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
   const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
   const characterSheetCacheCharRef = useRef<string>("");
+  const characterSheetCacheEpochRef = useRef<number>(0);
   // attemptId the user last dismissed the API-error modal at. The modal hides
   // while this matches the current overlay's attemptId; each fresh onRetry
   // bumps attemptId, so the next failure brings the modal back. Reset to null
@@ -84,6 +89,12 @@ export function PlayingPhase() {
   const narrativeRef = useRef<NarrativeAreaHandle>(null);
   const modalScrollRef = useRef<CenteredModalHandle>(null);
   const escTimestamps = useRef<number[]>([]);
+
+  // Inline images no longer need a remount-on-overlay-close hack: the
+  // InlineImage renderer repaints every frame inside the sync-output block and
+  // hides via the live occlusion gate (OcclusionProvider below). Modals report
+  // their row-spans through CenteredModal/OverlayPane; an overlay that doesn't
+  // cover the image leaves it visible.
 
   // Clear the dismissal latch whenever the retry overlay goes away so the
   // next outage shows the modal again — even if the new attemptId numerically
@@ -138,9 +149,12 @@ export function PlayingPhase() {
     reportViewport({ columns: cols, rows, narrativeRows: narRows });
   }, [cols, rows, narRows, reportViewport]);
 
-  // Clear character sheet cache when active character changes
-  if (activeChar !== characterSheetCacheCharRef.current) {
+  // Clear character sheet cache when the active character changes, or when a
+  // detached scribe rewrote a sheet (sheetEpoch bumped) — the latter repaints
+  // an open pane with the scribe's late write instead of waiting for re-open.
+  if (activeChar !== characterSheetCacheCharRef.current || sheetEpoch !== characterSheetCacheEpochRef.current) {
     characterSheetCacheCharRef.current = activeChar;
+    characterSheetCacheEpochRef.current = sheetEpoch;
     setCharacterSheetCache(null);
   }
   const handleCharacterSheetLoaded = useCallback((content: string | null) => {
@@ -151,6 +165,11 @@ export function PlayingPhase() {
   const saveTranscript = useCallback(async () => {
     const playerColor = stateSnapshot?.players?.[activePlayerIndex]?.color ?? "#55ff55";
     const separatorColor = themeColor(theme, "separator") ?? "#666666";
+    // Pre-load image bytes referenced in the transcript so the exported
+    // HTML is self-contained (single file with inline base64 data: URIs).
+    // Read failures are silently skipped; the HTML renderer emits an
+    // "[image unavailable]" placeholder for any missing entry.
+    const imageBytes = await loadImageBytes(narrativeLines);
     const html = buildTranscriptHtml({
       narrativeLines,
       width: cols,
@@ -159,6 +178,7 @@ export function PlayingPhase() {
       separatorColor,
       playerColor,
       quoteColor: "#ffffff",
+      imageBytes,
     });
     try {
       const { path } = await apiClient.saveTranscript(html);
@@ -303,6 +323,16 @@ export function PlayingPhase() {
     } catch { /* fail quietly — menu reopens on next ESC */ }
   }, [apiClient, setActiveModal]);
 
+  const openRollbackPicker = useCallback(async () => {
+    try {
+      const { savepoints, gitEnabled } = await apiClient.getSavepoints();
+      setActiveModal({ kind: "rollback_picker", savepoints, gitEnabled } as never);
+    } catch {
+      // Surface an empty/disabled picker rather than silently swallowing.
+      setActiveModal({ kind: "rollback_picker", savepoints: [], gitEnabled: false } as never);
+    }
+  }, [apiClient, setActiveModal]);
+
   const toggleEngineConsole = useCallback(() => {
     // Silent catch matches the triple-ESC and direct-ESC mode-toggle handlers
     // elsewhere in this component — a transient command failure shouldn't
@@ -354,12 +384,38 @@ export function PlayingPhase() {
 
   // --- Input handling ---
   useInput((_input, key) => {
-    // Triple-ESC reset
+    // Triple-Esc panic-reset bookkeeping is stateful (a timestamp ring), so it
+    // stays here; the routing *decision* below is pure (see playing-input.ts).
+    let tripleEscReady = false;
     if (key.escape) {
       const now = Date.now();
       escTimestamps.current.push(now);
       escTimestamps.current = escTimestamps.current.filter((t) => now - t <= 1500);
-      if (escTimestamps.current.length >= 3) {
+      tripleEscReady = escTimestamps.current.length >= 3;
+    }
+
+    // Esc/menu both open the pause menu and refresh the token summary.
+    const openMenu = () => {
+      setMenuOpen(true);
+      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
+    };
+
+    const action = routePlayingPhaseKey(
+      { escape: !!key.escape, tab: !!key.tab, pageUp: !!key.pageUp, pageDown: !!key.pageDown },
+      {
+        tripleEscReady,
+        apiErrorModalActive,
+        hasRetryOverlay: !!retryOverlay,
+        activeModal: !!activeModal,
+        menuOpen,
+        activeChoices: !!activeChoices,
+        characterPaneOpen,
+        mode,
+      },
+    );
+
+    switch (action) {
+      case "tripleEscReset":
         escTimestamps.current = [];
         setActiveChoices(null);
         setActiveModal(null);
@@ -369,60 +425,36 @@ export function PlayingPhase() {
           apiClient.command("exit_mode").catch(() => { /* no-op */ });
         }
         return;
-      }
-    }
-
-    // Esc on the API-error modal dismisses it (latched on attemptId so the
-    // next retry brings it back). Handled before the catch-all blocker below
-    // so the user isn't trapped while the engine retries in the background.
-    if (key.escape && apiErrorModalActive && retryOverlay) {
-      setDismissedAttemptId(retryOverlay.attemptId);
-      return;
-    }
-
-    if (apiErrorModalActive || activeModal || menuOpen) return;
-
-    // ESC while choices are visible opens the menu without clearing them.
-    // The overlay's own input is disabled while the menu is open (isActive
-    // prop), so arrow keys/Enter don't drive both UIs at once.
-    if (key.escape && activeChoices) {
-      setMenuOpen(true);
-      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
-      return;
-    }
-
-    if (activeChoices) return;
-
-    // Tab: toggle character pane
-    if (key.tab) {
-      setCharacterPaneOpen((prev) => !prev);
-      return;
-    }
-
-    // In OOC/Dev mode: ESC exits
-    if (mode === "ooc" || mode === "dev") {
-      if (key.escape) {
+      case "dismissApiError":
+        // Latched on attemptId so the next retry brings the modal back.
+        if (retryOverlay) setDismissedAttemptId(retryOverlay.attemptId);
+        return;
+      // The choice overlay's own input is disabled while the menu is open
+      // (isActive prop), so arrow keys/Enter don't drive both UIs at once.
+      case "openMenuOverChoices":
+      case "openMenu":
+        openMenu();
+        return;
+      case "toggleCharacterPane":
+        setCharacterPaneOpen((prev) => !prev);
+        return;
+      case "exitMode":
         apiClient.command("exit_mode").catch(() => { /* no-op */ });
         return;
-      }
-    }
-
-    // ESC: dismiss character pane first, then open menu
-    if (key.escape) {
-      if (characterPaneOpen) {
+      case "dismissCharacterPane":
         setCharacterPaneOpen(false);
         return;
+      case "scroll": {
+        // Target the character pane when open, else the narrative.
+        const step = scrollAmount(rows);
+        const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
+        target?.scrollBy(key.pageUp ? -step : step);
+        return;
       }
-      setMenuOpen(true);
-      apiClient.getCost().then(({ formatted }) => setTokenSummary(formatted)).catch(() => { /* no-op */ });
-      return;
-    }
-
-    // Scroll keys — target character pane when open, else narrative
-    if (key.pageUp || key.pageDown) {
-      const step = scrollAmount(rows);
-      const target = characterPaneOpen ? modalScrollRef.current : narrativeRef.current;
-      target?.scrollBy(key.pageUp ? -step : step);
+      case "blocked":
+      case "choicesBlocked":
+      case "none":
+        return;
     }
   });
 
@@ -455,6 +487,7 @@ export function PlayingPhase() {
   ) : undefined;
 
   return (
+    <OcclusionProvider>
     <Box flexDirection="column" width={cols} height={rows}>
       <Layout
         dimensions={{ columns: cols, rows }}
@@ -479,6 +512,7 @@ export function PlayingPhase() {
         playerFrameColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
+        conversationPaneTop={conversationPaneTop}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}
         playerPaneOverlay={choiceOverlay}
@@ -546,6 +580,16 @@ export function PlayingPhase() {
           topOffset={conversationPaneTop}
         />
       )}
+      {am?.kind === "rollback" && (
+        <RollbackSummaryModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          summary={String(am.summary ?? "")}
+          onDismiss={onReturnToMenu}
+          topOffset={conversationPaneTop}
+        />
+      )}
       {am?.kind === "swatch" && (
         <SwatchModal
           theme={theme}
@@ -580,7 +624,44 @@ export function PlayingPhase() {
               dm_turn_length_pct: value,
             }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
           }}
+          onImageGenerationChange={async (value: "on" | "off") => {
+            await apiClient.patchSettings({
+              image_generation: value,
+            }).catch(() => { /* ignore — same rationale as Choices Frequency above */ });
+          }}
           globalDmTurnLengthPctDefault={dmTurnLengthPctDefault}
+          onOpenRollback={() => void openRollbackPicker()}
+        />
+      )}
+      {am?.kind === "rollback_picker" && (
+        <RollbackPickerModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          savepoints={(am.savepoints as never) ?? []}
+          gitEnabled={am.gitEnabled !== false}
+          onSelect={(savepoint, index) =>
+            setActiveModal({ kind: "rollback_confirm", savepoint, discardCount: index } as never)}
+          onCancel={() => void openCampaignSettings()}
+          topOffset={conversationPaneTop}
+        />
+      )}
+      {am?.kind === "rollback_confirm" && (
+        <RollbackConfirmModal
+          theme={theme}
+          width={cols}
+          height={narRows}
+          savepoint={am.savepoint as never}
+          discardCount={Number(am.discardCount ?? 0)}
+          onConfirm={() => {
+            // Fire the rollback; don't set a modal — the server ends the session
+            // and the stashed rollbackSummary drives RollbackSummaryModal via the
+            // app.tsx sessionEnded effect, then Enter returns to the menu.
+            const oid = (am.savepoint as { oid: string }).oid;
+            apiClient.command("rollback", oid).catch(() => { /* no-op; surfaced as system msg */ });
+          }}
+          onCancel={() => void openRollbackPicker()}
+          topOffset={conversationPaneTop}
         />
       )}
       {am?.kind === "saving" && (
@@ -607,5 +688,6 @@ export function PlayingPhase() {
         />
       )}
     </Box>
+    </OcclusionProvider>
   );
 }

@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "BakedAAA"
+rating: "D"
+description: "Mid-2000s AAA game screenshot with baked lightmap GI, DXT textures, faceted geometry and warm early-HDR bloom"
+tags: [game-render, stylized, warm, nostalgic, interior-friendly]
+made-for-model: gpt-image-2
+tokens: 253
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as an authentic in-game screenshot from a flagship 2004-era AAA game engine — real-time rasterized 3D of the mid-2000s, NOT a pre-rendered cinematic and NOT a modern render. Period fidelity is the whole point: moderate polygon counts with honestly faceted geometry on curved surfaces, DXT-compressed textures with their characteristic mild blocking, and crisp clean polygon edges from heavy 8x multisample anti-aliasing (no jaggies anywhere). Lighting is BAKED — precomputed lightmaps and radiosity give soft, warm, completely static global illumination, with gentle baked ambient occlusion pooling in the corners and soft contact shadows under objects; no real-time dynamic shadows. Early-HDR touches of the era: a restrained warm bloom off the brightest surfaces, slightly crushed near-black shadows, and a mild filmic colour grade. The intrinsic asset economy of the period is the discipline: honest game-asset budgeting, clean simple shapes, a limited set of repeated materials, no needless clutter — a technically confident game built within a 2004 hardware budget. Atmospheric, clean, nostalgic. Close with a caption overlaid in a tasteful font.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Game-render family ([Image](./Image.mvstyle) / [WesternRPG](./WesternRPG.mvstyle) / [RetroPSX](./RetroPSX.mvstyle) / [HeroShooter](./HeroShooter.mvstyle) / [JRPGCinematic](./JRPGCinematic.mvstyle) / [DX9Interior](./DX9Interior.mvstyle)) — the mid-2000s BAKED-LIGHTING AAA register (precomputed lightmaps + radiosity, heavy 8x MSAA, DXT textures), more advanced than the [RetroPSX](./RetroPSX.mvstyle) jank but distinctly PERIOD, not modern. KEY LEVER (user): this is one of the rare DENSITY-AS-FEATURE registers (like [MobaStylized](./MobaStylized.mvstyle) / [Blockbook](./Blockbook.mvstyle)) — 2004 games leaned on REPEATED tiling textures and RECURRING modular set-dressing, so the model's cram-detail tic reads as PERIOD-AUTHENTIC rather than as noise; the tic is welcome / disguised here, no suppression needed. The render CONVERGES toward a polished MODERN game shot (it collapsed into [WesternRPG](./WesternRPG.mvstyle) on the first pass) unless the period DEGRADATION tells carry real weight — the [RetroPSX](./RetroPSX.mvstyle) lesson: keep the baked-lightmap signature, DXT blocking, faceted geometry and early-HDR bloom doing the work; a bare "NOT modern" negation is weak on its own. SCENE NOTE: validated on the Xera dusk VISTA, but the register's NATIVE habitat is an INDOOR lightmapped corridor / interior (the era literally couldn't render this kind of open alien vista) — an indoor Xera scene is the truest FUTURE showcase. Caption overlaid in a tasteful font (the [Image](./Image.mvstyle) family caption). Validated on the Xera dusk scene; an instant keeper (user). Keep the baked-lighting signature, the period DXT / faceting / bloom degradation, the repeated-texture density-as-feature, and the overlaid caption.
+
+# Example
+
+![BakedAAA](../ImageStyleExample/BakedAAA.example.png)

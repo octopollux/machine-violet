@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildScribeToolHandler, splitSections, mergeSectionBodies, sanitizeFrontMatter } from "./scribe.js";
+import { buildScribeToolHandler, splitSections, mergeSectionBodies, sanitizeFrontMatter, buildPrefetchedEntityBlock } from "./scribe.js";
 import type { ScribeFileIO } from "./scribe.js";
+import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import { norm } from "../../utils/paths.js";
 
@@ -693,5 +694,63 @@ describe("sanitizeFrontMatter", () => {
     // information. `null` always means delete — never substitute.
     const out = sanitizeFrontMatter({ "**Location:** [[Old]]": null });
     expect(out).toEqual({ location: null });
+  });
+});
+
+describe("buildPrefetchedEntityBlock", () => {
+  const tree: EntityTree = {
+    grimjaw: { name: "Grimjaw", aliases: ["Captain Grimjaw"], type: "character", path: "characters/grimjaw.md" },
+    kael: { name: "Kael", aliases: [], type: "character", path: "characters/kael.md" },
+  };
+
+  it("prefetches a referenced entity as canonical and excludes the rest", async () => {
+    const fio = mockFileIO({
+      "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n\nA scarred orc chieftain.",
+      "/camp/characters/kael.md": "# Kael\n\nA quiet ranger.",
+    });
+    const block = await buildPrefetchedEntityBlock(
+      [{ visibility: "private", content: "Grimjaw takes 8 damage in the ambush" }],
+      tree, "/camp", fio,
+    );
+    expect(block).toContain("CANONICAL");
+    expect(block).toContain("Grimjaw (character)");
+    expect(block).toContain("A scarred orc chieftain.");
+    expect(block).not.toContain("Kael"); // unreferenced — not prefetched
+  });
+
+  it("matches by alias", async () => {
+    const fio = mockFileIO({ "/camp/characters/grimjaw.md": "# Grimjaw\n\nbody" });
+    const block = await buildPrefetchedEntityBlock(
+      [{ visibility: "private", content: "Captain Grimjaw draws his axe" }],
+      tree, "/camp", fio,
+    );
+    expect(block).toContain("Grimjaw (character)");
+  });
+
+  it("returns empty when no known entity is referenced", async () => {
+    const fio = mockFileIO({ "/camp/characters/grimjaw.md": "# Grimjaw" });
+    const block = await buildPrefetchedEntityBlock(
+      [{ visibility: "private", content: "A new merchant named Voss appears" }],
+      tree, "/camp", fio,
+    );
+    expect(block).toBe("");
+  });
+
+  it("respects word boundaries (no substring matches)", async () => {
+    const fio = mockFileIO({ "/camp/characters/kael.md": "# Kael" });
+    const block = await buildPrefetchedEntityBlock(
+      [{ visibility: "private", content: "Kaeldor the dragon stirs" }], // 'Kael' is a substring, not a word
+      tree, "/camp", fio,
+    );
+    expect(block).toBe("");
+  });
+
+  it("skips a referenced entity whose file is missing — the tool fetches it instead", async () => {
+    const fio = mockFileIO({}); // grimjaw is in the tree but absent on disk
+    const block = await buildPrefetchedEntityBlock(
+      [{ visibility: "private", content: "Grimjaw takes 8 damage" }],
+      tree, "/camp", fio,
+    );
+    expect(block).toBe("");
   });
 });

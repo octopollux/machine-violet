@@ -8,24 +8,67 @@
     "modern",
     "mystery"
   ],
-  "detail": "The host knows the player. The player doesn't remember the host. This is not an accident.\n\nRoll or choose the cage's nature:\n1. THE DEBT — The player did something terrible and had the memory erased. The party is a trial. Every guest is a witness. The host is the victim — or the victim's heir.\n2. THE AUDITION — The party is a test run by a secret society, a patron deity, or an extradimensional collector. Every interaction is being evaluated. The \"prize\" for passing is not what it seems.\n3. THE WAKE — The party is for someone who hasn't died yet. That someone is the player. The host is trying to save them from a fate they can't explain in plain terms — so they built an elaborate cage instead.\n\nThe house: Every room reveals something about the player's past (or a constructed version of it). Doors lead to rooms that shouldn't exist. The architecture responds to emotional state — a room expands when you're calm, contracts when you panic.\n\nGuests: 8-12 NPCs, each with a specific relationship to the central mystery. Some are allies, some are obstacles, some are distractions. At least one guest is not human (or not alive, or not really there). The staff knows everything and will say nothing.\n\nPacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, the midnight reveal. Each phase escalates. The player can try to break the structure, but the house adapts.\n\n<!--include:Pacing.ShortCampaigns-->",
-  "suboptions": [
+  "image_style": "ValueBlocked",
+  "detail": "The host knows the player. The player doesn't remember the host. This is not an accident.\n\nThe house: Every room reveals something about the player's past (or a constructed version of it). Doors lead to rooms that shouldn't exist. The architecture responds to emotional state — a room expands when you're calm, contracts when you panic. The chosen setting's detail carries a baseline floor plan; treat it as bones and grow the impossible rooms off it rather than from nothing.\n\nGuests: 8-12 NPCs, each with a specific relationship to the central mystery. Some are allies, some are obstacles, some are distractions. At least one guest is not human (or not alive, or not really there). The staff knows everything and will say nothing.\n\nPacing: The party has a rhythm — cocktails, dinner, entertainment, dessert, the midnight reveal. Each phase escalates. The player can try to break the structure, but the house adapts.",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open into the party already in motion — the player arriving or newly arrived as the guest of honor, greeted warmly and by name by a host they do not remember, the warmth a half-step too knowing. Establish the glamour and the rhythm first (a drink pressed into the hand, an introduction or two, the first room) before the wrongness arrives: the exits that don't quite work, a room that wasn't there a moment ago, a guest who knows something about the player they shouldn't. Do NOT reveal the cage's true purpose (the trial, the test, the rescue) or foreshadow the midnight reveal — let the player feel the pleasant, escalating dread of a party they cannot leave, and discover what it is in play.",
+  "forks": [
     {
+      "id": "cage-nature",
+      "label": "The cage's nature",
+      "chooser": "agent",
+      "prompt": "Roll or choose to fit the player's tone. Do NOT reveal early — this is the host's true purpose and the campaign's hidden truth.",
+      "options": [
+        {
+          "id": "the-debt",
+          "name": "The Debt",
+          "description": "The player did something terrible, had it erased, and the party is their trial.",
+          "detail": "THE DEBT — The player did something terrible and had the memory erased. The party is a trial. Every guest is a witness. The host is the victim — or the victim's heir."
+        },
+        {
+          "id": "the-audition",
+          "name": "The Audition",
+          "description": "The party is a test run by a secret society, deity, or collector; the prize is not what it seems.",
+          "detail": "THE AUDITION — The party is a test run by a secret society, a patron deity, or an extradimensional collector. Every interaction is being evaluated. The 'prize' for passing is not what it seems."
+        },
+        {
+          "id": "the-wake",
+          "name": "The Wake",
+          "description": "The party is for the player, who hasn't died yet; the host built a cage to save them.",
+          "detail": "THE WAKE — The party is for someone who hasn't died yet. That someone is the player. The host is trying to save them from a fate they can't explain in plain terms — so they built an elaborate cage instead."
+        }
+      ]
+    },
+    {
+      "id": "the-setting",
       "label": "The setting",
-      "choices": [
+      "chooser": "player",
+      "prompt": "Let the player pick the kind of party they have been brought to — they choose on the aesthetic. Each option's detail is the baseline room skeleton for that house: the spaces the party occupies. Treat them as bones — name more as the player moves, and grow the 'rooms that shouldn't exist' off this floor plan rather than from nothing.",
+      "options": [
         {
+          "id": "candlelit-manor",
           "name": "The Candlelit Manor",
-          "description": "Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. The party is a masquerade. Think Poe by way of Kubrick."
+          "description": "Gothic elegance, labyrinthine corridors, oil portraits with watching eyes. A candlelit masquerade in the Poe vein — exquisite manners over slow dread, and every face behind a mask.",
+          "detail": "THE CANDLELIT MANOR — A candlelit masquerade in the Poe vein: exquisite manners stretched thin over slow dread, every face behind a mask, corridors that fold back on themselves. Baseline rooms (the bones the party occupies — name more as the player moves, and grow the rooms-that-shouldn't-exist off this floor plan): the entrance hall and cloakroom where the masks are handed out; the grand staircase; the long portrait gallery, eyes that follow, and somewhere among them a portrait of the player; the dining hall with the place cards already set; the ballroom; the conservatory gone to overgrowth; the library; the music room; the card room; the locked east wing; the servants' stair and the passages below; the cellar and the ice house; the chapel; and the bedroom upstairs with the player's name on the door. The house contracts when the player panics and opens when they are calm — let the floor plan breathe."
         },
         {
+          "id": "glass-penthouse",
           "name": "The Glass Penthouse",
-          "description": "A modernist penthouse. Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée. Think corporate thriller with a supernatural edge."
+          "description": "A modernist penthouse. Glass walls, brutalist art, a host who knows too much about you. The party is an exclusive soirée — corporate thriller with a supernatural edge.",
+          "detail": "THE GLASS PENTHOUSE — A modernist aerie: glass walls, brutalist art, a host who knows too much, an exclusive soirée with a supernatural edge. Baseline rooms (the bones — name more as the player moves, and grow the impossible rooms off this floor plan): the private elevator that only rises here, its panel missing some numbers; the entry vestibule and coat drop; the open-plan great room where the party lives; the gallery wall, where one piece is unmistakably the player; the bar and the catering kitchen behind it; the cold wine room; the soundproof study, the host's office, the door usually shut; the rooftop terrace with the city laid out wrong below; the guest suite made up for the player; the wellness floor, pool and sauna and glass on every side; the panic room; the service stair; and the floor below that the elevator insists does not exist. The architecture answers the player's state — it tightens when they panic, opens when they steady."
         },
         {
+          "id": "fae-court-banquet",
           "name": "The Fae Court Banquet",
-          "description": "Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences."
+          "description": "Impossible food, glamoured guests, rules nobody will explain. The party follows fae etiquette — breaking a rule you didn't know existed has consequences.",
+          "detail": "THE FAE COURT BANQUET — Impossible food, glamoured guests, rules nobody will explain; break one you did not know existed and pay for it. Baseline spaces (the bones — name more as the player moves, and grow the rest off this ground): the threshold the player crossed and should not have; the high table where the host presides; the dancing floor where the player never tires, which is itself the warning; the orchard and the table of out-of-season fruit that must not be eaten; the gift table, where accepting anything incurs a debt; the hall where debts and favors are kept; the kitchen no guest may see inside; the bower for assignations; the menagerie where the glamour slips and the guests' true shapes show; the hedge-maze garden; the cold cellar the music rises from; the door home, which keeps moving; and the seat with the player's name carved into it, which means they are expected to stay. Time and space here run by the host's courtesy, not by sense."
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 190,
+    "setup_detail": 159,
+    "forks": 740,
+    "total": 1440
+  }
 }

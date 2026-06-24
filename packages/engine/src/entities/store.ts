@@ -151,6 +151,41 @@ export interface ObservedField {
 /** Per-type observed-field summary. */
 export type ObservedFields = Record<string, ObservedField>;
 
+/**
+ * Resolve the `**Type:**` field for an entity write.
+ *
+ * `type` is overloaded on disk. For most entities it mirrors the directory
+ * category, but character sheets conventionally use it for the PC/NPC role
+ * (`PC` | `NPC` | `character`) — that's the documentary marker a PC handoff
+ * flips. The store must guarantee two things:
+ *   1. `type` is never empty (validateEntityFile warns on a missing field).
+ *   2. A patch can never mislabel an entity as a *different* file-backed
+ *      category — that's cross-directory corruption (e.g. `type: location`
+ *      landing on a character sheet), which `validateEntityFile` and many
+ *      callers assume can't happen.
+ * Within those guards a legitimate role value survives, so promoting a
+ * character to `PC` (or demoting to `NPC`) through the `entity` tool sticks
+ * instead of being silently rewritten back to the directory category.
+ */
+export function resolveEntityTypeField(
+  category: FileBackedEntityType,
+  incoming: unknown,
+): string {
+  // Only character sheets carry a role in `type`. Every other entity type
+  // keeps `type` pinned to its directory category — there's no role concept
+  // for a location/faction/lore/item/rule, so a stray value is corruption.
+  if (category !== "character") return category;
+  if (typeof incoming !== "string" || !incoming.trim()) return category;
+  const value = incoming.trim();
+  const lower = value.toLowerCase();
+  // The generic role coincides with the category name — normalize its casing.
+  if (lower === category) return category;
+  // Mislabeled as a different file-backed category → force back to ours.
+  if (isFileBackedEntityType(lower)) return category;
+  // A legitimate role value (PC, NPC, …).
+  return value;
+}
+
 // --- Store ---
 
 export class EntityStore {
@@ -411,10 +446,12 @@ export class EntityStore {
     // Sanitize first to catch small-model corruption like
     // `{ "**Type:** character": "character" }` keys — without this they
     // round-trip as `****Type:** character:** character` and permanently
-    // corrupt the file. Then pin `type` last so a patch can never override
-    // the category marker the directory is committed to.
+    // corrupt the file. Then resolve `type` last: keep a legitimate role value
+    // (PC/NPC on a character) but never let a patch mislabel the entity as a
+    // different file-backed category. See resolveEntityTypeField.
     const sanitized = sanitizeFrontMatter(patch.frontMatter ?? {});
-    const fm: EntityFrontMatter = { ...sanitized, type };
+    const fm: EntityFrontMatter = { ...sanitized };
+    fm.type = resolveEntityTypeField(type, sanitized.type);
     const changelog: string[] = [];
     if (patch.changelogEntry) {
       changelog.push(formatChangelogEntry(sceneNumber, patch.changelogEntry));
@@ -462,10 +499,11 @@ export class EntityStore {
         }
       }
     }
-    // Pin `type` to the directory's canonical category. Patches that try to
-    // change or null it are silently overridden — the on-disk type is the
-    // contract validateEntityFile checks and many other places assume.
-    fm.type = type;
+    // Resolve `type`: a character can be marked PC/NPC (the role lives in this
+    // field by convention), but a patch can never mislabel the entity as a
+    // different file-backed category, and the field is never left empty.
+    // See resolveEntityTypeField.
+    fm.type = resolveEntityTypeField(type, fm.type);
 
     const body = patch.body !== undefined ? patch.body : parsed.body;
     const changelog = [...parsed.changelog];

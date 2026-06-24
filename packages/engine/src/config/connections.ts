@@ -188,14 +188,35 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
-  // Manual connections — auto-populate models if empty or missing
+  // Manual connections — refresh models from the registry on every load.
+  //
+  // For registry-backed providers (anthropic, openai-apikey) the model list
+  // is purely derived from `known-models.json` — there's no user-editable
+  // per-model state to preserve, so always rebuilding picks up new entries
+  // (e.g. a newly-shipped flagship like gpt-5.5) without requiring the user
+  // to delete and re-add their connection.
+  //
+  // For `custom` / unknown providers the registry has no entries and
+  // `getModelsForProvider` returns an empty map; in that case fall back to
+  // populating only when the stored list is empty, since the user (or some
+  // future probe step) may have set models manually against a custom
+  // OpenAI-compatible endpoint.
+  //
+  // `openai-chatgpt` is harmless either way: its models are overwritten by
+  // a live `model/list` call against the codex subprocess at session
+  // startup, so whatever lands here gets replaced before the model picker
+  // ever consults it.
   for (const conn of stored.connections.filter((c) => c.source !== "env")) {
     if (!conn.models) conn.models = [];
-    if (conn.models.length === 0) {
-      const knownModels = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
-      conn.models = Object.entries(knownModels).map(([id, m]) => ({
-        id, displayName: m.displayName, available: true,
+    const knownModels = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
+    const knownIds = Object.keys(knownModels);
+    if (knownIds.length > 0) {
+      conn.models = knownIds.map((id) => ({
+        id, displayName: knownModels[id].displayName, available: true,
       }));
+    } else if (conn.models.length === 0) {
+      // Custom/unknown provider with no stored models — leave empty; the
+      // UI surfaces a "no models" state and the user can configure them.
     }
     connections.push(conn);
   }
@@ -291,11 +312,6 @@ export function updateConnectionModels(
       c.id === connectionId ? { ...c, models } : c,
     ),
   };
-}
-
-/** Find a connection by ID. */
-export function getConnection(store: ConnectionStore, connectionId: string): AIConnection | undefined {
-  return store.connections.find((c) => c.id === connectionId);
 }
 
 /**

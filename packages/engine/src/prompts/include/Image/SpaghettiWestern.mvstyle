@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "SpaghettiWestern"
+rating: "?"
+description: "Classic spaghetti-western frame: sun-bleached ochre palette, harsh desert glare, extreme telephoto compression, grit"
+tags: [motion-picture, period, warm, high-saturation, gritty, outdoor-revealing]
+made-for-model: gpt-image-2
+tokens: 143
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a frame from a classic SPAGHETTI WESTERN motion picture — the sun-scorched Italian-western look. Its signature: a hot, dusty, sun-bleached palette of ochre, amber, tan and sweat; harsh overhead desert sun and squint-inducing glare; an extreme TELEPHOTO compression flattening the distance; deep weathered close-up texture on skin and grit; heat-shimmer; a lurid saturated golden warmth; and a tense, operatic, dust-and-leather mood. Gritty, parched, iconic. Close with a small caption in a rugged period font.`
+
+# Notes
+
+Append at the END — style last. MOTION-PICTURE family — the SPAGHETTI-WESTERN look: sun-bleached ochre / amber / tan palette, harsh sun glare, extreme TELEPHOTO compression, weathered close-up grit, heat-shimmer, operatic dust-and-leather mood. SCENE AFFINITY: shines on OUTDOOR / arid / sunlit scenes (validated on a noon desert) — the sun-baked light is part of the genre signature, so it fits sunny exteriors best (less so a dark interior). Caption = rugged period font. Validated on a desert; an instant take + user favourite. Keep the sun-baked palette + telephoto grit.
+
+# Example
+
+![SpaghettiWestern](../ImageStyleExample/SpaghettiWestern.example.png)

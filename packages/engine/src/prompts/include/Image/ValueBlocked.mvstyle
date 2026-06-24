@@ -1,0 +1,25 @@
+---
+type: visual-style
+title: "ValueBlocked"
+rating: "C"
+description: "Bold digital illustration designed around a few big interlocking light-and-shadow shapes for a strong notan value read"
+tags: [illustration, graphic, limited-palette, any-scene]
+made-for-model: gpt-image-2
+tokens: 127
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render the image in this visual style:
+
+# Style
+
+`Rendered as a clean modern digital illustration designed around BIG SHAPES and a strong value read. Strict process discipline: design the whole image as a few large, simple, interlocking shapes of light and shadow (a clear notan) with a powerful silhouette read; keep those big shapes flat and clean and subordinate ALL detail to them; only the focal point gets a little refinement, everything else stays in big calm value masses. A harmonious limited palette. Bold, clear, modern, uncluttered. Close with a small tasteful caption in clean type.`
+
+# Notes
+
+Append this style descriptor at the END of every prompt, after the scene/subject description — `gpt-image-2` adheres better when style guidance comes last. Describe the subject, composition, lighting, and mood first; close with the style line verbatim. Tic-controlled digital-illustration workhorse, family of [CleanDigital](./CleanDigital.mvstyle). The SINGLE STRONGEST tic-suppressor of the digital primitives: "design as a few BIG simple value shapes / a clear notan with a powerful silhouette, subordinate ALL detail to them." Big-shape value economy forces the background to collapse into calm masses (the [PaperbackCover](./PaperbackCover.mvstyle) flat-value-mass lever, expressed digitally) — it's the active ingredient behind [CleanDigital](./CleanDigital.mvstyle)'s strength. Reach for this when you want the cleanest, boldest, most graphic read. Caption = tasteful clean type.
+
+# Example
+
+![ValueBlocked](../ImageStyleExample/ValueBlocked.example.png)

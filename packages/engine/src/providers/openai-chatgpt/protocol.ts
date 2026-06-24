@@ -272,6 +272,17 @@ export interface ItemBase {
   contentItems?: unknown[];
   success?: boolean;
   durationMs?: number;
+  // `imageGeneration` variant (codex's built-in image_gen skill). Spike-
+  // confirmed on codex 0.133.0: `result` carries the raw base64 image bytes
+  // inline (no data: prefix), `revisedPrompt` is the backend-rewritten prompt,
+  // and `savedPath` is where codex also wrote the PNG under
+  // <codexHome>/generated_images/<sessionId>/. We harvest `result` inline when
+  // it survives the stdio pipe, but that line is multi-MB and can be dropped or
+  // corrupted in transit — so the canonical fallback is to read the PNG off
+  // disk from that per-session dir. See provider.ts readNewestPngAsBase64.
+  result?: string;
+  revisedPrompt?: string | null;
+  savedPath?: string;
 }
 
 export interface TokenUsageUpdatedNotification {
@@ -296,14 +307,15 @@ export interface TokenUsageBreakdown {
 // rawResponseItem/completed (notification)
 //
 // Codex exposes the raw Responses-API items it received from OpenAI on this
-// secondary stream. We use it specifically to capture the opaque
-// `encrypted_content` blob on reasoning items — the sanitized `item/completed`
-// stream strips that field. Replaying the blob via thread/inject_items on
-// the next turn is what lets the model continue its chain-of-thought across
-// turn boundaries instead of re-deriving setup beat-to-beat. See issue #533.
+// secondary stream. The opaque `encrypted_content` blob on reasoning items lives
+// here (the sanitized `item/completed` stream strips that field). #533 wired the
+// codex provider to capture and replay it for cross-turn chain-of-thought, but
+// that was a no-op on the ChatGPT-account path — codex emits no reasoning items
+// here at all — so the replay was removed (#607). We still subscribe, now only
+// to COUNT reasoning items for the #597 tripwire. See issues #533 / #607.
 //
 // Source: codex-rs/app-server-protocol/schema/json/v2/RawResponseItemCompletedNotification.json
-// (codex 0.130.0+). Modeled minimally — we only read the reasoning variant.
+// (codex 0.130.0+). Modeled minimally — we only read the reasoning variant's type.
 // ---------------------------------------------------------------------------
 
 export interface RawResponseItemCompletedNotification {

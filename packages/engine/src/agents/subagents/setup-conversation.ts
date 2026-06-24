@@ -1,15 +1,19 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
+import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
+import { normalizeForks, assembleCampaignDetail } from "../../config/world-forks.js";
+import type { WorldFile, WorldFork } from "@machine-violet/shared/types/world.js";
+import { rollDice } from "../../tools/dice/index.js";
 import { KNOWN_SYSTEMS, readChargenSection } from "../../config/systems.js";
 import type { SystemComplexity } from "../../config/systems.js";
 import { getEffortConfig } from "../../config/models.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { processIncludes } from "../../prompts/process-includes.js";
+import { resolveImageStyleLine } from "../../prompts/image-style.js";
 import { dumpContext, dumpThinking } from "../../config/context-dump.js";
 import {
   extractStatus,
@@ -22,6 +26,12 @@ import type {
   NormalizedMessage, NormalizedTool, NormalizedUsage,
   SystemBlock, ContentPart,
 } from "../../providers/types.js";
+import type { FileIO } from "../scene-manager.js";
+import { handleImageGenerated } from "../image-handler.js";
+import { campaignPaths } from "../../tools/filesystem/index.js";
+import { norm } from "../../utils/paths.js";
+import { slugify } from "../../utils/slug.js";
+import { logEvent } from "../../context/engine-log.js";
 
 // --- Types ---
 
@@ -30,6 +40,14 @@ export interface SetupTurnResult extends SubagentResult {
   finalized?: SetupResult;
   /** Non-null when the agent called present_choices — must be resolved before continuing */
   pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] };
+  /**
+   * Portrait drafts the setup agent generated during this turn (persisted
+   * to the __setup__ scratch campaign by the time this returns). The
+   * caller is expected to broadcast a `display_image` TUI event for each
+   * so the client renders the draft inline. Empty/absent means no
+   * portraits were emitted this turn.
+   */
+  imageDisplays?: { filename: string; intent: "character_portrait" }[];
 }
 
 /**
@@ -50,6 +68,22 @@ export interface SetupConversation {
   readonly hasPendingChoice: boolean;
 }
 
+/**
+ * Outcome of dispatching one setup tool call through the shared dispatcher
+ * (`runToolDispatch`). `content`/`isError` form the tool_result body for every
+ * non-suspending tool. `pendingChoices` is set ONLY by present_choices, which
+ * suspends the turn: when present, the caller must capture the choices and
+ * record NO tool_result — that result is synthesized later from the player's
+ * selection in resolveChoice/send. Both dispatch paths (the codex
+ * `dispatchTool` closure and the legacy per-tool loop) interpret this same
+ * shape, so each tool body has one source of truth.
+ */
+interface ToolDispatchOutcome {
+  content: string;
+  isError: boolean;
+  pendingChoices?: { prompt: string; choices: string[]; descriptions?: string[] };
+}
+
 // --- Tool definitions ---
 
 const FINALIZE_TOOL: NormalizedTool = {
@@ -62,7 +96,7 @@ const FINALIZE_TOOL: NormalizedTool = {
     properties: {
       genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
       system: { type: "string", description: "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.", nullable: true },
-      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a suboption from a seeded world, suffix with that suboption's name: `<World Name> - <Suboption Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without suboptions." },
+      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a player-facing fork option from a seeded world, you may suffix with that option's name: `<World Name> - <Option Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without player forks." },
       campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
       mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
       difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
@@ -77,16 +111,36 @@ const FINALIZE_TOOL: NormalizedTool = {
       character_name: { type: "string", description: "Player character's name" },
       character_description: { type: "string", description: "One-sentence character concept" },
       character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "The world's hidden detail block (from load_world), passed through verbatim for the DM. Omit if the chosen world has no detail or the campaign is fully custom.", nullable: true },
-      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Omit for fully custom campaigns.", nullable: true },
+      campaign_detail: { type: "string", description: "DM-only detail. For a FULLY CUSTOM campaign (no seeded world) this is the entire DM detail. For a seeded world, the seed's own detail is assembled in code from your fork_selections; anything you pass here is APPENDED to it — use this only to record a specific setup-time DM directive you were asked to add (e.g. a chosen visual-style include). Omit if there is nothing to add.", nullable: true },
+      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.", nullable: true },
+      fork_selections: {
+        type: "object",
+        description: "How you resolved the chosen world's forks (from load_world), as a map of forkId → optionId. Include an entry for EVERY fork the world declared: player forks (the option the player picked) and agent forks (the option you rolled or chose). Use the exact ids shown by load_world. Omit for fully custom campaigns or worlds with no forks.",
+        additionalProperties: { type: "string" },
+        nullable: true,
+      },
       age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
       content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
+      image_generation: {
+        type: "string",
+        enum: ["on", "off"],
+        description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+        nullable: true,
+      },
+      mechanics_mode: {
+        type: "string",
+        enum: ["dm-managed", "player-facing"],
+        description: "Player's answer to the mechanics-handling question. 'dm-managed' if they want you to run the rules silently behind the scenes; 'player-facing' if they want to engage the mechanics directly. ONLY include this field if you actually asked the question, which only happens when the chosen system is light or ultra-light (see the System selection section of your prompt). Omit for crunchy systems and pure-narrative campaigns.",
+        nullable: true,
+      },
       handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
+      opening_scene: { type: "string", description: "ONE sentence telling the DM where and how to OPEN the very first turn — the concrete situation the player character is in when the curtain rises. Bias hard toward a character-grounded entry beat (waking somewhere, a quiet moment, mid-journey, a conversation, an ordinary task) rather than dropping the player straight onto the campaign's main objective or a crisis — a story should start with the PC, then let plot ensue. Ground it in this specific PC and premise; if the seed's setup-only guidance suggests an opening, honor it. Written as a direct instruction to the DM, not as narration (e.g. \"Open with the PC asleep in a warm bed, woken by frantic hammering at the door\" or \"Begin mid-flight on the back of their pet dragon, the city shrinking below\"). Always include this field." },
     },
     required: [
       "genre", "campaign_name", "campaign_premise", "mood",
       "difficulty", "dm_personality", "player_name",
       "character_name", "character_description", "handoff_note",
+      "opening_scene",
     ],
   },
 };
@@ -124,10 +178,12 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
 const LOAD_WORLD_TOOL: NormalizedTool = {
   name: "load_world",
   description:
-    "Load the full detail and suboptions for a world file by slug. " +
-    "Use this when you want to learn more about a specific campaign world " +
-    "(e.g., after the player picks one, or to preview its options). " +
-    "Returns the world's detail block, suboptions, and any config hints.",
+    "Load a world's forks (variant decision points) and config hints by slug. " +
+    "Use this after the player shows interest in a specific seeded world. " +
+    "Returns the world's forks — player forks to present, agent forks for you to " +
+    "decide — and any system/mood/difficulty/scope hints. The DM-only premise is " +
+    "NOT returned: it is assembled in code from your fork_selections, so you never " +
+    "carry it. Resolve every fork and report your choices in finalize_setup.fork_selections.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -137,7 +193,202 @@ const LOAD_WORLD_TOOL: NormalizedTool = {
   },
 };
 
-const TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL];
+const ROLL_DICE_TOOL: NormalizedTool = {
+  name: "roll_dice",
+  description:
+    "Roll dice during setup. Primary use: resolve an agent-decided fork at random — " +
+    "roll `1dN` to pick uniformly among a fork's N options (option 1 = result 1, etc.), " +
+    "which avoids biasing every campaign toward the first/most-obvious branch. " +
+    "Returns the individual rolls and the total.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      expression: { type: "string", description: "Dice expression, e.g. \"1d4\", \"2d6+1\", \"1d20\"." },
+      reason: { type: "string", description: "Optional short reason (e.g. 'genre-wrapper fork').", nullable: true },
+    },
+    required: ["expression"],
+  },
+};
+
+/**
+ * Render a world's forks + setup-only guidance + config hints for the setup
+ * agent. Deliberately omits the DM-only premise prose (base `detail` and each
+ * option's `detail`) — that is assembled in code at finalize from the agent's
+ * `fork_selections`, so the setup agent never carries the DM's secrets in its
+ * context. The seed's `setup_detail` IS surfaced here (with includes expanded):
+ * it's setup-agent-only material that never reaches the DM.
+ */
+export function renderWorldForAgent(world: WorldFile): string {
+  const parts: string[] = [];
+  const forks = normalizeForks(world);
+  const playerForks = forks.filter((f) => f.chooser === "player");
+  const agentForks = forks.filter((f) => f.chooser === "agent");
+
+  const renderFork = (f: WorldFork): string =>
+    `- Fork \`${f.id}\` — ${f.label}${f.prompt ? ` _(${f.prompt})_` : ""}\n` +
+    f.options.map((o) => `    - \`${o.id}\`: **${o.name}** — ${o.description}`).join("\n");
+
+  if (playerForks.length) {
+    parts.push(
+      "## Player forks — present each to the player via present_choices\n" +
+      "Use each option's **name** as the choice label and its description as the choice description. " +
+      "When the player picks, record it in finalize_setup.fork_selections as `{ \"<forkId>\": \"<optionId>\" }`.\n\n" +
+      playerForks.map(renderFork).join("\n"),
+    );
+  }
+  if (agentForks.length) {
+    parts.push(
+      "## Agent forks — you decide these (DM-only; never shown to the player)\n" +
+      "For each, roll `roll_dice` with `1dN` (N = number of options) to pick at random, or choose the option " +
+      "that best fits the player's stated preferences. Record each in finalize_setup.fork_selections.\n\n" +
+      agentForks.map(renderFork).join("\n"),
+    );
+  }
+  if (!forks.length) {
+    parts.push("This world declares no forks — nothing to resolve here.");
+  }
+
+  // Setup-agent-only guidance. Surfaced here with includes expanded; never
+  // assembled into the DM's campaign_detail. The setup prompt tells the agent
+  // how to act on it (e.g. present a scope/pacing variant) and to keep it from
+  // the player and the DM.
+  if (world.setup_detail?.trim()) {
+    parts.push(
+      "## Setup-only guidance — for you, the setup agent\n" +
+      "Act on this (e.g. present any scope/pacing options it describes, weigh any notes), " +
+      "but NEVER reveal it to the player or carry it into the campaign for the DM.\n\n" +
+      processIncludes(world.setup_detail),
+    );
+  }
+
+  if (world.system) parts.push(`Suggested system: ${world.system}`);
+  if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
+  if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
+  if (world.campaign_scope) {
+    parts.push(`Required campaign_scope: ${world.campaign_scope}`);
+    parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
+  }
+  return parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
+}
+
+/** Dispatch a setup-time `roll_dice` call. */
+function renderRollDice(input: Record<string, unknown>): { content: string; isError: boolean } {
+  const expression = typeof input.expression === "string" ? input.expression.trim() : "";
+  if (!expression) return { content: "roll_dice requires an `expression` (e.g. \"1d4\").", isError: true };
+  try {
+    const reason = typeof input.reason === "string" && input.reason.trim() ? input.reason.trim() : undefined;
+    const out = rollDice({ expression, reason });
+    const rendered = out.results
+      .map((r) => `${r.expression} → [${r.rolls.join(", ")}] = ${r.total}`)
+      .join("; ");
+    return { content: rendered, isError: false };
+  } catch (e) {
+    return { content: `roll_dice error: ${e instanceof Error ? e.message : String(e)}`, isError: true };
+  }
+}
+
+const GENERATE_IMAGE_TOOL: NormalizedTool = {
+  name: "generate_image",
+  description:
+    "Generate the player character's reference sheet: a SINGLE landscape image showing the SAME full-body character " +
+    "from three angles side by side against one plain black background — a front view, a three-quarter view from the " +
+    "front-left, and a three-quarter view from the rear-right. " +
+    "Use ONLY for the character reference sheet during chargen — never for scenes or other illustrations during setup. " +
+    "This sheet becomes the canonical reference the DM later conditions in-game art on, so the multiple angles are what " +
+    "keep generated scenes from defaulting to a stiff, camera-facing pose. " +
+    "The image is shown to the player automatically. After showing each draft, ask the player whether it looks right or " +
+    "what to adjust, then call this again with an updated prompt if needed. " +
+    "When the player confirms, call `set_portrait` with that draft's filename to keep it. " +
+    "Write the prompt as the CHARACTER and the THREE VIEWS only: describe the character once (build, clothing, " +
+    "footwear, mood, expression), then call for the three side-by-side angles (front, front-left three-quarter, " +
+    "rear-right three-quarter) against a plain black background. Do NOT specify an art medium or lighting — the engine " +
+    "renders the CHARACTER in the campaign's visual style against that plain black background (a clean reference sheet, " +
+    "not a scene), so the character card matches the look the DM will condition in-game art on. " +
+    "You don't choose render effort or aspect here either — the engine always renders the chargen sheet at a fixed " +
+    "standard quality (fast enough to iterate, the ceiling a character sheet needs) and landscape framing (the three " +
+    "views need the width). Just write the character.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      prompt: {
+        type: "string",
+        description: "Vivid description of the character's full-body appearance — clothing, build, footwear, mood, expression — described once, since the character is identical in every view. Pin any one-sided feature (a robot arm, a cybernetic eye, an eyepatch, a scar, a missing limb, a holstered weapon) to a definite side in the wording — e.g. \"a robotic LEFT arm\" — so it stays on that side across all three angles instead of flipping. End by calling for the three side-by-side angles (front, front-left three-quarter, rear-right three-quarter) on a plain black background. The model composes the image from this; be specific.",
+      },
+    },
+    required: ["prompt"],
+  },
+};
+
+const SET_PORTRAIT_TOOL: NormalizedTool = {
+  name: "set_portrait",
+  description:
+    "Keep one of the generated portrait drafts as the final character portrait. Call this once the " +
+    "player has confirmed they're happy with a draft (or call it on the latest draft if the player " +
+    "is moving on without explicit love). Pass the character's name and the filename of the draft " +
+    "to keep — the engine copies it to the canonical character portrait path. Drafts not chosen " +
+    "are left in place for audit; they don't follow the campaign forward.",
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      character_name: {
+        type: "string",
+        description: "The character's name as established during chargen. Must match the name you'll pass to finalize_setup.",
+      },
+      draft_filename: {
+        type: "string",
+        description: "Filename of the draft to promote (e.g. 'portrait-draft-1716800000000.png'). Just the basename, not a full path.",
+      },
+    },
+    required: ["character_name", "draft_filename"],
+  },
+};
+
+const BASE_TOOLS = [FINALIZE_TOOL, PRESENT_CHOICES_TOOL, LOAD_WORLD_TOOL, ROLL_DICE_TOOL];
+const IMAGE_GEN_TOOLS = [GENERATE_IMAGE_TOOL, SET_PORTRAIT_TOOL];
+
+/**
+ * Placeholder fallback style for the chargen reference sheet when the chosen
+ * seed declares no `image_style` (or the campaign is fully custom). Per the
+ * visual-style MVP wiring — `CinematicFilm` until per-seed defaults are graded.
+ */
+const DEFAULT_PORTRAIT_STYLE = "CinematicFilm";
+
+/**
+ * Reference-sheet framing for the chargen portrait, appended after the campaign
+ * style line. The campaign style governs how the CHARACTER renders; this keeps
+ * the sheet a functional turnaround on plain black and strips the chrome the
+ * scene-oriented style directives drag along (captions, letterbox/frames,
+ * HUD/timestamp overlays, vignettes) — none of which belong on a character card.
+ */
+const PORTRAIT_SHEET_FRAMING =
+  "This is a character REFERENCE SHEET, not a scene: place all three views of the same character " +
+  "against a plain, empty, flat black background — no environment, set, props, furniture, or location " +
+  "of any kind. Apply the visual style above ONLY to how the CHARACTER itself is rendered (its medium, " +
+  "grade, linework, texture, lighting, and finish). Keep every one-sided or asymmetric feature — a " +
+  "prosthetic or robotic limb, a cybernetic eye, an eyepatch, a scar, an amputation, a holstered weapon — " +
+  "on the SAME side of the body in all three views; it must not switch sides between angles. Strip any " +
+  "other trappings the style might add: NO " +
+  "caption, title, lettering, or text of any kind; NO frame, border, letterbox bars, vignette, or matte; " +
+  "NO HUD, on-screen display, timestamp, watermark, or logo. Just the three clean character views on plain black.";
+
+/**
+ * Compose the chargen reference-sheet prompt from three ordered parts: the
+ * agent's character + three-view description, then the campaign style's `# Style`
+ * directive, then {@link PORTRAIT_SHEET_FRAMING} LAST. The order is the whole
+ * point — the style line stamps the CHARACTER's render treatment, and the
+ * framing, stated last, wins the composition so scene-oriented styles can't
+ * stage the turnaround or drag along captions/frames/HUD chrome.
+ *
+ * `styleName` is the chosen seed's `image_style` (undefined for a fully custom
+ * campaign); an unknown or missing style falls back to the {@link
+ * DEFAULT_PORTRAIT_STYLE} placeholder. Exported so the exact prompt shape is
+ * unit-testable without driving a live portrait render.
+ */
+export function composeChargenPortraitPrompt(character: string, styleName?: string): string {
+  const name = styleName?.trim() || DEFAULT_PORTRAIT_STYLE;
+  const styleLine = resolveImageStyleLine(name) ?? resolveImageStyleLine(DEFAULT_PORTRAIT_STYLE);
+  return [character, styleLine, PORTRAIT_SHEET_FRAMING].filter(Boolean).join("\n\n");
+}
 
 // --- System prompt ---
 
@@ -186,13 +437,60 @@ function shuffle<T>(arr: readonly T[]): T[] {
  *
  * BP3 (tools) and BP4 (last message) are stamped via cacheHints in runTurn.
  */
-function buildSystemPrompt(model: string, existingPlayers?: KnownPlayer[], userWorldsDir?: string, userPersonalitiesDir?: string): SystemBlock[] {
+function buildSystemPrompt(
+  model: string,
+  existingPlayers?: KnownPlayer[],
+  userWorldsDir?: string,
+  userPersonalitiesDir?: string,
+  imageGenSupported?: boolean,
+  portraitLoopActive?: boolean,
+): SystemBlock[] {
   const blocks: SystemBlock[] = [];
 
   // ── Tier 1: Global-stable (identical across all sessions) ──
 
   const base = loadPrompt("setup-conversation", model);
   blocks.push({ text: base });
+
+  // Image-generation consent guidance is conditionally appended ONLY when
+  // the active provider/model exposes image generation. Skipping it
+  // entirely when unsupported avoids the setup agent asking a question
+  // that can't be acted on — and keeps the cached prefix tighter for
+  // text-only tiers. The locked phrasing for the question itself is
+  // baked into the prompt text below per saved feedback memory.
+  if (imageGenSupported) {
+    const portraitSection = portraitLoopActive ? [
+      "",
+      "### Character reference sheet (only when the player said Yes above)",
+      "",
+      "Once the player has chosen a character name and given you a description, generate a character reference sheet for them. Use the `generate_image` tool — its `prompt` should describe the character's full body once (build, clothing, footwear, mood, expression) and then call for a single side-by-side sheet showing that SAME character from three angles: a front view, a three-quarter view from the front-left, and a three-quarter view from the rear-right, against a plain black background. The extra angles are what stop generated scenes from defaulting to a stiff, camera-facing pose, since this sheet becomes the canonical reference the DM conditions in-game art on. Don't specify an art medium or lighting yourself — the engine renders the character in the campaign's visual style against a plain black background (a clean reference sheet, not a scene), so the character card matches the look the DM will use in play. (It also pins a fixed standard quality and landscape framing — you just write the character.)",
+      "",
+      "If the player's description leaves a one-sided feature ambiguous — a robot arm, a cybernetic eye, an eyepatch, a scar, a missing limb, a holstered weapon — COMMIT to a definite side yourself and state it in the prompt (e.g. \"a robotic LEFT arm\", \"an eyepatch over the RIGHT eye\"). The player rarely cares which side; just pick one. If you leave it unstated, the feature lands on a different side in each angle and the three views won't look like the same person. (You don't need to ask the player — choosing for them is the right call.)",
+      "",
+      "After each draft is rendered, ask the player something light like \"Look right, or do you want me to try again with anything different?\" — don't editorialize about the image yourself. If they want adjustments, call `generate_image` again with a revised prompt. There's no iteration cap; let them iterate until they're happy.",
+      "",
+      "When the player confirms (or moves on without enthusiasm), call `set_portrait` with the character's name and the latest draft's filename. The filename comes back as the tool result of `generate_image` — record it and pass it through verbatim. Do this BEFORE calling `finalize_setup`.",
+      "",
+      "If the player said No to images at the consent step above, skip this entire section. Don't generate a reference sheet, don't call set_portrait, just continue with character creation and finalize.",
+    ].join("\n") : "";
+
+    blocks.push({
+      text: [
+        "## Image generation",
+        "",
+        "After the player has chosen a world (Quick Start) or finished system selection (Full Setup), and BEFORE you ask any character questions, present the image-generation consent question:",
+        "",
+        "Call `present_choices` with:",
+        "  prompt: \"Do you want images in your game? (you can change this in game settings later)\"",
+        "  choices: [\"Yes\", \"No\"]",
+        "",
+        "Pass the player's answer to `finalize_setup` as the `image_generation` field — `\"on\"` if they picked Yes, `\"off\"` if they picked No. If they answer freeform, interpret naturally. Do not editorialize or explain further; the parenthetical in the question already tells the player it's reversible.",
+        "",
+        "Use the locked phrasing verbatim — do not paraphrase, expand, or add caveats. The choice is reversible (the in-campaign ESC menu has a toggle for it), so don't agonize over it; one quick yes/no.",
+        portraitSection,
+      ].join("\n"),
+    });
+  }
 
   const { light, crunchy } = groupByTier(KNOWN_SYSTEMS);
   const lightList = light.map(formatSystemLine).join("\n");
@@ -328,11 +626,35 @@ export function createSetupConversation(
   onRetry?: (status: number, delayMs: number) => void,
   userWorldsDir?: string,
   userPersonalitiesDir?: string,
+  /**
+   * FileIO + setupRoot enable the portrait loop: drafts land at
+   * `<setupRoot>/campaign/images/portrait-draft-*.png` via handleImageGenerated,
+   * and set_portrait copies a chosen draft to
+   * `<setupRoot>/characters/<slug>-portrait.png`. world-builder picks that
+   * up at finalize and copies it into the freshly-scaffolded campaign.
+   * When either is absent (e.g. test paths), image-gen tools are not
+   * registered and portraits are skipped entirely.
+   */
+  fileIO?: FileIO,
+  setupRoot?: string,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
   // so the model sees them close to the flow instructions that reference them.
-  const systemPrompt = buildSystemPrompt(model, existingPlayers, userWorldsDir, userPersonalitiesDir);
+  // imageGenSupported gates the image-consent prompt section so the setup
+  // agent doesn't ask the question on text-only tiers.
+  const imageGenSupported = provider.getCapabilities?.(model).imageGeneration ?? false;
+  /**
+   * Full portrait loop requires capability + on-disk scratch space.
+   * Test paths typically omit fileIO/setupRoot, so they get the consent
+   * question (if imageGenSupported) but no portrait tools — finalize
+   * still records the player's preference.
+   */
+  const portraitLoopActive = imageGenSupported && !!fileIO && !!setupRoot;
+  const systemPrompt = buildSystemPrompt(
+    model, existingPlayers, userWorldsDir, userPersonalitiesDir,
+    imageGenSupported, portraitLoopActive,
+  );
 
   const messages: NormalizedMessage[] = [];
   const totalUsage: NormalizedUsage = {
@@ -344,12 +666,179 @@ export function createSetupConversation(
   };
 
   let finalized: SetupResult | undefined;
+  /**
+   * The world most recently fetched via `load_world`. Tracked so the chargen
+   * portrait can be rendered in that seed's `image_style` (the player loads the
+   * world they're interested in before chargen, so by portrait time this is the
+   * campaign's seed). Undefined for fully custom campaigns → CinematicFilm
+   * fallback. A heuristic, not authoritative: if the player loads several seeds
+   * and reconsiders after the portrait, the last-loaded one wins.
+   */
+  let lastLoadedWorld: WorldFile | undefined;
   // Pending state when present_choices is called — stores tool_use_id so we can send the result back
   let pendingToolUseId: string | null = null;
   // Tool results for tools that ran alongside present_choices (e.g. load_world).
   // They must be flushed with the choice resolution — otherwise their tool_use
   // blocks are left orphaned and Anthropic 400s on the next request.
   let pendingExtraToolResults: ContentPart[] = [];
+  /**
+   * Active tool list this conversation will offer the model. When the
+   * portrait loop is gated on, add generate_image (intercepted by the
+   * provider) + set_portrait (dispatched here in runToolDispatch / the
+   * legacy loop). When off, only the base tools are exposed so models
+   * on text-only tiers don't see calls they can't service.
+   */
+  const TOOLS: NormalizedTool[] = portraitLoopActive
+    ? [...BASE_TOOLS, ...IMAGE_GEN_TOOLS]
+    : BASE_TOOLS;
+
+  // Breadcrumb so the harness can confirm setup-agent actually believes it
+  // should be doing portraits. If this is false in a live image-gen smoke
+  // test, the consent gate or capability detection is the culprit, not
+  // the image API.
+  logEvent("setup:image_tools_registered", {
+    model,
+    providerId: provider.providerId,
+    // Raw return so we can spot a provider returning a surprising shape
+    // (e.g. `imageGeneration: "true"` as a string, or a model-registry
+    // fallback path returning true on a provider whose dispatch can't
+    // actually serve it).
+    rawCapabilities: provider.getCapabilities?.(model),
+    hasGenerateImage: typeof provider.generateImage === "function",
+    imageGenSupported,
+    portraitLoopActive,
+    hasFileIO: !!fileIO,
+    hasSetupRoot: !!setupRoot,
+  });
+
+  /**
+   * Drafts persisted during this turn. Lifted into the SetupTurnResult so
+   * the caller can broadcast a `display_image` TUI command for each.
+   * Reset at the top of runTurn.
+   */
+  let turnImageDisplays: { filename: string; intent: "character_portrait" }[] = [];
+
+  /**
+   * Dispatch a `generate_image` function tool call.
+   *
+   * Flow: read effort/aspect/prompt from model args → call
+   * provider.generateImage → persist bytes to disk via handleImageGenerated
+   * → record path for the caller to broadcast as a display_image TUI
+   * command → return a text tool_result confirming the image was shown
+   * to the player and naming the draft filename so the model can
+   * subsequently call set_portrait with the right basename.
+   *
+   * Errors (no provider support, network failure, content refusal) bubble
+   * up as an isError tool_result so the model can apologize or retry.
+   */
+  async function dispatchGenerateImage(
+    callId: string,
+    input: Record<string, unknown>,
+  ): Promise<{ content: string; isError: boolean }> {
+    if (!portraitLoopActive || !fileIO || !setupRoot) {
+      return { content: "generate_image is not available (portrait loop gated off).", isError: true };
+    }
+    if (!provider.generateImage) {
+      return { content: "The configured provider does not support image generation.", isError: true };
+    }
+    const promptText = typeof input.prompt === "string" ? input.prompt.trim() : "";
+    if (!promptText) {
+      return { content: "generate_image requires a non-empty prompt.", isError: true };
+    }
+    // Render the reference sheet in the campaign's visual style: the chosen
+    // seed's `image_style` stamps the CHARACTER's render treatment, the framing
+    // (appended last) keeps the sheet a clean black-background turnaround. The
+    // agent writes only the character + three-view text; the engine owns the
+    // style + framing ordering — see composeChargenPortraitPrompt, where the
+    // ordering IS the fix. Unknown/missing style falls back to the default.
+    const styledPrompt = composeChargenPortraitPrompt(promptText, lastLoadedWorld?.image_style);
+    try {
+      // Chargen has exactly one canonical render config — a standard-effort,
+      // landscape multi-angle reference sheet — so we pin both here rather than
+      // read them from the model. Tool args aren't enforced server-side (see
+      // image-coerce), and a stray `aspect: "portrait"` would collapse the
+      // sheet back to a single front pose (defeating the whole point); pinning
+      // `effort: "standard"` keeps the card off the apikey path's slow `high`
+      // tier (it's a no-op on the codex path — see types.ts ImageEffort).
+      // That's why the tool no longer exposes either knob.
+      const result = await provider.generateImage({
+        prompt: styledPrompt,
+        effort: "standard",
+        aspect: "landscape",
+        intent: "character_portrait",
+      });
+      // Persist via image-handler — shared with the DM-side dispatch in
+      // game-engine.ts, so disk naming, sidecar JSON, and downstream
+      // consumers (transcript export, world-builder finalize) are uniform
+      // across both call sites.
+      const persisted = await handleImageGenerated(fileIO, setupRoot, null, {
+        id: callId,
+        base64: result.base64,
+        mimeType: result.mimeType,
+        intent: "character_portrait",
+        ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+      });
+      const absPath = norm(`${setupRoot}/${persisted.relPath}`);
+      turnImageDisplays.push({ filename: absPath, intent: "character_portrait" });
+      const basename = persisted.relPath.split("/").pop() ?? "portrait-draft.png";
+      return {
+        content: `Reference sheet rendered and shown to the player at ${basename} (effort: ${result.effortUsed}, aspect: ${result.aspectUsed}). Now check in with the player about it — and remember the filename if they want to keep this draft via set_portrait.`,
+        isError: false,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      logEvent("image_gen:dispatch_failed", {
+        agent: "setup",
+        message: message.slice(0, 400),
+      });
+      return { content: `Image generation failed: ${message}`, isError: true };
+    }
+  }
+
+  /**
+   * Copy a draft from `<setupRoot>/campaign/images/<draft_filename>` to
+   * `<setupRoot>/characters/<slug>-portrait.png`. The world-builder
+   * picks up the latter at finalize and ports it into the new campaign.
+   * Returns content for the tool_result body.
+   */
+  async function dispatchSetPortrait(input: Record<string, unknown>): Promise<{ content: string; isError: boolean }> {
+    if (!fileIO || !setupRoot || !fileIO.readBinaryFile || !fileIO.writeBinaryFile) {
+      return { content: "set_portrait is not available — fileIO or setupRoot missing.", isError: true };
+    }
+    const characterName = typeof input.character_name === "string" ? input.character_name.trim() : "";
+    const draftFilename = typeof input.draft_filename === "string" ? input.draft_filename.trim() : "";
+    if (!characterName || !draftFilename) {
+      return { content: "set_portrait requires both character_name and draft_filename.", isError: true };
+    }
+    // Sanitize the draft filename to a basename — defense against an agent
+    // accidentally emitting an absolute or relative path with separators.
+    const safeBasename = draftFilename.replace(/[\\/]/g, "").trim();
+    if (!safeBasename) {
+      return { content: `Invalid draft_filename: ${draftFilename}`, isError: true };
+    }
+    const srcPath = norm(`${setupRoot}/campaign/images/${safeBasename}`);
+    if (!(await fileIO.exists(srcPath))) {
+      return { content: `Draft not found: ${safeBasename}`, isError: true };
+    }
+    const charSlug = slugify(characterName);
+    const destPath = norm(campaignPaths(setupRoot).characterPortrait(characterName));
+    try {
+      const bytes = await fileIO.readBinaryFile(srcPath);
+      // Ensure characters/ exists — campaignDirs() created it for the new
+      // campaign but the __setup__ scratch tree was minimal at startup.
+      await fileIO.mkdir(norm(`${setupRoot}/characters`));
+      await fileIO.writeBinaryFile(destPath, bytes);
+      return {
+        content: `Portrait set for ${characterName} (slug: ${charSlug}). The campaign will use this image when setup completes.`,
+        isError: false,
+      };
+    } catch (e) {
+      return {
+        content: `Failed to set portrait: ${e instanceof Error ? e.message : String(e)}`,
+        isError: true,
+      };
+    }
+  }
 
   function handleFinalize(input: Record<string, unknown>): void {
     const personalityName = (input.dm_personality as string) || "The Unknown";
@@ -372,19 +861,80 @@ export function createSetupConversation(
     // Only fall back when the field is truly absent (undefined/null) — an explicit
     // empty string means the agent intentionally omitted it.
     const campaignName = (input.campaign_name as string) || "A New Story";
+
+    // The explicit seed slug the agent passed (came from load_world — reliable).
+    // Sanitized to a clean slug to prevent path traversal. Empty when the
+    // campaign is fully custom (no world chosen). This is the *only* slug used
+    // to materialize a seed's inline content — we never fall back to a
+    // campaign-name-derived slug for materialization, which could pull in an
+    // unrelated bundled world that happens to share the name.
+    const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
+    const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+
+    // Parse the agent's fork resolutions (forkId → optionId). Validated
+    // against the seed's actual forks below before anything is stored.
+    const rawForkSel = input.fork_selections;
+    let reportedSelections: Record<string, string> | undefined;
+    if (rawForkSel && typeof rawForkSel === "object" && !Array.isArray(rawForkSel)) {
+      const fs: Record<string, string> = {};
+      for (const [k, v] of Object.entries(rawForkSel as Record<string, unknown>)) {
+        if (typeof v === "string" && v.trim()) fs[k] = v.trim();
+      }
+      if (Object.keys(fs).length) reportedSelections = fs;
+    }
+
     const rawDetail = input.campaign_detail;
+    // Trim the agent's detail: when it is appended to a seeded campaign's
+    // assembled base, a leading-whitespace/newline `<!--include:...-->` would
+    // expand to an INDENTED <TAG>, which applyLayeredOverrides (column-0 only)
+    // would miss — silently dropping the intended override. Trimming keeps the
+    // appended block flush-left so the override is seen.
     let campaignDetail: string | null = typeof rawDetail === "string" && rawDetail.trim()
-      ? rawDetail : null;
-    if (rawDetail === undefined || rawDetail === null) {
-      // Primary: use world_slug if the agent passed it (reliable — came from load_world)
-      // Fallback: derive slug from campaign_name (fragile — agent may rename the campaign)
-      // Sanitize world_slug to prevent path traversal (strip non-slug chars)
-      const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
-      const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
-      const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-      const slug = worldSlug || fallbackSlug;
-      const world = loadWorldBySlug(slug, userWorldsDir);
-      if (world?.detail) campaignDetail = world.detail;
+      ? rawDetail.trim() : null;
+
+    // For a seeded campaign, code assembles the DM-detail FLOOR from the seed's
+    // fork-invariant base plus the *selected* fork branches, so the DM sees one
+    // collapsed variant and the unchosen branches never reach its context; the
+    // setup agent may then APPEND its own campaign_detail on top (see below).
+    // Precedence: an explicit world_slug always assembles from the
+    // seed; otherwise (only when the agent supplied no detail) we fall back to
+    // a campaign-name-derived slug for back-compat with agents that forget the
+    // slug. An agent-supplied detail with no slug = a fully custom campaign.
+    const fallbackSlug = campaignName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const seedSlug = worldSlug || (campaignDetail === null ? fallbackSlug : "");
+    let forkSelections: Record<string, string> | undefined;
+    if (seedSlug) {
+      const world = loadWorldBySlug(seedSlug, userWorldsDir);
+      if (world) {
+        const forks = normalizeForks(world);
+        // Keep only selections that name a real fork + a real option of it.
+        if (reportedSelections) {
+          const valid: Record<string, string> = {};
+          for (const fork of forks) {
+            const optId = reportedSelections[fork.id];
+            if (optId && fork.options.some((o) => o.id === optId)) valid[fork.id] = optId;
+          }
+          if (Object.keys(valid).length) forkSelections = valid;
+        }
+        // Append any agent-supplied detail (held in `campaignDetail`) AFTER the
+        // seed base, so a setup-time choice (e.g. a chosen visual-style include)
+        // overrides a seed default for colliding <Tag> blocks at DM-prompt time.
+        const assembled = assembleCampaignDetail(world.detail, forks, forkSelections);
+        // The seed's visual style reaches the DM as an Image include in
+        // campaign_detail — resolved at DM-prompt time into an <Image> block that
+        // overrides the bare default (the campaign_detail slot outranks
+        // dm-directives). Validated against a real .mvstyle (resolveImageStyleLine
+        // returns null for a bad stem / missing file) so a malformed seed value
+        // can't brick every DM turn with an unresolved-include throw — a bogus
+        // style just leaves the campaign on the default look. Placed BEFORE the
+        // agent's append so a style the setup agent records still wins the
+        // <Image> collision (last occurrence in-slot).
+        const rawStyle = world.image_style?.trim() ?? "";
+        const styleInclude = rawStyle && resolveImageStyleLine(rawStyle)
+          ? `<!--include:Image.${rawStyle}-->`
+          : null;
+        campaignDetail = [assembled, styleInclude, campaignDetail].filter(Boolean).join("\n\n") || null;
+      }
     }
 
     // The setup prompt + tool description document `few-sessions` as the
@@ -413,8 +963,21 @@ export function createSetupConversation(
       themeColor: generateThemeColor(characterName),
       ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
       contentPreferences: (input.content_preferences as string) || undefined,
+      imageGeneration: input.image_generation === "on" || input.image_generation === "off"
+        ? (input.image_generation as "on" | "off")
+        : undefined,
+      // Only honored for light/ultra-light systems (the only case the agent is
+      // told to ask). Recorded verbatim when the agent reports it; the DM prefix
+      // applies MECHANICS_MODE_DEFAULT when a light system runs without a choice.
+      mechanicsMode: input.mechanics_mode === "dm-managed" || input.mechanics_mode === "player-facing"
+        ? (input.mechanics_mode as MechanicsMode)
+        : undefined,
       handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
         ? input.handoff_note.trim() : undefined,
+      openingScene: (typeof input.opening_scene === "string" && input.opening_scene.trim())
+        ? input.opening_scene.trim() : undefined,
+      worldSlug: worldSlug || undefined,
+      forkSelections,
     };
   }
 
@@ -436,6 +999,7 @@ export function createSetupConversation(
   async function runTurn(onDelta: (delta: string) => void): Promise<SetupTurnResult> {
     finalized = undefined;
     pendingToolUseId = null;
+    turnImageDisplays = [];
 
     const ec = getEffortConfig("setup");
     const thinking = ec.effort ? { effort: ec.effort } : undefined;
@@ -474,7 +1038,13 @@ export function createSetupConversation(
      * the same side effects: `handleFinalize` fires when finalize_setup
      * lands, `pendingChoices` is captured when present_choices lands, etc.
      */
-    function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): { content: string; isError: boolean } {
+    async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<ToolDispatchOutcome> {
+      if (call.name === "generate_image") {
+        return dispatchGenerateImage(call.id, call.input);
+      }
+      if (call.name === "set_portrait") {
+        return dispatchSetPortrait(call.input);
+      }
       if (call.name === "present_choices") {
         const input = call.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
         const rawChoices = Array.isArray(input.choices) ? input.choices : [];
@@ -483,40 +1053,28 @@ export function createSetupConversation(
         const descriptions = rawDescs.length > 0
           ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
           : undefined;
-        internalPendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
         pendingToolUseId = call.id;
-        // Tell the model to halt — we'll resume the conversation with the
-        // player's selection via resolveChoice on the next chat() call.
+        // present_choices suspends the turn — signal that via pendingChoices so
+        // both dispatch paths handle it uniformly (capture the choices, skip the
+        // tool_result; it's synthesized later from the player's selection). The
+        // content is still returned so codex's in-band server request gets a
+        // synchronous reply telling the model to halt.
         return {
           content: "Choices have been presented to the player. End your turn now; you will be re-invoked once they select.",
           isError: false,
+          pendingChoices: { prompt: input.prompt ?? "Choose:", choices, descriptions },
         };
       }
       if (call.name === "load_world") {
         const slug = (call.input as { slug?: string }).slug ?? "";
         const world = loadWorldBySlug(slug, userWorldsDir);
-        let content: string;
-        if (world) {
-          const parts: string[] = [];
-          if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
-          if (world.suboptions?.length) {
-            for (const sub of world.suboptions) {
-              parts.push(`## Suboption: ${sub.label}\n` +
-                sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
-            }
-          }
-          if (world.system) parts.push(`Suggested system: ${world.system}`);
-          if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
-          if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
-          if (world.campaign_scope) {
-            parts.push(`Required campaign_scope: ${world.campaign_scope}`);
-            parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
-          }
-          content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
-        } else {
-          content = `No world found with slug "${slug}".`;
-        }
+        // Remember the seed so the chargen portrait can adopt its visual style.
+        if (world) lastLoadedWorld = world;
+        const content = world ? renderWorldForAgent(world) : `No world found with slug "${slug}".`;
         return { content, isError: false };
+      }
+      if (call.name === "roll_dice") {
+        return renderRollDice(call.input);
       }
       if (call.name === "finalize_setup") {
         if (call.input._parse_error) {
@@ -550,11 +1108,15 @@ export function createSetupConversation(
         // API-key providers do. Other providers ignore this field.
         dispatchTool: async (call) => {
           internalDispatchUsed = true;
-          const dispatched = runToolDispatch({ id: call.id, name: call.name, input: call.input });
+          const dispatched = await runToolDispatch({ id: call.id, name: call.name, input: call.input });
           // Record tool_result for non-suspending tools. present_choices
-          // produces no recorded result here — its tool_result is synthesized
-          // later from the player's selection in resolveChoice/send.
-          if (call.name !== "present_choices") {
+          // suspends instead (pendingChoices set) — its tool_result is
+          // synthesized later from the player's selection in resolveChoice/send,
+          // so stash the choices for the post-stream codex block and record
+          // nothing here.
+          if (dispatched.pendingChoices) {
+            internalPendingChoices = dispatched.pendingChoices;
+          } else {
             internalToolResults.push({
               type: "tool_result",
               tool_use_id: call.id,
@@ -562,11 +1124,16 @@ export function createSetupConversation(
               ...(dispatched.isError ? { is_error: true } : {}),
             });
           }
-          return dispatched;
+          // dispatchTool's contract is { content, isError? }; strip the suspend
+          // signal before replying to codex's in-band request.
+          return { content: dispatched.content, isError: dispatched.isError };
         },
       };
 
       const result = await streamWithRetry(provider, params, onDelta, onRetry);
+      // Portrait drafts are now persisted directly inside dispatchGenerateImage
+      // when the model calls the generate_image function tool — no post-hoc
+      // assistantContent scrape needed.
 
       // Defense-in-depth: a refusal-stop with no usable output is a dead
       // end for setup. The previous behavior (silently continue with
@@ -613,6 +1180,7 @@ export function createSetupConversation(
             text,
             usage: { ...totalUsage },
             pendingChoices: internalPendingChoices,
+            ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
           };
         }
         // No suspension: push tool_results as a synthetic user message so the
@@ -641,68 +1209,27 @@ export function createSetupConversation(
       const toolResults: ContentPart[] = [];
       let pendingChoices: { prompt: string; choices: string[]; descriptions?: string[] } | undefined;
 
+      // Dispatch every tool call through the SAME shared dispatcher the codex
+      // path uses (runToolDispatch), so each tool body lives in exactly one
+      // place. This is what prevents the paths from drifting — previously the
+      // load_world / finalize_setup / generate_image bodies were written out a
+      // second time here, and a missed branch silently dropped a tool call (the
+      // generate_image bug this dedupe closes). present_choices is the one
+      // suspending tool: runToolDispatch returns a `pendingChoices` signal and
+      // sets pendingToolUseId, and we record NO tool_result for it (it's
+      // synthesized from the player's selection in resolveChoice/send). Every
+      // other tool returns a uniform { content, isError } body.
       for (const tc of result.toolCalls) {
-        if (tc.name === "present_choices") {
-          // Don't resolve immediately — pause and return to the app for player input
-          const input = tc.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
-          const rawChoices = Array.isArray(input.choices) ? input.choices : [];
-          const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-          const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
-          const descriptions = rawDescs.length > 0
-            ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
-            : undefined;
-          pendingChoices = { prompt: input.prompt ?? "Choose:", choices, descriptions };
-          pendingToolUseId = tc.id;
-        } else if (tc.name === "load_world") {
-          const slug = (tc.input as { slug?: string }).slug ?? "";
-          const world = loadWorldBySlug(slug, userWorldsDir);
-          let content: string;
-          if (world) {
-            const parts: string[] = [];
-            if (world.detail) parts.push(`## Detail\n${processIncludes(world.detail)}`);
-            if (world.suboptions?.length) {
-              for (const sub of world.suboptions) {
-                parts.push(`## Suboption: ${sub.label}\n` +
-                  sub.choices.map((c: { name: string; description: string }) => `- **${c.name}** — ${c.description}`).join("\n"));
-              }
-            }
-            if (world.system) parts.push(`Suggested system: ${world.system}`);
-            if (world.mood) parts.push(`Suggested mood: ${world.mood}`);
-            if (world.difficulty) parts.push(`Suggested difficulty: ${world.difficulty}`);
-            if (world.campaign_scope) {
-              parts.push(`Required campaign_scope: ${world.campaign_scope}`);
-              parts.push("(The world above defines a required campaign scope. Use the slug exactly as shown — no extra text — in finalize_setup, and do NOT ask the player about campaign length.)");
-            }
-            content = parts.length > 0 ? parts.join("\n\n") : "World loaded but has no additional detail.";
-          } else {
-            content = `No world found with slug "${slug}".`;
-          }
+        const dispatched = await runToolDispatch({ id: tc.id, name: tc.name, input: tc.input });
+        if (dispatched.pendingChoices) {
+          // Pause and return to the app for player input — don't push a result.
+          pendingChoices = dispatched.pendingChoices;
+        } else {
           toolResults.push({
             type: "tool_result",
             tool_use_id: tc.id,
-            content,
-          });
-        } else if (tc.name === "finalize_setup") {
-          // The provider returns `_parse_error` when tool-call JSON is
-          // truncated or otherwise unparseable (e.g. a model hits its
-          // output cap mid-emission). Surface that as an error tool_result
-          // so the agent sees it and can retry — `handleFinalize` would
-          // otherwise default-fill every missing field and ship a
-          // placeholder campaign. (Mirrors agent-loop-bridge.ts:312.)
-          if (tc.input._parse_error) {
-            toolResults.push({
-              type: "tool_result",
-              tool_use_id: tc.id,
-              content: String(tc.input._parse_error),
-              is_error: true,
-            });
-            continue;
-          }
-          handleFinalize(tc.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: tc.id,
-            content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
+            content: dispatched.content,
+            ...(dispatched.isError ? { is_error: true } : {}),
           });
         }
       }
@@ -716,6 +1243,7 @@ export function createSetupConversation(
           text,
           usage: { ...totalUsage },
           pendingChoices,
+          ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
         };
       }
 
@@ -767,6 +1295,7 @@ export function createSetupConversation(
       text,
       usage: { ...totalUsage },
       finalized,
+      ...(turnImageDisplays.length > 0 ? { imageDisplays: turnImageDisplays } : {}),
     };
   }
 

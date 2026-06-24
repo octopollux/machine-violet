@@ -12,7 +12,12 @@ export interface ArchivedCampaignsPhaseProps {
   onUnarchive: (entry: ArchivedCampaignEntry) => void;
   onBack: () => void;
   statusMessage?: string;
+  /** Zip paths whose restore is in flight — render "Restoring…" and block re-triggers. */
+  restoringPaths?: ReadonlySet<string>;
 }
+
+/** Shared empty set so an absent `restoringPaths` prop is a stable reference. */
+const NO_RESTORING: ReadonlySet<string> = new Set<string>();
 
 function formatDate(iso: string): string {
   try {
@@ -29,6 +34,7 @@ export function ArchivedCampaignsPhase({
   onUnarchive,
   onBack,
   statusMessage,
+  restoringPaths = NO_RESTORING,
 }: ArchivedCampaignsPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
   const [menuIndex, setMenuIndex] = useState(0);
@@ -48,7 +54,11 @@ export function ArchivedCampaignsPhase({
       return;
     }
     if (key.return && archives.length > 0) {
-      onUnarchive(archives[menuIndex]);
+      const entry = archives[menuIndex];
+      // Ignore Enter on an archive that's already restoring (the synchronous
+      // ref guard in app.tsx is authoritative; this just avoids the no-op call).
+      if (restoringPaths.has(entry.zipPath)) return;
+      onUnarchive(entry);
     }
   });
 
@@ -78,6 +88,7 @@ export function ArchivedCampaignsPhase({
     for (let i = 0; i < archives.length; i++) {
       const entry = archives[i];
       const isSelected = i === menuIndex;
+      const restoring = restoringPaths.has(entry.zipPath);
       const marker = isSelected ? "◆" : "○";
       const markerColor = isSelected ? accentColor : dimColor;
       const dateStr = formatDate(entry.archivedDate);
@@ -86,7 +97,9 @@ export function ArchivedCampaignsPhase({
         <Text key={entry.zipPath}>
           <Text color={markerColor}>{marker}</Text>
           <Text color={isSelected ? accentColor : undefined} bold={isSelected}>{` ${entry.name}`}</Text>
-          <Text color={dimColor}>{`  Archived ${dateStr}`}</Text>
+          {restoring
+            ? <Text color="#66cc66">{`  Restoring…`}</Text>
+            : <Text color={dimColor}>{`  Archived ${dateStr}`}</Text>}
         </Text>,
       );
     }

@@ -78,6 +78,10 @@ export interface LayoutProps {
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
 
+  /** Absolute top row of the conversation pane (forwarded to NarrativeArea as
+   *  the image-crop viewport top). Equals PlayingPhase's conversationPaneTop. */
+  conversationPaneTop?: number;
+
   /** When set, mouse scroll targets this handle instead of the narrative area */
   mouseScrollOverrideRef?: React.RefObject<ScrollHandle | null>;
 
@@ -124,6 +128,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     playerFrameColor = playerColor,
     turnIndicatorColor,
     narrativeRef,
+    conversationPaneTop,
     mouseScrollOverrideRef,
     hideInputLine,
     playerPaneOverlay,
@@ -254,6 +259,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
             themeAsset={theme.asset}
             separatorColor={separatorColor}
             showVerbose={showVerbose}
+            viewportTop={conversationPaneTop}
             mouseScrollOverrideRef={mouseScrollOverrideRef}
           />
 

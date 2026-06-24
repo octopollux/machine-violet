@@ -1,0 +1,33 @@
+---
+type: visual-style
+title: "Ghosts of Station Proxima"
+rating: "?"
+description: "Ghosts of Station Proxima campaign look: AnimatedFamilyFilm by default, ConceptPoster for the intro, DarkAirbrush for player-requested images"
+tags: [animation, illustration, stylized, muted, period]
+made-for-model: gpt-image-2
+tokens: 675
+---
+
+# Direction
+
+When composing prompts for `generate_image`, render in this campaign's visual style. Most scenes use the **default** animated-film look below. The **intro** scene uses the concept-poster key-art look. When the **player explicitly requests** an image, use the silver-age airbrush look.
+
+# Style
+
+Default (most scenes) — `Rendered as a frame from a high-budget pre-CGI hand-drawn animated family feature of the late 1980s to 1990s: traditional ink-and-paint cels over painted backgrounds. Strict process discipline: render the characters and foreground objects as hand-inked cels — clean, confident black ink outlines filled with FLAT cel paint, and shading done only as a few hard-edged flat shadow and highlight shapes (cel shading), never smooth photographic gradients or rendered surface detail. Behind them, a lush hand-painted background in soft gouache — atmospheric and deep, with visible painterly brushwork and warm cinematic light — clearly a separate painted layer from the crisp cels, with multiplane depth and a slight focus falloff on the background. A warm, harmonious feature-film palette and expressive storybook lighting, with gentle rim light and glow on the key forms. The whole frame carries the soft warm grain of film. Close with a caption like a title card: a short line of elegant hand-lettered type integrated into the frame.`
+
+Intro — `Rendered as a contemporary editorial illustration — the kind of smart, stylised spot art that runs with a magazine feature or op-ed. Strict process discipline: build the whole image from flat, confident shapes filled with FLAT colour from a restrained, sophisticated limited palette of a few harmonious hues only — bold, slightly muted, considered colours, no photographic rendering, no smooth gradients, no rendered surface detail. Simplify every form to its essentials with clean geometric stylisation and a strong graphic composition; do all modelling as a few flat shapes of light and shadow, never blends. Lay a subtle, even texture over the flat colour — a fine soft grain or a light halftone/screenprint tooth — so the flat areas read as printed, not digital. Reduce the scene to a single clear, confident graphic idea, intentionally composed. Modern, intelligent, clean. Close with a caption set in clean contemporary sans-serif type, like an article's title or kicker.`
+
+When the player requests an image — `Illustrated as a silver-age (mid-1950s to 1960s) science-fiction magazine illustration rendered in technical masked airbrush: built up with frisket masks and an airbrush so the image is made of crisp hard masked edges set against perfectly smooth, even airbrushed gradients. Strict process discipline: every form is a clean masked shape filled with a smooth graded airbrush blend — no visible brushwork, no photographic texture, no digital gradient banding. Render polished retro-futurist surfaces with airbrushed specular highlights and soft graded shadows, a limited period palette of a few harmonious mid-century hues, and a faint airbrushed atmospheric haze. Crisp masked highlight edges and small reserved white catch-lights do the detail work; large forms stay smooth and graded. A subtle paper-stock tooth and the slightly faded ink of vintage magazine printing. Close with a caption set in clean mid-century type, integrated like a magazine illustration's plate caption.`
+
+# Notes
+
+Campaign composite for the **ghosts-of-station-proxima** seed — three already-validated catalog styles bundled into one include (no new render). DEFAULT = [AnimatedFamilyFilm](./AnimatedFamilyFilm.mvstyle) (hand-drawn cel-over-painted-background animated feature). INTRO = [ConceptPoster](./ConceptPoster.mvstyle) (cinematic concept-poster key art; renders richly painterly, the validated quirk). PLAYER-REQUESTED = [DarkAirbrush](./DarkAirbrush.mvstyle) (silver-age masked-airbrush sci-fi illustration). All three `# Style` lines are verbatim from the parents — keep them intact; the DM chooses per the `# Direction`.
+
+# Example
+
+Composed from three banked styles — see their worked samples:
+
+![AnimatedFamilyFilm](../ImageStyleExample/AnimatedFamilyFilm.example.png)
+![ConceptPoster](../ImageStyleExample/ConceptPoster.example.png)
+![DarkAirbrush](../ImageStyleExample/DarkAirbrush.example.png)

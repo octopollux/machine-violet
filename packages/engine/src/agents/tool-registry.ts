@@ -53,6 +53,10 @@ import {
 import { manageObjectives } from "../tools/objectives/index.js";
 import type { ManageObjectivesInput } from "../tools/objectives/index.js";
 import { ENTITY_TOOLS } from "../entities/tools.js";
+import { loadPrompt } from "../prompts/load-prompt.js";
+import { loadAllPersonalities, getPersonality } from "../config/personality-loader.js";
+import { join } from "node:path";
+import type { DMPersonality } from "@machine-violet/shared/types/config.js";
 
 // --- Helpers ---
 
@@ -674,10 +678,211 @@ const TOOL_DEFS: RegisteredTool[] = [
       const idx = state.config.players.findIndex(
         (p) => p.character.toLowerCase() === target,
       );
-      if (idx === -1) return err(`Player '${input.player}' not found.`);
+      if (idx === -1) {
+        const roster = state.config.players.map((p) => p.character).join(", ") || "(none)";
+        return err(
+          `Player '${input.player}' not found. switch_player only passes the turn between characters already in the roster (${roster}). ` +
+          `Making a character that ISN'T in the roster the player's PC — a handoff to a new or existing character — is a PC swap, performed with swap_pc on the OOC surface (see howto_swap_pc). If you're the DM, hand off to OOC to do it.`,
+        );
+      }
       state.activePlayerIndex = idx;
       const p = state.config.players[idx];
       return ok(`Active player: ${p.character} (${p.type})`);
+    },
+  },
+  {
+    definition: {
+      name: "swap_pc",
+      description:
+        "Hand player control from the current PC to a different character (a 'PC swap'). Reassigns a player slot in the roster to `character` and makes it the active PC — this is the only tool that edits config.players, and it persists the change so the new PC survives a reload. Use for retiring a PC and continuing as an NPC/ally, or introducing a brand-new PC. Run howto_swap_pc first: this tool only moves the roster pointer — you must also create/locate the character sheet, demote the outgoing PC, and refresh party.md, resources, modeline, and theme.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          character: { type: "string", description: "Name of the character who becomes the player's PC (new or existing)." },
+          replaces: { type: "string", description: "Name of the current PC being handed off. Defaults to the active player's current character." },
+          color: { type: "string", description: "Theme/display color for the new PC as a hex string (e.g. #b33f5d). Optional." },
+          player_name: { type: "string", description: "New label for the human player behind this slot. Optional — defaults to keeping the existing player name." },
+        },
+        required: ["character"],
+      },
+    },
+    handler: (state, input) => {
+      const players = state.config.players;
+      if (players.length === 0) return err("No players in the roster to reassign.");
+
+      const character = (input.character as string).trim();
+      if (!character) return err("`character` is required.");
+
+      // Resolve which roster slot to reassign. `replaces` names the outgoing
+      // character explicitly; otherwise we hand off the active slot.
+      let idx: number;
+      const replaces = (input.replaces as string | undefined)?.trim();
+      if (replaces) {
+        idx = players.findIndex((p) => p.character.toLowerCase() === replaces.toLowerCase());
+        if (idx === -1) {
+          const roster = players.map((p) => p.character).join(", ") || "(none)";
+          return err(`Cannot swap: no player currently controls '${replaces}'. Current PCs: ${roster}.`);
+        }
+      } else {
+        idx = state.activePlayerIndex;
+        // activePlayerIndex can drift out of range (config edited externally,
+        // scene/config mismatch). Fall back to the first slot rather than
+        // dereferencing undefined — mirrors getActivePlayer's guard.
+        if (idx < 0 || idx >= players.length) idx = 0;
+      }
+
+      const slot = players[idx];
+      const outgoing = slot.character;
+
+      // Warn (but allow) if another slot already controls the incoming
+      // character — two players sharing one PC is almost always a mistake.
+      const dup = players.findIndex(
+        (p, i) => i !== idx && p.character.toLowerCase() === character.toLowerCase(),
+      );
+
+      slot.character = character;
+      if (typeof input.color === "string" && input.color.trim()) slot.color = input.color.trim();
+      if (typeof input.player_name === "string" && input.player_name.trim()) slot.name = input.player_name.trim();
+      state.activePlayerIndex = idx;
+
+      const note = dup !== -1
+        ? ` Warning: '${players[dup].name}' also controls '${character}' — you likely want to swap or retire that slot too.`
+        : "";
+      return ok(
+        `PC swapped: '${slot.name}' now plays ${character} (was ${outgoing}). ` +
+        `${outgoing} is no longer player-controlled. Active PC set to ${character}.${note} ` +
+        `Reminder: demote ${outgoing}'s sheet to a character/NPC, set up ${character}'s sheet + party.md + resources + modeline + theme (see howto_swap_pc).`,
+      );
+    },
+  },
+  {
+    definition: {
+      name: "howto_swap_pc",
+      description:
+        "Knowledge tool (a 'skill'): returns the step-by-step procedure for swapping the player character with a new or existing character. Takes no arguments and changes nothing — it just loads the playbook into context. Call this BEFORE doing a PC swap so you touch every piece of state (config roster, character sheets, party.md, resources, modeline, theme) and nothing loads stale.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: () => {
+      return ok(loadPrompt("howto-swap-pc"));
+    },
+  },
+
+  // ====== DM PERSONALITY ======
+  {
+    definition: {
+      name: "list_dm_personalities",
+      description:
+        "List the DM personalities (personas) available to swap to — bundled presets plus any the user has added. Returns each persona's name and description. Use this to learn the options before presenting choices to the player; the in-game agent doesn't otherwise have the persona catalog in context (only the setup agent does).",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: (state) => {
+      const userDir = state.homeDir ? join(state.homeDir, "personalities") : undefined;
+      const personalities = loadAllPersonalities(userDir);
+      const current = state.config.dm_personality?.name;
+      const list = personalities.map((p) => ({
+        name: p.name,
+        description: p.description ?? "",
+        current: p.name === current || undefined,
+      }));
+      return ok(JSON.stringify({ current, personalities: list }, null, 2));
+    },
+  },
+  {
+    definition: {
+      name: "swap_dm_personality",
+      description:
+        "Change the DM's personality (narrative voice) for the rest of the campaign. Pass a `name` from list_dm_personalities to switch to a preset, OR invent a custom persona by also passing `prompt_fragment` (and optionally `detail`). This is the only tool that edits config.dm_personality, and it persists the change. It takes effect on the NEXT DM turn (no reload needed) — so the incoming persona must open with an in-fiction handoff. Run howto_swap_dm_personality first.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          name: { type: "string", description: "Persona name. Matches a preset from list_dm_personalities, or names a new custom persona when prompt_fragment is supplied." },
+          prompt_fragment: { type: "string", description: "Custom personas only: 2-4 sentences describing the DM's voice and style, written in second person ('You are ... You narrate ...'). Omit to use a preset by name." },
+          detail: { type: "string", description: "Custom personas only: optional hidden tuning block — signature techniques, pacing rules, register notes. Not shown to the player." },
+          description: { type: "string", description: "Custom personas only: optional one-line player-facing flavor for the persona." },
+        },
+        required: ["name"],
+      },
+    },
+    handler: (state, input) => {
+      const name = (input.name as string | undefined)?.trim();
+      if (!name) return err("`name` is required.");
+
+      const promptFragment = (input.prompt_fragment as string | undefined)?.trim();
+      const userDir = state.homeDir ? join(state.homeDir, "personalities") : undefined;
+
+      const detail = (input.detail as string | undefined)?.trim();
+      const description = (input.description as string | undefined)?.trim();
+
+      let next: DMPersonality;
+      const preset = getPersonality(name, userDir);
+      if (preset) {
+        // Named an existing persona. Custom-only fields alongside a preset are
+        // contradictory intent — reject rather than silently using the preset
+        // unchanged, which would leave the caller thinking they'd customized it.
+        if (promptFragment || detail || description) {
+          return err(
+            `'${name}' is an existing preset, so prompt_fragment/detail/description don't apply. ` +
+            `Pass just { name: "${name}" } to use it, or choose a different name to invent a custom persona.`,
+          );
+        }
+        next = preset;
+      } else if (promptFragment) {
+        // Inventing a custom persona on the fly (setup's invent path).
+        next = { name, prompt_fragment: promptFragment };
+        if (description) next.description = description;
+        if (detail) next.detail = detail;
+      } else {
+        const names = loadAllPersonalities(userDir).map((p) => p.name).join(", ");
+        return err(
+          `No preset persona named '${name}'. Either pick one of: ${names} — or invent it by passing a prompt_fragment (see howto_swap_dm_personality).`,
+        );
+      }
+
+      const previous = state.config.dm_personality?.name ?? "the previous DM";
+      state.config.dm_personality = next;
+
+      return ok(
+        `DM personality set to '${next.name}' (was '${previous}'). Persisted; takes effect on the next DM turn. ` +
+        `REQUIRED: the next DM narration must open with an in-fiction handoff that bridges ${previous}'s voice into ${next.name}'s — do not switch silently (see howto_swap_dm_personality).`,
+      );
+    },
+  },
+  {
+    definition: {
+      name: "howto_swap_dm_personality",
+      description:
+        "Knowledge tool (a 'skill'): returns the step-by-step procedure for changing the DM's personality mid-campaign. Takes no arguments and changes nothing. Call this BEFORE swapping so you present real options, persist the change, and perform the required in-fiction voice handoff.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: () => {
+      return ok(loadPrompt("howto-swap-dm-personality"));
+    },
+  },
+  {
+    definition: {
+      name: "howto_campaign_state",
+      description:
+        "Knowledge tool (a 'skill'): the catch-all reference for campaign state. Returns a map of where everything lives on disk and WHICH TOOL edits each thing. Takes no arguments and changes nothing. Call this when you need to change something and there's no obvious dedicated tool for it — it routes you to the right tool (or tells you the change needs Dev mode).",
+      inputSchema: {
+        type: "object" as const,
+        properties: {},
+        required: [],
+      },
+    },
+    handler: () => {
+      return ok(loadPrompt("howto-campaign-state"));
     },
   },
 
@@ -946,7 +1151,7 @@ const READ_ONLY_OPS: Record<string, Set<string>> = {
 };
 
 /** Maps tool names to which state slices they mutate */
-export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
+const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   start_combat: ["combat", "clocks"],
   end_combat: ["combat", "clocks"],
   advance_turn: ["combat"],
@@ -958,6 +1163,12 @@ export const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
   deck: ["decks"],
   manage_objectives: ["objectives"],
   switch_player: [],
+  // swap_pc / swap_dm_personality mutate config (players / dm_personality),
+  // which isn't a StateSlice — persistence is handled out-of-band by
+  // GameEngine.onToolSuccess (persistConfig). Listed here so the tools are
+  // recognized as state-mutating.
+  swap_pc: [],
+  swap_dm_personality: [],
   resolve_turn: [],
 };
 

@@ -10,28 +10,67 @@
     "fantasy",
     "sci-fi"
   ],
-  "detail": "The player comes home — apartment, house, quarters, whatever — and someone is already there. Same face, same name, same keys. The friends recognize them. The job expects them. The life fits them. And by every visible measure, they're doing it better: kinder, sharper, more present. The player is standing outside their own life, watching it improve without them.\n\n\n\nThe crucial question (DM only — roll or choose, do NOT reveal early):\n1. THE PLAYER IS REAL — The player is the original. The replacement is the intruder. The horror is that nobody believes the player, because the replacement is more convincing. The player has to prove they're themselves to people who prefer the other version.\n2. THE PLAYER IS THE FAKE — The player is the replacement. They don't know it. Their memories are constructed or copied. The person living in their apartment is the original, who came home to find the player had already taken over and is now trying to reclaim their life. Everything the player feels — the outrage, the violation, the certainty that this is THEIR life — is real emotion built on a false foundation. This should be revealed gradually, through details that don't add up: a scar the player remembers getting but their body doesn't have, a memory that's too perfect, a skill they shouldn't possess.\n\n\"Better at it\" — this is the knife. The replacement isn't just present, they're an improvement. They remember birthdays. They listen. They got the promotion. The player's friends are happier. This is the existential horror: not that someone stole your life, but that your life is better without you in it. The DM should make this specific and painful — not abstract, but concrete moments the player witnesses. The replacement did the thing the player always meant to do.\n\nDM approach:\n- The first scene should be the discovery: coming home, key doesn't work (or does — and someone else is inside). Play the confusion before the horror.\n- Give the player allies who believe them, but make those allies uncertain. \"I believe you, but...\" is more unsettling than outright rejection.\n- The replacement should not be a villain. They should be sympathetic, confused, and — if confronted — afraid. A replacement who begs not to be erased is harder to deal with than one who fights.\n- If the player IS the fake (option 2), seed inconsistencies from the start. Don't lie to the player, but let them misinterpret. A detail that seems like a continuity error is actually a clue.\n\nPacing: Start with the locked door. The first act is displacement — the player loses access to their life piece by piece and has to operate outside it. The second act is investigation — what is the replacement, how did this happen, who's responsible? The third act is the confrontation — face to face with the replacement — and the reveal of which one is real.\n\n<!--include:Pacing.ShortCampaigns-->",
-  "suboptions": [
+  "image_style": "DigitalPainting",
+  "setup_detail": "<!--include:Pacing.ShortCampaigns-->\n\nOpening scene: open on the discovery itself — the player coming home (apartment, house, quarters, whatever) to a locked door that should be theirs, or a key that works and someone already inside wearing their face and living their life. Play the confusion before the horror: the wrongness arriving first as a mistake or a misunderstanding, before it becomes undeniable. Do NOT reveal which of them is real, or what the replacement actually is — let both of those land in play.",
+  "detail": "The player comes home — apartment, house, quarters, whatever — and someone is already there. Same face, same name, same keys. The friends recognize them. The job expects them. The life fits them. And by every visible measure, they're doing it better: kinder, sharper, more present. The player is standing outside their own life, watching it improve without them.\n\n\"Better at it\" — this is the knife. The replacement isn't just present, they're an improvement. They remember birthdays. They listen. They got the promotion. The player's friends are happier. This is the existential horror: not that someone stole your life, but that your life is better without you in it. The DM should make this specific and painful — not abstract, but concrete moments the player witnesses. The replacement did the thing the player always meant to do.\n\nDM approach:\n- The first scene should be the discovery: coming home, key doesn't work (or does — and someone else is inside). Play the confusion before the horror.\n- Give the player allies who believe them, but make those allies uncertain. \"I believe you, but...\" is more unsettling than outright rejection.\n- The replacement should not be a villain by default. They should often be sympathetic, confused, and — if confronted — afraid. A replacement who begs not to be erased is harder to deal with than one who fights. (The Wearer is the deliberate exception — see its detail.)\n- If the player IS the fake (crucial question), seed inconsistencies from the start. Don't lie to the player, but let them misinterpret. A detail that seems like a continuity error is actually a clue.\n- The chosen replacement-type (the player's fork) carries that version's driving situation, antagonist, and objective in its detail — the player discovers these in play; you deploy them.\n\nPacing: Start with the locked door. The first act is displacement — the player loses access to their life piece by piece and has to operate outside it. The second act is investigation — what is the replacement, how did this happen, who's responsible? The third act is the confrontation — face to face with the replacement — and the reveal of which one is real.",
+  "forks": [
     {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose. Do NOT reveal early.",
+      "options": [
+        {
+          "id": "player-is-real",
+          "name": "The Player Is Real",
+          "description": "The player is the original; nobody believes them because the replacement is more convincing.",
+          "detail": "THE PLAYER IS REAL — The player is the original. The replacement is the intruder. The horror is that nobody believes the player, because the replacement is more convincing. The player has to prove they're themselves to people who prefer the other version."
+        },
+        {
+          "id": "player-is-the-fake",
+          "name": "The Player Is The Fake",
+          "description": "The player is the replacement and doesn't know it; the reveal comes gradually through details that don't add up.",
+          "detail": "THE PLAYER IS THE FAKE — The player is the replacement. They don't know it. Their memories are constructed or copied. The person living in their apartment is the original, who came home to find the player had already taken over and is now trying to reclaim their life. Everything the player feels — the outrage, the violation, the certainty that this is THEIR life — is real emotion built on a false foundation. This should be revealed gradually, through details that don't add up: a scar the player remembers getting but their body doesn't have, a memory that's too perfect, a skill they shouldn't possess."
+        }
+      ]
+    },
+    {
+      "id": "what-the-replacement-is",
       "label": "What the replacement is",
-      "choices": [
+      "chooser": "player",
+      "prompt": "Present to the player as what the replacement turns out to be — the register of the story; they choose on the description alone. Each option's detail embeds that version's driving situation, antagonist, and objective, which the player discovers in play and you deploy. It composes with the crucial question (who is real).",
+      "options": [
         {
+          "id": "the-fetch",
           "name": "The Fetch",
-          "description": "Changeling — a fae swap. The replacement is a fetch, a constructed double left behind when the fae took... someone. The player's life has been infiltrated by something ancient that treats human identity as a costume. The replacement isn't malicious — it was made to fill a hole. It doesn't know it's not real. Or it does, and it's terrified of being sent back."
+          "description": "Changeling — a fae swap. The replacement is a fetch, a constructed double left behind when the fae took... someone. The player's life has been infiltrated by something ancient that treats human identity as a costume. The replacement isn't malicious — it was made to fill a hole. It doesn't know it's not real. Or it does, and it's terrified of being sent back.",
+          "detail": "THE FETCH — The fae are not done with the duo. The swap was a move in a longer game, not the end of one: they took someone (the original, or someone the original loved) and left the fetch to fill the hole, and they fully intend to come back — to collect, to complete the exchange, to take again, or to harvest whatever the improved life is now producing for them. The objective grows out of that return. The player and the fetch are bound together now, and what happens NEXT is the fae's business with both of them: the fetch is terrified of being sent back; the player wants their life, or the person who was taken, returned. They may have to become an unlikely duo against the thing that made them. Seed: the unfinished bargain and its price, who or what the fae actually took, a way the fae can be called, refused, or cheated, and the cost of each. The endgame is rescue, renegotiation, or breaking the bargain — and deciding what becomes of the fetch when it is done."
         },
         {
+          "id": "the-copy",
           "name": "The Copy",
-          "description": "A clone — corporate, military, or black-market. The player was copied — legally or not — and the copy was activated. The replacement has the player's memories up to a point, then diverges. It thinks it's real. It has paperwork that says it's real. Someone manufactured this situation, and the reason matters."
+          "description": "A clone — corporate, military, or black-market. The player was copied — legally or not — and the copy was activated. The replacement has the player's memories up to a point, then diverges. It thinks it's real. It has paperwork that says it's real. Someone manufactured this situation, and the reason matters.",
+          "detail": "THE COPY — A corporation cloned the player, on purpose, for a reason that matters — pick and seed it: the player has knowledge, access, skills, or a body the company needs; the player was a prototype; the player was meant to be quietly replaced by a more controllable version; the copy was insurance that got activated early. The program assumed only ONE of them would ever exist. The driving clock: the corporation does not yet know the original is still walking around — and when it finds out, a duplicate is a liability, so it moves to resolve the redundancy by erasing one or both. The objective: survive the cleanup once the company notices there are two, uncover WHY the player was copied, and decide what to do about the people who did it — expose them, escape them, or turn the program against itself. (If the player is the fake, they ARE the redundancy the company will come to delete; if real, the company built the thing now living in their home.) The reason for the cloning is the mystery's spine — make it specific."
         },
         {
+          "id": "the-other-now",
           "name": "The Other Now",
-          "description": "A time-slip. The replacement IS the player, from a different point in the timeline. A future self who came back, or a parallel self who crossed over. They know things the player doesn't. They made choices the player hasn't made yet. They're better because they've already lived through whatever comes next."
+          "description": "A time-slip. The replacement IS the player, from a different point in the timeline. A future self who came back, or a parallel self who crossed over. They know things the player doesn't. They made choices the player hasn't made yet. They're better because they've already lived through whatever comes next.",
+          "detail": "THE OTHER NOW — Two of the same person in one timeline is a paradox, and paradoxes have consequences — play them out as escalating instability rather than a single rule. Reality frays around the duplication: memories bleed between them, events can't decide which of the two they happened to, objects and people flicker between versions, and the world grows less able to hold both the longer they coexist. Underneath, the timeline is trying to correct itself — one of them is not supposed to be here, and the correction is coming. The objective: resolve the paradox before the consequences compound — learn what the other-now came back to prevent or cause, decide which of them stays (or whether both can), and get ahead of the correction before it chooses for them. Easy to run: hand the player consequences, escalate them, and let the dread of an unstable reality do the work."
         },
         {
+          "id": "the-wearer",
           "name": "The Wearer",
-          "description": "Something wearing a face. Not human, never was. An entity that consumes identity — not the body, just the life. It moves from person to person, living each life better than the original, then moving on when it gets bored. The player is the first original who came back while it was still wearing them."
+          "description": "Something wearing a face. Not human, never was. An entity that consumes identity — not the body, just the life. It moves from person to person, living each life better than the original, then moving on when it gets bored. The player is the first original who came back while it was still wearing them.",
+          "detail": "THE WEARER — Unlike the others, the Wearer earns no sympathy: it is charismatic, and it is evil. It wears the life better than the player ever did precisely because it does not care about it — and if it is left alone, it will tear that life apart, wringing everything of value out of the relationships, the job, the reputation, then hollowing them out and discarding the wreckage when it gets bored and moves to the next face. The player is the first original to come back while it was still wearing them, which is the only reason there is still a life to save. The driving clock is its active consumption: it is spending the player's life right now, and some of what it spends will not come back. The objective: stop it before it finishes and moves on — find what it is and how it is fastened to the life, learn whether the people it has charmed can be turned, and force it out or end it before the wreckage is total. There is no begging-not-to-be-erased here; the Wearer is the one you fight."
         }
       ]
     }
-  ]
+  ],
+  "_tokens": {
+    "detail": 446,
+    "setup_detail": 105,
+    "forks": 1008,
+    "total": 2024
+  }
 }

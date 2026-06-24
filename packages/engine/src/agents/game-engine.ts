@@ -5,6 +5,7 @@ import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.
 import { agentLoopStreaming } from "./agent-loop.js";
 import type { AgentLoopConfig, TuiCommand, UsageStats } from "./agent-loop.js";
 import type { LLMProvider, NormalizedMessage, ContentPart, TierProvider } from "../providers/types.js";
+import { GENERATE_IMAGE_TOOL_NAME, UPDATE_PORTRAIT_TOOL_NAME } from "../providers/types.js";
 import { ConversationManager } from "../context/conversation.js";
 import type { DroppedExchange } from "../context/conversation.js";
 import { narrativeLinesToMarkdown } from "../context/display-log.js";
@@ -36,6 +37,8 @@ import type { DMSessionState } from "./dm-prompt.js";
 import type { ModelTier } from "../config/models.js";
 import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
+import { withSpan, setSpanAttrs } from "../context/trace.js";
+import { basename } from "node:path";
 import { getMaxOutput } from "../config/model-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
@@ -43,6 +46,9 @@ import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents/choice-generator.js";
 import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
 import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { handleImageGenerated } from "./image-handler.js";
+import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
+import { loadDmPortraitMessage, loadCharacterReferences, commitPortraitRevision, downscalePortraitForContext, buildPortraitRevisionPrompt } from "./dm-portraits.js";
 import { runScribe } from "./subagents/scribe.js";
 import { promoteCharacter } from "./subagents/character-promotion.js";
 import { searchCampaign } from "./subagents/search-campaign.js";
@@ -54,6 +60,7 @@ import type { GitIO } from "../tools/git/index.js";
 import { writeDebugDump } from "../tools/filesystem/debug-dump.js";
 import { styleTheme } from "./subagents/theme-styler.js";
 import { SCENE_TRACKER_CADENCE } from "./subagents/scene-tracker.js";
+import { DeferredWork } from "./deferred-work.js";
 import { ResolveSession } from "./resolve-session.js";
 import { EntityStore } from "../entities/store.js";
 import { buildEntityToolHandler, ENTITY_TOOL_NAME_SET } from "../entities/tools.js";
@@ -63,6 +70,9 @@ import type { ActionDeclaration, StateDelta } from "@machine-violet/shared/types
 
 import type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
 export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/shared/types/engine.js";
+
+/** Cap on an `update_portrait` change description — keeps the prompt, ack, and context marker bounded. */
+const MAX_PORTRAIT_CHANGE_CHARS = 280;
 
 /**
  * The game engine — orchestrates the DM agent, tools, TUI, and scene management.
@@ -83,6 +93,12 @@ export class GameEngine {
   private sceneManager: SceneManager;
   private callbacks: EngineCallbacks;
   private engineState: EngineState = "idle";
+  /** Count of in-flight `generate_image` tool calls. Image renders take minutes
+   *  and run concurrently with faster sibling tools (scene_transition,
+   *  style_scene); this keeps the "generating_image" activity state up for the
+   *  whole render instead of letting a sibling's completion flip it to thinking.
+   *  Reset to 0 at each turn start in case a render was abandoned mid-flight. */
+  private imageGenInFlight = 0;
   private sessionUsage: UsageStats = {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
   };
@@ -114,9 +130,81 @@ export class GameEngine {
    *  Used to suppress auto-generated choices for that turn. */
   private dmProvidedChoicesThisTurn = false;
 
+  /** Collected during a DM turn whenever a display_image TUI command fires
+   *  (from generate_image). Appended to the display-log alongside the DM's
+   *  text so the image survives session resume. Reset at the top of each
+   *  player input. */
+  private imagesEmittedThisTurn: { filename: string; intent: "scene_snapshot" | "player_request" | "character_portrait" }[] = [];
+
   /** Long-lived Haiku session for generating suggested responses.
    *  Lazy-initialized on first use, reset on scene transitions. */
   private choiceSession: ChoiceGeneratorSession | null = null;
+
+  /**
+   * Cached synthetic prefix message carrying PC portraits as `image_input`
+   * ContentParts. Built lazily on first DM turn and held for the engine's
+   * lifetime so portrait bytes don't re-read from disk every turn. Null
+   * means "no portraits on disk for any PC" — the DM context proceeds
+   * text-only. Invalidate by setting to undefined to trigger a rebuild
+   * (e.g. after the setup agent writes a new portrait mid-campaign).
+   */
+  private cachedPortraitMessage: NormalizedMessage | null | undefined = undefined;
+
+  /**
+   * Revised PC portraits waiting to be handed back to the DM. When the DM
+   * fires `update_portrait`, the render runs in the background; on completion
+   * it pushes the downscaled new portrait here. The NEXT real player turn
+   * folds these into its user message (the OOC-summary pattern) so the DM
+   * sees the actual updated image — and it persists in that exchange — without
+   * spending a dedicated turn or API call. Dropped on scene transition (the
+   * prefix refresh carries the current portrait into the new scene).
+   */
+  private pendingPortraitInjections: { name: string; change: string; image: ContentPart }[] = [];
+
+  /**
+   * In-flight `update_portrait` renders. Tracked (not detached) so a failure
+   * is logged rather than swallowed and so teardown can await them; the bytes
+   * land on disk + the pointer swaps via the promise's own `.then`.
+   */
+  private inFlightPortraitRenders = new Set<Promise<void>>();
+
+  /**
+   * Serializes the archive+swap critical section across portrait revisions.
+   * Renders run in parallel (each takes minutes), but two completing close
+   * together for the same character would otherwise compute the same next
+   * archive version (`listDir` + max + 1) and clobber history. Commits chain
+   * through here so they run one-at-a-time; the chain swallows errors so one
+   * failure never poisons later commits.
+   */
+  private portraitCommitChain: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Detached background work that has to be consistent at barriers, but doesn't
+   * gate the player turn that produced it. Two lanes today:
+   *
+   * - **scribe** — write-only: persists narrative into entity files the DM never
+   *   reads back, yet was the single largest chunk of player-facing turn latency
+   *   (~half of an entity-heavy turn). All its barriers are cold (consistency,
+   *   never freshness-for-the-DM).
+   * - **scene-tracker** — write-back: refreshes open threads / NPC intents that
+   *   feed the DM's *next-turn* `activeState` (`buildActiveState`). Its next-turn
+   *   barrier is hot — a barrier-for-freshness: detach execution to turn-end but
+   *   pin consumption to the next context build, so human think-time hides it for
+   *   free with zero staleness, and worst case degrades to inline. Never a
+   *   regression.
+   *
+   * `settleDeferredWork()` is the barrier; it flushes *every* lane at each point
+   * that reads or snapshots the durable state this work touches — the next turn's
+   * context build (before `getSystemPrompt` reads activeState), scene transition,
+   * session end, rollback, `promote_character` — and is what tests/teardown use to
+   * settle background work deterministically. Lanes serialize internally
+   * (consecutive scribes apply in order for dedup) and run parallel to each other
+   * (think-time hides max(), not sum()). See {@link DeferredWork} for why one
+   * `settle` per barrier covers every lane — it's what kills the "forgot a barrier
+   * for the new task" bug class (cf. the `promote_character` barrier we only caught
+   * in the scribe-detach review).
+   */
+  private readonly deferred = new DeferredWork();
 
   constructor(params: {
     provider: LLMProvider;
@@ -219,6 +307,18 @@ export class GameEngine {
     this.registry.onToolSuccess = (toolName, state) => {
       if (toolName === "switch_player") {
         this.persistCurrentScene();
+      }
+      if (toolName === "swap_pc") {
+        // swap_pc rewrites the PC roster (config.players) and the active
+        // index. Both must reach disk or the next load resurrects the old PC.
+        this.persister?.persistConfig(state.config);
+        this.persistCurrentScene();
+      }
+      if (toolName === "swap_dm_personality") {
+        // swap_dm_personality rewrites config.dm_personality. buildDMPrefix
+        // reads it live each turn, so the new voice is in play next turn;
+        // persist so it also survives a reload.
+        this.persister?.persistConfig(state.config);
       }
       if (toolName === "start_combat") {
         void this.initResolveSession(state);
@@ -348,7 +448,13 @@ export class GameEngine {
       } else if (cmd.type === "rollback") {
         await this.rollbackAndExit(cmd.target as string);
       } else if (cmd.type === "scribe") {
-        await this.handleScribe(cmd);
+        // Detached: the DM doesn't need the scribe's result to keep narrating,
+        // and the scribe is ~half of player-facing turn latency. The "scribe"
+        // lane serializes consecutive scribes (dedup needs scribe N's tree
+        // deltas applied before scribe N+1 reads) and swallows their errors;
+        // `settleDeferredWork()` (next turn start, scene transition, session
+        // end, rollback, promote) flushes it before any durable entity read.
+        this.deferred.enqueue("scribe", () => this.handleScribe(cmd));
       } else if (cmd.type === "promote_character") {
         await this.handlePromoteCharacter(cmd);
       } else if (cmd.type === "dm_notes") {
@@ -451,6 +557,14 @@ export class GameEngine {
   }
 
   /**
+   * Campaign slug used to tag trace spans — the campaign directory basename,
+   * matching how campaign-explorer keys campaigns (`?campaign=<slug>`).
+   */
+  private get campaignId(): string {
+    return basename(norm(this.gameState.campaignRoot));
+  }
+
+  /**
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
    */
@@ -488,9 +602,23 @@ export class GameEngine {
     };
     this.callbacks.onTurnStart(dmTurn);
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
+
+    // Barrier: the previous turn's detached work runs off the critical path
+    // (see `deferred`). Flush every lane before building this turn's context.
+    // The scribe lane: the DM's entity registry + character sheets need its
+    // writes landed (a concurrent read could tear a half-written sheet). The
+    // scene-tracker lane: `getSystemPrompt` below reads its refreshed
+    // threads/intents into activeState, so this doubles as the freshness barrier
+    // for that write-back lane. Placed AFTER `setState("dm_thinking")` so the
+    // re-entrancy guard above is already armed before we yield on the await;
+    // usually a no-op, since the player's think-time dwarfs the work.
+    await this.deferred.settle("next-turn", this.campaignId);
+
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
+    this.imagesEmittedThisTurn = [];
     logEvent("turn:player_input", { character: characterName, textLength: text.length });
 
     // Tag the input with character name; prepend OOC summary if pending
@@ -516,8 +644,23 @@ export class GameEngine {
       turnHolder: characterName,
     });
 
-    // Build message list
-    const messages: NormalizedMessage[] = [...this.conversation.getMessages()];
+    // Build message list. When PC portraits exist on disk and the
+    // provider supports image input, prepend a synthetic non-ephemeral
+    // user message carrying them as image_input ContentParts. The
+    // message sits inside the BP4 cached prefix, so portraits cost
+    // tokens once per cache write rather than every turn. Helper
+    // tolerates missing portraits silently — campaigns that skipped
+    // chargen portraits run text-only without throwing.
+    if (this.cachedPortraitMessage === undefined) {
+      this.cachedPortraitMessage = await loadDmPortraitMessage(
+        this.gameState.config.players,
+        this.fileIO,
+        this.gameState.campaignRoot,
+      );
+    }
+    const messages: NormalizedMessage[] = this.cachedPortraitMessage
+      ? [this.cachedPortraitMessage, ...this.conversation.getMessages()]
+      : [...this.conversation.getMessages()];
 
     // Build the user message: player input with system-generated preamble.
     // All injections (volatile context, behavioral reminders, scene pacing,
@@ -556,14 +699,24 @@ export class GameEngine {
     // message instead of this one, so next turn's cache lookup hits through
     // the stable tail and only pays for one turn's delta — not the entire
     // conversation tail.
+    // Revised portraits that finished rendering since the last turn ride into
+    // THIS turn's user message as image_input parts — the DM sees the actual
+    // updated likeness for free (no dedicated turn), and they persist in the
+    // stored exchange so they replay through the rest of the scene. See the
+    // `pendingPortraitInjections` field and `dispatchUpdatePortrait`.
+    const portraitParts = this.consumePendingPortraitInjections();
     const apiUserMessage: NormalizedMessage = {
       role: "user",
-      content: `${preamble}${taggedInput}`,
+      content: portraitParts.length > 0
+        ? [...portraitParts, { type: "text", text: `${preamble}${taggedInput}` }]
+        : `${preamble}${taggedInput}`,
       ephemeral: preamble.length > 0,
     };
     const storedUserMessage: NormalizedMessage = {
       role: "user",
-      content: taggedInput,
+      content: portraitParts.length > 0
+        ? [...portraitParts, { type: "text", text: taggedInput }]
+        : taggedInput,
     };
     messages.push(apiUserMessage);
 
@@ -578,6 +731,19 @@ export class GameEngine {
       },
     };
 
+    // Root turn span: the wall-clock envelope the flame chart segments on.
+    // The DM agent loop (agentLoopStreaming) and any deferred subagents
+    // (scribe/promote/scene_transition, run in applyDeferredTuiCommands) nest
+    // under it via ALS. Errors are caught (not re-thrown) here, so the span is
+    // tagged `failed` rather than `isError`.
+    await withSpan(
+      {
+        kind: "turn",
+        name: `turn ${this.turnCounter}`,
+        campaignId: this.campaignId,
+        attrs: { turnNumber: this.turnCounter, participant: characterName },
+      },
+      async () => {
     try {
       // Run the agent loop with streaming
       const result = await agentLoopStreaming(
@@ -611,35 +777,17 @@ export class GameEngine {
         this.sceneManager.appendDMResponse(result.text);
       }
 
-      // Split round messages into tool interactions and final assistant.
-      // When truncated, roundMessages may end with a user tool_result (no final assistant).
-      const roundMsgs = result.roundMessages;
-      let toolMessages: NormalizedMessage[] = [];
-      let finalAssistantText = result.text;
-      if (roundMsgs.length > 0) {
-        const lastMsg = roundMsgs[roundMsgs.length - 1];
-        if (roundMsgs.length > 1 && lastMsg.role === "assistant") {
-          toolMessages = roundMsgs.slice(0, -1);
-          // Extract text from only the final assistant to avoid duplicating
-          // text that appeared in intermediate tool-use rounds
-          finalAssistantText = typeof lastMsg.content === "string"
-            ? lastMsg.content
-            : (lastMsg.content as ContentPart[])
-                .filter((b): b is ContentPart & { type: "text" } => b.type === "text")
-                .map((b) => b.text)
-                .join("");
-        } else {
-          // Truncated or single-message: keep all as tool context
-          toolMessages = roundMsgs;
-          finalAssistantText = "";
-        }
-      }
-
-      // Add exchange to conversation manager (assistant kept as string for handleDroppedExchange compat)
-      const assistantMessage: NormalizedMessage = {
-        role: "assistant",
-        content: finalAssistantText || result.text,
-      };
+      // `turnMessages` is the bridge's canonical turn: tool_use ↔ tool_result
+      // pairs ending in an assistant message whose content is the narration.
+      // It always ends on an assistant message (the bridge guarantees this), so
+      // decompose into the existing exchange model unconditionally — no shape
+      // sniffing. The final assistant message is the DM response; everything
+      // before it is the tool interaction context.
+      const turn = result.turnMessages;
+      const assistantMessage: NormalizedMessage = turn.length > 0
+        ? turn[turn.length - 1]
+        : { role: "assistant", content: result.text };
+      const toolMessages = turn.slice(0, -1);
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
       // Persist display log and scene state after each exchange.
@@ -665,8 +813,18 @@ export class GameEngine {
             }
             logLines.push({ kind: "dm", text: result.text });
           }
+          // Images emitted during the turn (via generate_image's display_image
+          // TUI command) are appended after the DM's text so they sit at the
+          // visual end of the turn in scrollback. The actual mid-turn render
+          // order is preserved by the live broadcast; here we're just making
+          // sure the image survives a reload.
+          for (const img of this.imagesEmittedThisTurn) {
+            logLines.push({ kind: "image", text: img.filename, intent: img.intent });
+          }
           logLines.push({ kind: "dm", text: "" }); // paragraph separator
-          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines));
+          // Pass campaignRoot so image paths land relative — keeps the
+          // display-log portable across machines if the campaign is moved.
+          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines, this.gameState.campaignRoot));
         }
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
@@ -691,27 +849,43 @@ export class GameEngine {
       // label.
       await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
 
-      // Run scene tracker periodically to maintain open threads / NPC intents
-      if (!opts?.skipTranscript) {
-        const currentScene = this.sceneManager.getScene();
-        const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
-        if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
-          try {
-            const trackerUsage = await this.sceneManager.runSceneTracker(this.provider);
-            accUsage(this.sessionUsage, trackerUsage);
-            this.persistCurrentScene();
-          } catch (e) {
-            this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
-          }
-        }
-      }
-
       // Handle dropped exchange — update precis, then re-persist scene
       // so the precis written to disk includes the just-dropped content.
       if (dropped) {
         this.callbacks.onExchangeDropped();
         await this.handleDroppedExchange(dropped);
         this.persistCurrentScene();
+      }
+
+      // Run scene tracker periodically to maintain open threads / NPC intents.
+      // Detached onto its own "scene-tracker" lane (parallel to the scribe, so
+      // think-time hides max(), not sum()). It is write-back — its threads/intents
+      // feed the DM's *next-turn* `activeState` (buildActiveState) — kept fresh by
+      // the barrier-for-freshness at the next turn's context build:
+      // `this.deferred.settle("next-turn")` (in processInput) runs before
+      // `getSystemPrompt` reads activeState, so the refresh either finished
+      // during think-time (free) or
+      // the player out-raced it and we block just long enough to avoid serving
+      // stale threads. Enqueued AFTER the dropped-exchange handler on purpose:
+      // that handler's precis-updater also writes openThreads/npcIntents (and
+      // persists the scene) inline, so detaching the tracker last makes it the
+      // sole *final* writer of those fields — no concurrent scene mutation or
+      // persist to race — instead of overlapping it. The cadence gate stays
+      // inline so we only spawn the subagent on its cadence, not every turn.
+      if (!opts?.skipTranscript) {
+        const currentScene = this.sceneManager.getScene();
+        const playerExchanges = currentScene.transcript.filter((t) => t.startsWith("**[")).length;
+        if (playerExchanges > 0 && playerExchanges % SCENE_TRACKER_CADENCE === 0) {
+          this.deferred.enqueue("scene-tracker", async () => {
+            try {
+              const trackerUsage = await this.sceneManager.runSceneTracker(this.provider);
+              accUsage(this.sessionUsage, trackerUsage);
+              this.persistCurrentScene();
+            } catch (e) {
+              this.callbacks.onDevLog?.(`[dev] scene-tracker failed: ${e instanceof Error ? e.message : e}`);
+            }
+          });
+        }
       }
 
       // Process deferred TUI commands — engine-side work (scene transitions,
@@ -730,7 +904,7 @@ export class GameEngine {
       logEvent("turn:dm_complete", {
         textLength: result.text.length,
         toolCalls: toolCallCount,
-        rounds: result.roundMessages.filter((m) => m.role === "assistant").length,
+        rounds: result.turnMessages.filter((m) => m.role === "assistant").length,
         durationMs: Date.now() - turnStartTime,
       });
 
@@ -748,6 +922,7 @@ export class GameEngine {
       this.lastFailedInput = null;
 
     } catch (e) {
+      setSpanAttrs({ failed: true });
       if (e instanceof ContentRefusalError) {
         // Content classifier refusal — don't persist exchange or set retry
         // (same input would just re-trigger). Clear partial DM output and
@@ -780,6 +955,8 @@ export class GameEngine {
         this.callbacks.onError(error);
       }
     }
+      },
+    );
 
     this.setState("waiting_input");
 
@@ -821,6 +998,13 @@ export class GameEngine {
 
     if (!shouldGenerateChoices(frequency, this.dmProvidedChoicesThisTurn)) return;
 
+    // Detached background span (root). This is fire-and-forget from the turn
+    // (void-called after the turn span closes), so it must NOT extend the turn
+    // bar — `root: true` starts a fresh trace so the choice-generator subagent
+    // shows as its own short bar in the timeline.
+    await withSpan(
+      { kind: "background", name: "suggested_choices", campaignId: this.campaignId, root: true },
+      async () => {
     try {
       const session = await this.getOrCreateChoiceSession();
       const generated = await session.generate({
@@ -844,6 +1028,8 @@ export class GameEngine {
         `[dev] choice-generator failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+      },
+    );
   }
 
   /**
@@ -906,7 +1092,25 @@ export class GameEngine {
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the re-entrancy guard BEFORE the barrier: transitionScene is
+    // reachable from `waiting_input` (the server `/scene` command), so flushing
+    // while still input-accepting would let a concurrent processInput slip in
+    // and touch entity state mid-transition. setState to a non-input state
+    // first (as processInput does), THEN flush — a scene transition rebuilds
+    // the next scene's opening from persisted entity files + changelogs, so
+    // every detached write (scribe + scene-tracker) must land first (non-blocking
+    // within a scene, flushed before it advances).
     this.setState("scene_transition");
+    await this.deferred.settle("scene-transition", this.campaignId);
+
+    // The conversation is cleared on transition (sceneManager.stepPruneContext),
+    // so the BP4 message cache is rebuilt anyway — the free moment to refresh the
+    // portrait prefix. Invalidate the cached prefix message so the new scene
+    // reloads each PC's *current* portrait (picking up any mid-scene revision),
+    // and drop any pending portrait injection: the prefix now carries it, so
+    // there's nothing left to hand back as a "previous turn."
+    this.cachedPortraitMessage = undefined;
+    this.pendingPortraitInjections = [];
 
     try {
       const result = await this.sceneManager.sceneTransition(
@@ -947,7 +1151,11 @@ export class GameEngine {
   async endSession(title: string, timeAdvance?: number): Promise<void> {
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
+    // Arm the guard before the barrier (endSession is reachable from
+    // `waiting_input` too): set the non-input state, THEN flush detached work so
+    // we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
+    await this.deferred.settle("session-end", this.campaignId);
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1025,6 +1233,10 @@ export class GameEngine {
       this.callbacks.onError(new Error("Rollback unavailable: git is disabled for this campaign."));
       return;
     }
+    // Barrier: a git rollback rewrites entity files; let any detached work
+    // finish first so its writes are part of the snapshot being reverted (not
+    // racing the checkout).
+    await this.deferred.settle("rollback", this.campaignId);
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1034,6 +1246,20 @@ export class GameEngine {
   // --- Validation ---
 
   // --- Worldbuilding Entity I/O ---
+
+  /**
+   * Barrier: flush all detached background lanes (scribe, scene-tracker) before
+   * reading or snapshotting the durable state they touch. Never throws (lanes
+   * `.catch`-guard their seams and the tasks swallow their own errors). Usually
+   * resolves instantly — by the time the player acts or the DM ends a scene the
+   * background work has long finished; it only actually blocks when work
+   * overruns that gap, which is exactly when waiting is correct (and is recorded
+   * as a `barrier_wait` span). Public so graceful teardown and deterministic
+   * tests can settle it (mirrors `awaitPendingPortraitRenders`).
+   */
+  async settleDeferredWork(): Promise<void> {
+    await this.deferred.settle("teardown", this.campaignId);
+  }
 
   /** Spawn the scribe subagent to process batched entity updates */
   private async handleScribe(cmd: TuiCommand): Promise<void> {
@@ -1045,6 +1271,9 @@ export class GameEngine {
     try {
       const sceneNumber = this.sceneManager.getScene().sceneNumber;
       const small = this.tierProviders.small;
+      // (runScribe prefetches the batch's referenced entities and hands them to
+      // the subagent as canonical, so it skips the read_entity round-trips —
+      // see buildPrefetchedEntityBlock in scribe.ts.)
       const result = await runScribe(small.provider, {
         updates: updates.map(u => ({
           visibility: u.visibility as "private" | "player-facing",
@@ -1072,6 +1301,21 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");
       this.callbacks.onDevLog?.(`[dev] scribe: ${result.summary}`);
+
+      // Now that the scribe runs detached, a PC sheet it rewrote (HP, inventory,
+      // conditions) may land seconds after the turn ended — the client's cached
+      // sheet is stale until it refetches. Nudge any open character pane to
+      // re-pull. Bare signal (no payload): the bridge's default branch forwards
+      // `tui:character_sheet_changed`, the client bumps a sheet epoch and
+      // re-fetches the active sheet on demand. Gate on an actual character/player
+      // write — the pane only shows character sheets, so a location/item/faction
+      // edit shouldn't invalidate its cache.
+      const touchedSheet = result.entityDeltas.some(
+        (d) => d.type === "character" || d.type === "player",
+      );
+      if (touchedSheet) {
+        this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       logEvent("subagent:error", { name: "scribe", message: msg, durationMs: Date.now() - subStart });
@@ -1084,6 +1328,11 @@ export class GameEngine {
     const characterName = cmd.character as string;
     const context = cmd.context as string;
     if (!characterName) return;
+
+    // Barrier: promote reads + rewrites the character sheet and upserts the
+    // entity tree. A detached scribe may be rewriting the same files, so flush
+    // first or the read tears / the writes clobber (last-writer-wins).
+    await this.deferred.settle("promote-character", this.campaignId);
 
     const paths = campaignPaths(this.gameState.campaignRoot);
     const filePath = norm(paths.character(characterName));
@@ -1178,6 +1427,245 @@ export class GameEngine {
    * If `description` is present, spawns a Haiku subagent to interpret
    * the natural-language request. Otherwise, dispatches directly.
    */
+  /**
+   * Dispatch the DM's `generate_image` function tool. Calls the active
+   * provider's generateImage method, persists the bytes via the shared
+   * image-handler, and emits a display_image TUI command on the same
+   * tool result so the client renders the image inline as soon as the
+   * tool fires (not at end-of-turn). Returns a textual tool_result the
+   * model can riff off in its continuation.
+   *
+   * Errors (no provider support, content refusal, network) surface as
+   * an isError tool_result so the model can apologize, retry, or skip.
+   */
+  private async dispatchGenerateImage(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    if (!this.provider.generateImage) {
+      return {
+        content: "Image generation is not available on the configured provider.",
+        is_error: true,
+      };
+    }
+    const promptText = typeof input.prompt === "string" ? input.prompt.trim() : "";
+    if (!promptText) {
+      return { content: "generate_image requires a non-empty prompt.", is_error: true };
+    }
+    // Fallback matches the documented DM default (the tool schema marks
+    // `effort` required, but coerce defensively so an omitted/invalid value
+    // still lands on the intended "quality" tier rather than the lib default).
+    const effort = normalizeImageEffort(input.effort, "quality");
+    const aspect = normalizeImageAspect(input.aspect);
+    // Default to scene_snapshot: that's the DM's overwhelmingly common case
+    // (in-narrative scene rendering) and matches the on-disk naming the
+    // image-handler picks (scene-NNN-slug-…). player_request is only the
+    // right tag when the player explicitly asked for an illustration, and
+    // character_portrait is for character close-ups (rare in gameplay —
+    // setup-conversation owns the chargen portrait loop).
+    const rawIntent = typeof input.intent === "string" ? input.intent : "";
+    const intent: "scene_snapshot" | "player_request" | "character_portrait" =
+      rawIntent === "scene_snapshot" || rawIntent === "character_portrait" || rawIntent === "player_request"
+        ? rawIntent
+        : "scene_snapshot";
+    // Optional image-to-image references: the DM names characters whose
+    // established portrait this render should match (face/build/outfit). Resolve
+    // the names to portrait files now — a missing or typo'd name degrades to a
+    // text-only render rather than erroring, and an empty list omits the field
+    // so we do a plain text-to-image. Off by default: a portrait reference
+    // biases the whole render toward that character, wrong for a scene they're
+    // not in, so the DM must opt in per call.
+    const referenceNames = Array.isArray(input.reference_characters)
+      ? input.reference_characters.filter((n): n is string => typeof n === "string")
+      : [];
+    const referenceImages = referenceNames.length > 0
+      ? await loadCharacterReferences(
+          referenceNames,
+          this.sceneManager.getFileIO(),
+          this.gameState.campaignRoot,
+        )
+      : [];
+    try {
+      const result = await this.provider.generateImage({
+        prompt: promptText,
+        effort,
+        aspect,
+        intent,
+        ...(referenceImages.length > 0 ? { referenceImages } : {}),
+      });
+      const scene = this.sceneManager.getScene();
+      const persisted = await handleImageGenerated(
+        this.sceneManager.getFileIO(),
+        this.gameState.campaignRoot,
+        { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
+        {
+          // Timestamp-based surrogate id — never sent to the API. Lives in
+          // the on-disk sidecar JSON so each generation has a stable handle
+          // for log correlation. (Earlier hosted-tool path used the
+          // response's revised_prompt here; the function-tool path no
+          // longer surfaces that, so we synthesize instead.)
+          id: `img-${Date.now()}`,
+          base64: result.base64,
+          mimeType: result.mimeType,
+          intent,
+          ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+        },
+      );
+      const absPath = norm(`${this.gameState.campaignRoot}/${persisted.relPath}`);
+      return {
+        content: `Image rendered and displayed to the player (${result.effortUsed} effort, ${result.aspectUsed} aspect). The model's next narrative can reference it.`,
+        // _tui field attaches a TUI command to the tool result so it
+        // broadcasts immediately, before the DM's continuation runs.
+        _tui: {
+          type: "display_image",
+          filename: absPath,
+          relPath: persisted.relPath,
+          intent,
+        },
+      } as import("./tool-registry.js").ToolResult;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Engine log: visible to the harness + post-mortem dumps. onDevLog
+      // alone goes to the TUI dev pane and disappears with the process.
+      logEvent("image_gen:dispatch_failed", {
+        agent: "dm",
+        message: msg.slice(0, 400),
+      });
+      this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
+      return { content: `Image generation failed: ${msg}`, is_error: true };
+    }
+  }
+
+  /**
+   * Silent portrait revision (`update_portrait`). Re-renders a PC's portrait
+   * conditioned on their current one to reflect a durable appearance change,
+   * archives the prior version, and hands the new portrait back to the DM in
+   * context on a later turn. Unlike `generate_image` it does NOT display to the
+   * player and does NOT block the turn: it returns an immediate ack (which
+   * persists the DM's intent in conversation) and runs the render in the
+   * background. The new bytes land on disk + swap the current pointer via the
+   * tracked promise's own continuation.
+   */
+  private async dispatchUpdatePortrait(
+    input: Record<string, unknown>,
+  ): Promise<import("./tool-registry.js").ToolResult> {
+    if (!this.provider.generateImage) {
+      return { content: "Image generation is not available on the configured provider.", is_error: true };
+    }
+    const name = typeof input.character === "string" ? input.character.trim() : "";
+    // Cap the change description — it rides into the render prompt, the
+    // persisted ack, and the next-turn context marker, so an over-long string
+    // bloats all three.
+    const change = (typeof input.change === "string" ? input.change.trim() : "").slice(0, MAX_PORTRAIT_CHANGE_CHARS);
+    if (!name || !change) {
+      return { content: "update_portrait requires both `character` and `change`.", is_error: true };
+    }
+
+    const fileIO = this.sceneManager.getFileIO();
+    if (!fileIO.writeBinaryFile) {
+      // Bail before spending a (paid, minutes-long) render we couldn't persist.
+      return { content: "Portrait revision isn't available here (no file persistence).", is_error: true };
+    }
+    const root = this.gameState.campaignRoot;
+
+    // Condition the revision on the current portrait so identity carries
+    // forward — change one thing, keep the rest. No existing portrait → nothing
+    // to revise (e.g. an NPC, or a campaign where image-gen was off at setup).
+    const referenceImages = await loadCharacterReferences([name], fileIO, root);
+    if (referenceImages.length === 0) {
+      return {
+        content: `No saved portrait for "${name}" to revise — update_portrait only works on a character who already has one.`,
+        is_error: true,
+      };
+    }
+
+    logEvent("portrait_update:requested", { agent: "dm", character: name, change: change.slice(0, 200) });
+
+    const generateImage = this.provider.generateImage.bind(this.provider);
+    const render = (async () => {
+      try {
+        const result = await generateImage({
+          prompt: buildPortraitRevisionPrompt(name, change),
+          effort: "standard",
+          // The canonical portrait is the multi-angle landscape reference
+          // sheet from setup; re-render in landscape so the revision keeps
+          // that three-view layout rather than cropping to a single pose.
+          aspect: "landscape",
+          intent: "character_portrait",
+          referenceImages,
+        });
+        const bytes = Buffer.from(result.base64, "base64");
+        const small = await downscalePortraitForContext(bytes);
+        // Serialize archive+swap+stash through the commit chain: renders run in
+        // parallel, but this fast critical section must be one-at-a-time so two
+        // revisions completing close together don't compute the same archive
+        // version and clobber history. The chain swallows errors so one failure
+        // can't poison later commits; `commit` re-throws into the catch below.
+        const commit = this.portraitCommitChain.then(async () => {
+          const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
+          this.pendingPortraitInjections.push({
+            name,
+            change,
+            image: { type: "image_input", base64: small.base64, mimeType: small.mimeType, lowDetail: true, label: name },
+          });
+          logEvent("portrait_update:completed", { agent: "dm", character: name, archivedVersion });
+        });
+        this.portraitCommitChain = commit.catch(() => undefined);
+        await commit;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logEvent("portrait_update:failed", { agent: "dm", character: name, message: msg.slice(0, 400) });
+        this.callbacks.onDevLog?.(`[portrait] update for ${name} failed: ${msg}`);
+      }
+    })();
+    this.trackPortraitRender(render);
+
+    return {
+      content:
+        `Portrait revision for ${name} started in the background (silent — the player sees no image). ` +
+        `It will reflect: ${change}. The updated portrait returns to you in context on a later turn; ` +
+        `narrate the change in the fiction now, and do not announce a new image.`,
+    };
+  }
+
+  /** Track a background portrait render so failures aren't swallowed and teardown can await it. */
+  private trackPortraitRender(p: Promise<void>): void {
+    this.inFlightPortraitRenders.add(p);
+    void p.finally(() => this.inFlightPortraitRenders.delete(p));
+  }
+
+  /**
+   * Await any in-flight background `update_portrait` renders. Each settles on
+   * its own (disk write + pointer swap happen in the promise), so callers don't
+   * normally need this — it exists for graceful teardown and deterministic tests.
+   */
+  async awaitPendingPortraitRenders(): Promise<void> {
+    await Promise.all([...this.inFlightPortraitRenders]);
+  }
+
+  /**
+   * Drain revised portraits into image_input + label parts for the next user
+   * message. Returns [] when nothing is pending (the common case keeps the
+   * user message a plain string).
+   */
+  private consumePendingPortraitInjections(): ContentPart[] {
+    if (this.pendingPortraitInjections.length === 0) return [];
+    // Strip structural chars + collapse whitespace so a name/change can't break
+    // the marker or smuggle markup into the DM context. The values are
+    // model-authored (not untrusted user input), but keep the frame well-formed
+    // regardless — a stray quote or newline shouldn't malform the tag.
+    const safe = (s: string) => s.replace(/[<>"&]/g, " ").replace(/\s+/g, " ").trim();
+    const parts: ContentPart[] = [];
+    for (const inj of this.pendingPortraitInjections) {
+      parts.push({
+        type: "text",
+        text: `<portrait_updated character="${safe(inj.name)}">Now reflects: ${safe(inj.change)}</portrait_updated>`,
+      });
+      parts.push(inj.image);
+    }
+    this.pendingPortraitInjections = [];
+    return parts;
+  }
+
   /**
    * Handle style_scene as an async tool — runs the theme-styler subagent
    * during tool execution so the theme update broadcasts immediately
@@ -1347,6 +1835,7 @@ export class GameEngine {
     const active = getActivePlayer(this.gameState);
     const characterName = active.characterName;
 
+    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
     // Load character sheet (best-effort)
@@ -1441,19 +1930,37 @@ export class GameEngine {
   }
 
   private buildAgentConfig(): AgentLoopConfig {
+    // Image gen is gated on BOTH provider capability and campaign
+    // preference. Treat any non-"off" preference (including unset and
+    // undefined for legacy campaigns) as opt-in for now — phase 8 wires
+    // the setup-agent's explicit consent question, after which "unset"
+    // shouldn't occur for new campaigns. Existing campaigns get image
+    // gen enabled by default when the provider supports it, which
+    // matches the spec's "default on when capability is present" intent.
+    const capability = this.provider.getCapabilities?.(this.model).imageGeneration ?? false;
+    const preference = this.gameState.config.image_generation;
+    const imageGenEnabled = capability && preference !== "off";
+
     return {
       model: this.model,
       provider: this.provider,
       maxTokens: getMaxOutput(this.model),
       maxToolRounds: 10,
+      imageGenEnabled,
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
-        this.setState("tool_running");
+        if (name === GENERATE_IMAGE_TOOL_NAME) this.imageGenInFlight++;
+        // An in-flight image render owns the indicator (it's the slow, notable
+        // one); otherwise it's a generic tool.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "tool_running");
         this.callbacks.onToolStart(name);
       },
       onToolEnd: (name, result) => {
-        this.setState("dm_thinking");
+        if (name === GENERATE_IMAGE_TOOL_NAME && this.imageGenInFlight > 0) this.imageGenInFlight--;
+        // Stay on "generating_image" while any render is still going — a faster
+        // sibling tool finishing first must not drop the image indicator.
+        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {
@@ -1462,6 +1969,22 @@ export class GameEngine {
         // visual updates appear mid-narration instead of after the turn.
         if (cmd.type === "present_choices") {
           this.dmProvidedChoicesThisTurn = true;
+        } else if (cmd.type === "display_image") {
+          // Capture for display-log persistence at end-of-turn. The
+          // image lands in scrollback at the right ordinal position
+          // on session resume — without this, the bytes persist on
+          // disk but disappear from the in-game transcript after a
+          // reload. TuiCommand is a loose `{ type, [k]: unknown }`
+          // shape, so we narrow at the use site.
+          const filename = typeof cmd.filename === "string" ? cmd.filename : "";
+          const rawIntent = typeof cmd.intent === "string" ? cmd.intent : "";
+          const intent: "scene_snapshot" | "player_request" | "character_portrait" =
+            rawIntent === "scene_snapshot" || rawIntent === "player_request" || rawIntent === "character_portrait"
+              ? rawIntent
+              : "scene_snapshot";
+          if (filename) {
+            this.imagesEmittedThisTurn.push({ filename, intent });
+          }
         }
         this.callbacks.onTuiCommand(cmd);
       },
@@ -1500,6 +2023,22 @@ export class GameEngine {
     if (ENTITY_TOOL_NAME_SET.has(name)) {
       return this.getEntityToolDispatcher()(name, input);
     }
+
+    if (name === "generate_image") {
+      return this.dispatchGenerateImage(input);
+    }
+
+    if (name === UPDATE_PORTRAIT_TOOL_NAME) {
+      return this.dispatchUpdatePortrait(input);
+    }
+
+    /**
+     * Inlined to keep the dispatch table flat. Mirrors setup-conversation's
+     * dispatchGenerateImage but with DM-side context: scene number/slug for
+     * the on-disk basename, scene_snapshot intent default (DM usually
+     * generates scenes, not portraits).
+     */
+    // (see private dispatchGenerateImage method below)
 
     if (name === "resolve_turn") {
       if (!this.resolveSession) {
