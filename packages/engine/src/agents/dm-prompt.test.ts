@@ -260,3 +260,36 @@ describe("buildDMPrefix model conditionals", () => {
     expect(allText).not.toContain(GPT_ONLY_PHRASE);
   });
 });
+
+describe("buildDMPrefix image cadence interpolation", () => {
+  const cfg = (overrides: Partial<CampaignConfig>): CampaignConfig => ({
+    name: "Test",
+    system: "D&D 5e",
+    dm_personality: { name: "grim", prompt_fragment: "You are terse." },
+    players: [{ name: "Alice", character: "Aldric", type: "human" }],
+    combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+    context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
+    recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+    choices: { campaign_default: "never", player_overrides: {} },
+    ...overrides,
+  } as CampaignConfig);
+
+  const directivesText = (config: CampaignConfig): string =>
+    buildDMPrefix(config, {}).system.map((b) => b.text).join("\n");
+
+  it("substitutes the default cadence (12) when unset and leaves no placeholder", () => {
+    const all = directivesText(cfg({}));
+    expect(all).toContain("**12** images across every 100 player exchanges");
+    expect(all).not.toContain("{{imageCadence}}");
+  });
+
+  it("honors an explicit per-campaign cadence", () => {
+    const all = directivesText(cfg({ image_cadence_per_100: 25 }));
+    expect(all).toContain("**25** images across every 100 player exchanges");
+  });
+
+  it("clamps an out-of-range cadence to the supported max", () => {
+    const all = directivesText(cfg({ image_cadence_per_100: 999 }));
+    expect(all).toContain("**50** images across every 100 player exchanges");
+  });
+});

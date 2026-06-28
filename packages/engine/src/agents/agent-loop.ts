@@ -168,7 +168,10 @@ async function runAgentLoopInternal(
     tools.push({
       name: GENERATE_IMAGE_TOOL_NAME,
       description:
-        "Generate one illustrated image rendered inline with this response. " +
+        "Generate one illustrated image. Fire-and-forget: the render runs in the " +
+        "background (a minute or two) and the finished image surfaces to the player " +
+        "on its own a little later — it is NOT shown inline with this response, so " +
+        "do not narrate it as appearing now. " +
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. Use sparingly — at most " +

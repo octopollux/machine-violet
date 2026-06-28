@@ -93,12 +93,6 @@ export class GameEngine {
   private sceneManager: SceneManager;
   private callbacks: EngineCallbacks;
   private engineState: EngineState = "idle";
-  /** Count of in-flight `generate_image` tool calls. Image renders take minutes
-   *  and run concurrently with faster sibling tools (scene_transition,
-   *  style_scene); this keeps the "generating_image" activity state up for the
-   *  whole render instead of letting a sibling's completion flip it to thinking.
-   *  Reset to 0 at each turn start in case a render was abandoned mid-flight. */
-  private imageGenInFlight = 0;
   private sessionUsage: UsageStats = {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
   };
@@ -167,6 +161,23 @@ export class GameEngine {
    * land on disk + the pointer swaps via the promise's own `.then`.
    */
   private inFlightPortraitRenders = new Set<Promise<void>>();
+
+  /**
+   * Player-facing images from `generate_image` that have finished rendering in
+   * the background and are waiting to surface. The render is fire-and-forget:
+   * the DM fires the tool, gets an immediate ack, and keeps narrating; when the
+   * (minutes-long) render lands, the finished image pushes here and is drained
+   * at the next turn boundary (broadcast to the client + appended to the display
+   * log), divorced from the turn it was requested on. See `dispatchGenerateImage`.
+   */
+  private pendingImageDisplays: { filename: string; relPath: string; intent: "scene_snapshot" | "player_request" | "character_portrait" }[] = [];
+
+  /**
+   * In-flight `generate_image` renders. Tracked (like portrait renders) so
+   * failures are logged not swallowed, the resting `generating_image` indicator
+   * can reflect "an image is still cooking", and teardown/tests can await them.
+   */
+  private inFlightImageRenders = new Set<Promise<void>>();
 
   /**
    * Serializes the archive+swap critical section across portrait revisions.
@@ -569,7 +580,13 @@ export class GameEngine {
    * This is the main game loop entry point.
    */
   async processInput(characterName: string, text: string, opts?: { fromAI?: boolean; skipTranscript?: boolean }): Promise<void> {
-    if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
+    // `generating_image` is a *resting* state — the engine sits in it between
+    // turns while a fire-and-forget image render is still cooking in the
+    // background. The player can (and should) keep playing through it, so it's
+    // a valid entry point alongside idle/waiting_input. Only the genuinely
+    // mid-turn states (dm_thinking, tool_running, scene_transition, …) gate
+    // re-entrancy.
+    if (this.engineState !== "idle" && this.engineState !== "waiting_input" && this.engineState !== "generating_image") {
       return; // Already processing
     }
 
@@ -602,7 +619,6 @@ export class GameEngine {
     };
     this.callbacks.onTurnStart(dmTurn);
 
-    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
     // Barrier: the previous turn's detached work runs off the critical path
@@ -790,6 +806,13 @@ export class GameEngine {
       const toolMessages = turn.slice(0, -1);
       const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
 
+      // Drain any background `generate_image` renders that finished since the
+      // last turn. They're divorced from turn order (the DM fired them earlier
+      // and moved on), so they surface HERE — appended to the display log below
+      // (with a divider so they read as out-of-band) and broadcast live after
+      // this turn's narration completes. Drain once; reuse for both.
+      const drainedImages = this.consumePendingImageDisplays();
+
       // Persist display log and scene state after each exchange.
       // Writes are fire-and-forget for crash resilience; CampaignRepo's
       // preCommitHook flushes them to disk before any git commit.
@@ -813,12 +836,16 @@ export class GameEngine {
             }
             logLines.push({ kind: "dm", text: result.text });
           }
-          // Images emitted during the turn (via generate_image's display_image
-          // TUI command) are appended after the DM's text so they sit at the
-          // visual end of the turn in scrollback. The actual mid-turn render
-          // order is preserved by the live broadcast; here we're just making
-          // sure the image survives a reload.
+          // Any images emitted synchronously during the turn (legacy/other
+          // display_image sources) sit right after the DM's text.
           for (const img of this.imagesEmittedThisTurn) {
+            logLines.push({ kind: "image", text: img.filename, intent: img.intent });
+          }
+          // Background renders that completed since the last turn surface here,
+          // each behind a divider so they read as a standalone illustration of
+          // an earlier beat rather than part of this turn's narration.
+          for (const img of drainedImages) {
+            logLines.push({ kind: "separator", text: "---" });
             logLines.push({ kind: "image", text: img.filename, intent: img.intent });
           }
           logLines.push({ kind: "dm", text: "" }); // paragraph separator
@@ -912,6 +939,19 @@ export class GameEngine {
       this.callbacks.onNarrativeComplete(result.text, text || undefined);
       this.callbacks.onTurnEnd(dmTurn);
 
+      // Surface any background images that finished since the last turn, now
+      // that this turn's narration is fully flushed. The client's display_image
+      // handler frames each with a separator; landing them after onNarrativeComplete
+      // keeps them below the DM's prose instead of splicing mid-stream.
+      for (const img of drainedImages) {
+        this.callbacks.onTuiCommand({
+          type: "display_image",
+          filename: img.filename,
+          relPath: img.relPath,
+          intent: img.intent,
+        });
+      }
+
       // Auto-generate suggested responses for the next (human) turn when the
       // campaign's Choices Frequency is set above "never" and the DM didn't
       // already call `present_choices` itself. Fire-and-forget failures — the
@@ -958,7 +998,10 @@ export class GameEngine {
       },
     );
 
-    this.setState("waiting_input");
+    // Rest in `generating_image` if a background render is still cooking, so the
+    // player sees "the DM is creating an image…" between turns — but input stays
+    // unblocked (processInput accepts that state). Otherwise plain waiting_input.
+    this.setState(this.restingState());
 
     // Check if an AI player should auto-act next
     this.processAITurnIfNeeded();
@@ -1142,7 +1185,7 @@ export class GameEngine {
       this.callbacks.onError(error);
     }
 
-    this.setState("waiting_input");
+    this.setState(this.restingState());
   }
 
   /**
@@ -1176,7 +1219,32 @@ export class GameEngine {
       this.callbacks.onError(error);
     }
 
+    // Best-effort: flush any background images that finished but never got a
+    // turn boundary to surface on, so they're not lost — they'll reappear in
+    // scrollback on the next resume. We do NOT await still-in-flight renders
+    // (they can take minutes); their bytes are on disk regardless.
+    this.flushPendingImageDisplaysToLog();
+
     this.setState("idle");
+  }
+
+  /**
+   * Append any completed-but-unshown background images to the display log.
+   * Used at teardown so an image that landed without a turn boundary to drain
+   * it still survives into the next session's scrollback. No live broadcast —
+   * the session is ending.
+   */
+  private flushPendingImageDisplaysToLog(): void {
+    if (!this.persister) return;
+    const drained = this.consumePendingImageDisplays();
+    if (drained.length === 0) return;
+    const logLines: NarrativeLine[] = [];
+    for (const img of drained) {
+      logLines.push({ kind: "separator", text: "---" });
+      logLines.push({ kind: "image", text: img.filename, intent: img.intent });
+    }
+    logLines.push({ kind: "dm", text: "" });
+    this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines, this.gameState.campaignRoot));
   }
 
   /**
@@ -1428,15 +1496,19 @@ export class GameEngine {
    * the natural-language request. Otherwise, dispatches directly.
    */
   /**
-   * Dispatch the DM's `generate_image` function tool. Calls the active
-   * provider's generateImage method, persists the bytes via the shared
-   * image-handler, and emits a display_image TUI command on the same
-   * tool result so the client renders the image inline as soon as the
-   * tool fires (not at end-of-turn). Returns a textual tool_result the
-   * model can riff off in its continuation.
+   * Dispatch the DM's `generate_image` function tool. Fire-and-forget: it
+   * validates inputs, kicks the (minutes-long) render on a tracked background
+   * promise, and returns an immediate ack so the DM keeps narrating without
+   * waiting. When the render lands, the bytes persist via the shared
+   * image-handler and the finished image pushes onto `pendingImageDisplays`,
+   * which the next turn boundary drains to the player (broadcast + display log).
+   * The image is therefore divorced from the turn it was requested on — by
+   * design, so a slow render never blocks gameplay.
    *
-   * Errors (no provider support, content refusal, network) surface as
-   * an isError tool_result so the model can apologize, retry, or skip.
+   * Validation errors (no provider, empty prompt) surface synchronously as an
+   * isError tool_result. Render-time errors (content refusal, network) can't
+   * reach the DM anymore — the turn is long over — so they're logged and the
+   * image is silently dropped (the DM never claimed it appeared).
    */
   private async dispatchGenerateImage(
     input: Record<string, unknown>,
@@ -1468,71 +1540,136 @@ export class GameEngine {
         ? rawIntent
         : "scene_snapshot";
     // Optional image-to-image references: the DM names characters whose
-    // established portrait this render should match (face/build/outfit). Resolve
-    // the names to portrait files now — a missing or typo'd name degrades to a
-    // text-only render rather than erroring, and an empty list omits the field
-    // so we do a plain text-to-image. Off by default: a portrait reference
-    // biases the whole render toward that character, wrong for a scene they're
-    // not in, so the DM must opt in per call.
+    // established portrait this render should match (face/build/outfit). A
+    // missing or typo'd name degrades to a text-only render rather than
+    // erroring, and an empty list omits the field so we do a plain
+    // text-to-image. Off by default: a portrait reference biases the whole
+    // render toward that character, wrong for a scene they're not in, so the
+    // DM must opt in per call.
     const referenceNames = Array.isArray(input.reference_characters)
       ? input.reference_characters.filter((n): n is string => typeof n === "string")
       : [];
-    const referenceImages = referenceNames.length > 0
-      ? await loadCharacterReferences(
-          referenceNames,
-          this.sceneManager.getFileIO(),
-          this.gameState.campaignRoot,
-        )
-      : [];
-    try {
-      const result = await this.provider.generateImage({
-        prompt: promptText,
-        effort,
-        aspect,
-        intent,
-        ...(referenceImages.length > 0 ? { referenceImages } : {}),
-      });
-      const scene = this.sceneManager.getScene();
-      const persisted = await handleImageGenerated(
-        this.sceneManager.getFileIO(),
-        this.gameState.campaignRoot,
-        { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" },
-        {
-          // Timestamp-based surrogate id — never sent to the API. Lives in
-          // the on-disk sidecar JSON so each generation has a stable handle
-          // for log correlation. (Earlier hosted-tool path used the
-          // response's revised_prompt here; the function-tool path no
-          // longer surfaces that, so we synthesize instead.)
-          id: `img-${Date.now()}`,
-          base64: result.base64,
-          mimeType: result.mimeType,
+
+    // Snapshot the scene NOW (at request time): the render takes minutes and
+    // the scene may transition before it lands, but the image illustrates THIS
+    // moment, so it should file under the scene it was requested in.
+    const scene = this.sceneManager.getScene();
+    const sceneRef = { sceneNumber: scene.sceneNumber, slug: scene.slug || "untitled" };
+    const fileIO = this.sceneManager.getFileIO();
+    const root = this.gameState.campaignRoot;
+    const generateImage = this.provider.generateImage.bind(this.provider);
+
+    const render = (async () => {
+      try {
+        const referenceImages = referenceNames.length > 0
+          ? await loadCharacterReferences(referenceNames, fileIO, root)
+          : [];
+        const result = await generateImage({
+          prompt: promptText,
+          effort,
+          aspect,
           intent,
-          ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
-        },
-      );
-      const absPath = norm(`${this.gameState.campaignRoot}/${persisted.relPath}`);
-      return {
-        content: `Image rendered and displayed to the player (${result.effortUsed} effort, ${result.aspectUsed} aspect). The model's next narrative can reference it.`,
-        // _tui field attaches a TUI command to the tool result so it
-        // broadcasts immediately, before the DM's continuation runs.
-        _tui: {
-          type: "display_image",
-          filename: absPath,
-          relPath: persisted.relPath,
+          ...(referenceImages.length > 0 ? { referenceImages } : {}),
+        });
+        const persisted = await handleImageGenerated(
+          fileIO,
+          root,
+          sceneRef,
+          {
+            // Timestamp-based surrogate id — never sent to the API. Lives in
+            // the on-disk sidecar JSON so each generation has a stable handle
+            // for log correlation. (Earlier hosted-tool path used the
+            // response's revised_prompt here; the function-tool path no
+            // longer surfaces that, so we synthesize instead.)
+            id: `img-${Date.now()}`,
+            base64: result.base64,
+            mimeType: result.mimeType,
+            intent,
+            ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+          },
+        );
+        const absPath = norm(`${root}/${persisted.relPath}`);
+        // Queue for the next turn boundary to surface (broadcast + display log).
+        this.pendingImageDisplays.push({ filename: absPath, relPath: persisted.relPath, intent });
+        logEvent("image_gen:completed", {
+          agent: "dm",
           intent,
-        },
-      } as import("./tool-registry.js").ToolResult;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // Engine log: visible to the harness + post-mortem dumps. onDevLog
-      // alone goes to the TUI dev pane and disappears with the process.
-      logEvent("image_gen:dispatch_failed", {
-        agent: "dm",
-        message: msg.slice(0, 400),
-      });
-      this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
-      return { content: `Image generation failed: ${msg}`, is_error: true };
-    }
+          effort: result.effortUsed,
+          aspect: result.aspectUsed,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Engine log: visible to the harness + post-mortem dumps. onDevLog
+        // alone goes to the TUI dev pane and disappears with the process.
+        logEvent("image_gen:dispatch_failed", {
+          agent: "dm",
+          message: msg.slice(0, 400),
+        });
+        this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
+      }
+    })();
+    this.trackImageRender(render);
+
+    const playerNote = intent === "player_request"
+      ? " Let the player know in your narration that you're sketching it now — it'll appear shortly."
+      : "";
+    return {
+      content:
+        `Image render started in the background (${effort} effort, ${aspect} aspect). ` +
+        `It will surface to the player on its own a little later — keep narrating, and do ` +
+        `not announce it as appearing now (it isn't there yet).${playerNote}`,
+    };
+  }
+
+  /**
+   * Track a background `generate_image` render so failures aren't swallowed,
+   * the resting "generating_image" indicator reflects it, and teardown/tests
+   * can await it. Mirrors `trackPortraitRender`.
+   */
+  private trackImageRender(p: Promise<void>): void {
+    this.inFlightImageRenders.add(p);
+    this.refreshRestingImageState();
+    void p.finally(() => {
+      this.inFlightImageRenders.delete(p);
+      this.refreshRestingImageState();
+    });
+  }
+
+  /**
+   * Await any in-flight background `generate_image` renders. Each settles on
+   * its own (the finished image queues itself for display), so this exists for
+   * graceful teardown and deterministic tests — mirrors `awaitPendingPortraitRenders`.
+   */
+  async awaitPendingImageRenders(): Promise<void> {
+    await Promise.all([...this.inFlightImageRenders]);
+  }
+
+  /** The state the engine should rest in between turns: `generating_image`
+   *  while a background render is still cooking, else `waiting_input`. */
+  private restingState(): EngineState {
+    return this.inFlightImageRenders.size > 0 ? "generating_image" : "waiting_input";
+  }
+
+  /**
+   * Nudge the *resting* activity indicator to match in-flight renders, without
+   * ever stomping a mid-turn state. Called when a render starts/finishes: if the
+   * engine is sitting between turns, flip waiting_input ↔ generating_image so the
+   * client shows "the DM is creating an image…" while one cooks. During a turn
+   * (dm_thinking/tool_running/…) it's a no-op — the turn owns the state and will
+   * recompute the resting state itself when it ends.
+   */
+  private refreshRestingImageState(): void {
+    if (this.engineState !== "waiting_input" && this.engineState !== "generating_image") return;
+    const target = this.restingState();
+    if (this.engineState !== target) this.setState(target);
+  }
+
+  /** Pop all background images that finished rendering since the last drain. */
+  private consumePendingImageDisplays(): { filename: string; relPath: string; intent: "scene_snapshot" | "player_request" | "character_portrait" }[] {
+    if (this.pendingImageDisplays.length === 0) return [];
+    const drained = this.pendingImageDisplays;
+    this.pendingImageDisplays = [];
+    return drained;
   }
 
   /**
@@ -1835,7 +1972,6 @@ export class GameEngine {
     const active = getActivePlayer(this.gameState);
     const characterName = active.characterName;
 
-    this.imageGenInFlight = 0;
     this.setState("dm_thinking");
 
     // Load character sheet (best-effort)
@@ -1950,17 +2086,15 @@ export class GameEngine {
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
-        if (name === GENERATE_IMAGE_TOOL_NAME) this.imageGenInFlight++;
-        // An in-flight image render owns the indicator (it's the slow, notable
-        // one); otherwise it's a generic tool.
-        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "tool_running");
+        // `generate_image` no longer blocks the turn — it kicks a background
+        // render and returns immediately (see dispatchGenerateImage), so it's
+        // just another quick tool here. The "generating_image" indicator is
+        // driven separately, off the in-flight render set (refreshRestingImageState).
+        this.setState("tool_running");
         this.callbacks.onToolStart(name);
       },
       onToolEnd: (name, result) => {
-        if (name === GENERATE_IMAGE_TOOL_NAME && this.imageGenInFlight > 0) this.imageGenInFlight--;
-        // Stay on "generating_image" while any render is still going — a faster
-        // sibling tool finishing first must not drop the image indicator.
-        this.setState(this.imageGenInFlight > 0 ? "generating_image" : "dm_thinking");
+        this.setState("dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {
@@ -2024,7 +2158,7 @@ export class GameEngine {
       return this.getEntityToolDispatcher()(name, input);
     }
 
-    if (name === "generate_image") {
+    if (name === GENERATE_IMAGE_TOOL_NAME) {
       return this.dispatchGenerateImage(input);
     }
 

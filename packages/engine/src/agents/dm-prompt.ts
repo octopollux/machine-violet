@@ -1,4 +1,5 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import { IMAGE_CADENCE_PER_100_DEFAULT, clampImageCadencePer100 } from "@machine-violet/shared/types/config.js";
 import { buildCachedPrefix } from "../context/index.js";
 import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
 import { getModel } from "../config/models.js";
@@ -78,7 +79,17 @@ export function buildDMPrefix(
   // occurrence survives, so a personality's `<NPCS>` block trumps a seed's,
   // which in turn trumps the main DM's.
   const dmIdentity = loadPrompt("dm-identity", model);
-  const dmDirectives = loadPrompt("dm-directives", model);
+  // dm-directives carries a {{imageCadence}} placeholder for the per-campaign
+  // image cadence target. Interpolate here (loadPrompt has no var substitution)
+  // before applyLayeredOverrides — the placeholder lives in free prose, not a
+  // <TAG> block, so override collapsing is unaffected.
+  const imageCadence = clampImageCadencePer100(
+    config.image_cadence_per_100 ?? IMAGE_CADENCE_PER_100_DEFAULT,
+  );
+  const dmDirectives = loadPrompt("dm-directives", model).replace(
+    /\{\{imageCadence\}\}/g,
+    String(imageCadence),
+  );
   const campaignDetail = processIncludes(config.campaign_detail ?? "");
   const personality = processIncludes(config.dm_personality.prompt_fragment ?? "");
   const personalityDetail = processIncludes(config.dm_personality.detail ?? "");
