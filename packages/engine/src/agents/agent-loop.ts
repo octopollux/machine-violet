@@ -174,8 +174,7 @@ async function runAgentLoopInternal(
         "do not narrate it as appearing now. " +
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
-        "as a printed plate, not emitted as separate text. Use sparingly — at most " +
-        "one image per turn. " +
+        "as a printed plate, not emitted as separate text. At most one image per turn. " +
         "Default to `effort: \"quality\"` for scene snapshots and player-requested " +
         "illustrations — a high-quality render that still comes back at reasonable speed. " +
         "Drop to `\"standard\"` (medium) for quick or minor inserts where speed matters more. " +
