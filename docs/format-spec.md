@@ -227,13 +227,13 @@ Everything else is created during play.
                                           // toggle (Esc → Settings; persisted via PATCH /settings).
 
   // Image generation cadence
-  "image_cadence_per_100": 12             // Optional. Target number of DM-initiated images per 100
+  "image_cadence_per_100": 8              // Optional. Target number of DM-initiated images per 100
                                           // player exchanges, surfaced to the DM as soft guidance
                                           // ("aim for ~N per 100 exchanges, timing your call") and
                                           // interpolated into dm-directives. The DM self-paces from
                                           // its own context + the exchange counter — this is a target,
                                           // not a hard cap. Player-requested images render regardless
-                                          // and don't count against it. Range 0–50; default 12. Only
+                                          // and don't count against it. Range 0–50; default 8. Only
                                           // meaningful when image generation is enabled. Editable via
                                           // config.json.
 

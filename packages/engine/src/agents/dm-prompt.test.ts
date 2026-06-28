@@ -277,9 +277,9 @@ describe("buildDMPrefix image cadence interpolation", () => {
   const directivesText = (config: CampaignConfig): string =>
     buildDMPrefix(config, {}).system.map((b) => b.text).join("\n");
 
-  it("substitutes the default cadence (12) when unset and leaves no placeholder", () => {
+  it("substitutes the default cadence (8) when unset and leaves no placeholder", () => {
     const all = directivesText(cfg({}));
-    expect(all).toContain("**12** images across every 100 player exchanges");
+    expect(all).toContain("**8** images across every 100 player exchanges");
     expect(all).not.toContain("{{imageCadence}}");
   });
 

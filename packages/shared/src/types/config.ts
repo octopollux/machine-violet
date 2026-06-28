@@ -215,7 +215,7 @@ export function clampDmTurnLengthPct(value: number): number {
   return Math.max(DM_TURN_LENGTH_PCT_MIN, Math.min(DM_TURN_LENGTH_PCT_MAX, stepped));
 }
 
-export const IMAGE_CADENCE_PER_100_DEFAULT = 12;
+export const IMAGE_CADENCE_PER_100_DEFAULT = 8;
 export const IMAGE_CADENCE_PER_100_MIN = 0;
 export const IMAGE_CADENCE_PER_100_MAX = 50;
 
