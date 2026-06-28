@@ -279,17 +279,17 @@ describe("buildDMPrefix image cadence interpolation", () => {
 
   it("substitutes the default cadence (8) when unset and leaves no placeholder", () => {
     const all = directivesText(cfg({}));
-    expect(all).toContain("**8** images across every 100 player exchanges");
+    expect(all).toContain("roughly 8 images across every 100 player exchanges");
     expect(all).not.toContain("{{imageCadence}}");
   });
 
   it("honors an explicit per-campaign cadence", () => {
     const all = directivesText(cfg({ image_cadence_per_100: 25 }));
-    expect(all).toContain("**25** images across every 100 player exchanges");
+    expect(all).toContain("roughly 25 images across every 100 player exchanges");
   });
 
   it("clamps an out-of-range cadence to the supported max", () => {
     const all = directivesText(cfg({ image_cadence_per_100: 999 }));
-    expect(all).toContain("**50** images across every 100 player exchanges");
+    expect(all).toContain("roughly 50 images across every 100 player exchanges");
   });
 });
