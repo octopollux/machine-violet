@@ -32,8 +32,16 @@ All under `packages/engine/src/providers/openai-chatgpt/`:
 
 1. **Construction** is synchronous and free — `createOpenAIChatGptProvider()` returns a provider with no subprocess yet running.
 2. **First `chat()` / `stream()` call** lazily spawns codex, sends `initialize`, validates a ChatGPT account is logged in, and subscribes to rate-limit updates. Failures here clear the start promise so subsequent calls retry from scratch.
-3. **Per-turn**: a fresh Codex thread is created with `developerInstructions` (system prompt) and `dynamicTools` (tool defs); prior history is pushed via `thread/inject_items`; `turn/start` runs the turn. Tool calls arrive as `item/tool/call` server requests and are dispatched via `params.dispatchTool` synchronously.
+3. **Per-turn**: a fresh Codex thread is created with `developerInstructions` (the MV system prompt), `baseInstructions: ""` (see below), and `dynamicTools` (tool defs); prior history is pushed via `thread/inject_items`; `turn/start` runs the turn. Tool calls arrive as `item/tool/call` server requests and are dispatched via `params.dispatchTool` synchronously.
 4. **`dispose()`** is called by the session manager at session end. Idempotent.
+
+## Base instructions (stripping codex's coding-agent persona)
+
+MV's system prompt rides as `developerInstructions`, which codex layers **on top of** its built-in coding-agent base prompt. That base persona leaks into the agent: asked to self-describe, the DM said *"I'm Codex … following safety, tool, and workspace constraints"* — which skews it deferential and conservative, unlike the same prompt on API Claude.
+
+`thread/start` also accepts **`baseInstructions`**, which **replaces** that base prompt. The provider defaults it to `""` for every `chat()`/`stream()` turn (overridable per-call via `ChatParamsBase.baseInstructions`), stripping the codex persona so the agent runs on `developerInstructions` alone. None of MV's codex agents are coding agents, so this is a blanket strip.
+
+Verified live on gpt-5.5 (`test-harness/bin/codex-base-instructions.ts`): the override is **accepted — no HTTP 400** (openai/codex#3202's "Instructions are not valid" does *not* reproduce on the app-server `baseInstructions` path / codex 0.133), it removes the "Codex / workspace constraints" identity, and **tool dispatch is unaffected** (a tools-enabled turn still fired `roll_dice`). The **image-render turn is a separate `thread/start`** (`renderImageOnce`) and is intentionally left alone — it keeps codex's default base so its built-in `image_gen` scaffolding survives.
 
 ## History ownership
 
