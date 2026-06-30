@@ -174,8 +174,9 @@ export class GameEngine {
 
   /**
    * In-flight `generate_image` renders. Tracked (like portrait renders) so
-   * failures are logged not swallowed, the resting `generating_image` indicator
-   * can reflect "an image is still cooking", and teardown/tests can await them.
+   * failures are logged not swallowed and teardown/tests can await them. The
+   * renders are fully detached from the turn state — the player keeps their
+   * turn while one cooks; the finished image surfaces on a later turn.
    */
   private inFlightImageRenders = new Set<Promise<void>>();
 
@@ -580,13 +581,7 @@ export class GameEngine {
    * This is the main game loop entry point.
    */
   async processInput(characterName: string, text: string, opts?: { fromAI?: boolean; skipTranscript?: boolean }): Promise<void> {
-    // `generating_image` is a *resting* state — the engine sits in it between
-    // turns while a fire-and-forget image render is still cooking in the
-    // background. The player can (and should) keep playing through it, so it's
-    // a valid entry point alongside idle/waiting_input. Only the genuinely
-    // mid-turn states (dm_thinking, tool_running, scene_transition, …) gate
-    // re-entrancy.
-    if (this.engineState !== "idle" && this.engineState !== "waiting_input" && this.engineState !== "generating_image") {
+    if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
     }
 
@@ -998,10 +993,14 @@ export class GameEngine {
       },
     );
 
-    // Rest in `generating_image` if a background render is still cooking, so the
-    // player sees "the DM is creating an image…" between turns — but input stays
-    // unblocked (processInput accepts that state). Otherwise plain waiting_input.
-    this.setState(this.restingState());
+    // Yield to the player immediately — a fire-and-forget image render is
+    // detached and keeps cooking in the background (it surfaces on a later
+    // turn). We deliberately do NOT park in `generating_image` here: that
+    // resting state reads as "DM's turn" in the client (turnHolder=DM, greyed
+    // player frame, "the DM is creating an image…"), so a multi-minute render
+    // would make the player wait their own turn out for no reason. The image
+    // arrives on its own; the turn is the player's now.
+    this.setState("waiting_input");
 
     // Check if an AI player should auto-act next
     this.processAITurnIfNeeded();
@@ -1185,7 +1184,7 @@ export class GameEngine {
       this.callbacks.onError(error);
     }
 
-    this.setState(this.restingState());
+    this.setState("waiting_input");
   }
 
   /**
@@ -1622,16 +1621,15 @@ export class GameEngine {
   }
 
   /**
-   * Track a background `generate_image` render so failures aren't swallowed,
-   * the resting "generating_image" indicator reflects it, and teardown/tests
-   * can await it. Mirrors `trackPortraitRender`.
+   * Track a background `generate_image` render so failures aren't swallowed and
+   * teardown/tests can await it. Mirrors `trackPortraitRender`. The render is
+   * fully detached — it never touches the engine's turn state, so the player
+   * keeps their turn the whole time it cooks (it surfaces on a later turn).
    */
   private trackImageRender(p: Promise<void>): void {
     this.inFlightImageRenders.add(p);
-    this.refreshRestingImageState();
     void p.finally(() => {
       this.inFlightImageRenders.delete(p);
-      this.refreshRestingImageState();
     });
   }
 
@@ -1642,26 +1640,6 @@ export class GameEngine {
    */
   async awaitPendingImageRenders(): Promise<void> {
     await Promise.all([...this.inFlightImageRenders]);
-  }
-
-  /** The state the engine should rest in between turns: `generating_image`
-   *  while a background render is still cooking, else `waiting_input`. */
-  private restingState(): EngineState {
-    return this.inFlightImageRenders.size > 0 ? "generating_image" : "waiting_input";
-  }
-
-  /**
-   * Nudge the *resting* activity indicator to match in-flight renders, without
-   * ever stomping a mid-turn state. Called when a render starts/finishes: if the
-   * engine is sitting between turns, flip waiting_input ↔ generating_image so the
-   * client shows "the DM is creating an image…" while one cooks. During a turn
-   * (dm_thinking/tool_running/…) it's a no-op — the turn owns the state and will
-   * recompute the resting state itself when it ends.
-   */
-  private refreshRestingImageState(): void {
-    if (this.engineState !== "waiting_input" && this.engineState !== "generating_image") return;
-    const target = this.restingState();
-    if (this.engineState !== target) this.setState(target);
   }
 
   /** Pop all background images that finished rendering since the last drain. */
@@ -2088,8 +2066,9 @@ export class GameEngine {
       onToolStart: (name) => {
         // `generate_image` no longer blocks the turn — it kicks a background
         // render and returns immediately (see dispatchGenerateImage), so it's
-        // just another quick tool here. The "generating_image" indicator is
-        // driven separately, off the in-flight render set (refreshRestingImageState).
+        // just another quick tool here. The render is fully detached and never
+        // touches the engine's turn state, so the turn yields to the player as
+        // soon as it ends regardless of any in-flight render.
         this.setState("tool_running");
         this.callbacks.onToolStart(name);
       },

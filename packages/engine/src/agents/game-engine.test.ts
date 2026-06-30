@@ -391,15 +391,15 @@ describe("GameEngine", () => {
     // render is still gated. No image has surfaced yet...
     await engine.processInput("Aldric", "Show me the sword.");
     expect(log.tuiCommands.some((c) => c.type === "display_image")).toBe(false);
-    // ...and the engine rests in "generating_image" while the render cooks —
-    // yet still accepts input (it's a resting state, not a turn-in-progress).
-    expect(engine.getState()).toBe("generating_image");
+    // ...and the turn yields straight to the player (waiting_input) even though
+    // the render is still in flight — the render is detached and never parks the
+    // engine in a DM-looking state, so the player isn't made to wait it out.
+    expect(engine.getState()).toBe("waiting_input");
 
-    // Let the render finish; it queues itself for display and the resting
-    // indicator falls back to waiting_input.
+    // Let the render finish; it queues itself for display.
     releaseRender();
     await engine.awaitPendingImageRenders();
-    await Promise.resolve(); // flush the render's finally (set delete + state refresh)
+    await Promise.resolve(); // flush the render's finally (set cleanup)
     expect(engine.getState()).toBe("waiting_input");
 
     // Turn 2: the completed image surfaces here — divorced from turn 1.
