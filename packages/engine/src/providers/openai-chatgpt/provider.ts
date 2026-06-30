@@ -897,25 +897,13 @@ export class OpenAIChatGptProvider implements LLMProvider {
       ? params.tools.map(toolToDynamicSpec)
       : undefined;
 
-    const startParams: ThreadStartParams = {
+    const startParams = buildThreadStartParams({
       model: params.model,
       developerInstructions,
-      // Replace codex's built-in coding-agent base prompt. None of MV's codex
-      // chat agents are coding agents, and that base persona ("you are Codex …
-      // follow safety, tool, and workspace constraints") leaks into the DM —
-      // it self-identifies as Codex and skews deferential/conservative. Default
-      // to "" (strip it entirely) so the agent runs on developerInstructions
-      // alone; a caller can still pass an explicit base. Verified on gpt-5.5:
-      // accepted (no HTTP 400), strips the Codex identity, tool dispatch intact.
-      // The image-render turn is a SEPARATE thread/start (renderImageOnce) and
-      // is not touched by this — it keeps codex's default base + image_gen
-      // scaffolding. Probe: test-harness/bin/codex-base-instructions.ts.
-      baseInstructions: params.baseInstructions ?? "",
-      ...(dynamicTools ? { dynamicTools } : {}),
+      baseInstructions: params.baseInstructions,
+      dynamicTools,
       cwd: this.cwd,
-      sandbox: "read-only",
-      approvalPolicy: "never",
-    };
+    });
 
     const thread = await client.call<ThreadStartResult>("thread/start", startParams);
     const threadId = thread.thread.id;
@@ -1197,6 +1185,38 @@ export class OpenAIChatGptProvider implements LLMProvider {
 function systemPromptToString(systemPrompt: string | SystemBlock[]): string {
   if (typeof systemPrompt === "string") return systemPrompt;
   return systemPrompt.map((b) => b.text).join("\n\n");
+}
+
+/**
+ * Build the `thread/start` params for a DM/subagent chat turn. Extracted as a
+ * pure function so the wiring is unit-testable without spinning up codex.
+ *
+ * `baseInstructions` defaults to `""` — this REPLACES codex's built-in
+ * coding-agent base prompt. None of MV's codex chat agents are coding agents,
+ * and that base persona ("you are Codex … follow safety, tool, and workspace
+ * constraints") otherwise leaks into the DM (it self-identifies as Codex and
+ * skews deferential/conservative). A caller can pass an explicit base to
+ * override. Verified on gpt-5.5: accepted (no HTTP 400), strips the Codex
+ * identity, tool dispatch intact. The image-render turn is a SEPARATE
+ * `thread/start` (`renderImageOnce`) and does NOT use this — it keeps codex's
+ * default base + image_gen scaffolding. Probe: `test-harness/bin/codex-base-instructions.ts`.
+ */
+export function buildThreadStartParams(opts: {
+  model: string;
+  developerInstructions: string;
+  baseInstructions?: string;
+  dynamicTools?: DynamicToolSpec[];
+  cwd: string;
+}): ThreadStartParams {
+  return {
+    model: opts.model,
+    developerInstructions: opts.developerInstructions,
+    baseInstructions: opts.baseInstructions ?? "",
+    ...(opts.dynamicTools ? { dynamicTools: opts.dynamicTools } : {}),
+    cwd: opts.cwd,
+    sandbox: "read-only",
+    approvalPolicy: "never",
+  };
 }
 
 /**
