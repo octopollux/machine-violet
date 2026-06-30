@@ -168,10 +168,18 @@ async function runAgentLoopInternal(
     tools.push({
       name: GENERATE_IMAGE_TOOL_NAME,
       description:
-        "Generate one illustrated image. Fire-and-forget: the render runs in the " +
-        "background (a minute or two) and the finished image surfaces to the player " +
-        "on its own a little later — it is NOT shown inline with this response, so " +
-        "do not narrate it as appearing now. " +
+        "Generate one illustrated image. A render takes a minute or two. This tool " +
+        "has TWO modes, chosen by `intent`:\n" +
+        "• BACKGROUND (intent 'scene_snapshot' or 'character_portrait') — an ambient " +
+        "illustration the player didn't ask for. Fire-and-forget: it renders in the " +
+        "background and the finished image surfaces on its own a little later, NOT in " +
+        "this response. The player keeps playing meanwhile, so do not announce it as " +
+        "appearing now and do not wait for it — just call it and keep narrating. This " +
+        "is the usual case.\n" +
+        "• INLINE (intent 'player_request') — the player explicitly asked you to draw " +
+        "or show them something, so they are waiting for THIS image. It renders inline " +
+        "and appears in this same turn; the player waits the minute-or-two for it. Use " +
+        "this ONLY when the player actually requested an image. " +
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. At most one image per turn. " +
@@ -181,11 +189,6 @@ async function runAgentLoopInternal(
         "Reserve `\"showcase\"` for rare set-piece hero shots; it takes a bit longer. " +
         "Use `aspect: \"landscape\"` for scenes, " +
         "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
-        "Set `intent` to `\"scene_snapshot\"` for scenes (the usual case), " +
-        "`\"character_portrait\"` for character close-ups, or `\"player_request\"` " +
-        "when the player explicitly asked for an illustration of something. The " +
-        "intent steers on-disk naming and the engine-log breadcrumb — it does not " +
-        "affect the rendered image. " +
         "When a specific player character is clearly the subject of the image, list " +
         "their name in `reference_characters` so the render matches their established " +
         "portrait (face, build, outfit). Only name characters who actually appear in " +
@@ -212,7 +215,7 @@ async function runAgentLoopInternal(
           intent: {
             type: "string",
             enum: ["scene_snapshot", "player_request", "character_portrait"],
-            description: "Steers on-disk naming and the engine-log breadcrumb. 'scene_snapshot' is the right default for in-narrative renders. Omit to default to scene_snapshot.",
+            description: "Selects the delivery mode (see the tool description). 'scene_snapshot' (default) and 'character_portrait' render in the BACKGROUND and surface on a later turn — use for ambient illustration the player didn't ask for. 'player_request' renders INLINE this turn, with the player waiting — use ONLY when the player explicitly asked for an image. Omit to default to scene_snapshot.",
           },
           reference_characters: {
             type: "array",

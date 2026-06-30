@@ -173,12 +173,21 @@ export class GameEngine {
   private pendingImageDisplays: { filename: string; relPath: string; intent: "scene_snapshot" | "player_request" | "character_portrait" }[] = [];
 
   /**
-   * In-flight `generate_image` renders. Tracked (like portrait renders) so
-   * failures are logged not swallowed and teardown/tests can await them. The
-   * renders are fully detached from the turn state — the player keeps their
-   * turn while one cooks; the finished image surfaces on a later turn.
+   * In-flight BACKGROUND `generate_image` renders (intent ≠ player_request).
+   * Tracked (like portrait renders) so failures are logged not swallowed and
+   * teardown/tests can await them. Fully detached from the turn state — the
+   * player keeps their turn while one cooks; the image surfaces on a later turn.
    */
   private inFlightImageRenders = new Set<Promise<void>>();
+
+  /**
+   * Count of in-flight SYNCHRONOUS (player_request) image renders — the player
+   * explicitly asked and is waiting, so we render inline and block the turn.
+   * Keeps the "generating_image" activity indicator lit for the whole render
+   * even if a faster sibling tool batched in the same response finishes first
+   * (its onToolEnd would otherwise flip the state back to dm_thinking).
+   */
+  private syncImageRenderInFlight = 0;
 
   /**
    * Serializes the archive+swap critical section across portrait revisions.
@@ -1495,19 +1504,24 @@ export class GameEngine {
    * the natural-language request. Otherwise, dispatches directly.
    */
   /**
-   * Dispatch the DM's `generate_image` function tool. Fire-and-forget: it
-   * validates inputs, kicks the (minutes-long) render on a tracked background
-   * promise, and returns an immediate ack so the DM keeps narrating without
-   * waiting. When the render lands, the bytes persist via the shared
-   * image-handler and the finished image pushes onto `pendingImageDisplays`,
-   * which the next turn boundary drains to the player (broadcast + display log).
-   * The image is therefore divorced from the turn it was requested on — by
-   * design, so a slow render never blocks gameplay.
+   * Dispatch the DM's `generate_image` function tool. Two modes, chosen by the
+   * DM via `intent` (the tool description guides the choice):
    *
-   * Validation errors (no provider, empty prompt) surface synchronously as an
-   * isError tool_result. Render-time errors (content refusal, network) can't
-   * reach the DM anymore — the turn is long over — so they're logged and the
-   * image is silently dropped (the DM never claimed it appeared).
+   *  - **player_request → SYNCHRONOUS.** The player explicitly asked and is
+   *    waiting for THIS image, so render inline and return it on the tool result
+   *    (`_tui: display_image`) so it shows in the SAME turn. The turn pauses on
+   *    the render (the proven nested-codex pattern — the DM turn is paused
+   *    awaiting our tool reply) and the `generating_image` indicator runs while
+   *    the player waits. Render errors surface as an isError tool_result the DM
+   *    can apologize for, since the turn is still open.
+   *  - **scene_snapshot / character_portrait → FIRE-AND-FORGET.** An ambient
+   *    illustration the player didn't ask for shouldn't seize their turn, so we
+   *    kick a tracked background render and return an immediate ack; the DM keeps
+   *    narrating, the turn yields, and the finished image pushes onto
+   *    `pendingImageDisplays` to surface on a LATER turn. Render errors can't
+   *    reach the DM (the turn is long over) so they're logged and dropped.
+   *
+   * Validation errors (no provider, empty prompt) surface synchronously either way.
    */
   private async dispatchGenerateImage(
     input: Record<string, unknown>,
@@ -1558,65 +1572,79 @@ export class GameEngine {
     const root = this.gameState.campaignRoot;
     const generateImage = this.provider.generateImage.bind(this.provider);
 
-    const render = (async () => {
+    // A single render closure shared by both modes. Resolves to the persisted
+    // absolute path, or throws on failure.
+    const runRender = async (): Promise<{ absPath: string; relPath: string }> => {
+      const referenceImages = referenceNames.length > 0
+        ? await loadCharacterReferences(referenceNames, fileIO, root)
+        : [];
+      const result = await generateImage({
+        prompt: promptText,
+        effort,
+        aspect,
+        intent,
+        ...(referenceImages.length > 0 ? { referenceImages } : {}),
+      });
+      const persisted = await handleImageGenerated(fileIO, root, sceneRef, {
+        // Timestamp-based surrogate id — never sent to the API. Lives in the
+        // on-disk sidecar JSON so each generation has a stable handle for log
+        // correlation. (Earlier hosted-tool path used the response's
+        // revised_prompt here; the function-tool path no longer surfaces that.)
+        id: `img-${Date.now()}`,
+        base64: result.base64,
+        mimeType: result.mimeType,
+        intent,
+        ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
+      });
+      logEvent("image_gen:completed", { agent: "dm", intent, effort: result.effortUsed, aspect: result.aspectUsed });
+      return { absPath: norm(`${root}/${persisted.relPath}`), relPath: persisted.relPath };
+    };
+
+    // SYNCHRONOUS mode: the player asked and is waiting. Render inline and show
+    // it THIS turn via `_tui: display_image`. The "generating_image" indicator
+    // is held for the render's duration (see the syncImageRenderInFlight guard
+    // in onToolStart/onToolEnd). The DM turn pauses on the await — the nested
+    // codex render turn the provider already handles deadlock-free.
+    if (intent === "player_request") {
+      this.syncImageRenderInFlight++;
+      this.setState("generating_image");
       try {
-        const referenceImages = referenceNames.length > 0
-          ? await loadCharacterReferences(referenceNames, fileIO, root)
-          : [];
-        const result = await generateImage({
-          prompt: promptText,
-          effort,
-          aspect,
-          intent,
-          ...(referenceImages.length > 0 ? { referenceImages } : {}),
-        });
-        const persisted = await handleImageGenerated(
-          fileIO,
-          root,
-          sceneRef,
-          {
-            // Timestamp-based surrogate id — never sent to the API. Lives in
-            // the on-disk sidecar JSON so each generation has a stable handle
-            // for log correlation. (Earlier hosted-tool path used the
-            // response's revised_prompt here; the function-tool path no
-            // longer surfaces that, so we synthesize instead.)
-            id: `img-${Date.now()}`,
-            base64: result.base64,
-            mimeType: result.mimeType,
-            intent,
-            ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
-          },
-        );
-        const absPath = norm(`${root}/${persisted.relPath}`);
-        // Queue for the next turn boundary to surface (broadcast + display log).
-        this.pendingImageDisplays.push({ filename: absPath, relPath: persisted.relPath, intent });
-        logEvent("image_gen:completed", {
-          agent: "dm",
-          intent,
-          effort: result.effortUsed,
-          aspect: result.aspectUsed,
-        });
+        const { absPath, relPath } = await runRender();
+        return {
+          content: `Image rendered and shown to the player inline (${effort} effort, ${aspect} aspect).`,
+          _tui: { type: "display_image", filename: absPath, relPath, intent },
+        } as import("./tool-registry.js").ToolResult;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // Engine log: visible to the harness + post-mortem dumps. onDevLog
-        // alone goes to the TUI dev pane and disappears with the process.
-        logEvent("image_gen:dispatch_failed", {
-          agent: "dm",
-          message: msg.slice(0, 400),
-        });
+        logEvent("image_gen:dispatch_failed", { agent: "dm", message: msg.slice(0, 400) });
+        this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
+        return { content: `Image generation failed: ${msg}`, is_error: true };
+      } finally {
+        this.syncImageRenderInFlight--;
+      }
+    }
+
+    // FIRE-AND-FORGET mode (scene_snapshot / character_portrait): detached
+    // background render that surfaces on a later turn; never blocks the turn.
+    const render = (async () => {
+      try {
+        const { absPath, relPath } = await runRender();
+        this.pendingImageDisplays.push({ filename: absPath, relPath, intent });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Engine log: visible to the harness + post-mortem dumps. onDevLog alone
+        // goes to the TUI dev pane and disappears with the process.
+        logEvent("image_gen:dispatch_failed", { agent: "dm", message: msg.slice(0, 400) });
         this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
       }
     })();
     this.trackImageRender(render);
 
-    const playerNote = intent === "player_request"
-      ? " Let the player know in your narration that you're sketching it now — it'll appear shortly."
-      : "";
     return {
       content:
         `Image render started in the background (${effort} effort, ${aspect} aspect). ` +
         `It will surface to the player on its own a little later — keep narrating, and do ` +
-        `not announce it as appearing now (it isn't there yet).${playerNote}`,
+        `not announce it as appearing now (it isn't there yet).`,
     };
   }
 
@@ -2064,16 +2092,15 @@ export class GameEngine {
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
-        // `generate_image` no longer blocks the turn — it kicks a background
-        // render and returns immediately (see dispatchGenerateImage), so it's
-        // just another quick tool here. The render is fully detached and never
-        // touches the engine's turn state, so the turn yields to the player as
-        // soon as it ends regardless of any in-flight render.
-        this.setState("tool_running");
+        // A SYNCHRONOUS (player_request) image render owns the "creating an
+        // image" indicator for its whole duration — hold it across any faster
+        // sibling tool batched in the same response. Background renders are
+        // detached and never touch turn state, so they don't figure here.
+        this.setState(this.syncImageRenderInFlight > 0 ? "generating_image" : "tool_running");
         this.callbacks.onToolStart(name);
       },
       onToolEnd: (name, result) => {
-        this.setState("dm_thinking");
+        this.setState(this.syncImageRenderInFlight > 0 ? "generating_image" : "dm_thinking");
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {

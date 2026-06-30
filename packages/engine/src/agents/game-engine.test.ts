@@ -410,6 +410,70 @@ describe("GameEngine", () => {
     expect(engine.getState()).toBe("waiting_input");
   });
 
+  it("renders an intent='player_request' image INLINE in the same turn (synchronous)", async () => {
+    // The player explicitly asked, so they're waiting for THIS image: it renders
+    // inline, shows in the same turn (display_image broadcast), and the engine
+    // holds "generating_image" while they wait. Distinct from the background mode.
+    let releaseRender!: () => void;
+    const renderGate = new Promise<void>((r) => { releaseRender = r; });
+    let stateWhileRendering: string | undefined;
+    const engineRef: { current?: { getState(): string } } = {};
+    const imageBatch: ChatResult = {
+      text: "",
+      toolCalls: [
+        { id: "t1", name: "generate_image", input: { prompt: "the dragon", effort: "quality", aspect: "landscape", intent: "player_request" } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "t1", name: "generate_image", input: { prompt: "the dragon", effort: "quality", aspect: "landscape", intent: "player_request" } },
+      ],
+    };
+    const responses = [imageBatch, textMessage("Here it is.")];
+    let idx = 0;
+    const generateImage = vi.fn(async () => {
+      stateWhileRendering = engineRef.current!.getState();
+      await renderGate;
+      return { base64: "AAA=", mimeType: "image/png", effortUsed: "quality", aspectUsed: "landscape" };
+    });
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
+    } as unknown as LLMProvider;
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: { ...mockFileIO(), writeBinaryFile: vi.fn(async () => {}) },
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+    engineRef.current = engine;
+
+    // Start the turn but don't await — it blocks on the gated inline render.
+    const turn = engine.processInput("Aldric", "Draw me the dragon.");
+    await new Promise((r) => setTimeout(r, 0)); // let it reach the gated render
+    // The render is in flight INSIDE this still-open turn, and the indicator is lit.
+    expect(stateWhileRendering).toBe("generating_image");
+    expect(engine.getState()).toBe("generating_image");
+    expect(log.tuiCommands.some((c) => c.type === "display_image")).toBe(false);
+
+    // Finish the render; the image shows in THIS turn, then the turn completes.
+    releaseRender();
+    await turn;
+    const displayed = log.tuiCommands.filter((c) => c.type === "display_image");
+    expect(displayed).toHaveLength(1);
+    expect(displayed[0].intent).toBe("player_request");
+    expect(engine.getState()).toBe("waiting_input");
+  });
+
   it("update_portrait revises the portrait and hands the new image to the DM next turn (no extra turn)", async () => {
     const paths = campaignPaths("/tmp/test-campaign");
     const portraitPath = norm(paths.characterPortrait("Aldric"));
