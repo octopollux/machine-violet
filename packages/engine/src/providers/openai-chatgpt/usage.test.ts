@@ -39,6 +39,22 @@ describe("toUsageStatus", () => {
     expect(status.segments[0].id).toBe("primary");
   });
 
+  it("omits the primary segment when null (quota-exhausted payload)", () => {
+    // Codex sends primary: null once a plan's quota is exhausted. This must not
+    // throw — it used to crash the whole process via the rate-limits handler.
+    const status = toUsageStatus(makeLimits({
+      primary: null,
+      secondary: { usedPercent: 100, windowDurationMins: 10080, resetsAt: 5 },
+    }));
+    expect(status.segments).toHaveLength(1);
+    expect(status.segments[0].id).toBe("secondary");
+  });
+
+  it("handles a payload with neither window", () => {
+    const status = toUsageStatus(makeLimits({ primary: null, secondary: undefined }));
+    expect(status.segments).toHaveLength(0);
+  });
+
   it("classifies status by usedPercent thresholds", () => {
     const cases: [number, "ok" | "warning" | "critical" | "exceeded"][] = [
       [0, "ok"],
@@ -110,5 +126,13 @@ describe("shouldWarn", () => {
       primary: { usedPercent: 79.99, windowDurationMins: 300, resetsAt: 0 },
       secondary: { usedPercent: 79.99, windowDurationMins: 10080, resetsAt: 0 },
     }))).toBe(false);
+  });
+
+  it("does not throw and falls back to secondary when primary is null", () => {
+    expect(shouldWarn(makeLimits({
+      primary: null,
+      secondary: { usedPercent: 90, windowDurationMins: 10080, resetsAt: 0 },
+    }))).toBe(true);
+    expect(shouldWarn(makeLimits({ primary: null, secondary: undefined }))).toBe(false);
   });
 });

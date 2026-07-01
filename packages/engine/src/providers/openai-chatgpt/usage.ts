@@ -49,9 +49,10 @@ function windowToSegment(
 
 /** Convert the most recent `RateLimits` snapshot to a generic `UsageStatus`. */
 export function toUsageStatus(limits: RateLimits): UsageStatus {
-  const segments: UsageSegment[] = [
-    windowToSegment("primary", labelForWindow("primary", limits), limits.primary),
-  ];
+  const segments: UsageSegment[] = [];
+  if (limits.primary) {
+    segments.push(windowToSegment("primary", labelForWindow("primary", limits), limits.primary));
+  }
   if (limits.secondary) {
     segments.push(windowToSegment("secondary", labelForWindow("secondary", limits), limits.secondary));
   }
@@ -76,7 +77,7 @@ function labelForWindow(which: "primary" | "secondary", limits: RateLimits): str
 
 /** Returns true when this snapshot crosses the warning threshold and should fire a log event. */
 export function shouldWarn(limits: RateLimits): boolean {
-  if (limits.primary.usedPercent >= WARNING_THRESHOLD) return true;
+  if (limits.primary && limits.primary.usedPercent >= WARNING_THRESHOLD) return true;
   if (limits.secondary && limits.secondary.usedPercent >= WARNING_THRESHOLD) return true;
   return false;
 }

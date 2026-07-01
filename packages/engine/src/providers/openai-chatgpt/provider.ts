@@ -838,7 +838,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.latestRateLimits = limits;
     log.rateLimitUpdated({ ...limits });
     if (shouldWarn(limits)) {
-      if (limits.primary.usedPercent >= 80) {
+      if (limits.primary && limits.primary.usedPercent >= 80) {
         log.rateLimitWarning({
           segmentId: "primary",
           usedPercent: limits.primary.usedPercent,
