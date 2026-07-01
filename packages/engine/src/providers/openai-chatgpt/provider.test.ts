@@ -7,6 +7,7 @@ import {
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
   shouldRetryImageRender, ImageGenNoDataError,
   summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
+  buildThreadStartParams,
 } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
@@ -325,6 +326,40 @@ describe("getCapabilities", () => {
   it("exposes generateImage as a defined method", () => {
     const provider = createOpenAIChatGptProvider();
     expect(typeof provider.generateImage).toBe("function");
+  });
+});
+
+describe("buildThreadStartParams", () => {
+  const base = { model: "gpt-5.5", developerInstructions: "be a DM", cwd: "/cwd" };
+
+  it("strips codex's base prompt by default — baseInstructions is \"\"", () => {
+    const p = buildThreadStartParams(base);
+    // The whole point of the change: an absent baseInstructions REPLACES codex's
+    // coding-agent base with an empty string, not "leave codex's default".
+    expect(p.baseInstructions).toBe("");
+    // And it must actually be present in the payload (not undefined/omitted),
+    // or codex would fall back to its own base prompt.
+    expect("baseInstructions" in p).toBe(true);
+  });
+
+  it("respects an explicit baseInstructions override", () => {
+    const p = buildThreadStartParams({ ...base, baseInstructions: "you run TTRPGs" });
+    expect(p.baseInstructions).toBe("you run TTRPGs");
+  });
+
+  it("passes through developer instructions + the fixed read-only/no-approval config", () => {
+    const p = buildThreadStartParams(base);
+    expect(p.developerInstructions).toBe("be a DM");
+    expect(p.model).toBe("gpt-5.5");
+    expect(p.cwd).toBe("/cwd");
+    expect(p.sandbox).toBe("read-only");
+    expect(p.approvalPolicy).toBe("never");
+  });
+
+  it("includes dynamicTools only when provided", () => {
+    expect("dynamicTools" in buildThreadStartParams(base)).toBe(false);
+    const tools = [{ name: "roll_dice", description: "", inputSchema: {} }];
+    expect(buildThreadStartParams({ ...base, dynamicTools: tools }).dynamicTools).toBe(tools);
   });
 });
 
