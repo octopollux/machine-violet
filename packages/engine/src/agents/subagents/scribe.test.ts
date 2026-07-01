@@ -578,9 +578,18 @@ describe("splitSections", () => {
     const result = splitSections(body);
     expect(result).toHaveLength(3);
     expect(result[0].heading).toBe("");
-    expect(result[0].content).toBe("Preamble.\n");
+    // Trailing blank line (the separator before ## Stats) is stripped from content.
+    expect(result[0].content).toBe("Preamble.");
     expect(result[1].heading).toBe("## Stats");
+    expect(result[1].content).toBe("## Stats\nHP: 42");
     expect(result[2].heading).toBe("## Inventory");
+  });
+
+  it("strips trailing blank lines from section content (no separator baked in)", () => {
+    const body = "## Stats\nHP: 42\n\n\n## Inventory\n- Sword\n\n";
+    const result = splitSections(body);
+    expect(result[0].content).toBe("## Stats\nHP: 42");
+    expect(result[1].content).toBe("## Inventory\n- Sword");
   });
 
   it("does not split on ### headings", () => {
@@ -606,6 +615,17 @@ describe("mergeSectionBodies", () => {
     expect(result).toContain("Dagger");
     expect(result).toContain("## Notes");
     expect(result).toContain("Brave.");
+  });
+
+  it("does not accumulate blank lines across repeated merges (regression)", () => {
+    let body = "## Stats\nHP: 3/3\n\n## Skills\n- Salvage `d8`\n\n## Inventory\n- Tool belt";
+    const once = mergeSectionBodies(body, "## Inventory\n- Tool belt\n- Wrench");
+    // Re-merging the same incoming must be a fixed point — no growing gaps.
+    const twice = mergeSectionBodies(once, "## Inventory\n- Tool belt\n- Wrench");
+    expect(twice).toBe(once);
+    // Even after many section-touching writes, no blank-line run (3+ newlines) appears.
+    for (let i = 0; i < 6; i++) body = mergeSectionBodies(body, "## Stats\nHP: 2/3");
+    expect(body).not.toMatch(/\n\n\n/);
   });
 
   it("preserves preamble text before first heading", () => {
