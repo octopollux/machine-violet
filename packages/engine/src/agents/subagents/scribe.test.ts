@@ -592,6 +592,13 @@ describe("splitSections", () => {
     expect(result[1].content).toBe("## Inventory\n- Sword");
   });
 
+  it("preserves meaningful trailing whitespace on a content line (markdown hard break)", () => {
+    // The two trailing spaces on "first line" are a hard break — keep them;
+    // only the trailing blank lines get stripped.
+    const result = splitSections("## Notes\nfirst line  \nsecond line\n\n\n");
+    expect(result[0].content).toBe("## Notes\nfirst line  \nsecond line");
+  });
+
   it("does not split on ### headings", () => {
     const body = "## Stats\nHP: 42\n### Substats\nSTR: 10";
     const result = splitSections(body);
@@ -626,6 +633,14 @@ describe("mergeSectionBodies", () => {
     // Even after many section-touching writes, no blank-line run (3+ newlines) appears.
     for (let i = 0; i < 6; i++) body = mergeSectionBodies(body, "## Stats\nHP: 2/3");
     expect(body).not.toMatch(/\n\n\n/);
+  });
+
+  it("does not create a blank-line run joining a preamble-only body with a section", () => {
+    // `existing` has no ## heading and ends in a blank line — the early-return
+    // split path must strip it so the join can't produce \n\n\n.
+    const result = mergeSectionBodies("A brave knight.\n", "## Inventory\n- Sword");
+    expect(result).toBe("A brave knight.\n\n## Inventory\n- Sword");
+    expect(result).not.toMatch(/\n\n\n/);
   });
 
   it("preserves preamble text before first heading", () => {
