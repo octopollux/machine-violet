@@ -87,15 +87,63 @@ async function main(): Promise<void> {
   const samples = Number(arg("samples", "5"));
   const action = arg("action", DEFAULT_ACTION) ?? DEFAULT_ACTION;
   const connectionId = arg("connection");
+  // Signal amplifier: an explicit per-turn push so the UNLOCKED state fires
+  // ~always and the SUPPRESSED state stays ~0 — crisp separation for bisection
+  // (production cadence of 8/100 is too close to chance to resolve at small N).
+  const force = process.argv.slice(2).includes("--force");
+  const FORCE_LINE =
+    "\n\nRIGHT NOW: this is a visually strong moment. Call `generate_image` this " +
+    "turn with a vivid scene_snapshot BEFORE you finish narrating. Do not skip it.";
+  // Cadence amplifier: raise the in-distribution frequency target (still a
+  // judgment call, NOT a per-turn command like --force) so the unlocked state
+  // fires well above the cadence-8 noise floor while the suppressor can still
+  // pull it down. Rewrites the "roughly 8 images per 100" line in the section.
+  const cadence = arg("cadence");
+  // Surgical span removal: drop whole system blocks by index (comma-separated)
+  // while keeping the rest ~intact. Size-matched drops (e.g. sys[2] directives
+  // vs sys[6] data, both ~18KB) disentangle a SPECIFIC suppressor from generic
+  // volume dilution. Overrides --sys-frac when present. The image section is
+  // always re-appended, so dropping the block that holds it is safe.
+  const dropBlocksRaw = arg("drop-blocks");
+  const dropBlocks = new Set(
+    (dropBlocksRaw ?? "").split(",").map((s) => s.trim()).filter(Boolean).map(Number),
+  );
+  // Sub-block bisection: drop an absolute char span [START,END) from the joined
+  // system text (then re-append the image section). Lets us split a single block
+  // and localize the suppressor down to a sentence. Takes precedence over
+  // --drop-blocks / --sys-frac.
+  const dropRangeRaw = arg("drop-range");
+  const dropRange = dropRangeRaw
+    ? (dropRangeRaw.split("-").map(Number) as [number, number])
+    : undefined;
 
   const dump: Dump = JSON.parse(readFileSync(dumpPath, "utf8"));
 
   // --- Build the (possibly truncated) system prompt --------------------------
   const fullSystem = dump.system.map((b) => b.text).join("\n\n");
-  const imageSection = extractImageSection(fullSystem);
-  const keepChars = Math.max(0, Math.round(fullSystem.length * sysFrac));
-  const truncated = fullSystem.slice(0, keepChars);
-  const systemPrompt = `${truncated}\n\n${imageSection}`;
+  let imageSection = extractImageSection(fullSystem);
+  if (cadence) {
+    imageSection = imageSection.replace(
+      /roughly \d+ images across every 100/,
+      `roughly ${cadence} images across every 100`,
+    );
+  }
+  let base: string;
+  let shapeDesc: string;
+  if (dropRange) {
+    const [s, e] = dropRange;
+    base = fullSystem.slice(0, s) + fullSystem.slice(e);
+    shapeDesc = `drop-range=${s}-${e} (removed ${e - s} chars: "${fullSystem.slice(s, s + 50).replace(/\s+/g, " ").trim()}…")`;
+  } else if (dropBlocks.size > 0) {
+    const kept = dump.system.filter((_, i) => !dropBlocks.has(i));
+    base = kept.map((b) => b.text).join("\n\n");
+    shapeDesc = `drop-blocks=[${[...dropBlocks].join(",")}] (system ${fullSystem.length}→${base.length} chars)`;
+  } else {
+    const keepChars = Math.max(0, Math.round(fullSystem.length * sysFrac));
+    base = fullSystem.slice(0, keepChars);
+    shapeDesc = `sys-frac=${sysFrac} (system ${fullSystem.length}→${keepChars} chars)`;
+  }
+  const systemPrompt = `${base}\n\n${imageSection}${force ? FORCE_LINE : ""}`;
 
   // --- Build history (flattened to text) + fixed test action -----------------
   const flat: NormalizedMessage[] = dump.messages.map((m) => ({
@@ -111,8 +159,8 @@ async function main(): Promise<void> {
   const tools = dump.tools;
 
   process.stderr.write(
-    `▶ image-bisect — model=${model} sys-frac=${sysFrac} ` +
-      `(system ${fullSystem.length}→${keepChars} chars + ${imageSection.length}-char image section) ` +
+    `▶ image-bisect — model=${model} ${shapeDesc} force=${force} cadence=${cadence ?? "8(default)"} ` +
+      `+ ${imageSection.length}-char image section, ` +
       `history=${historyN}/${scene.length} msgs, samples=${samples}\n`,
   );
 
@@ -180,7 +228,7 @@ async function main(): Promise<void> {
   }
 
   process.stdout.write(
-    `\n=== RESULT sys-frac=${sysFrac} history=${historyN} ===\n` +
+    `\n=== RESULT ${shapeDesc} history=${historyN} cadence=${cadence ?? "8"} ===\n` +
       `fired ${fired}/${samples}\n` +
       perSample.join("\n") +
       "\n",
