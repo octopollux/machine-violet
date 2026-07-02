@@ -136,6 +136,12 @@ export interface GameState {
   homeDir: string;
   /** Index into config.players — tracks whose turn it is */
   activePlayerIndex: number;
+  /** Player exchanges since the DM last generated an image. Drives the
+   * turns-since-image feedback signal in volatile context; reset to 0 on each
+   * generate_image call, incremented per player exchange. Persisted across
+   * save/load so the nudge survives a resume. Optional/defaulted to 0 so
+   * existing GameState constructors need no change. */
+  turnsSinceImage?: number;
   /** Per-character resource display keys */
   displayResources: Record<string, string[]>;
   /** Per-character resource values: character → key → value */

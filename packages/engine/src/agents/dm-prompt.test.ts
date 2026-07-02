@@ -130,6 +130,29 @@ describe("buildHardStats", () => {
     expect(buildHardStats({ resourceValues: { Aldric: {} } })).toBe("");
   });
 
+  describe("turns-since-image feedback signal", () => {
+    it("renders the count without a nudge when within the interval", () => {
+      // cadence 8 → interval 12.5; 10 turns is under 12.5+2, so no (!)
+      const r = buildHardStats({ turnsSinceImage: 10, imageCadencePer100: 8 });
+      expect(r).toBe("Images: 10 turns since last");
+    });
+
+    it("adds a (!) nudge once more than 2 turns past the interval", () => {
+      // cadence 8 → interval 12.5; 15 > 14.5 → nudge
+      const r = buildHardStats({ turnsSinceImage: 15, imageCadencePer100: 8 });
+      expect(r).toBe("Images: 15 turns since last (!)");
+    });
+
+    it("omits the line entirely when image cadence is 0 (images off)", () => {
+      expect(buildHardStats({ turnsSinceImage: 99, imageCadencePer100: 0 })).toBe("");
+      expect(buildHardStats({ turnsSinceImage: 99 })).toBe("");
+    });
+
+    it("omits the line when the count is not provided", () => {
+      expect(buildHardStats({ imageCadencePer100: 8 })).toBe("");
+    });
+  });
+
   it("combines turn holder and resources on separate lines", () => {
     const result = buildHardStats({
       turnHolder: "Aldric",

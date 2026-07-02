@@ -1108,6 +1108,9 @@ export class SessionManager {
     if (loaded.scene?.activePlayerIndex != null) {
       gs.activePlayerIndex = loaded.scene.activePlayerIndex;
     }
+    if (loaded.scene?.turnsSinceImage != null) {
+      gs.turnsSinceImage = loaded.scene.turnsSinceImage;
+    }
 
     // Hydrate scene state fields that detectSceneState() doesn't read.
     // The scene object is shared by reference with the engine, so mutating

@@ -375,6 +375,7 @@ export class GameEngine {
       playerReads: scene.playerReads,
       activePlayerIndex: this.gameState.activePlayerIndex,
       sessionRecapPending: scene.sessionRecapPending,
+      turnsSinceImage: this.gameState.turnsSinceImage ?? 0,
     });
     this.persister.persistConversation(this.conversation.getExchanges());
   }
@@ -662,6 +663,7 @@ export class GameEngine {
     // behalf.
     const { system: systemPrompt, volatile: volatileContext, hardStats: hardStatsText } = this.sceneManager.getSystemPrompt({
       turnHolder: characterName,
+      turnsSinceImage: this.gameState.turnsSinceImage ?? 0,
     });
 
     // Build message list. When PC portraits exist on disk and the
@@ -865,6 +867,7 @@ export class GameEngine {
           playerReads: scene.playerReads,
           activePlayerIndex: this.gameState.activePlayerIndex,
           sessionRecapPending: scene.sessionRecapPending,
+          turnsSinceImage: this.gameState.turnsSinceImage ?? 0,
         });
         this.persister.persistConversation(this.conversation.getExchanges());
       }
@@ -879,6 +882,12 @@ export class GameEngine {
       // turns (skipTranscript: session open/resume) fall back to the generic
       // label.
       await this.repo?.trackExchange(opts?.skipTranscript ? undefined : text);
+
+      // Count this real player exchange toward the turns-since-image signal
+      // (skip synthetic system turns). Reset to 0 whenever generate_image fires.
+      if (!opts?.skipTranscript) {
+        this.gameState.turnsSinceImage = (this.gameState.turnsSinceImage ?? 0) + 1;
+      }
 
       // Handle dropped exchange — update precis, then re-persist scene
       // so the precis written to disk includes the just-dropped content.
@@ -1536,6 +1545,10 @@ export class GameEngine {
     if (!promptText) {
       return { content: "generate_image requires a non-empty prompt.", is_error: true };
     }
+    // Reset the turns-since-image feedback counter the moment the DM commits to
+    // an image (fire-and-forget: the decision, not the render outcome, is what
+    // the signal tracks). Surfaces in the next turn's [stats] block.
+    this.gameState.turnsSinceImage = 0;
     // Fallback matches the documented DM default (the tool schema marks
     // `effort` required, but coerce defensively so an omitted/invalid value
     // still lands on the intended "quality" tier rather than the lib default).
