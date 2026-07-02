@@ -22,7 +22,7 @@ Two call sites:
 | Site | File | Dispatch | Purpose |
 |---|---|---|---|
 | Setup-agent portrait loop | `packages/engine/src/agents/subagents/setup-conversation.ts` (`dispatchGenerateImage`) | **Synchronous** — awaits the render, returns `_tui: display_image` so the draft shows inline immediately | Character reference-sheet drafts during chargen (a landscape multi-angle turnaround — see [Visual style guidance](#visual-style-guidance)). Player iterates; `set_portrait` promotes a chosen draft. |
-| DM gameplay | `packages/engine/src/agents/game-engine.ts` (`dispatchGenerateImage`) | **Fire-and-forget** — kicks a background render, returns an immediate ack; the image surfaces on a later turn | Scene snapshots, character close-ups, player-requested illustrations. |
+| DM gameplay | `packages/engine/src/agents/game-engine.ts` (`dispatchGenerateImage`) | **Two modes by `intent`:** `scene_snapshot`/`character_portrait` → **fire-and-forget** (background render, immediate ack, surfaces on a later turn); `player_request` → **synchronous inline** (awaits the render in-turn, since the player is waiting). See [Two render modes (gameplay)](#two-render-modes-gameplay). | Scene snapshots, character close-ups, player-requested illustrations. |
 
 Both share `handleImageGenerated` in `packages/engine/src/agents/image-handler.ts` for on-disk persistence — same naming, same sidecar JSON, same downstream consumers.
 

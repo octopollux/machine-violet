@@ -340,10 +340,12 @@ describe("GameEngine", () => {
   it("renders generate_image fire-and-forget: ack now, image surfaces on a later turn", async () => {
     // generate_image no longer blocks the turn. The DM fires it, gets an
     // immediate ack, and keeps narrating; the (slow) render runs in the
-    // background. While it cooks the engine REST state is "generating_image"
-    // (but input stays unblocked), and the finished image surfaces — as a
-    // display_image broadcast — at the NEXT turn boundary, divorced from the
-    // turn it was requested on.
+    // background. The turn yields straight to the player ("waiting_input")
+    // while it cooks — NOT a "generating_image" resting state — and the
+    // finished image surfaces, as a display_image broadcast, at the NEXT turn
+    // boundary, divorced from the turn it was requested on. (The
+    // "generating_image" state is reserved for the synchronous player_request
+    // mode, where the player is waiting on the inline render.)
     let releaseRender!: () => void;
     const renderGate = new Promise<void>((r) => { releaseRender = r; });
     const imageBatch: ChatResult = {
