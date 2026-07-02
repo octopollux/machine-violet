@@ -116,6 +116,23 @@ async function main(): Promise<void> {
   const dropRange = dropRangeRaw
     ? (dropRangeRaw.split("-").map(Number) as [number, number])
     : undefined;
+  // Add-back: after building the base (typically via --drop-blocks=2, i.e. the
+  // UNLOCKED baseline with all main directives removed), re-insert one original
+  // system span [START,END). The right tool when suppression is REDUNDANT across
+  // spans — dropping one span never unlocks (another still suppresses), so instead
+  // add spans back onto an unlocked base and watch for the one that RE-SUPPRESSES.
+  const addRangeRaw = arg("add-range");
+  const addRange = addRangeRaw
+    ? (addRangeRaw.split("-").map(Number) as [number, number])
+    : undefined;
+  // Fix test: replace an original system span [START,END) with the text in
+  // --replace-file, keeping the rest of the FULL prompt intact. Validates the
+  // exact reword before it's applied to dm-directives.md — in-situ, realistic.
+  const replaceRangeRaw = arg("replace-range");
+  const replaceRange = replaceRangeRaw
+    ? (replaceRangeRaw.split("-").map(Number) as [number, number])
+    : undefined;
+  const replaceFile = arg("replace-file");
 
   const dump: Dump = JSON.parse(readFileSync(dumpPath, "utf8"));
 
@@ -130,7 +147,12 @@ async function main(): Promise<void> {
   }
   let base: string;
   let shapeDesc: string;
-  if (dropRange) {
+  if (replaceRange && replaceFile) {
+    const [rs, re] = replaceRange;
+    const repl = readFileSync(replaceFile, "utf8");
+    base = fullSystem.slice(0, rs) + repl + fullSystem.slice(re);
+    shapeDesc = `replace-range=${rs}-${re} with ${repl.length}-char file (full ${fullSystem.length}→${base.length})`;
+  } else if (dropRange) {
     const [s, e] = dropRange;
     base = fullSystem.slice(0, s) + fullSystem.slice(e);
     shapeDesc = `drop-range=${s}-${e} (removed ${e - s} chars: "${fullSystem.slice(s, s + 50).replace(/\s+/g, " ").trim()}…")`;
@@ -142,6 +164,12 @@ async function main(): Promise<void> {
     const keepChars = Math.max(0, Math.round(fullSystem.length * sysFrac));
     base = fullSystem.slice(0, keepChars);
     shapeDesc = `sys-frac=${sysFrac} (system ${fullSystem.length}→${keepChars} chars)`;
+  }
+  if (addRange) {
+    const [as, ae] = addRange;
+    const span = fullSystem.slice(as, ae);
+    base = `${base}\n\n${span}`;
+    shapeDesc += ` +add-range=${as}-${ae} (re-added ${ae - as} chars: "${span.slice(0, 50).replace(/\s+/g, " ").trim()}…")`;
   }
   const systemPrompt = `${base}\n\n${imageSection}${force ? FORCE_LINE : ""}`;
 
