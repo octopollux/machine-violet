@@ -175,8 +175,8 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 
 | Command | What it does |
 |---|---|
-| `start [--player NAME] [--fresh]` | Boot the game in the background; print the main menu. |
-| `record <scenario> [--player NAME] [--fresh]` | Like `start`, but tape every LLM call (`MV_TAPE_MODE=record`) for a golden. |
+| `start [--player NAME] [--fresh] [--live] [--data-dir PATH]` | Boot the game in the background; print the main menu. |
+| `record <scenario> [--player NAME] [--fresh] [--live] [--data-dir PATH]` | Like `start`, but tape every LLM call (`MV_TAPE_MODE=record`) for a golden. |
 | `save-tape <path>` | Pull the recorded tape (via `GET /tape`) and write a golden to `<path>` (record sessions only). |
 | `status` | Is a session alive? Show engine/turn/choices vitals. |
 | `screen [--ansi]` | Print the rendered terminal screen. |
@@ -188,6 +188,18 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | `wait [--for beat\|handoff\|choices] [--timeout SEC]` | Block until a new beat lands, print it, exit. |
 | `log [--tail N]` | Tail the launcher log (crash diagnostics). |
 | `stop` | Kill the session. |
+
+**Temp dir vs. live data.** By default `mvplay` plays in a throwaway campaigns
+dir under the system temp dir — isolated, so the menu is empty until you start a
+New Campaign and nothing can touch real saves. `--live` points the session at the
+user's machine-scope data root (`~/Documents/.machine-violet` on Win/macOS, XDG
+on Linux; mirrors the engine's `defaultCampaignRoot`); `--data-dir PATH` points at
+a custom `.machine-violet` root (`<PATH>/campaigns`). Use these to continue or
+inspect a campaign the user actually plays. ⚠️ **Turns MUTATE real campaigns** —
+`start` prints a LIVE DATA banner with the resolved dir, and you must never
+delete/overwrite/archive/roll back a live campaign unless the user explicitly
+asked (copy it out to inspect). The real data dir is never auto-created: a bad
+`--live` path just yields an empty menu.
 
 `record`/`save-tape` capture a full-stack golden tape: boot in record mode, play
 the scenario turn-for-turn, then `save-tape` before `stop` (teardown force-kills

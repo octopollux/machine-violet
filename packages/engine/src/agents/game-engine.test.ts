@@ -337,12 +337,17 @@ describe("GameEngine", () => {
     expect(log.toolEnds).toContain("style_scene");
   });
 
-  it("holds 'generating_image' across a faster sibling tool finishing mid-render", async () => {
-    // generate_image runs for minutes alongside fast tools batched in the same
-    // turn. The activity indicator must stay on "generating_image" for the whole
-    // render — a sibling's completion must NOT flip it back to dm_thinking.
-    const engineRef: { current?: { getState(): string } } = {};
-    let stateWhileRendering: string | undefined;
+  it("renders generate_image fire-and-forget: ack now, image surfaces on a later turn", async () => {
+    // generate_image no longer blocks the turn. The DM fires it, gets an
+    // immediate ack, and keeps narrating; the (slow) render runs in the
+    // background. The turn yields straight to the player ("waiting_input")
+    // while it cooks — NOT a "generating_image" resting state — and the
+    // finished image surfaces, as a display_image broadcast, at the NEXT turn
+    // boundary, divorced from the turn it was requested on. (The
+    // "generating_image" state is reserved for the synchronous player_request
+    // mode, where the player is waiting on the inline render.)
+    let releaseRender!: () => void;
+    const renderGate = new Promise<void>((r) => { releaseRender = r; });
     const imageBatch: ChatResult = {
       text: "",
       toolCalls: [
@@ -356,21 +361,90 @@ describe("GameEngine", () => {
         { type: "tool_use", id: "t2", name: "roll_dice", input: { expression: "1d20" } },
       ],
     };
-    const responses = [imageBatch, textMessage("Here it is.")];
+    const responses = [imageBatch, textMessage("Here it is."), textMessage("Onward.")];
     let idx = 0;
+    const generateImage = vi.fn(async () => {
+      // Gate the render so it's still in flight when turn 1 ends — deterministic,
+      // no wall-clock races.
+      await renderGate;
+      return { base64: "AAA=", mimeType: "image/png", effortUsed: "standard", aspectUsed: "square" };
+    });
     const provider = {
       providerId: "mock",
       chat: vi.fn(async () => responses[idx++]),
       stream: vi.fn(async () => responses[idx++]),
       healthCheck: vi.fn(async () => ({ ok: true })),
       getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
-      generateImage: vi.fn(async () => {
-        // Yield so the concurrently-dispatched roll_dice finishes first, then
-        // snapshot the engine state mid-render.
-        await new Promise((r) => setTimeout(r, 5));
-        stateWhileRendering = engineRef.current!.getState();
-        return { base64: "AAA=", mimeType: "image/png", effortUsed: "standard", aspectUsed: "square" };
-      }),
+      generateImage,
+    } as unknown as LLMProvider;
+    const { callbacks, log } = mockCallbacks();
+
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: { ...mockFileIO(), writeBinaryFile: vi.fn(async () => {}) },
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    // Turn 1: the DM fires generate_image and finishes narrating while the
+    // render is still gated. No image has surfaced yet...
+    await engine.processInput("Aldric", "Show me the sword.");
+    expect(log.tuiCommands.some((c) => c.type === "display_image")).toBe(false);
+    // ...and the turn yields straight to the player (waiting_input) even though
+    // the render is still in flight — the render is detached and never parks the
+    // engine in a DM-looking state, so the player isn't made to wait it out.
+    expect(engine.getState()).toBe("waiting_input");
+
+    // Let the render finish; it queues itself for display.
+    releaseRender();
+    await engine.awaitPendingImageRenders();
+    await Promise.resolve(); // flush the render's finally (set cleanup)
+    expect(engine.getState()).toBe("waiting_input");
+
+    // Turn 2: the completed image surfaces here — divorced from turn 1.
+    await engine.processInput("Aldric", "I sheathe it.");
+    const displayed = log.tuiCommands.filter((c) => c.type === "display_image");
+    expect(displayed).toHaveLength(1);
+    expect(displayed[0].intent).toBe("scene_snapshot");
+    expect(engine.getState()).toBe("waiting_input");
+  });
+
+  it("renders an intent='player_request' image INLINE in the same turn (synchronous)", async () => {
+    // The player explicitly asked, so they're waiting for THIS image: it renders
+    // inline, shows in the same turn (display_image broadcast), and the engine
+    // holds "generating_image" while they wait. Distinct from the background mode.
+    let releaseRender!: () => void;
+    const renderGate = new Promise<void>((r) => { releaseRender = r; });
+    let stateWhileRendering: string | undefined;
+    const engineRef: { current?: { getState(): string } } = {};
+    const imageBatch: ChatResult = {
+      text: "",
+      toolCalls: [
+        { id: "t1", name: "generate_image", input: { prompt: "the dragon", effort: "quality", aspect: "landscape", intent: "player_request" } },
+      ],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [
+        { type: "tool_use", id: "t1", name: "generate_image", input: { prompt: "the dragon", effort: "quality", aspect: "landscape", intent: "player_request" } },
+      ],
+    };
+    const responses = [imageBatch, textMessage("Here it is.")];
+    let idx = 0;
+    const generateImage = vi.fn(async () => {
+      stateWhileRendering = engineRef.current!.getState();
+      await renderGate;
+      return { base64: "AAA=", mimeType: "image/png", effortUsed: "quality", aspectUsed: "landscape" };
+    });
+    const provider = {
+      providerId: "mock",
+      chat: vi.fn(async () => responses[idx++]),
+      stream: vi.fn(async () => responses[idx++]),
+      healthCheck: vi.fn(async () => ({ ok: true })),
+      getCapabilities: () => ({ imageGeneration: true, thinking: false, tools: true, streaming: true, caching: false }),
+      generateImage,
     } as unknown as LLMProvider;
     const { callbacks, log } = mockCallbacks();
 
@@ -385,13 +459,20 @@ describe("GameEngine", () => {
     });
     engineRef.current = engine;
 
-    await engine.processInput("Aldric", "Show me the sword.");
-
-    // The render emitted the dedicated state...
-    expect(log.states).toContain("generating_image");
-    // ...and roll_dice ending did not clobber it back to dm_thinking.
+    // Start the turn but don't await — it blocks on the gated inline render.
+    const turn = engine.processInput("Aldric", "Draw me the dragon.");
+    await new Promise((r) => setTimeout(r, 0)); // let it reach the gated render
+    // The render is in flight INSIDE this still-open turn, and the indicator is lit.
     expect(stateWhileRendering).toBe("generating_image");
-    // Turn still ends cleanly.
+    expect(engine.getState()).toBe("generating_image");
+    expect(log.tuiCommands.some((c) => c.type === "display_image")).toBe(false);
+
+    // Finish the render; the image shows in THIS turn, then the turn completes.
+    releaseRender();
+    await turn;
+    const displayed = log.tuiCommands.filter((c) => c.type === "display_image");
+    expect(displayed).toHaveLength(1);
+    expect(displayed[0].intent).toBe("player_request");
     expect(engine.getState()).toBe("waiting_input");
   });
 

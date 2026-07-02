@@ -1,4 +1,5 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
+import { IMAGE_CADENCE_PER_100_DEFAULT, clampImageCadencePer100 } from "@machine-violet/shared/types/config.js";
 import { buildCachedPrefix } from "../context/index.js";
 import type { PrefixSections, CachedPrefixResult } from "../context/index.js";
 import { getModel } from "../config/models.js";
@@ -78,7 +79,17 @@ export function buildDMPrefix(
   // occurrence survives, so a personality's `<NPCS>` block trumps a seed's,
   // which in turn trumps the main DM's.
   const dmIdentity = loadPrompt("dm-identity", model);
-  const dmDirectives = loadPrompt("dm-directives", model);
+  // dm-directives carries a {{imageCadence}} placeholder for the per-campaign
+  // image cadence target. Interpolate here (loadPrompt has no var substitution)
+  // before applyLayeredOverrides — the placeholder lives in free prose, not a
+  // <TAG> block, so override collapsing is unaffected.
+  const imageCadence = clampImageCadencePer100(
+    config.image_cadence_per_100 ?? IMAGE_CADENCE_PER_100_DEFAULT,
+  );
+  const dmDirectives = loadPrompt("dm-directives", model).replace(
+    /\{\{imageCadence\}\}/g,
+    String(imageCadence),
+  );
   const campaignDetail = processIncludes(config.campaign_detail ?? "");
   const personality = processIncludes(config.dm_personality.prompt_fragment ?? "");
   const personalityDetail = processIncludes(config.dm_personality.detail ?? "");
@@ -169,6 +180,13 @@ export function buildHardStats(params: {
   /** When the system is run DM-managed (silently), tag the system line so the
    * reminder to keep mechanics behind the fiction rides the same cadence. */
   mechanicsSilent?: boolean;
+  /** Player exchanges since the DM last generated an image. Omitted when image
+   * generation is off (cadence 0), so the line never shows in image-less games. */
+  turnsSinceImage?: number;
+  /** Target images per 100 exchanges — sets the interval the counter is judged
+   * against. The `(!)` nudge appears once turnsSinceImage exceeds that interval
+   * by more than 2. */
+  imageCadencePer100?: number;
 }): string {
   const lines: string[] = [];
 
@@ -178,6 +196,16 @@ export function buildHardStats(params: {
 
   if (params.turnHolder) {
     lines.push(`Turn: ${params.turnHolder}${params.combatRound ? ` (Round ${params.combatRound})` : ""}`);
+  }
+
+  // Turns-since-last-image feedback signal. The DM systematically under-fires
+  // generate_image; surfacing the running count (with a `(!)` once it's more
+  // than 2 turns past the target interval) gives it a concrete cue without a
+  // heavier directive. Shown only when image gen is on (cadence > 0).
+  if (params.turnsSinceImage != null && params.imageCadencePer100 && params.imageCadencePer100 > 0) {
+    const interval = 100 / params.imageCadencePer100;
+    const overdue = params.turnsSinceImage > interval + 2;
+    lines.push(`Images: ${params.turnsSinceImage} turns since last${overdue ? " (!)" : ""}`);
   }
 
   if (params.resourceValues) {

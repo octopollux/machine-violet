@@ -156,3 +156,6 @@ voice-guides/
 /.debug/
 client-settings.json
 machine-settings.json
+
+# mv-image-bisect / batch-testing harness run outputs (narration, prompts, rendered PNGs)
+.batch-runs/

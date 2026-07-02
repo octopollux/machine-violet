@@ -838,7 +838,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.latestRateLimits = limits;
     log.rateLimitUpdated({ ...limits });
     if (shouldWarn(limits)) {
-      if (limits.primary.usedPercent >= 80) {
+      if (limits.primary && limits.primary.usedPercent >= 80) {
         log.rateLimitWarning({
           segmentId: "primary",
           usedPercent: limits.primary.usedPercent,
@@ -900,6 +900,16 @@ export class OpenAIChatGptProvider implements LLMProvider {
     const startParams = buildThreadStartParams({
       model: params.model,
       developerInstructions,
+      // Replace codex's built-in coding-agent base prompt. None of MV's codex
+      // chat agents are coding agents, and that base persona ("you are Codex …
+      // follow safety, tool, and workspace constraints") leaks into the DM —
+      // it self-identifies as Codex and skews deferential/conservative. The
+      // helper defaults this to "" (strip it entirely) so the agent runs on
+      // developerInstructions alone; a caller can still pass an explicit base.
+      // Verified on gpt-5.5: accepted (no HTTP 400), strips the Codex identity,
+      // tool dispatch intact. The image-render turn is a SEPARATE thread/start
+      // (renderImageOnce) and is not touched by this — it keeps codex's default
+      // base + image_gen scaffolding. Probe: test-harness/bin/codex-base-instructions.ts.
       baseInstructions: params.baseInstructions,
       dynamicTools,
       cwd: this.cwd,

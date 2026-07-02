@@ -15,6 +15,7 @@ import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
 import { updateCompendium, emptyCompendium, renderCompendiumForDM, canonicalizeCompendium } from "./subagents/compendium-updater.js";
 import type { Compendium } from "@machine-violet/shared/types/compendium.js";
+import { IMAGE_CADENCE_PER_100_DEFAULT, clampImageCadencePer100 } from "@machine-violet/shared/types/config.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
 import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
@@ -195,25 +196,34 @@ export class SceneManager {
    * stay consistent — contextRefresh runs after scene transitions, and must not
    * drop the active-system reminder from the hard-stats cadence.
    */
-  private buildCurrentHardStats(turnHolder?: string): string {
+  private buildCurrentHardStats(turnHolder?: string, turnsSinceImage?: number): string {
     const system = this.state.config.system;
+    const imagesOn = this.state.config.image_generation === "on";
     return buildHardStats({
       turnHolder,
       resourceValues: this.state.resourceValues,
       activeSystem: system ? (findSystem(system)?.name ?? system) : undefined,
       mechanicsSilent: effectiveMechanicsMode(this.state.config) === "dm-managed",
+      ...(imagesOn && turnsSinceImage != null
+        ? {
+            turnsSinceImage,
+            imageCadencePer100: clampImageCadencePer100(
+              this.state.config.image_cadence_per_100 ?? IMAGE_CADENCE_PER_100_DEFAULT,
+            ),
+          }
+        : {}),
     });
   }
 
   /** Get the current system prompt (cached prefix) and volatile context. */
-  getSystemPrompt(opts?: { turnHolder?: string }): CachedPrefixResult {
+  getSystemPrompt(opts?: { turnHolder?: string; turnsSinceImage?: number }): CachedPrefixResult {
     this.state.objectives.current_scene = this.scene.sceneNumber;
     this.sessionState.activeState = buildActiveState({
       pcSummaries: this.pcSummaries,
       pendingAlarms: [],
       activeObjectives: this.getActiveObjectives(),
     });
-    this.sessionState.hardStats = this.buildCurrentHardStats(opts?.turnHolder);
+    this.sessionState.hardStats = this.buildCurrentHardStats(opts?.turnHolder, opts?.turnsSinceImage);
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
     this.sessionState.entityIndex = this.entityRegistrySnapshot();

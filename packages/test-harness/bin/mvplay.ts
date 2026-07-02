@@ -45,8 +45,9 @@ import {
 const USAGE = `mvplay — interactive Machine Violet driver
 
 Commands:
-  start [--player NAME] [--fresh]   Boot the game in the background, print the menu.
-  record <scenario> [--player NAME] [--fresh]
+  start [--player NAME] [--fresh] [--live] [--data-dir PATH]
+                                    Boot the game in the background, print the menu.
+  record <scenario> [--player NAME] [--fresh] [--live] [--data-dir PATH]
                                     Like start, but tape every LLM call (MV_TAPE_MODE=record).
                                     Play the scenario, then \`save-tape\`.
   save-tape <path>                  Pull the recorded tape and write a golden to <path>.
@@ -66,6 +67,10 @@ Notes:
   - One session at a time (under the system temp dir).
   - 'wait' is the slow one (a DM turn is 1-5 min). Launch it with run_in_background
     so you're re-invoked on exit instead of blocking a tool call.
+  - By default you play in a throwaway temp campaigns dir (isolated, safe).
+  - --live plays the user's REAL machine-scope campaigns; --data-dir PATH points
+    at a custom data root (<PATH>/campaigns). ⚠️ Turns MUTATE real campaigns —
+    never delete/overwrite/roll back one unless the user explicitly asked.
 `;
 
 function flag(args: string[], name: string): boolean {
@@ -84,7 +89,7 @@ function positionals(args: string[]): string[] {
     const a = args[i];
     if (a.startsWith("--")) {
       // Skip a value for known value-taking flags.
-      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail") i++;
+      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail" || a === "--data-dir") i++;
       continue;
     }
     out.push(a);
@@ -98,12 +103,23 @@ async function main(): Promise<void> {
 
   switch (cmd) {
     case "start":
-      await start({ player: opt(rest, "player"), fresh: flag(rest, "fresh") });
+      await start({
+        player: opt(rest, "player"),
+        fresh: flag(rest, "fresh"),
+        live: flag(rest, "live"),
+        dataDir: opt(rest, "data-dir"),
+      });
       break;
     case "record": {
       const scenario = pos[0];
       if (!scenario) throw new Error(`record needs a scenario name: mvplay record open-door`);
-      await start({ record: scenario, player: opt(rest, "player"), fresh: flag(rest, "fresh") });
+      await start({
+        record: scenario,
+        player: opt(rest, "player"),
+        fresh: flag(rest, "fresh"),
+        live: flag(rest, "live"),
+        dataDir: opt(rest, "data-dir"),
+      });
       break;
     }
     case "save-tape": {
