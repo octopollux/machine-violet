@@ -156,6 +156,11 @@ async function main(): Promise<void> {
     ? (replaceRangeRaw.split("-").map(Number) as [number, number])
     : undefined;
   const replaceFile = arg("replace-file");
+  // Override the appended image directive with custom text (calibrating a
+  // STRONGER image directive to punch through the distributed restraint, since
+  // no surgical removal unlocks). The full base prompt is unchanged; this swaps
+  // the high-salience trailing image block for the candidate wording.
+  const imageFile = arg("image-file");
   // Asset preservation (this harness is load-bearing for playtesting at scale —
   // every run writes its narration, tool calls, image prompts, and (with
   // --render) the actual PNGs to disk, incrementally, so nothing is ever lost to
@@ -175,7 +180,7 @@ async function main(): Promise<void> {
 
   // --- Build the (possibly truncated) system prompt --------------------------
   const fullSystem = dump.system.map((b) => b.text).join("\n\n");
-  let imageSection = extractImageSection(fullSystem);
+  let imageSection = imageFile ? readFileSync(imageFile, "utf8") : extractImageSection(fullSystem);
   if (cadence) {
     imageSection = imageSection.replace(
       /roughly \d+ images across every 100/,
