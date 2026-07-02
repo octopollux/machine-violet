@@ -29,7 +29,10 @@
  *   node --import tsx/esm packages/test-harness/bin/mv-image-bisect.ts \
  *     [--dump=<path to dm.json>] [--sys-frac=1.0] [--history=8|all] \
  *     [--samples=5] [--model=gpt-5.5] [--action="..."] \
- *     [--render] [--out=<dir>] [--label=<name>]
+ *     [--render] [--out=<dir>] [--label=<name>] [--concurrency=K]
+ *   --concurrency=K warms one sample (token refresh + prompt-cache write) then
+ *     fans the rest out K-wide as cache-reads — use for same-prompt batches
+ *     instead of launching K cold processes.
  *   Shaping knobs (choose one): --sys-frac | --drop-blocks=2,6 | --drop-range=A-B
  *     | --add-range=A-B (onto --drop-blocks baseline) | --replace-range=A-B --replace-file=<f>
  *   Signal knobs: --cadence=N (raise freq target) | --force (imperative push)
@@ -157,6 +160,13 @@ async function main(): Promise<void> {
   const render = process.argv.slice(2).includes("--render");
   const outRoot = arg("out") ?? join(process.cwd(), ".batch-runs");
   const label = arg("label");
+  // In-process parallelism with a WARM-FIRST sample: run one sample alone to
+  // refresh the token AND warm the provider-side prompt cache, THEN fan out the
+  // rest concurrently as cache-READS. Without this, N cold-parallel samples of
+  // the same system prompt each pay a cache WRITE (1x write + N-1 reads becomes
+  // Nx writes). Only needed once the cache goes cold (~hourly). Prefer this over
+  // launching N separate processes for same-prompt batches.
+  const concurrency = Math.max(1, Number(arg("concurrency", "1")));
 
   const dump: Dump = JSON.parse(readFileSync(dumpPath, "utf8"));
 
@@ -244,9 +254,8 @@ async function main(): Promise<void> {
   interface SampleRec { i: number; status: "image" | "no-image" | "error"; ms: number; tools: string[]; images: ImgAsset[]; narration?: string; error?: string; }
   const records: SampleRec[] = [];
   let fired = 0;
-  const perSample: string[] = [];
 
-  for (let i = 0; i < samples; i++) {
+  const runSample = async (i: number): Promise<void> => {
     const n2 = String(i + 1).padStart(2, "0");
     const sampleDir = join(samplesDir, n2);
     mkdirSync(sampleDir, { recursive: true });
@@ -310,35 +319,50 @@ async function main(): Promise<void> {
       const toolNames = calls.map((c) => c.name);
       rec = { i: i + 1, status: hit ? "image" : "no-image", ms, tools: toolNames, images: imgAssets, narration: res.text || "" };
       writeFileSync(join(sampleDir, "narration.txt"), res.text || "(empty)");
-      perSample.push(
-        `  #${i + 1}: ${hit ? "🖼️ IMAGE" : "— no image"} (${ms}ms) tools=[${toolNames.join(",") || "(none)"}]` +
-          (hit ? `\n       prompt: ${imgAssets[0].prompt.slice(0, 160)}` : "") +
-          `\n       text: ${(res.text || "(empty)").replace(/\s+/g, " ").trim().slice(0, 160)}`,
-      );
       process.stderr.write(`  #${i + 1}: ${hit ? "IMAGE" + (render ? "(rendered)" : "") : "no image"} (${ms}ms, tools: ${toolNames.join(",") || "none"})\n`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       rec = { i: i + 1, status: "error", ms: Date.now() - start, tools: calls.map((c) => c.name), images: imgAssets, error: msg };
-      perSample.push(`  #${i + 1}: ERROR ${msg.slice(0, 200)}`);
       process.stderr.write(`  #${i + 1}: ERROR ${msg.slice(0, 200)}\n`);
     } finally {
       await provider.dispose();
     }
     records.push(rec);
-    // Write per-sample + rolling run summary EACH iteration so a mid-run kill
-    // (e.g. quota) never loses completed samples.
+    // Write per-sample + rolling run summary as EACH sample finishes so a
+    // mid-run kill (e.g. quota) never loses completed samples.
     writeFileSync(join(sampleDir, "sample.json"), JSON.stringify(rec, null, 2));
     writeRunSummary(runDir, { shapeDesc, historyN, cadence: cadence ?? "8", samples, model, render, action, fired, records });
+  };
+
+  // Warm-first parallelism: sample 0 alone (refresh token + warm prompt cache),
+  // then fan out the rest across `concurrency` workers as cache-reads.
+  if (concurrency > 1 && samples > 1) {
+    process.stderr.write(`  concurrency=${concurrency} (warming on sample 1, then fan out)\n`);
+    await runSample(0);
+    let next = 1;
+    const worker = async (): Promise<void> => {
+      for (let idx = next++; idx < samples; idx = next++) await runSample(idx);
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, samples - 1) }, worker));
+  } else {
+    for (let i = 0; i < samples; i++) await runSample(i);
   }
 
+  const ordered = [...records].sort((a, b) => a.i - b.i);
+  const errored = ordered.filter((r) => r.status === "error").length;
+  const lines = ordered.map((r) => {
+    const hit = r.status === "image";
+    return `  #${r.i}: ${r.status === "error" ? "⚠️ ERROR" : hit ? "🖼️ IMAGE" : "— no image"} (${r.ms}ms) tools=[${r.tools.join(",") || "(none)"}]` +
+      (hit && r.images[0] ? `\n       prompt: ${r.images[0].prompt.slice(0, 160)}` : "") +
+      (r.error ? `\n       ${r.error.slice(0, 160)}` : `\n       text: ${(r.narration || "(empty)").replace(/\s+/g, " ").trim().slice(0, 160)}`);
+  });
   process.stdout.write(
     `\n=== RESULT ${shapeDesc} history=${historyN} cadence=${cadence ?? "8"} ===\n` +
-      `fired ${fired}/${samples}` +
-      `${records.some((r) => r.status === "error") ? ` (${records.filter((r) => r.status === "error").length} errored — excluded)` : ""}\n` +
-      perSample.join("\n") +
+      `fired ${fired}/${samples - errored} valid${errored ? ` (${errored} errored — excluded)` : ""}\n` +
+      lines.join("\n") +
       `\nout: ${runDir}\n`,
   );
-  process.stderr.write(`\n▶ done — fired ${fired}/${samples} — assets in ${runDir}\n`);
+  process.stderr.write(`\n▶ done — fired ${fired}/${samples - errored} valid — assets in ${runDir}\n`);
 }
 
 /** Machine-readable + human-readable run summary. Rewritten every sample so a
@@ -349,18 +373,19 @@ function writeRunSummary(
     shapeDesc: string; historyN: number; cadence: string | number; samples: number; model: string;
     render: boolean; action: string;
     fired: number;
-    records: { i: number; status: string; ms: number; tools: string[]; images: { prompt: string; file?: string; error?: string }[]; narration?: string; error?: string }[];
+    records: { i: number; status: string; ms: number; tools: string[]; images: { prompt: string; effort?: string; aspect?: string; intent?: string; file?: string; error?: string }[]; narration?: string; error?: string }[];
   },
 ): void {
-  const valid = s.records.filter((r) => r.status !== "error");
-  const errored = s.records.filter((r) => r.status === "error").length;
+  const recs = [...s.records].sort((a, b) => a.i - b.i); // concurrency finishes out of order
+  const valid = recs.filter((r) => r.status !== "error");
+  const errored = recs.filter((r) => r.status === "error").length;
   const rate = valid.length > 0 ? (s.fired / valid.length) : 0;
   writeFileSync(join(runDir, "run.json"), JSON.stringify({
     shapeDesc: s.shapeDesc, historyN: s.historyN, cadence: s.cadence, samplesRequested: s.samples,
     model: s.model, render: s.render, action: s.action,
-    fired: s.fired, completed: s.records.length, valid: valid.length, errored,
+    fired: s.fired, completed: recs.length, valid: valid.length, errored,
     fireRateOverValid: Number(rate.toFixed(3)),
-    records: s.records,
+    records: recs,
   }, null, 2));
   const lines: string[] = [
     `# Batch run: ${s.shapeDesc}`,
@@ -371,7 +396,7 @@ function writeRunSummary(
     "",
     "| # | result | ms | tools | image prompt |",
     "|---|---|---|---|---|",
-    ...s.records.map((r) => {
+    ...recs.map((r) => {
       const p = r.images[0]?.prompt.replace(/\s+/g, " ").slice(0, 80).replace(/\|/g, "\\|") ?? "";
       const st = r.status === "image" ? "🖼️" : r.status === "error" ? "⚠️ err" : "—";
       return `| ${r.i} | ${st} | ${r.ms} | ${r.tools.join(" ") || "-"} | ${p} |`;
@@ -389,7 +414,7 @@ function writeRunSummary(
     `**Action (identical every sample):** ${s.action}`,
     "",
   ];
-  for (const r of s.records) {
+  for (const r of recs) {
     const st = r.status === "image" ? "🖼️ IMAGE" : r.status === "error" ? "⚠️ ERROR" : "— no image";
     t.push(`\n---\n\n## Sample ${r.i} — ${st}  ·  ${r.ms}ms  ·  tools: ${r.tools.join(", ") || "none"}`);
     for (const img of r.images) {
