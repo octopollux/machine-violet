@@ -132,10 +132,13 @@ async function main(): Promise<void> {
   // system text (then re-append the image section). Lets us split a single block
   // and localize the suppressor down to a sentence. Takes precedence over
   // --drop-blocks / --sys-frac.
+  // One or more "START-END" spans, comma-separated, all removed (highest offset
+  // first so earlier offsets stay valid). Lets a removal-ladder drop several
+  // redundant suppressor spans in one run.
   const dropRangeRaw = arg("drop-range");
-  const dropRange = dropRangeRaw
-    ? (dropRangeRaw.split("-").map(Number) as [number, number])
-    : undefined;
+  const dropRanges: [number, number][] = dropRangeRaw
+    ? dropRangeRaw.split(",").map((r) => r.split("-").map(Number) as [number, number])
+    : [];
   // Add-back: after building the base (typically via --drop-blocks=2, i.e. the
   // UNLOCKED baseline with all main directives removed), re-insert one original
   // system span [START,END). The right tool when suppression is REDUNDANT across
@@ -186,10 +189,14 @@ async function main(): Promise<void> {
     const repl = readFileSync(replaceFile, "utf8");
     base = fullSystem.slice(0, rs) + repl + fullSystem.slice(re);
     shapeDesc = `replace-range=${rs}-${re} with ${repl.length}-char file (full ${fullSystem.length}→${base.length})`;
-  } else if (dropRange) {
-    const [s, e] = dropRange;
-    base = fullSystem.slice(0, s) + fullSystem.slice(e);
-    shapeDesc = `drop-range=${s}-${e} (removed ${e - s} chars: "${fullSystem.slice(s, s + 50).replace(/\s+/g, " ").trim()}…")`;
+  } else if (dropRanges.length > 0) {
+    base = fullSystem;
+    let removed = 0;
+    for (const [s, e] of [...dropRanges].sort((a, b) => b[0] - a[0])) {
+      base = base.slice(0, s) + base.slice(e);
+      removed += e - s;
+    }
+    shapeDesc = `drop-range=[${dropRanges.map(([s, e]) => `${s}-${e}`).join(",")}] (removed ${removed} chars across ${dropRanges.length} span(s))`;
   } else if (dropBlocks.size > 0) {
     const kept = dump.system.filter((_, i) => !dropBlocks.has(i));
     base = kept.map((b) => b.text).join("\n\n");
