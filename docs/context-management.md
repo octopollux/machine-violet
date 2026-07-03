@@ -87,6 +87,8 @@ Dense, wikilinked, mechanically precise. ~150 tokens for 6 rounds of combat. The
 
 A fresh multicultural name sample is injected into the DM's cached prefix at the start of every session, emitted as a `## Name Inspiration` block by the prefix builder. Its sole purpose is **entropy injection**: LLMs tend to reuse a small set of names across sessions; exposing a different random sample each session shifts the model's priors without prescribing specific choices.
 
+The **setup agent** gets the same block for the same reason — its "surprise me" character generation otherwise collapses to a handful of names every campaign (a live sweep produced "Mara Vale" verbatim ~7 times across 67 seeds). `buildSystemPrompt()` in `setup-conversation.ts` calls the same `buildNameInspiration()` and pushes a `## Name Inspiration` block into **Tier 3** (the per-session, un-cached section alongside the shuffled seeds/personalities) — deliberately not the 1h-cached Tier 1/2 prefix, so the sample varies campaign-to-campaign rather than being frozen for the cache window.
+
 **Pool** (`packages/engine/src/assets/names/names.json`): a static JSON file with two string arrays — `given` (given names) and `family` (family names) — drawn from a broad range of cultural and linguistic origins.
 
 **Sampling** (`packages/engine/src/agents/name-inspiration.ts`): at session start, `buildNameInspiration()` selects 30 given names and 30 family names (its default counts) via a partial Fisher-Yates shuffle over an index array. Selection is without replacement within each list. The sample is clamped to the pool size if a list is shorter than the requested count.

@@ -1,6 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
+import { buildNameInspiration } from "../name-inspiration.js";
 import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
@@ -554,6 +555,13 @@ function buildSystemPrompt(
     text: "\n\n## Available campaign worlds\n\nUse these when presenting Quick Start options or campaign ideas. Pick worlds that match the player's genre if known. When presenting worlds as choices, use the name as the choice label and the summary (or description if available) as the choice description. For worlds marked [has detail], call `load_world` with the slug to get the full DM detail and any suboptions to present to the player.\n\n" + seedList +
       "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList,
   });
+
+  // Name inspiration — same entropy injection the DM gets (see
+  // name-inspiration.ts / session-manager). Without it the setup agent's
+  // "surprise me" character generation collapses to the same few names
+  // every campaign (Mara Vale / Voss / Venn). Fresh per session and kept
+  // out of the cached Tier 1/2 prefix so the sample varies campaign-to-campaign.
+  blocks.push({ text: "\n\n## Name Inspiration\n" + buildNameInspiration() });
 
   return blocks;
 }
