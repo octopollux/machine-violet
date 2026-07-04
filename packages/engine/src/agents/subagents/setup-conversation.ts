@@ -559,8 +559,12 @@ function buildSystemPrompt(
   // Name inspiration — same entropy injection the DM gets (see
   // name-inspiration.ts / session-manager). Without it the setup agent's
   // "surprise me" character generation collapses to the same few names
-  // every campaign (Mara Vale / Voss / Venn). Fresh per session and kept
-  // out of the cached Tier 1/2 prefix so the sample varies campaign-to-campaign.
+  // every campaign (Mara Vale / Voss / Venn). A fresh sample is drawn per
+  // session regardless of tier (buildSystemPrompt runs once per session);
+  // it lives in Tier 3 alongside the shuffled seeds so this per-session-
+  // random content stays out of the cache-stamped Tier 1/2 prefix, which is
+  // meant to stay byte-stable across sessions — putting it there would churn
+  // that shared cached prefix for no benefit.
   blocks.push({ text: "\n\n## Name Inspiration\n" + buildNameInspiration() });
 
   return blocks;
