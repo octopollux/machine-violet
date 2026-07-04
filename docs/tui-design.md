@@ -389,16 +389,11 @@ The passage forks ahead.
                             ESC dismiss
 ```
 
-**`present_choices`** — The DM's tool for this. Two modes:
+Choices reach the player two independent ways:
 
-No parameters (default): A Haiku subagent reads recent context and generates 2-3 reasonable options. Cheap, fast, doesn't need to be brilliant — freeform is always available. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type and press Enter without navigating.
+Engine-suggested (background): after a DM turn, *if the DM did not present choices itself*, the engine may auto-generate 2-3 options via the `choice-generator` subagent and deliver them as a synthetic `present_choices` command (`maybeGenerateSuggestedChoices`). Gated by the campaign's Choices Frequency setting (`never`/`rarely`/`sometimes`/`often`/`always`) with optional per-player overrides. Cheap, fast, doesn't need to be brilliant — freeform is always available. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type and press Enter without navigating.
 
-```
-present_choices({})
-→ subagent generates options from recent context, displays modal
-```
-
-Explicit choices: The DM sets specific options when it matters narratively. Optional `descriptions` provide per-choice detail shown in a fixed-height region (3 rows) that updates as the player highlights each option.
+DM-authored (the `present_choices` tool): the DM sets specific options when it matters narratively, passing `prompt` and `choices`. Optional `descriptions` provide per-choice detail shown in a fixed-height region (3 rows) that updates as the player highlights each option. Note the DM's tool does **not** auto-generate: calling it with no `choices` shows an all-but-empty modal *and* sets `dmProvidedChoicesThisTurn`, which suppresses the engine-suggested path above for that turn. So the DM authors real options or leaves the tool alone and lets the background path offer them.
 
 ```
 present_choices({

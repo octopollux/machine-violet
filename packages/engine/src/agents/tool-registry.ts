@@ -611,7 +611,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "present_choices",
-      description: "Show a choice modal to the player. Call with no params to delegate option-generation to a subagent (it reads the scene and writes fitting choices); pass `prompt`/`choices` to author them yourself.",
+      description: "Show the player a choice modal with options YOU author. Pass `prompt` (the question) and `choices` (the options you're offering); `descriptions` optionally adds per-choice detail. Provide real options — calling with no `choices` shows an all-but-empty modal AND suppresses the engine's own background choice suggestions for this turn, so don't call it empty. To leave suggestions to the engine instead, simply don't call this tool: it offers its own per the campaign's Choices Frequency setting. The player can always reject your options and type their own.",
       inputSchema: {
         type: "object" as const,
         properties: {
