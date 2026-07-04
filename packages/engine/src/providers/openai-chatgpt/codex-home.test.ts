@@ -70,11 +70,13 @@ describe("sweepStaleCodexHomes", () => {
       const fresh = new Date(now - 60_000); // 1 min ago
       await utimes(wal, fresh, fresh);
 
-      const removed = await sweepStaleCodexHomes(now, 3 * 24 * 60 * 60 * 1000);
-      // Our active home must still be present (removed count excludes it).
+      await sweepStaleCodexHomes(now, 3 * 24 * 60 * 60 * 1000);
+      // Assert ONLY that OUR active home survives — not the total removed count.
+      // The sweep runs against the shared real temp base, so a prior local run
+      // or a concurrent test can leave other stale homes it legitimately reaps;
+      // asserting `removed === 0` there is a shared-state flake (Copilot #699).
       const st = await stat(dir);
       expect(st.isDirectory()).toBe(true);
-      expect(removed).toBe(0);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
