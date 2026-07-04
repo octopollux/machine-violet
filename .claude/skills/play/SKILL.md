@@ -26,8 +26,8 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 
 | Command | What it does |
 |---|---|
-| `start [--player NAME] [--fresh]` | Boot the game in the background; print the main menu. |
-| `record <scenario> [--player NAME] [--fresh]` | Like `start`, but tape every LLM call (records a golden — see /record-tape). |
+| `start [--player NAME] [--fresh] [--live] [--data-dir PATH]` | Boot the game in the background; print the main menu. |
+| `record <scenario> [--player NAME] [--fresh] [--live] [--data-dir PATH]` | Like `start`, but tape every LLM call (records a golden — see /record-tape). |
 | `save-tape <path>` | Pull the recorded tape and write a golden to `<path>` (record sessions only). |
 | `status` | Is a session alive? Show engine/turn/choices vitals. |
 | `screen [--ansi]` | Print the rendered terminal screen (use for menu phase). |
@@ -42,6 +42,34 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 
 One session at a time (state lives under the system temp dir). Read-back is over
 the sidecar's HTTP `/screen` + `/state` — nothing blocks on stdio.
+
+## Temp dir vs. the user's live campaigns (`--live`)
+
+By **default** you play in a throwaway temp campaigns dir (`tmpdir()/mvplay/
+campaigns`) — isolated from the user's real saves, so the menu is empty until
+*you* start a New Campaign, and nothing you do can hurt real data. That's the
+right mode for exercising fresh flows.
+
+To **continue or inspect a campaign the user actually plays**, boot with
+`--live` (their machine-scope data dir, `~/Documents/.machine-violet` on
+Windows/macOS) or `--data-dir PATH` (a custom `.machine-violet` root):
+
+```bash
+mvplay start --live          # menu now lists the user's real campaigns
+```
+
+> ⚠️ **`--live`/`--data-dir` play the user's REAL campaigns, and every turn
+> MUTATES them** — narration is appended, saves and rollback points are written,
+> generated images land on disk. This is exactly the data a lost/corrupted copy
+> would run a player off the product. So:
+> - **Never** delete, overwrite, archive, roll back, or "reset" a live campaign
+>   unless the user explicitly asked for that specific campaign.
+> - To *inspect* a campaign safely, copy it out (`cp -r`) and read the copy, or
+>   read files directly — don't drive turns you don't intend to keep.
+> - When in doubt, play in the default temp dir, or ask.
+
+The startup banner prints the resolved dir and this warning whenever real data
+is in play — read it and confirm it's the dir you meant.
 
 ## The turn loop
 

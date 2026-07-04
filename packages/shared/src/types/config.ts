@@ -191,6 +191,17 @@ export interface CampaignConfig {
    * choice (e.g. older saves).
    */
   mechanics_mode?: MechanicsMode;
+  /**
+   * Target cadence for the DM's inline `generate_image` calls, expressed as
+   * an approximate count of images per 100 player exchanges. Surfaced to the
+   * DM as soft guidance ("aim for ~N images per 100 exchanges, timing your
+   * call") — the DM self-paces from its own context + the exchange counter,
+   * so this is a target, not a hard cap. Player-requested images render
+   * regardless and don't count against it. Defaults to
+   * IMAGE_CADENCE_PER_100_DEFAULT; the user can change it by editing
+   * config.json. Only meaningful when image generation is enabled.
+   */
+  image_cadence_per_100?: number;
 }
 
 export const DM_TURN_LENGTH_PCT_DEFAULT = 80;
@@ -202,4 +213,14 @@ export const DM_TURN_LENGTH_PCT_STEP = 5;
 export function clampDmTurnLengthPct(value: number): number {
   const stepped = Math.round(value / DM_TURN_LENGTH_PCT_STEP) * DM_TURN_LENGTH_PCT_STEP;
   return Math.max(DM_TURN_LENGTH_PCT_MIN, Math.min(DM_TURN_LENGTH_PCT_MAX, stepped));
+}
+
+export const IMAGE_CADENCE_PER_100_DEFAULT = 8;
+export const IMAGE_CADENCE_PER_100_MIN = 0;
+export const IMAGE_CADENCE_PER_100_MAX = 50;
+
+/** Clamp a candidate image cadence to the supported range, rounded to a whole count. */
+export function clampImageCadencePer100(value: number): number {
+  const whole = Math.round(value);
+  return Math.max(IMAGE_CADENCE_PER_100_MIN, Math.min(IMAGE_CADENCE_PER_100_MAX, whole));
 }

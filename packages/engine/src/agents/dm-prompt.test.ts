@@ -130,6 +130,29 @@ describe("buildHardStats", () => {
     expect(buildHardStats({ resourceValues: { Aldric: {} } })).toBe("");
   });
 
+  describe("turns-since-image feedback signal", () => {
+    it("renders the count without a nudge when within the interval", () => {
+      // cadence 8 → interval 12.5; 10 turns is under 12.5+2, so no (!)
+      const r = buildHardStats({ turnsSinceImage: 10, imageCadencePer100: 8 });
+      expect(r).toBe("Images: 10 turns since last");
+    });
+
+    it("adds a (!) nudge once more than 2 turns past the interval", () => {
+      // cadence 8 → interval 12.5; 15 > 14.5 → nudge
+      const r = buildHardStats({ turnsSinceImage: 15, imageCadencePer100: 8 });
+      expect(r).toBe("Images: 15 turns since last (!)");
+    });
+
+    it("omits the line entirely when image cadence is 0 (images off)", () => {
+      expect(buildHardStats({ turnsSinceImage: 99, imageCadencePer100: 0 })).toBe("");
+      expect(buildHardStats({ turnsSinceImage: 99 })).toBe("");
+    });
+
+    it("omits the line when the count is not provided", () => {
+      expect(buildHardStats({ imageCadencePer100: 8 })).toBe("");
+    });
+  });
+
   it("combines turn holder and resources on separate lines", () => {
     const result = buildHardStats({
       turnHolder: "Aldric",
@@ -258,5 +281,38 @@ describe("buildDMPrefix model conditionals", () => {
     const { system } = buildDMPrefix(mockConfig, {}, "claude-opus-4-6");
     const allText = system.map((b) => b.text).join("\n");
     expect(allText).not.toContain(GPT_ONLY_PHRASE);
+  });
+});
+
+describe("buildDMPrefix image cadence interpolation", () => {
+  const cfg = (overrides: Partial<CampaignConfig>): CampaignConfig => ({
+    name: "Test",
+    system: "D&D 5e",
+    dm_personality: { name: "grim", prompt_fragment: "You are terse." },
+    players: [{ name: "Alice", character: "Aldric", type: "human" }],
+    combat: { initiative_method: "d20_dex", round_structure: "individual", surprise_rules: false },
+    context: { retention_exchanges: 5, max_conversation_tokens: 4000, tool_result_stub_after: 200 },
+    recovery: { auto_commit_interval: 300, max_commits: 100, enable_git: false },
+    choices: { campaign_default: "never", player_overrides: {} },
+    ...overrides,
+  } as CampaignConfig);
+
+  const directivesText = (config: CampaignConfig): string =>
+    buildDMPrefix(config, {}).system.map((b) => b.text).join("\n");
+
+  it("substitutes the default cadence (8) when unset and leaves no placeholder", () => {
+    const all = directivesText(cfg({}));
+    expect(all).toContain("roughly 8 images across every 100 player exchanges");
+    expect(all).not.toContain("{{imageCadence}}");
+  });
+
+  it("honors an explicit per-campaign cadence", () => {
+    const all = directivesText(cfg({ image_cadence_per_100: 25 }));
+    expect(all).toContain("roughly 25 images across every 100 player exchanges");
+  });
+
+  it("clamps an out-of-range cadence to the supported max", () => {
+    const all = directivesText(cfg({ image_cadence_per_100: 999 }));
+    expect(all).toContain("roughly 50 images across every 100 player exchanges");
   });
 });

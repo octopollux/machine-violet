@@ -50,6 +50,9 @@ export interface PersistedSceneState {
   activePlayerIndex: number;
   /** Set true by sessionEnd after writing recap files; cleared by sessionResume once delivered. */
   sessionRecapPending?: boolean;
+  /** Player exchanges since the DM last generated an image (turns-since-image
+   * feedback signal). Persisted so the count/nudge survives a resume. */
+  turnsSinceImage?: number;
 }
 
 /** UI theme state that gets persisted.

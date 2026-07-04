@@ -197,21 +197,44 @@ import { sanitizeFrontMatter } from "../../tools/filesystem/frontmatter.js";
 const H2_RE = /^## (?!#)/m;
 
 /**
+ * Strip trailing *blank lines* (empty or whitespace-only) from a chunk of
+ * markdown. Only whole trailing blank lines go — meaningful trailing whitespace
+ * on the last content line (e.g. the two-space markdown hard break) is left
+ * intact, because the pattern only matches from a newline onward.
+ */
+function stripTrailingBlankLines(s: string): string {
+  return s.replace(/(?:\n[ \t]*)+$/, "");
+}
+
+/**
  * Split a markdown body into sections keyed by `## Heading`.
  * Returns an array of { heading, content } where heading is the full
  * `## Foo` line (or "" for preamble text before the first heading).
  * Content includes the heading line itself.
+ *
+ * Trailing *blank lines* are stripped from each section's content (via
+ * {@link stripTrailingBlankLines}): the blank line that visually separates one
+ * section from the next is *presentation*, re-added by the joiner (see
+ * {@link mergeSectionBodies}). If it were kept in `content`, every merge would
+ * join sections whose content already ends in the separator with another
+ * `\n\n`, so each write would grow the gaps by a blank line — a slow, silent
+ * newline-accumulation bug across an entity's lifetime. Stripping here makes a
+ * parse→merge round-trip idempotent (and self-heals a file that already
+ * accumulated runs, the next time it is written).
  */
 export function splitSections(body: string): { heading: string; content: string }[] {
-  if (!H2_RE.test(body)) return [{ heading: "", content: body }];
+  if (!H2_RE.test(body)) return [{ heading: "", content: stripTrailingBlankLines(body) }];
 
   const sections: { heading: string; content: string }[] = [];
   const lines = body.split("\n");
   let current: { heading: string; lines: string[] } | null = null;
+  const finish = () => {
+    if (current) sections.push({ heading: current.heading, content: stripTrailingBlankLines(current.lines.join("\n")) });
+  };
 
   for (const line of lines) {
     if (line.startsWith("## ") && !line.startsWith("### ")) {
-      if (current) sections.push({ heading: current.heading, content: current.lines.join("\n") });
+      finish();
       current = { heading: line, lines: [line] };
     } else {
       if (!current) {
@@ -220,7 +243,7 @@ export function splitSections(body: string): { heading: string; content: string 
       current.lines.push(line);
     }
   }
-  if (current) sections.push({ heading: current.heading, content: current.lines.join("\n") });
+  finish();
 
   return sections;
 }
@@ -234,9 +257,11 @@ export function splitSections(body: string): { heading: string; content: string 
  */
 export function mergeSectionBodies(existing: string, incoming: string): string {
   // If incoming has no ## headings, append as before (backward compat for
-  // plain-text updates like adding a paragraph of description).
+  // plain-text updates like adding a paragraph of description). Strip trailing
+  // blanks off `existing` first so a preamble that ends in blank lines can't
+  // combine with the `\n\n` joiner into a growing gap.
   if (!H2_RE.test(incoming)) {
-    return existing ? `${existing}\n\n${incoming}` : incoming;
+    return existing ? `${stripTrailingBlankLines(existing)}\n\n${incoming}` : incoming;
   }
 
   const existingSections = splitSections(existing);

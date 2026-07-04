@@ -332,6 +332,17 @@ interface ChatParamsBase {
    * out of cache-miss attribution; the call itself behaves identically.
    */
   conversationId?: string;
+  /**
+   * Optional override for the model's *base* system instructions. Only the
+   * `openai-chatgpt` (codex) provider consumes this: it maps to `baseInstructions`
+   * on codex `thread/start`, which REPLACES codex's built-in coding-agent base
+   * prompt (the deferential "you are Codex … workspace constraints" persona) —
+   * distinct from `systemPrompt`, which rides as additive developer instructions.
+   * When unset, the openai-chatgpt provider defaults it to "" (strips the codex
+   * base entirely) so the agent runs on `systemPrompt` alone. Other providers
+   * ignore it. See `openai-chatgpt/provider.ts` for the rationale + verification.
+   */
+  baseInstructions?: string;
 }
 
 interface ChatParamsToolless extends ChatParamsBase {

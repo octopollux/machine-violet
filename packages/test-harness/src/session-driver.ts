@@ -35,8 +35,8 @@ import {
   writeFileSync,
   rmSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { tmpdir, homedir } from "node:os";
+import { join, dirname, resolve } from "node:path";
 
 import { buildLaunchEnv, pickEphemeralPort, LAUNCHER_NODE_ARGS } from "./launch-env.js";
 import { choiceLabel, type ClientStateSnapshot, type ActiveChoices } from "./client-state.js";
@@ -51,6 +51,22 @@ export const SESSION_DIR = join(tmpdir(), "mvplay");
 const SESSION_FILE = join(SESSION_DIR, "session.json");
 const LAUNCHER_LOG = join(SESSION_DIR, "launcher.log");
 const CAMPAIGNS_DIR = join(SESSION_DIR, "campaigns");
+
+/**
+ * The user's REAL, machine-scope data root — where the installed app and
+ * `npm run dev` keep live campaigns. Mirrors the engine's `defaultCampaignRoot`
+ * (packages/engine/src/tools/filesystem/platform.ts); kept in sync by hand
+ * because test-harness doesn't depend on @machine-violet/engine. Only reached
+ * via `--live` / `--data-dir`; the default play dir stays the throwaway temp one.
+ */
+function machineDataRoot(): string {
+  const home = homedir();
+  if (process.platform === "win32" || process.platform === "darwin") {
+    return join(home, "Documents", ".machine-violet");
+  }
+  const xdg = process.env["XDG_DATA_HOME"];
+  return xdg ? join(xdg, ".machine-violet") : join(home, ".local", "share", ".machine-violet");
+}
 
 interface SessionFile {
   pid: number;
@@ -277,6 +293,19 @@ export interface StartOptions {
    * `saveTape()`. Omit for a normal play session.
    */
   record?: string;
+  /**
+   * Play against the user's REAL, machine-scope campaigns dir
+   * ({@link machineDataRoot}/campaigns) instead of the throwaway temp one.
+   * ⚠️ Turns you take MUTATE the user's live campaigns. Use only to continue
+   * or inspect a real campaign the user pointed you at.
+   */
+  live?: boolean;
+  /**
+   * Explicit data ROOT (the `.machine-violet` dir) to play against; campaigns
+   * are read from `<dataDir>/campaigns`. Implies {@link live}'s real-data
+   * behavior with a custom location. Overrides `live`.
+   */
+  dataDir?: string;
 }
 
 /**
@@ -298,8 +327,17 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     await sleep(500);
   }
 
+  // Resolve which campaigns dir to play against. Default: the throwaway temp
+  // dir (isolated, safe). --data-dir / --live: the user's REAL campaigns.
+  const usingRealData = opts.dataDir != null || opts.live === true;
+  const dataRoot = opts.dataDir != null ? resolve(opts.dataDir) : machineDataRoot();
+  const campaignsDir = usingRealData ? join(dataRoot, "campaigns") : CAMPAIGNS_DIR;
+
   mkdirSync(SESSION_DIR, { recursive: true });
-  mkdirSync(CAMPAIGNS_DIR, { recursive: true });
+  // Only create the temp campaigns dir. Never conjure the user's real data dir
+  // — if --live/--data-dir points somewhere that doesn't exist, surface an
+  // empty menu rather than silently creating a stray tree.
+  if (!usingRealData) mkdirSync(CAMPAIGNS_DIR, { recursive: true });
 
   const serverPort = pickEphemeralPort();
   let agentPort = pickEphemeralPort();
@@ -312,7 +350,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   const { env, cwd } = buildLaunchEnv({
     serverPort,
     agentPort,
-    campaignsDir: CAMPAIGNS_DIR,
+    campaignsDir,
     player,
     extraEnv: opts.record
       ? { MV_TAPE_MODE: "record", MV_TAPE_SCENARIO: opts.record }
@@ -341,7 +379,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     pid: child.pid,
     serverPort,
     agentPort,
-    campaignsDir: CAMPAIGNS_DIR,
+    campaignsDir,
     launcherLog: LAUNCHER_LOG,
     player,
     launchedAt,
@@ -381,6 +419,15 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   writeSession(session);
 
   process.stdout.write(`✔ session started (pid ${child.pid}, sidecar :${agentPort})\n`);
+  if (usingRealData) {
+    process.stdout.write(
+      `\n⚠️  LIVE DATA — playing against the user's REAL campaigns dir:\n` +
+      `    ${campaignsDir}\n` +
+      `    Turns you take MUTATE real campaigns (narration, saves, generated\n` +
+      `    images). NEVER delete, overwrite, or roll back a campaign here unless\n` +
+      `    the user explicitly asked. Prefer copying a campaign out to inspect it.\n`,
+    );
+  }
   if (opts.record) {
     process.stdout.write(
       `● recording tape "${opts.record}" — play the scenario, then \`mvplay save-tape <path>\`.\n`,

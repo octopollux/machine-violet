@@ -1,6 +1,8 @@
 # Image Generation
 
-The DM can render illustrated images inline with its responses — a character reference sheet during setup, scene snapshots during gameplay, ad-hoc illustrations on player request. Rendering goes through whichever provider backs the `large` tier, gated by both provider capability and per-campaign consent.
+The DM can render illustrated images — a character reference sheet during setup, scene snapshots during gameplay, ad-hoc illustrations on player request. Rendering goes through whichever provider backs the `large` tier, gated by both provider capability and per-campaign consent.
+
+**A render takes 1–3 minutes at the backend's own (uncapped) quality, so when the turn waits matters.** During chargen the setup agent shows portrait drafts inline and the player iterates, so that path *awaits* the render. In gameplay the DM's `generate_image` has **two modes** (chosen by `intent`): an ambient illustration the player didn't ask for renders **fire-and-forget** and surfaces on a later turn (never blocking play), while an image the player **explicitly requested** renders **inline** in the same turn (they're waiting for it). See [Two render modes (gameplay)](#two-render-modes-gameplay).
 
 ## Capability + consent
 
@@ -13,14 +15,14 @@ When either is false, the `generate_image` tool is omitted from the DM's toolset
 
 ## Tool dispatch
 
-`generate_image` is a **function tool** (not a hosted/server-side tool). The model calls it like any other tool; the host runs `provider.generateImage()`, persists the bytes, and attaches a `display_image` TUI command to the tool result so the image renders inline mid-turn — before the model's continuation runs.
+`generate_image` is a **function tool** (not a hosted/server-side tool). The model calls it like any other tool; the host runs `provider.generateImage()` and persists the bytes. How the rendered image reaches the player differs by call site (synchronous inline vs. fire-and-forget — see below).
 
 Two call sites:
 
-| Site | File | Purpose |
-|---|---|---|
-| Setup-agent portrait loop | `packages/engine/src/agents/subagents/setup-conversation.ts` (`dispatchGenerateImage`) | Character reference-sheet drafts during chargen (a landscape multi-angle turnaround — see [Visual style guidance](#visual-style-guidance)). Player iterates; `set_portrait` promotes a chosen draft. |
-| DM gameplay | `packages/engine/src/agents/game-engine.ts` (`dispatchGenerateImage`) | Scene snapshots, character close-ups, player-requested illustrations. |
+| Site | File | Dispatch | Purpose |
+|---|---|---|---|
+| Setup-agent portrait loop | `packages/engine/src/agents/subagents/setup-conversation.ts` (`dispatchGenerateImage`) | **Synchronous** — awaits the render, returns `_tui: display_image` so the draft shows inline immediately | Character reference-sheet drafts during chargen (a landscape multi-angle turnaround — see [Visual style guidance](#visual-style-guidance)). Player iterates; `set_portrait` promotes a chosen draft. |
+| DM gameplay | `packages/engine/src/agents/game-engine.ts` (`dispatchGenerateImage`) | **Two modes by `intent`:** `scene_snapshot`/`character_portrait` → **fire-and-forget** (background render, immediate ack, surfaces on a later turn); `player_request` → **synchronous inline** (awaits the render in-turn, since the player is waiting). See [Two render modes (gameplay)](#two-render-modes-gameplay). | Scene snapshots, character close-ups, player-requested illustrations. |
 
 Both share `handleImageGenerated` in `packages/engine/src/agents/image-handler.ts` for on-disk persistence — same naming, same sidecar JSON, same downstream consumers.
 
@@ -66,15 +68,39 @@ The DM can ask a render to **match a player character's established look** by na
 
 **Cost / caveats.** Image-to-image is materially slower than text-to-image (gpt-image-2 backend cost — a reference render is minutes, vs. roughly a second for plain text-to-image). Earlier the renderer instruction told the model to "match each character's face to their reference," which sometimes made it spend a reasoning pass *analyzing* the attached portrait and then reply with text instead of calling `image_gen` at all (a wasted multi-minute attempt the bounded retry rescued). #596 reframed the instruction — references are consumed by `image_gen` automatically, so the model is told *not* to view/analyze them, its only job is to call the tool once — and a live 8-render reference batch afterward showed **0 text-replies (8/8 first-attempt images, avg 1.00 attempts)** while conditioning still held (the depicted character stayed on-model). The bounded retry (see [Provider backends](#provider-backends)) stays as the safety net for the residual intermittent case. Lowering the render turn's reasoning effort would be the other lever, but `"low"` is the **floor** — the backend rejects `image_gen` at `reasoning.effort: "minimal"` (HTTP 400), so it isn't available. Net: references work and come out on-model, but each render is minutes — reserve them for deliberate "show *this* character" moments. To re-measure the first-attempt rate after any renderer-instruction or effort change, run the probe: `node --import tsx/esm packages/test-harness/bin/ref-render-rate.ts` (issue #599).
 
-## Mid-turn render
+## Two render modes (gameplay)
 
-The bridge dispatches all of a turn's tool calls concurrently via `Promise.all` (`packages/engine/src/providers/agent-loop-bridge.ts`). Tool results carrying a `_tui` field broadcast their TUI command immediately rather than queuing until end-of-turn. `generate_image` returns `_tui: { type: "display_image", filename, relPath, intent }` so the image appears inline as soon as the bytes are written — same pattern as `style_scene` returning `_tui: set_theme`.
+In gameplay `GameEngine.dispatchGenerateImage` has **two modes**, chosen by the DM via the `intent` argument — and *only* the tool description text separates them; the DM picks. (Validation errors — no provider, empty prompt — surface synchronously either way.)
 
-The bridge's `_tui` extraction is gated on `tuiToolNames.has(toolName)` — tools not in `TUI_TOOLS` (`packages/engine/src/agents/agent-loop.ts`) have their `_tui` field silently ignored. `generate_image` is in the set; removing it would cause images to land on disk but never render in the client, with no error anywhere. A regression test in `agent-loop.test.ts` guards against this.
+### Background (`scene_snapshot` / `character_portrait`) — fire-and-forget
 
-DM prompt guidance instructs the model to fire `generate_image` in the **same parallel tool batch** as `scene_transition` and `style_scene`, never sequenced before — otherwise the player waits for the (potentially slow) render before any narrative arrives.
+An ambient illustration the player didn't ask for shouldn't seize their turn. Modeled on `update_portrait` (see [Mid-campaign portrait revision](#mid-campaign-portrait-revision-update_portrait)):
 
-Crucially, the guidance points a scene-transition image at **the DM's favorite moment from the scene that *just finished***, not the scene being entered. At the boundary turn the departing scene's full transcript is still alive in the model's context (the transition's compaction runs *after* the agent loop, so the rich detail hasn't been pruned yet), whereas the entering scene is still nothing but a title. Aiming the image at the departing scene is what gives it the context to be good. This is also why a transition image files under the *departing* scene's `scene-NNN-slug`: `dispatchGenerateImage` reads `sceneManager.getScene()` before the deferred transition fires, so the image is correctly named for the scene it depicts.
+1. Validate inputs, snapshot the **current scene** (so the image files under the scene it was requested in even if the scene transitions before the render lands), kick the render on a **tracked promise** (`inFlightImageRenders` + `trackImageRender`, `.catch` logs — never a detached `void`), and return an **immediate text ack**. The DM keeps narrating without waiting.
+2. When the (1–3 minute) render completes, the bytes persist via `handleImageGenerated` and the finished image pushes onto `pendingImageDisplays`.
+3. At the **next turn boundary**, `processInput` drains that queue (`consumePendingImageDisplays`): each image is broadcast as a `display_image` TUI command (after the turn's narration completes, so it lands *below* the prose, not spliced mid-stream) and appended to the display log behind a separator divider — on reload it reads as a standalone illustration of an earlier beat, not part of that turn's narration.
+
+So a background image is **divorced from the turn that requested it** — a slow render never blocks the player. Render-time errors can't reach the DM (the turn is long over), so they're logged and the image is silently dropped — the DM never claimed it appeared, because the prompt forbids narrating it as present.
+
+**The turn yields immediately.** A background render is fully detached from the engine's turn state. At the end of the DM turn the engine goes straight to `waiting_input`, handing the turn to the player even if a render is still cooking. We deliberately do **not** park in `generating_image` here: that state reads as "DM's turn" in the client (`turnHolder=DM`, greyed player frame, "The DM is creating an image…"), so a multi-minute background render would make the player wait out their own turn for no reason. The image surfaces on its own; the player keeps playing (and the next DM turn runs concurrently with the render on the shared codex subprocess, which supports concurrent threads).
+
+### Inline (`player_request`) — synchronous
+
+The player explicitly asked you to draw something, so they are *waiting for that specific image*. Here blocking the turn is correct — it's the point of the turn, not an interruption:
+
+1. The render is **awaited inline**; the DM turn pauses on it (the proven nested-codex pattern — the DM turn is paused awaiting our tool reply, which the provider handles deadlock-free).
+2. The engine holds **`generating_image`** for the render's duration so the client shows "The DM is creating an image…" with its elapsed escalation. The `syncImageRenderInFlight` counter keeps that indicator lit across any faster sibling tool batched in the same response (whose `onToolEnd` would otherwise flip the state back to `dm_thinking`).
+3. The finished image returns on the tool result as `_tui: { type: "display_image", … }`, so it shows in **this same turn** (the existing mid-turn `imagesEmittedThisTurn` path persists it to the display log). Render errors surface as an isError tool_result the DM can apologize for, since the turn is still open.
+
+**Teardown.** `awaitPendingImageRenders` (for tests/graceful teardown) awaits in-flight renders; `endSession` best-effort flushes any already-completed-but-unshown images to the display log (`flushPendingImageDisplaysToLog`) so they reappear in the next resume's scrollback. It does **not** await still-in-flight renders (they can take minutes; the bytes are on disk regardless).
+
+**Pacing and subject discipline.** The DM self-paces via prompt guidance — a campaign-scope target of ~N images per 100 player exchanges (`image_cadence_per_100`, default 8, interpolated into `dm-directives.md` as `{{imageCadence}}` by `buildDMPrefix`). The *frequency* is unchanged, but `dm-directives.md` disciplines *what* gets rendered, because the renderer has no world-model or memory and cannot reproduce a subject consistently twice: each subject is illustrated **once** (the DM keeps an "already illustrated" ledger in `dm_notes` — the DM-owned scratchpad that rides the prefix and survives the scene-transition context clear that would otherwise erase its running memory of past images (`transitionScene` prunes the conversation, not the persisted stores)), the emphasis is pushed toward objects / maps / points-of-interest and first looks at new locations rather than faces, and any one character (including the PC) appears in frame no more than once every seven images. Player-requested images are exempt from all of it — they render regardless, don't count against the target, and ignore the once-only and character-cadence rules. There is no longer any coupling between image generation and scene transitions.
+
+The image directive is framed **definitionally, not permissively** — imaging is stated to be "a normal, expected, routine part of your turns … commit to it," rather than piling on reassurances ("it's cheap," "not an interruption"). A batch investigation found the model systematically under-fires against a *permissive* directive because restraint-toned guidance elsewhere in the prompt (space economy, pacing) is smeared across the directive corpus and can't be surgically removed; a committing directive overcomes it (measured ~8% → ~58% fire rate on image-worthy beats at an amplified test cadence). Two supports back it up: the `<directives>` space-economy note is scoped to *prose length only* (it explicitly does not restrain tools), and a **turns-since-image feedback signal** rides the volatile `[stats]` block.
+
+**Turns-since-image signal.** `GameState.turnsSinceImage` counts player exchanges since the DM last called `generate_image` (reset to 0 on each call in `dispatchGenerateImage`, incremented per real player exchange; persisted in scene state so it survives resume). `buildHardStats` renders it as `Images: N turns since last` in the `[stats]` block, appending a `(!)` nudge once `N` exceeds the target interval (`100 / image_cadence_per_100`) by more than 2. Shown only when image generation is on (`config.image_generation === "on"`); the ever-changing count means the `[stats]` block emits every turn rather than on its usual every-other-turn cadence — a deliberate, cheap trade for a reliable cue.
+
+The setup path still uses the `_tui` broadcast: the bridge dispatches a turn's tool calls concurrently via `Promise.all`, and tool results carrying a `_tui` field broadcast immediately. Extraction is gated on `tuiToolNames.has(toolName)` — tools not in `TUI_TOOLS` (`packages/engine/src/agents/agent-loop.ts`) have their `_tui` silently ignored. `generate_image` stays in the set (the setup portrait loop returns `_tui: display_image`); a regression test in `agent-loop.test.ts` guards against its removal.
 
 ## Inline rendering (TUI)
 
@@ -163,7 +189,8 @@ For harness probes + post-mortem debugging:
 | `codex:subprocess:stderr` | provider (rpc) | A line codex wrote to its own stderr (tracing/diagnostics), captured to the engine log instead of the terminal. The place a misbehaving render/tool turn explains itself. ANSI-stripped, length-capped; volume scales with `RUST_LOG`. |
 | `codex:rpc:reasoning_item_missing` | provider | **Once/session.** Model reasoned but no `rawResponseItem/completed` reasoning item arrived. The expected steady state on a ChatGPT account — codex emits no raw reasoning items there at all, so the #533 codex replay was removed as a no-op (#607); kept as a tripwire. See [openai-chatgpt-provider.md](openai-chatgpt-provider.md#reasoning-preservation-across-turns) / #597. |
 | `image_gen:persisted` | image-handler | Bytes written to disk; carries relPath + size. |
-| `image_gen:dispatch_failed` | setup-conversation, game-engine | Caller couldn't dispatch (no capability, empty prompt, etc.). |
+| `image_gen:completed` | game-engine | A fire-and-forget gameplay render finished and queued for display; carries intent + effort + aspect. |
+| `image_gen:dispatch_failed` | setup-conversation, game-engine | Caller couldn't dispatch (no capability, empty prompt) or a background render threw (logged, image dropped). |
 | `image_gen:legacy_hosted_item_ignored` | provider | Tripwire — see Tool dispatch above. |
 | `setup:image_tools_registered` | setup-conversation | Setup-agent snapshot at startup: which capability/tools/loop active. |
 

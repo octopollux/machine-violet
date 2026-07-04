@@ -104,7 +104,11 @@ export interface RateLimitWindow {
 export interface RateLimits {
   limitId: string;
   limitName: string | null;
-  primary: RateLimitWindow;
+  // Codex normally sends `primary` (the 5h window), but it can be null — e.g.
+  // once a plan's quota is exhausted the payload arrives with no primary window.
+  // Treat it as nullable and null-guard every read, or the update handler crashes
+  // the whole process mid-session (observed live at quota exhaustion).
+  primary: RateLimitWindow | null;
   secondary?: RateLimitWindow;
   credits?: unknown;
   planType?: string;
