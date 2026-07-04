@@ -20,6 +20,8 @@
  *   MV_PLAYER     — Player name (default "Player")
  *   MV_CAMPAIGN   — Campaign ID to auto-start
  *   MV_AGENT_PORT — Port for the dev-only agent sidecar
+ *   MV_REACT_PERF_TRACK — set to 1 to keep React's dev DevTools Performance
+ *                 Track on (off by default; leaving it on OOMs long dev sessions — #694)
  *   ANTHROPIC_API_KEY — Required for the engine
  */
 import { join } from "node:path";
@@ -36,6 +38,29 @@ handleVelopackHook();
 
 // --- Load environment ---
 loadEnv();
+
+// --- Disable React's dev "Performance Track" unless profiling (#694) ---
+// react-reconciler's DEVELOPMENT build (loaded when NODE_ENV !== "production" —
+// how the harness and `npm run dev` run) emits a `performance.measure()` per
+// component render to feed React DevTools' component Performance Track. Node
+// buffers every User Timing entry forever and nothing in this terminal app reads
+// them, so a long session's continuous re-renders (menu starfield, in-turn
+// thinking ticks, streaming deltas) fill the buffer and OOM the launcher (~4 GB;
+// it climbs ~14 MB/min even at an idle menu). React gates the ENTIRE track on
+// `typeof console.timeStamp === "function"`, captured ONCE when react-reconciler
+// first evaluates — which in a plain Node process (no inspector) is a
+// meaningless no-op that React nonetheless reads as "profiling wanted." Clearing
+// that method here — BEFORE the client (and its Ink/react-reconciler graph) is
+// dynamically imported below — disables the emission at the source: no measures,
+// no buffer growth, and none of the per-render arg-building churn. `console.
+// timeStamp` is a DevTools-timeline no-op unused anywhere in the app. Opt back in
+// with MV_REACT_PERF_TRACK=1 to actually profile React renders. (Production ships
+// the production reconciler with no track, so this is moot there; the flag is
+// honored uniformly regardless.)
+const reactPerfTrack = /^(1|true|on|yes)$/i.test(process.env.MV_REACT_PERF_TRACK ?? "");
+if (!reactPerfTrack) {
+  (console as { timeStamp?: (label?: string) => void }).timeStamp = undefined;
+}
 
 // --- Parse args ---
 const serverOnly = process.argv.includes("--server");
