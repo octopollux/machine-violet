@@ -255,7 +255,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // failed removal must not fail dispose.
     if (rpc) await rpc.stop();
     if (this.codexHomeDir) {
-      await rm(this.codexHomeDir, { recursive: true, force: true }).catch(() => { /* reaped later by the date-sweep */ });
+      // `maxRetries`/`retryDelay` matter on Windows: `rpc.stop()` awaits the
+      // process `exit`, but the OS releases the SQLite WAL/shm file handles a
+      // beat LATER, so an immediate rm loses the race with EBUSY/EPERM. Node's
+      // built-in retry backs off across that window (≤ ~1s total) so the common
+      // graceful path actually cleans up, instead of leaking to the date-sweep.
+      // Still best-effort — a leftover temp home is harmless and the sweep reaps
+      // any that survive, so a failed removal must never fail dispose.
+      await rm(this.codexHomeDir, { recursive: true, force: true, maxRetries: 6, retryDelay: 150 })
+        .catch(() => { /* reaped later by the date-sweep */ });
     }
   }
 

@@ -91,7 +91,9 @@ export async function sweepStaleCodexHomes(nowMs: number, maxAgeMs: number): Pro
     try {
       const freshest = await freshestMtimeMs(dir);
       if (freshest != null && nowMs - freshest > maxAgeMs) {
-        await rm(dir, { recursive: true, force: true });
+        // Retry on Windows: a home left by a *killed* process can still have
+        // briefly-locked SQLite handles as the OS tears the process down.
+        await rm(dir, { recursive: true, force: true, maxRetries: 4, retryDelay: 150 });
         removed++;
       }
     } catch {
