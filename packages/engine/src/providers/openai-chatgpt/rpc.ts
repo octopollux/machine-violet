@@ -93,6 +93,18 @@ export interface CodexRpcClientOptions {
   sessionId?: string;
   /** Codex CLI args after `app-server`. Default: empty (stdio transport). */
   extraArgs?: string[];
+  /**
+   * Override for codex's home directory (its `CODEX_HOME` env var; default
+   * `~/.codex`). codex initializes a single SQLite "state runtime" under this
+   * dir at startup, and concurrent subprocesses sharing one home CONTEND on that
+   * DB — on Windows the loser exits `code=1` with `(code: 1546) disk I/O error`
+   * (confirmed: a 4-wide simultaneous spawn against one `~/.codex` killed all
+   * four; staggered spawns never did). Pointing each concurrent subprocess at
+   * its own home removes the contention entirely. Auth still works from an empty
+   * home because MV pushes ChatGPT tokens over RPC (`pushChatGptAuthTokens`), not
+   * from `<home>/auth.json`. When absent, codex uses its default `~/.codex`.
+   */
+  codexHome?: string;
 }
 
 export class CodexRpcClient extends EventEmitter {
@@ -107,11 +119,13 @@ export class CodexRpcClient extends EventEmitter {
   private startPromise: Promise<void> | null = null;
   private readonly sessionId?: string;
   private readonly extraArgs: string[];
+  private readonly codexHome?: string;
 
   constructor(opts: CodexRpcClientOptions = {}) {
     super();
     this.sessionId = opts.sessionId;
     this.extraArgs = opts.extraArgs ?? [];
+    this.codexHome = opts.codexHome;
   }
 
   /** Spawn the subprocess and resolve when it has emitted the first byte. */
@@ -125,11 +139,18 @@ export class CodexRpcClient extends EventEmitter {
     const bin = resolveCodexBinary();
     log.spawn({ binaryPath: bin.path, sessionId: this.sessionId });
 
+    // Spawn env: base process env, plus any binary-resolution additions (PATH
+    // augmentation for bundled `rg`), plus an optional CODEX_HOME override that
+    // isolates this subprocess's SQLite state runtime from every other codex —
+    // the fix for the shared-`~/.codex` contention crash (see codexHome docs).
+    const spawnEnv: NodeJS.ProcessEnv = { ...process.env, ...(bin.extraEnv ?? {}) };
+    if (this.codexHome) spawnEnv.CODEX_HOME = this.codexHome;
+
     this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...CODEX_LEAN_FLAGS, ...this.extraArgs], {
       // Pipe stderr (not `inherit`) so codex's own diagnostics land in the
       // engine log instead of vanishing to the terminal — see handleStderrLine.
       stdio: ["pipe", "pipe", "pipe"],
-      env: bin.extraEnv ? { ...process.env, ...bin.extraEnv } : process.env,
+      env: spawnEnv,
       // `.cmd` shims on Windows (used by PATH-resolved global installs) need
       // shell resolution. Bundled-mode invokes node directly so shell is off.
       shell: process.platform === "win32" && bin.source === "path",

@@ -36,7 +36,7 @@ import type {
   ImageEffort, ImageAspect,
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
-import { readFile, readdir, stat, rm } from "node:fs/promises";
+import { readFile, readdir, stat, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { CodexRpcClient } from "./rpc.js";
@@ -81,6 +81,19 @@ export interface OpenAIChatGptProviderOptions {
    * without a token store.
    */
   tokenStore?: ChatGptTokenStore;
+  /**
+   * Override for codex's home dir (`CODEX_HOME`, default `~/.codex`). Set to a
+   * per-session dir to isolate this provider's codex subprocess from every other
+   * one — codex initializes a single SQLite state runtime under its home, and
+   * concurrent subprocesses sharing `~/.codex` contend on it and crash (`code=1`,
+   * `disk I/O error`). Safe to isolate because we push ChatGPT tokens over RPC,
+   * not from `<home>/auth.json` — so an empty home still authenticates (verify
+   * this assumption before relying on it: `bin/codex-home-isolation.ts`). When
+   * set, the provider `mkdir`s the dir before spawn and removes it on
+   * `dispose()`. Leave undefined to use codex's default `~/.codex` (the
+   * no-tokenStore/env-key flow needs that home's `auth.json`).
+   */
+  codexHome?: string;
 }
 
 export function createOpenAIChatGptProvider(opts: OpenAIChatGptProviderOptions = {}): OpenAIChatGptProvider {
@@ -122,6 +135,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private readonly sessionId?: string;
   private readonly cwd: string;
   private readonly tokenStore?: ChatGptTokenStore;
+  /**
+   * Configured `CODEX_HOME` override (per-session isolation dir), or undefined to
+   * use codex's default `~/.codex`. When set we `mkdir` it before spawn, spawn
+   * codex with `CODEX_HOME` pointing here (via the RPC client), and remove it on
+   * `dispose()`. Distinct from {@link codexHome} below, which is the home codex
+   * REPORTS at the handshake — when an override is set the two are equal. See
+   * {@link OpenAIChatGptProviderOptions.codexHome}.
+   */
+  private readonly codexHomeDir?: string;
   /**
    * codex's home dir, learned from the `initialize` handshake. The image_gen
    * skill writes every rendered PNG to `<codexHome>/generated_images/<thread
@@ -168,6 +190,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
     this.tokenStore = opts.tokenStore;
+    this.codexHomeDir = opts.codexHome;
   }
 
   // -----------------------------------------------------------------------
@@ -223,10 +246,17 @@ export class OpenAIChatGptProvider implements LLMProvider {
   /** Shut down the subprocess. Called by session-manager at session end. */
   async dispose(): Promise<void> {
     const rpc = this.rpc;
-    if (!rpc) return;
     this.rpc = null;
     this.startPromise = null;
-    await rpc.stop();
+    // Stop the subprocess first (awaits its `exit`), THEN remove our isolation
+    // home — by now nothing is writing to it. Only remove a home WE own (an
+    // explicit override); never touch the default `~/.codex`. Best-effort: a
+    // leftover temp home is harmless and the date-sweep will reap it later, so a
+    // failed removal must not fail dispose.
+    if (rpc) await rpc.stop();
+    if (this.codexHomeDir) {
+      await rm(this.codexHomeDir, { recursive: true, force: true }).catch(() => { /* reaped later by the date-sweep */ });
+    }
   }
 
   /**
@@ -673,7 +703,12 @@ export class OpenAIChatGptProvider implements LLMProvider {
     if (this.startPromise) return this.startPromise;
 
     this.startPromise = (async () => {
-      const client = new CodexRpcClient({ sessionId: this.sessionId });
+      // Ensure the isolation home exists before spawn (codex would create it, but
+      // pre-creating removes a startup race and gives cleanup a definite target).
+      if (this.codexHomeDir) {
+        await mkdir(this.codexHomeDir, { recursive: true }).catch(() => { /* codex will retry/create; non-fatal */ });
+      }
+      const client = new CodexRpcClient({ sessionId: this.sessionId, codexHome: this.codexHomeDir });
       await client.start();
 
       // If this subprocess exits on its own AFTER a successful start — a codex
