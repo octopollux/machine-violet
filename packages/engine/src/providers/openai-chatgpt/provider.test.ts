@@ -7,7 +7,7 @@ import {
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
   shouldRetryImageRender, ImageGenNoDataError,
   summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
-  buildThreadStartParams,
+  buildThreadStartParams, CodexProcessExitedError, shouldAutoRetryTurn,
 } from "./provider.js";
 import type {
   AgentMessageDeltaNotification, ItemCompletedNotification,
@@ -594,5 +594,50 @@ describe("CodexTurnFailedError", () => {
     // This test guards against the constructor itself swallowing the input.
     const err = new CodexTurnFailedError("(no error message from codex)", "t_abc");
     expect(err.codexMessage).toBe("(no error message from codex)");
+  });
+});
+
+describe("CodexProcessExitedError", () => {
+  it("carries the exit code/signal and a player-facing, reassuring message", () => {
+    const err = new CodexProcessExitedError(1, null);
+    expect(err.code).toBe(1);
+    expect(err.signal).toBeNull();
+    expect(err.name).toBe("CodexProcessExitedError");
+    expect(err).toBeInstanceOf(Error);
+    // The turn isn't lost — the message must say so (manual retry now respawns).
+    expect(err.message).toMatch(/wasn't lost|try again/i);
+    expect(err.message).toContain("code=1");
+  });
+
+  it("preserves a kill signal when the process was terminated by one", () => {
+    const err = new CodexProcessExitedError(null, "SIGKILL");
+    expect(err.code).toBeNull();
+    expect(err.signal).toBe("SIGKILL");
+    expect(err.message).toContain("signal=SIGKILL");
+  });
+});
+
+describe("shouldAutoRetryTurn (codex mid-turn death auto-retry policy)", () => {
+  it("retries a first-attempt subprocess death that ran no tool", () => {
+    // The target case: the heavy first turn where codex crashes before doing
+    // anything with side effects. Safe and worth replaying transparently.
+    expect(shouldAutoRetryTurn(true, false, 1)).toBe(true);
+  });
+
+  it("does NOT retry once a tool has dispatched this turn", () => {
+    // A tool (scribe write, rendered image) may have persisted side effects;
+    // a blind replay could double-apply them, so defer to the manual retry.
+    expect(shouldAutoRetryTurn(true, true, 1)).toBe(false);
+  });
+
+  it("does NOT retry past the single-retry bound", () => {
+    // attempt 2 is already the retry; a second consecutive death must not loop.
+    expect(shouldAutoRetryTurn(true, false, 2)).toBe(false);
+    expect(shouldAutoRetryTurn(true, false, 3)).toBe(false);
+  });
+
+  it("does NOT retry when the failure was not a subprocess death", () => {
+    // A content/auth/schema failure won't be fixed by a fresh process.
+    expect(shouldAutoRetryTurn(false, false, 1)).toBe(false);
   });
 });
