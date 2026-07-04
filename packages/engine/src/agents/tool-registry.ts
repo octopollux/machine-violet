@@ -611,7 +611,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "present_choices",
-      description: "Show a choice modal to the player. No params = auto-generate options.",
+      description: "Show a choice modal to the player. Call with no params to delegate option-generation to a subagent (it reads the scene and writes fitting choices); pass `prompt`/`choices` to author them yourself.",
       inputSchema: {
         type: "object" as const,
         properties: {
