@@ -179,7 +179,14 @@ async function runAgentLoopInternal(
         "• INLINE (intent 'player_request') — the player explicitly asked you to draw " +
         "or show them something, so they are waiting for THIS image. It renders inline " +
         "and appears in this same turn; the player waits the minute-or-two for it. Use " +
-        "this ONLY when the player actually requested an image. " +
+        "this ONLY when the player actually requested an image.\n" +
+        "Illustrate each place, object, or face only ONCE across the campaign: the " +
+        "renderer keeps no memory and has no 3D model, so it cannot reproduce a subject " +
+        "consistently, and a second render of something already shown will silently " +
+        "contradict it. Favour new locations, plot objects, clues, and maps over faces, " +
+        "and keep any character (including the PC) out of frame unless they are truly the " +
+        "subject AND have not appeared in the last several images. These limits are lifted " +
+        "for a 'player_request' — draw whatever the player asked for. " +
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. At most one image per turn. " +
