@@ -12,6 +12,8 @@
  *   codex:subprocess:spawn        — child started, binary resolved
  *   codex:subprocess:initialized  — `initialize` handshake completed (records codex version + userAgent)
  *   codex:subprocess:exit         — child died (expected or otherwise)
+ *   codex:subprocess:reset        — active client dropped after an unexpected exit so the next call respawns a fresh subprocess
+ *   codex:turn:retry_after_exit   — a turn's codex subprocess died before any tool ran; respawning and re-issuing the turn once, transparently
  *   codex:subprocess:stderr       — a line codex wrote to ITS stderr (its tracing/diagnostics), captured to our log
  *   codex:rpc:error               — JSON-RPC method returned an error
  *   codex:rpc:parse_failure       — a large stdout line failed to JSON.parse (truncated/corrupt payload)
@@ -35,6 +37,28 @@ export const log = {
     logEvent("codex:subprocess:initialized", data),
   exit: (data: { code: number | null; signal: NodeJS.Signals | null; sessionId?: string }) =>
     logEvent("codex:subprocess:exit", data),
+  /**
+   * The active codex client exited on its own (not via our `dispose()`), so we
+   * dropped the reference. The dead subprocess would otherwise stay latched as
+   * `this.rpc`, and every subsequent call would throw "codex app-server has
+   * exited" with no way to recover the session short of relaunch — the bug
+   * behind the unrecoverable first-turn crash. Clearing it lets the next call
+   * (a manual "Press Enter to retry" or the transparent auto-retry) respawn a
+   * fresh subprocess.
+   */
+  subprocessReset: (data: { code: number | null; signal: string | null; sessionId?: string }) =>
+    logEvent("codex:subprocess:reset", data),
+  /**
+   * A codex turn's subprocess died BEFORE any MV tool ran this turn, so no tool
+   * side effects landed and re-issuing is safe. We respawn and replay the turn
+   * once, transparently, so a one-off codex crash (common on the heavy first
+   * turn) never reaches the player as a failure. Bounded to a single retry; a
+   * second death falls through to the manual retry overlay. If a tool HAD
+   * dispatched, we do NOT auto-retry (its effects may have persisted) and let
+   * the player decide.
+   */
+  turnRetryAfterExit: (data: { code: number | null; signal: string | null; sessionId?: string }) =>
+    logEvent("codex:turn:retry_after_exit", data),
   /**
    * One line codex wrote to its OWN stderr — a WARN/ERROR `tracing` record or
    * any non-tracing diagnostic (panic, stack frame, raw print). We pipe + drain

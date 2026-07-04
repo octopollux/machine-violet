@@ -297,6 +297,16 @@ export class CodexRpcClient extends EventEmitter {
   // Public API
   // -----------------------------------------------------------------------
 
+  /**
+   * Whether the subprocess has exited (either via our {@link stop} or on its
+   * own). Once true this client is dead for good — the owner must drop it and
+   * spawn a fresh one. Lets a caller decide, without matching on error message
+   * strings, whether a thrown error was a subprocess death worth respawning for.
+   */
+  get hasExited(): boolean {
+    return this.exited;
+  }
+
   /** Send a request and await the typed response. */
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
     if (this.exited) throw new Error("codex app-server has exited; call stop()/start() to restart");
