@@ -19,7 +19,7 @@
  * the player can't escape without a relaunch.
  */
 import type { ErrorCategory, ServerEvent } from "@machine-violet/shared";
-import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, CodexProcessExitedError, type CodexFailureKind } from "../providers/openai-chatgpt/provider.js";
 
 /**
  * Decide which WS error category a thrown error belongs in.
@@ -61,6 +61,14 @@ export function classifyServerError(
     // the limit clears, so keep the session alive with a retry overlay rather
     // than dropping to menu. (Explicit even though it equals the retryable
     // default, so a future default change can't silently reroute it.)
+    return "retryable";
+  }
+  if (err instanceof CodexProcessExitedError) {
+    // The codex subprocess died mid-turn (crash/panic/OOM). The provider's
+    // transparent auto-retry handles the common case; if it still escapes here
+    // (e.g. a tool had already run, so auto-retry was suppressed, or a second
+    // consecutive death), keep the session alive — the manual retry now respawns
+    // a fresh subprocess, so "Press Enter to retry" can actually recover.
     return "retryable";
   }
   return defaultCategory;

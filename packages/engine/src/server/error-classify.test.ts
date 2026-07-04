@@ -13,7 +13,7 @@ import {
   performSessionFatalTeardown,
   userMessageFor,
 } from "./error-classify.js";
-import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
+import { CodexTurnFailedError, ChatGptAuthError, CodexTurnStalledError, CodexProcessExitedError, classifyCodexFailure } from "../providers/openai-chatgpt/provider.js";
 
 describe("classifyCodexFailure", () => {
   it("classifies the canonical refresh-token failure (#529) as auth_expired", () => {
@@ -117,6 +117,18 @@ describe("classifyServerError", () => {
     expect(classifyServerError(err, "session-fatal-recoverable")).toBe("retryable");
     // Message is user-facing and mentions the rate-limit possibility.
     expect(userMessageFor(err)).toMatch(/rate-limited|stopped responding/i);
+  });
+
+  it("routes CodexProcessExitedError to retryable (mid-turn subprocess death)", () => {
+    // The codex subprocess crashed/OOM'd mid-turn. If the provider's transparent
+    // auto-retry didn't already absorb it (a tool had run, or a second death),
+    // keep the session alive: the manual retry now respawns a fresh subprocess.
+    const err = new CodexProcessExitedError(1, null);
+    expect(classifyServerError(err)).toBe("retryable");
+    // Class wins even when the caller's default is the stricter bucket.
+    expect(classifyServerError(err, "session-fatal-recoverable")).toBe("retryable");
+    // Message is user-facing and reassures the turn wasn't lost.
+    expect(userMessageFor(err)).toMatch(/wasn't lost|try again|stopped unexpectedly/i);
   });
 
   it("routes ChatGptAuthError to session-fatal-recoverable (#558)", () => {

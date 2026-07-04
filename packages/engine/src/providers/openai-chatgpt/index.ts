@@ -39,3 +39,10 @@ export { resolveCodexBinary } from "./binary.js";
 export type { CodexBinaryResolution } from "./binary.js";
 export { getCodexClientInfo } from "./client-info.js";
 export type { CodexClientInfo } from "./client-info.js";
+export {
+  allocateCodexHome,
+  sweepStaleCodexHomesOnce,
+  sweepStaleCodexHomes,
+  codexHomeBase,
+  CODEX_HOME_STALE_MS,
+} from "./codex-home.js";
