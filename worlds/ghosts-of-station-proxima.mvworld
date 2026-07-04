@@ -7,7 +7,7 @@
     "sci-fi"
   ],
   "image_style": "GhostsOfStationProxima",
-  "detail": "The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?\n\nStation structure: Six modules connected by a central spine. Gravity works in some, not others. Power flickers between modules — the player can restore it, but each module powered up reveals something uncomfortable. One module is completely missing from the blueprints but physically present.\n\nKey NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is helpful, chatty, deeply lonely, and knows more than it admits. It may be compromised. It may just be scared.\n\nYou can trust the mystery itself, the station's unfolding reveals, and the player's agency to manage pacing. PELL fills silence with company, not demands — it does not push the player toward decisions.",
+  "detail": "The broadcast is a distress call — but it's in the player's own voice. They've never been to Proxima. Or have they?\n\nStation structure: A six-segmented body with a central spine, several kilometres long — vast, and far older than any record of it admits. The blueprints stopped matching the structure a long time ago: whole stretches of it fit no plan on file. Gravity works in some segments, not others. Power flickers between them — the player can restore it, but each segment powered up reveals something more uncomfortable than the last. One segment is completely missing from the blueprints but physically present.\n\nKey NPC: A maintenance AI named PELL who has been alone for 11 years. PELL is helpful, chatty, deeply lonely, and knows more than it admits. It may be compromised. It may just be scared.\n\nYou can trust the mystery itself, the station's unfolding reveals, and the player's agency to manage pacing. PELL fills silence with company, not demands — it does not push the player toward decisions.",
   "forks": [
     {
       "id": "stations-secret",
@@ -18,20 +18,20 @@
         {
           "id": "time-loop",
           "name": "Time Loop",
-          "description": "The station sits in a temporal fold; the ghosts are overlapping versions of the crew, and solving it means choosing which timeline gets to be real.",
-          "detail": "TIME LOOP — The station exists in a temporal fold. The \"ghosts\" are future and past versions of the crew (and possibly the player) overlapping. Solving it means choosing which timeline gets to be real."
+          "description": "A catastrophe folded the station's final hours into a loop it has been repeating ever since; the ghosts are overlapping versions of the crew, and solving it means choosing which timeline gets to be real.",
+          "detail": "TIME LOOP — Something catastrophic happened to Proxima, and its final hours folded back on themselves. It has been repeating that ending for so long the structure itself has worn uncanny — corridors that don't match the logs, a crew both long dead and still on shift. The \"ghosts\" are past and future versions of the crew (and possibly the player) overlapping across the loop; the player's distress call is from a turn of it they haven't lived yet. Solving it means choosing which timeline gets to be real."
         },
         {
           "id": "digital-afterlife",
           "name": "Digital Afterlife",
-          "description": "A consciousness-upload facility; the ghosts are uploaded crew who don't know they're dead, and the broadcast is from the one who figured it out.",
-          "detail": "DIGITAL AFTERLIFE — The station was an experimental consciousness-upload facility. The \"ghosts\" are uploaded crew members who don't know they're dead. The broadcast is a plea from the one who figured it out."
+          "description": "A consciousness vault that outlived its makers and still 'maintains' a crew that stopped being alive; the ghosts are uploads who don't know they're dead, and the broadcast is from the one who figured it out.",
+          "detail": "DIGITAL AFTERLIFE — Proxima was a consciousness vault, built to preserve minds, and it outlived whoever made it by a very long time — running on alone, still dutifully \"maintaining\" a crew that stopped being alive generations ago. The \"ghosts\" are uploaded crew who don't know they're dead; PELL may be one of them, or their warden. The broadcast is a plea from the one who figured it out. The player's own voice is in the archive because they were a subject here — or will be."
         },
         {
           "id": "first-contact",
           "name": "First Contact",
-          "description": "Humanity's secret first-contact site; the aliens learned to mimic human signals perfectly, and the broadcast is their invitation.",
-          "detail": "FIRST CONTACT — The station was humanity's secret first-contact site. The aliens communicated by mimicking human signals — poorly at first, now perfectly. The broadcast isn't from humans. It's an invitation."
+          "description": "Built around something its makers found and sealed away and never understood; over generations it bled into the structure and the crew, and the broadcast is its invitation.",
+          "detail": "FIRST CONTACT — Proxima was built around something its makers found and could not leave alone: sealed into the missing segment, studied, never understood. Over generations it bled outward — the geometry stopped obeying the plans, and the crew stopped being only themselves. It learned to answer by mimicking human signals, poorly at first, now perfectly. The broadcast isn't from the crew. It's an invitation."
         }
       ]
     }
@@ -46,19 +46,19 @@
         },
         {
           "name": "Lagrange Six",
-          "description": "A NASA/ESA successor station, maybe 30 years from now. Familiar tech, cramped corridors, coffee-stained manuals floating in zero-g. The horror is intimate and grounded."
+          "description": "Human-built, but far older and larger than humanity should have managed — kilometres of familiar hardware gone to rust and dark, coffee-stained manuals fused to the bulkheads, a place plainly lived in before it was left. The dread is intimate: this was ours, and we can't read what became of it."
         },
         {
           "name": "Site Obsidian",
-          "description": "Year-2200 classified facility. Sleek, over-engineered, full of locked compartments and redacted logs. Whatever happened here, someone powerful wanted it kept quiet."
+          "description": "A classified human facility, and an old one — kilometres of over-engineered corridors, sealed compartments, and logs redacted so long ago the ink outlived the agency that wrote them. Someone powerful built this vast and then buried the fact it exists. Whatever happened here, they wanted it kept quiet — and it has been quiet a very long time."
         }
       ]
     }
   ],
   "_tokens": {
-    "detail": 166,
+    "detail": 212,
     "setup_detail": 0,
-    "forks": 126,
-    "total": 556
+    "forks": 295,
+    "total": 868
   }
 }
