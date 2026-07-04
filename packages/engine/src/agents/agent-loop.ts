@@ -183,10 +183,11 @@ async function runAgentLoopInternal(
         "Illustrate each place, object, or face only ONCE across the campaign: the " +
         "renderer keeps no memory and has no 3D model, so it cannot reproduce a subject " +
         "consistently, and a second render of something already shown will silently " +
-        "contradict it. Favour new locations, plot objects, clues, and maps over faces, " +
-        "and keep any character (including the PC) out of frame unless they are truly the " +
-        "subject AND have not appeared in the last several images. These limits are lifted " +
-        "for a 'player_request' — draw whatever the player asked for. " +
+        "contradict it — keep a running list of what you've already illustrated in " +
+        "`dm_notes` (it survives scene changes). Favour new locations, plot objects, clues, " +
+        "and maps over faces, and keep any character (including the PC) out of frame unless " +
+        "they are truly the subject AND haven't appeared in the last seven images. These " +
+        "limits are lifted for a 'player_request' — draw whatever the player asked for. " +
         "Provide a vivid descriptive prompt covering subject, composition, mood, " +
         "and style. The caption (if any) should be composed into the image itself " +
         "as a printed plate, not emitted as separate text. At most one image per turn. " +
