@@ -31,6 +31,7 @@ import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/pla
 import { configDir } from "../packages/engine/src/utils/paths.js";
 import { loadEnv } from "../packages/engine/src/config/first-launch.js";
 import { checkTerminal } from "../packages/engine/src/config/terminal-check.js";
+import { disableReactPerfTrackUnlessRequested } from "../packages/client-ink/src/react-perf-track.js";
 
 // --- Velopack lifecycle hooks (Windows install/update/uninstall) ---
 // Must run before any server/client startup. Exits the process if a hook fires.
@@ -40,27 +41,12 @@ handleVelopackHook();
 loadEnv();
 
 // --- Disable React's dev "Performance Track" unless profiling (#694) ---
-// react-reconciler's DEVELOPMENT build (loaded when NODE_ENV !== "production" —
-// how the harness and `npm run dev` run) emits a `performance.measure()` per
-// component render to feed React DevTools' component Performance Track. Node
-// buffers every User Timing entry forever and nothing in this terminal app reads
-// them, so a long session's continuous re-renders (menu starfield, in-turn
-// thinking ticks, streaming deltas) fill the buffer and OOM the launcher (~4 GB;
-// it climbs ~14 MB/min even at an idle menu). React gates the ENTIRE track on
-// `typeof console.timeStamp === "function"`, captured ONCE when react-reconciler
-// first evaluates — which in a plain Node process (no inspector) is a
-// meaningless no-op that React nonetheless reads as "profiling wanted." Clearing
-// that method here — BEFORE the client (and its Ink/react-reconciler graph) is
-// dynamically imported below — disables the emission at the source: no measures,
-// no buffer growth, and none of the per-render arg-building churn. `console.
-// timeStamp` is a DevTools-timeline no-op unused anywhere in the app. Opt back in
-// with MV_REACT_PERF_TRACK=1 to actually profile React renders. (Production ships
-// the production reconciler with no track, so this is moot there; the flag is
-// honored uniformly regardless.)
-const reactPerfTrack = /^(1|true|on|yes)$/i.test(process.env.MV_REACT_PERF_TRACK ?? "");
-if (!reactPerfTrack) {
-  (console as { timeStamp?: (label?: string) => void }).timeStamp = undefined;
-}
+// Must run BEFORE the client (and its Ink/react-reconciler graph) is dynamically
+// imported below, so the reconciler captures the neutralized probe on first eval.
+// See react-perf-track.ts for the full rationale; opt back in with
+// MV_REACT_PERF_TRACK=1 to profile React renders. The imported helper is a
+// zero-import leaf, so this static import does not pull Ink into --server builds.
+disableReactPerfTrackUnlessRequested(process.env);
 
 // --- Parse args ---
 const serverOnly = process.argv.includes("--server");
