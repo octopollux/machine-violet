@@ -78,12 +78,14 @@ mvplay start --live          # menu now lists the user's real campaigns
 The startup banner prints the resolved dir and this warning whenever real data
 is in play — read it and confirm it's the dir you meant.
 
-> **Concurrent sessions share nothing only if their campaigns dirs differ.** Setup
-> writes to a shared `__setup__` scratch dir *inside* the campaigns dir, so two
-> concurrent sessions must not share one `--data-dir` while running setup — give
-> each its own (`--data-dir <root>/<id>`) or use the per-session temp default.
-> Resuming *distinct existing* campaigns from a shared dir is fine. See the
-> `playtest-sweep` skill for bulk dispatch.
+> **Concurrent sessions isolate their *campaign files* only if their campaigns
+> dirs differ.** (They still share the engine config dir — `connections.json` —
+> but that write is made atomic, so it's concurrency-safe.) Setup writes to a
+> shared `__setup__` scratch dir *inside* the campaigns dir, so two concurrent
+> sessions must not share one `--data-dir` while running setup — give each its own
+> (`--data-dir <root>/<id>`) or use the per-session temp default. Resuming
+> *distinct existing* campaigns from a shared dir is fine. See the `playtest-sweep`
+> skill for bulk dispatch.
 
 ## The turn loop
 
