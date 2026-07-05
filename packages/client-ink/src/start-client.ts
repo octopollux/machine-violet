@@ -9,6 +9,7 @@ import React from "react";
 import { Readable } from "node:stream";
 import { render, type RenderOptions } from "ink";
 import { App } from "./app.js";
+import { RenderZone } from "./tui/render-meter.js";
 import { installRawModeGuard } from "./tui/hooks/rawModeGuard.js";
 import { installSyncWriteCombiner } from "./tui/hooks/syncWriteCombiner.js";
 import {
@@ -164,7 +165,11 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   }
 
   const { unmount, waitUntilExit: inkWaitUntilExit } = render(
-    React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain, graphicsCaps }),
+    React.createElement(
+      RenderZone,
+      { id: "app" },
+      React.createElement(App, { serverUrl, playerId, campaignId, hasKittyProtocol: hasKitty, stdinFilterChain: filterChain, graphicsCaps }),
+    ),
     renderOpts,
   );
 

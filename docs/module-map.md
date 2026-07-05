@@ -113,6 +113,10 @@ Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT 
 
 Dev-only HTTP server for AI agent integration testing (`--agent-port` or `MV_AGENT_PORT`). Embeds in the TUI client, provides screen capture via `@xterm/headless`, state inspection, and keystroke injection. Endpoints: `GET /screen` (plain text or `?ansi=true`), `GET /state` (JSON), `POST /input` (raw bytes), `POST /input/key` (named key via KEY_MAP). Excluded from release builds.
 
+## Client: tui/render-meter.tsx — Dev-only render-frequency instrument
+
+Diagnoses how often React commits and what re-renders when nothing visibly changed (Ink diffs the whole output tree per commit, so anything re-rendering at animation FPS is expensive). Wrap a region in `<RenderZone id="...">`; with `MV_RENDER_LOG` set it counts that subtree's commits via `React.Profiler` and appends per-2s-window JSONL summaries (`=1` → `<tmpdir>/machine-violet/render-meter.jsonl`, else an explicit path), flushed from a Node timer outside the commit path. Unset, it's a zero-overhead passthrough. Nest zones — a root zone gives the total, inner zones attribute it; the wired zones are `app` (root), `frame` (`FullScreenFrame`), `narrative` (play-area). Only fires under the development reconciler (mvplay / `npm run dev`), so it's dev-only like the leak it chases (#694).
+
 ## Client: tui/ — Terminal UI
 
 Ink (React for CLI) components, formatting pipeline, theme system.
