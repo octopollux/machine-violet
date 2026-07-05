@@ -8,7 +8,7 @@
  * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY) auto-create
  * connections at runtime via buildEffectiveConnections().
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-registry.js";
@@ -144,7 +144,51 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
     connections: store.connections.filter((c) => c.source !== "env"),
     tierAssignments: store.tierAssignments,
   };
-  writeFileSync(join(appDir, STORE_FILENAME), JSON.stringify(toSave, null, 2) + "\n");
+  const target = join(appDir, STORE_FILENAME);
+  // Atomic write: serialize to a unique temp file in the same dir, then rename
+  // over the target. A rename is atomic on a filesystem, so a reader — or a
+  // concurrent writer, e.g. a second parallel mvplay session whose codex
+  // provider refreshes its OAuth token at the same moment (#696) — never sees a
+  // half-written store, and a crash mid-write can't truncate it. This file holds
+  // the user's API keys / OAuth tokens; a corrupt one bricks every connection.
+  const tmp = join(appDir, `.${STORE_FILENAME}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`);
+  writeFileSync(tmp, JSON.stringify(toSave, null, 2) + "\n");
+  renameOverwrite(tmp, target);
+}
+
+/**
+ * Block the current thread for `ms` without spinning. `saveConnectionStore` is
+ * synchronous (its callers — token refresh, settings routes — are sync), so the
+ * retry backoff below can't `await`; `Atomics.wait` on a throwaway buffer times
+ * out after `ms`, giving a real sync sleep. Node permits this on the main thread.
+ */
+function sleepSync(ms: number): void {
+  if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * `renameSync` over an existing file can transiently fail on Windows (EPERM/
+ * EBUSY/EACCES) when another process holds the target open for a read. Retry with
+ * an escalating backoff so the attempts actually SPAN the lock window instead of
+ * burning through in one timeslice (Copilot #702). On POSIX the first rename just
+ * succeeds. On final failure the temp file is cleaned up so we don't litter.
+ */
+function renameOverwrite(from: string, to: string): void {
+  const MAX = 6;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < MAX; attempt++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (err) {
+      lastErr = err;
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES") break;
+      if (attempt < MAX - 1) sleepSync(20 * (attempt + 1)); // 20,40,60,80,100ms
+    }
+  }
+  try { rmSync(from, { force: true }); } catch { /* best-effort cleanup */ }
+  throw lastErr;
 }
 
 // ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ export default defineConfig({
     projects: [
       "packages/engine",
       "packages/client-ink",
+      "packages/test-harness",
       "tools/campaign-explorer",
     ],
   },
