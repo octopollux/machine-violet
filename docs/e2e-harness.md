@@ -166,8 +166,13 @@ so multiple run concurrently (parallel playtests / recordings, #696): pass
 ports and `CODEX_HOME`, so concurrent codex sessions don't contend. Ports are
 random-picked (no free-port probe), which is fine for one session; for **bulk
 concurrent dispatch** hand each session a disjoint `--port-base <N>` (engine `N`,
-sidecar `N+1`) so starts can't collide. The `playtest-sweep` skill is the
-dispatcher playbook for fanning out N live playtests across subagents this way.
+sidecar `N+1`) so starts can't collide. One more isolation axis: **campaigns.**
+The default temp dir is already per-session, but a shared `--data-dir` is *not* —
+and setup writes to a shared `__setup__` scratch dir inside it, so concurrent
+fresh setups in one `--data-dir` corrupt each other. Give each session its own
+(`--data-dir <root>/<id>`) unless they only resume distinct existing campaigns.
+The `playtest-sweep` skill is the dispatcher playbook for fanning out N live
+playtests across subagents this way.
 
 This exists because `runProbe` kills the process the moment its scripted body
 returns; nothing survives between an agent's tool calls, so there's no session
