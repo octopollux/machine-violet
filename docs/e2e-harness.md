@@ -159,7 +159,11 @@ For "did I break it?", reach for **Tier 2** (`/replay-goldens`), not a live prob
 keeps the launcher + sidecar alive in a **detached background process** that
 outlives each command, so you submit one turn per invocation across as many
 invocations as the game lasts. State (ports, pid, and a read cursor) lives in a
-session file under the system temp dir — one session at a time.
+session file under `<tmpdir>/mvplay/<session-id>/`. Sessions are isolated per id,
+so multiple run concurrently (parallel playtests / recordings, #696): pass
+`--session <id>` (or set `MVPLAY_SESSION`) on every command, default `"default"`;
+`mvplay list` shows all live sessions. Each session also gets its own ephemeral
+ports and `CODEX_HOME`, so concurrent codex sessions don't contend.
 
 This exists because `runProbe` kills the process the moment its scripted body
 returns; nothing survives between an agent's tool calls, so there's no session

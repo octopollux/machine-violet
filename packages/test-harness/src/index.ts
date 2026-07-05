@@ -53,8 +53,12 @@ export {
   pick as playPick,
   wait as playWait,
   log as playLog,
-  SESSION_DIR,
+  list as playList,
+  resolveSessionId,
+  sessionPaths,
+  DEFAULT_SESSION_ID,
   type StartOptions,
+  type SessionPaths,
   type WaitOptions as PlayWaitOptions,
   type WaitFor,
 } from "./session-driver.js";
