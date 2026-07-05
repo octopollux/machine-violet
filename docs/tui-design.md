@@ -366,22 +366,6 @@ Below 80×25, the game replaces the entire UI with a fullscreen `TerminalTooSmal
 1. **Top frame** (resource display) — resources still available via character sheet
 2. **Activity line** — degrades to single glyph in modeline
 
-### Full-frame invariant: autowrap stays OFF
-
-The layout fills the **entire** terminal (`height={rows}`, `width={cols}`), so it
-paints the bottom-right cell — the one cell most Ink apps never touch. With
-terminal autowrap (DECAWM) enabled, that last-cell write leaves the terminal in a
-deferred-wrap state that, on Windows Terminal, scrolls the alt-screen buffer by one
-line; the resulting overflow surfaces an auto-hidden scrollbar painted over the last
-column, eating the right frame edge. So the client turns autowrap **off** for the
-duration of the full-screen session (restored on exit) — the same technique
-ncurses/vim use to draw a bottom-right corner safely. Ink never relies on terminal
-autowrap (it wraps text per-box and moves the cursor explicitly), so this affects
-only the last-cell scroll, not layout. **Don't re-enable autowrap mid-session or
-leave the last cell unpainted to "work around" a scrollbar** — the guard is the fix.
-
-**Code:** `src/tui/hooks/autowrap.ts`, wired in `src/start-client.ts` (gated on `alternateScreen`)
-
 
 ## Modals
 
