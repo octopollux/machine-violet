@@ -157,14 +157,26 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
 }
 
 /**
+ * Block the current thread for `ms` without spinning. `saveConnectionStore` is
+ * synchronous (its callers — token refresh, settings routes — are sync), so the
+ * retry backoff below can't `await`; `Atomics.wait` on a throwaway buffer times
+ * out after `ms`, giving a real sync sleep. Node permits this on the main thread.
+ */
+function sleepSync(ms: number): void {
+  if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
  * `renameSync` over an existing file can transiently fail on Windows (EPERM/
- * EBUSY/EACCES) when another process holds the target open for a read; a few
- * immediate retries clear it. On POSIX the first rename just succeeds. On final
- * failure the temp file is cleaned up so we don't litter the config dir.
+ * EBUSY/EACCES) when another process holds the target open for a read. Retry with
+ * an escalating backoff so the attempts actually SPAN the lock window instead of
+ * burning through in one timeslice (Copilot #702). On POSIX the first rename just
+ * succeeds. On final failure the temp file is cleaned up so we don't litter.
  */
 function renameOverwrite(from: string, to: string): void {
+  const MAX = 6;
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < MAX; attempt++) {
     try {
       renameSync(from, to);
       return;
@@ -172,6 +184,7 @@ function renameOverwrite(from: string, to: string): void {
       lastErr = err;
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES") break;
+      if (attempt < MAX - 1) sleepSync(20 * (attempt + 1)); // 20,40,60,80,100ms
     }
   }
   try { rmSync(from, { force: true }); } catch { /* best-effort cleanup */ }
