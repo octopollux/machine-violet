@@ -24,8 +24,12 @@ describe("renderMeterLogPath", () => {
 });
 
 describe("renderMeterEnabled", () => {
-  it("is off by default (the test env sets no MV_RENDER_LOG, so no Profiler/timer is installed)", () => {
-    expect(renderMeterEnabled()).toBe(false);
+  it("matches the env the singleton read at import — deterministic whether or not MV_RENDER_LOG is set", () => {
+    // The meter singleton reads process.env ONCE at module import, so a fixed
+    // `false` expectation is wrong in any shell/CI that has MV_RENDER_LOG set
+    // (e.g. a render-metering session). Derive the expectation from that same
+    // env instead so the assertion holds either way (Copilot #701).
+    expect(renderMeterEnabled()).toBe(renderMeterLogPath(process.env) !== null);
   });
 });
 

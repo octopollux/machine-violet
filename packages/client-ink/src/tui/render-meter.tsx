@@ -102,7 +102,7 @@ class RenderMeter {
     }
     if (Object.keys(zones).length === 0) return; // nothing has rendered yet
     try {
-      appendFileSync(this.path, JSON.stringify({ windowMs: FLUSH_MS, zones }) + "\n");
+      appendFileSync(this.path, JSON.stringify({ t: Date.now(), windowMs: FLUSH_MS, zones }) + "\n");
     } catch {
       /* best-effort */
     }
