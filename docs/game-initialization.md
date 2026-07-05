@@ -201,6 +201,13 @@ Personalities are stored as short prompt fragments shipped with the app. Each is
 
 The canonical roster lives in [personalities/](../personalities/) at the repo root — one `.mvdm` file per personality, parsed by [packages/engine/src/config/personality-loader.ts](../packages/engine/src/config/personality-loader.ts). Each file carries a `format: "machine-violet-dm"` envelope plus the `name`, `description`, `prompt_fragment`, and optional `detail` fields. Read the directory for the current list; the roster has grown well past the original four (Chronicler / Trickster / Warden / Bard) and is curated rather than counted, so treat the files as the source of truth and avoid mirroring the list here. Users can drop additional `.mvdm` files into `~/.machine-violet/personalities/` to add their own.
 
+### Authoring notes
+
+A personality file *demonstrates* a voice, and the DM reproduces whatever the `detail` exemplars show — at volume. Two pitfalls, both learned from the playtest sweep:
+
+- **Don't grant qualia to inanimate things.** Models already over-attribute wishing, waiting, remembering, breathing, and debt-keeping to objects and scenery; an exemplar that *models* it (e.g. "the mud remembers last night's rain") reinforces the tic rather than adding flavor. Keep a voice's lens on physical, observable detail and let objects be objects. The canonical statement of the rule lives in the core prompt — [`dm-identity.md`](../packages/engine/src/prompts/dm-identity.md): *"inanimate objects … do not wish, wait, breathe, track debts, remember, know, or otherwise behave as if they have a context window"* (exception: actually animate or sentient objects).
+- **Don't demonstrate tics you don't want at volume.** Similes are the worst offender — the model needs no help writing florid ones, so seeding them in exemplars over-tunes the output. The same goes for any signature affectation (found-document framing, invocation preambles like "Hear now of…", NPCs who "talk in tides and debts"): show the register you want the DM to reach for, not the mannerism you'd rather it ration. A `detail` block also sits in the highest-priority override slot, so a stray line there can silently countermand a base rule — prefer removing a conflicting directive to shouting a louder one over it.
+
 ### Custom personalities
 
 The "Enter your own" option in setup lets the player describe a DM personality in their own words. The setup agent writes a prompt fragment from the description and saves it.
