@@ -20,6 +20,7 @@ import {
   kittyKeyToLegacy,
 } from "./tui/hooks/kittyProtocol.js";
 import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
+import { disableAutowrap, restoreAutowrap } from "./tui/hooks/autowrap.js";
 import { compositePainters, setIncrementalRendering } from "./tui/image/painterRegistry.js";
 import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
 import { getAgentClientState } from "./agent-state-ref.js";
@@ -173,6 +174,14 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
     renderOpts,
   );
 
+  // Disable autowrap while the full-screen frame owns the terminal so painting
+  // the bottom-right cell can't scroll the alt-screen buffer (which on Windows
+  // Terminal surfaces an auto-hidden scrollbar over the last column, eating the
+  // right frame edge). Sequenced AFTER render() so it lands inside the alt
+  // buffer Ink just entered. Gated on alternateScreen so the mode change never
+  // leaks into redirected output, pipes, or CI logs. See tui/hooks/autowrap.ts.
+  if (alternateScreen) disableAutowrap(process.stdout);
+
   // Graceful shutdown on SIGINT
   const onSigInt = () => {
     unmount();
@@ -187,6 +196,7 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
       process.removeListener("SIGINT", onSigInt);
       if (sidecarClose) await sidecarClose();
     } finally {
+      if (alternateScreen) restoreAutowrap(process.stdout);
       if (hasKitty) disableKittyProtocol(process.stdout);
       filterChain.teardown();
       unlockRawMode();
