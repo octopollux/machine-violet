@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveSessionId, sessionPaths, DEFAULT_SESSION_ID } from "./session-driver.js";
+import { resolveSessionId, sessionPaths, resolvePorts, DEFAULT_SESSION_ID } from "./session-driver.js";
 
 const norm = (p: string): string => p.replace(/\\/g, "/");
 const ROOT = norm(join(tmpdir(), "mvplay"));
@@ -63,5 +63,32 @@ describe("sessionPaths", () => {
 
   it("puts the default session under its own subdir too (back-compat isolation)", () => {
     expect(norm(sessionPaths(DEFAULT_SESSION_ID).dir)).toBe(`${ROOT}/default`);
+  });
+});
+
+describe("resolvePorts", () => {
+  it("pins ports deterministically from a base (engine=base, sidecar=base+1)", () => {
+    expect(resolvePorts(30000)).toEqual({ serverPort: 30000, agentPort: 30001 });
+    expect(resolvePorts(30002)).toEqual({ serverPort: 30002, agentPort: 30003 });
+  });
+
+  it("gives disjoint bases disjoint port pairs (bulk dispatch is collision-free)", () => {
+    const used = new Set<number>();
+    for (const base of [30000, 30002, 30004, 30006]) {
+      const { serverPort, agentPort } = resolvePorts(base);
+      expect(used.has(serverPort)).toBe(false);
+      expect(used.has(agentPort)).toBe(false);
+      used.add(serverPort);
+      used.add(agentPort);
+    }
+  });
+
+  it("random-picks two distinct ports when no base is given", () => {
+    const { serverPort, agentPort } = resolvePorts();
+    expect(serverPort).not.toBe(agentPort);
+    for (const p of [serverPort, agentPort]) {
+      expect(p).toBeGreaterThanOrEqual(30000);
+      expect(p).toBeLessThan(40000);
+    }
   });
 });

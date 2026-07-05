@@ -84,6 +84,20 @@ export function resolveSessionId(explicit?: string): string {
   return sanitizeSessionId(explicit || process.env.MVPLAY_SESSION || DEFAULT_SESSION_ID);
 }
 
+/**
+ * Assign a session's engine + sidecar ports. A `portBase` pins them
+ * deterministically (base / base+1) so a bulk dispatcher can hand out disjoint,
+ * collision-free ports; without one they're random-picked and only guaranteed
+ * distinct from each other (fine for a single ad-hoc session).
+ */
+export function resolvePorts(portBase?: number): { serverPort: number; agentPort: number } {
+  if (portBase != null) return { serverPort: portBase, agentPort: portBase + 1 };
+  const serverPort = pickEphemeralPort();
+  let agentPort = pickEphemeralPort();
+  while (agentPort === serverPort) agentPort = pickEphemeralPort();
+  return { serverPort, agentPort };
+}
+
 /** Compute a session's paths from its id (pure — no I/O). */
 export function sessionPaths(id: string): SessionPaths {
   const dir = join(SESSIONS_ROOT, id);
@@ -358,6 +372,14 @@ export interface StartOptions {
    * settable via the MVPLAY_SESSION env var. (#696)
    */
   session?: string;
+  /**
+   * Assign this session's ports deterministically instead of picking at random:
+   * engine on `portBase`, sidecar on `portBase + 1`. For BULK concurrent starts
+   * (a dispatcher fanning out playtests), hand each session a disjoint base
+   * (e.g. 30000, 30002, 30004, …) so ports can't collide — the default random
+   * pick has no free-port probe and a loser just fails to launch. (#696)
+   */
+  portBase?: number;
 }
 
 /**
@@ -394,11 +416,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   // empty menu rather than silently creating a stray tree.
   if (!usingRealData) mkdirSync(paths.campaignsDir, { recursive: true });
 
-  const serverPort = pickEphemeralPort();
-  let agentPort = pickEphemeralPort();
-  // Distinct ports — a collision would make the second listener fail to bind
-  // (or the sidecar check attach to the engine). 1-in-10000, but cheap to rule out.
-  while (agentPort === serverPort) agentPort = pickEphemeralPort();
+  const { serverPort, agentPort } = resolvePorts(opts.portBase);
   const player = opts.player ?? "Player";
   const launchedAt = Date.now();
 

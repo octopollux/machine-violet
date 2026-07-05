@@ -69,6 +69,11 @@ Global:
   --session <id>                    Target a named session (default "default"; also
                                     settable via MVPLAY_SESSION). Distinct ids run
                                     fully isolated, so sessions play concurrently.
+  --port-base <N>                   (start/record) Assign ports deterministically:
+                                    engine N, sidecar N+1. For bulk concurrent
+                                    dispatch, give each session a disjoint base
+                                    (30000, 30002, …) so ports can't collide.
+                                    Omit to pick at random (fine for one session).
 
 Notes:
   - Sessions are isolated per --session id (state/log/temp-campaigns under the
@@ -98,7 +103,7 @@ function positionals(args: string[]): string[] {
     const a = args[i];
     if (a.startsWith("--")) {
       // Skip a value for known value-taking flags.
-      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail" || a === "--data-dir" || a === "--session") i++;
+      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail" || a === "--data-dir" || a === "--session" || a === "--port-base") i++;
       continue;
     }
     out.push(a);
@@ -121,6 +126,7 @@ async function main(): Promise<void> {
         live: flag(rest, "live"),
         dataDir: opt(rest, "data-dir"),
         session,
+        portBase: opt(rest, "port-base") ? Number(opt(rest, "port-base")) : undefined,
       });
       break;
     case "record": {
@@ -133,6 +139,7 @@ async function main(): Promise<void> {
         live: flag(rest, "live"),
         dataDir: opt(rest, "data-dir"),
         session,
+        portBase: opt(rest, "port-base") ? Number(opt(rest, "port-base")) : undefined,
       });
       break;
     }

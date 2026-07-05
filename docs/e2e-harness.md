@@ -163,7 +163,11 @@ session file under `<tmpdir>/mvplay/<session-id>/`. Sessions are isolated per id
 so multiple run concurrently (parallel playtests / recordings, #696): pass
 `--session <id>` (or set `MVPLAY_SESSION`) on every command, default `"default"`;
 `mvplay list` shows all live sessions. Each session also gets its own ephemeral
-ports and `CODEX_HOME`, so concurrent codex sessions don't contend.
+ports and `CODEX_HOME`, so concurrent codex sessions don't contend. Ports are
+random-picked (no free-port probe), which is fine for one session; for **bulk
+concurrent dispatch** hand each session a disjoint `--port-base <N>` (engine `N`,
+sidecar `N+1`) so starts can't collide. The `playtest-sweep` skill is the
+dispatcher playbook for fanning out N live playtests across subagents this way.
 
 This exists because `runProbe` kills the process the moment its scripted body
 returns; nothing survives between an agent's tool calls, so there's no session
