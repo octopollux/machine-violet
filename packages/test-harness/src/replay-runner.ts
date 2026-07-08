@@ -262,10 +262,13 @@ async function workStarted(
  * narrative flush can push `dmCount` past that stale-low baseline in the brief
  * waiting_input gap BEFORE this turn renders, tripping the beat one turn early.
  * Left unguarded the final capture then misses the last turn's whole response
- * (nightly #697: install-smoke replay diverged, 59 vs 77 dm lines). So after the
- * beat we wait for the dm-line count to HOLD STEADY across a quiet window with
- * the engine idle: the turn is fully rendered before we return, which also keeps
- * the next turn's `baseDm` accurate.
+ * (the install-smoke replay diverged, 59 vs 77 dm lines). So after the beat we
+ * wait for the dm-line count to HOLD STEADY across a quiet window with the engine
+ * idle: the turn is fully rendered before we return, which also keeps the next
+ * turn's `baseDm` accurate.
+ *
+ * Beat wait and quiesce share one `timeoutMs` deadline, so a slow turn can't
+ * spend the full budget twice.
  */
 async function settle(
   h: Harness,
@@ -273,6 +276,7 @@ async function settle(
   baselineFp: string | null,
   timeoutMs: number,
 ): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
   await h.waitForState(
     (s) => {
       const dmAdvanced = s.engineState === "waiting_input" && dmCount(s) > baseDm;
@@ -282,7 +286,7 @@ async function settle(
     },
     { timeoutMs, pollMs: 250, description: "beat after input" },
   );
-  await quiesce(h, timeoutMs);
+  await quiesce(h, Math.max(0, deadline - Date.now()));
 }
 
 /** How long the dm-line count must hold steady (engine idle) to count as done. */
