@@ -255,6 +255,17 @@ async function workStarted(
  * `dm` lines specifically: the previous turn's detached scribe keeps appending
  * `dev` breadcrumbs after the turn settles, and counting those as "the beat"
  * would let the next input fire before its DM response actually lands.
+ *
+ * The beat predicate fires on the FIRST qualifying poll, but the narrative may
+ * still be streaming — and `baseDm` is snapshotted BEFORE submit, so on a slow
+ * cold boot (the packaged install-smoke path) the PREVIOUS turn's trailing
+ * narrative flush can push `dmCount` past that stale-low baseline in the brief
+ * waiting_input gap BEFORE this turn renders, tripping the beat one turn early.
+ * Left unguarded the final capture then misses the last turn's whole response
+ * (nightly #697: install-smoke replay diverged, 59 vs 77 dm lines). So after the
+ * beat we wait for the dm-line count to HOLD STEADY across a quiet window with
+ * the engine idle: the turn is fully rendered before we return, which also keeps
+ * the next turn's `baseDm` accurate.
  */
 async function settle(
   h: Harness,
@@ -271,6 +282,35 @@ async function settle(
     },
     { timeoutMs, pollMs: 250, description: "beat after input" },
   );
+  await quiesce(h, timeoutMs);
+}
+
+/** How long the dm-line count must hold steady (engine idle) to count as done. */
+const QUIESCE_QUIET_MS = 1_000;
+
+/**
+ * Block until the DM narrative stops growing — `dm`-line count unchanged across
+ * a quiet window while the engine is back at waiting_input. Best-effort: on
+ * exhausting the budget it returns rather than throwing, since `settle`'s beat
+ * wait has already proven the turn happened; the divergence check that follows
+ * surfaces any genuinely-missing narrative.
+ */
+async function quiesce(h: Harness, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastDm = -1;
+  let steadySince = Date.now();
+  while (Date.now() < deadline) {
+    let s: ClientStateSnapshot;
+    try { s = await h.getState(); } catch { await delay(150); continue; }
+    const n = dmCount(s);
+    if (s.engineState === "waiting_input" && n === lastDm) {
+      if (Date.now() - steadySince >= QUIESCE_QUIET_MS) return;
+    } else {
+      lastDm = n;
+      steadySince = Date.now();
+    }
+    await delay(200);
+  }
 }
 
 function firstCharDiff(a: string, b: string): number {
