@@ -22,6 +22,7 @@
     "e2e:replay": "node --import tsx/esm packages/test-harness/bin/replay-golden.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
     "tokens": "node --import tsx/esm scripts/content-tokens.ts",
+    "catalog:docs": "node --import tsx/esm scripts/gen-catalog-docs.ts",
     "voice-guide": "node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts",
     "dist": "node scripts/build-dist.js",
     "explorer": "node tools/campaign-explorer/scripts/dev.js",

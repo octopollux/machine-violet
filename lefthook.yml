@@ -3,11 +3,14 @@
 #   pre-commit — fast + offline. Lint (cached) + Tier-1/unit tests for the
 #                staged files only (`vitest related --run`). A few seconds. NOT
 #                the Tier-2 goldens: cold-importing the engine module graph is
-#                ~20-30s, too heavy to pay on every commit.
+#                ~20-30s, too heavy to pay on every commit. Also regenerates the
+#                derived catalog docs (see `npm run catalog:docs`) when a seed or
+#                personality asset is staged, so the docs land in the same commit.
 #   pre-push   — the real gate. First refreshes content token stamps (see
-#                `npm run tokens`), then full `npm run check` (lint + the entire
-#                vitest suite, which INCLUDES the Tier-2 golden replays). ~80s,
-#                paid once before sharing.
+#                `npm run tokens`), verifies the catalog docs are current (a
+#                backstop for `--no-verify`/merge commits), then full `npm run
+#                check` (lint + the entire vitest suite, which INCLUDES the
+#                Tier-2 golden replays). ~80s, paid once before sharing.
 #
 # Activated by `npm install` (root `prepare` runs `scripts/install-hooks.mjs`,
 # which force-installs into the shared `.git/hooks` dir under worktrees). The
@@ -23,6 +26,13 @@ pre-commit:
     test:
       glob: "*.{ts,tsx}"
       run: npx vitest related --run {staged_files}
+    # Regenerate the derived catalog docs when a seed/personality asset changes
+    # (add, edit, or the .disabled rename) and stage them into this commit. The
+    # glob covers the whole dirs — those hold only .mvworld/.mvdm assets — so a
+    # rename to/from *.disabled also triggers it. No-op when nothing changed.
+    catalog-docs:
+      glob: "{worlds/*,personalities/*}"
+      run: npm run catalog:docs && git add docs/campaign-seeds.md docs/dm-personalities.md
 
 # `piped: true` runs these in priority order and HALTS on the first failure, so a
 # stale-stamp commit aborts the push before the slow check runs. token-stamp
@@ -34,6 +44,13 @@ pre-push:
     token-stamp:
       priority: 1
       run: npm run tokens -- --write --commit
-    check:
+    # Read-only backstop: if a seed/personality change reached here without the
+    # pre-commit regen (e.g. `--no-verify` or a merge), fail before the slow
+    # check with a "run npm run catalog:docs" message rather than shipping stale
+    # docs. Doesn't auto-commit — keeps derived docs attached to their own edit.
+    catalog-docs:
       priority: 2
+      run: npm run catalog:docs -- --check
+    check:
+      priority: 3
       run: npm run check
