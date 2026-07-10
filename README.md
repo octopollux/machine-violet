@@ -6,7 +6,7 @@
 
 | | | |
 |:-:|:-:|:-:|
-| ![Screenshot 1](assets/screenshot-1.png) | ![Screenshot 2](assets/screenshot-2.png) | ![Screenshot 3](assets/screenshot-3.png) |
+| ![Guided campaign setup](assets/screenshot-1.png) | ![Live play with a status modeline](assets/screenshot-2.png) | ![Inline AI-generated scene art](assets/screenshot-3.png) |
 
 Machine Violet is an agentic AI storytelling/roleplay engine that runs in your terminal.
 
