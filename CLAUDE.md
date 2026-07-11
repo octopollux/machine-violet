@@ -2,6 +2,12 @@
 
 Agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
 
+## Agent Metadata
+
+Keep shared agent guidance in this file and reusable workflows in `.claude/skills/`.
+Agents from other runtimes should follow these conventions directly rather than
+adding runtime-specific instruction or memory files to the repository.
+
 ```bash
 npm install
 npm run check           # lint + tests (run before every PR)
