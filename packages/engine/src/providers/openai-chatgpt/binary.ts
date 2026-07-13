@@ -2,7 +2,7 @@
  * Resolve the `codex` binary path.
  *
  * Look up order:
- *   1. Colocated with the running executable: `<exeDir>/codex/vendor/{triple}/codex/codex[.exe]`,
+ *   1. Colocated with the running executable: `<exeDir>/codex/vendor/{triple}/bin/codex[.exe]`,
  *      vendored next to the SEA binary by `scripts/build-dist.js`. We spawn
  *      the native Rust binary directly — NOT the `codex.js` wrapper —
  *      because `process.execPath` in a Node SEA build is the SEA exe itself
@@ -10,8 +10,15 @@
  *      binary ignores its first script-path argv and always runs its
  *      embedded main, so `MachineViolet.exe codex/bin/codex.js app-server`
  *      would relaunch Machine Violet instead of running Codex.
- *      We also prepend `vendor/{triple}/path` to PATH so the bundled
- *      `rg.exe` is discoverable — that's what codex.js does too.
+ *      The subdir names (`bin/`, `codex-path/`) mirror the `@openai/codex`
+ *      platform package's own `vendor/{triple}/` tree — they must match what
+ *      `codex/bin/codex.js` resolves (`path.join(vendorRoot, triple, "bin",
+ *      "codex[.exe]")`), because that wrapper is the layout's source of truth.
+ *      We reproduce `codex.js`'s spawn environment for the direct native
+ *      invocation: set `CODEX_MANAGED_PACKAGE_ROOT` to the colocated `codex/`
+ *      dir (so the native binary finds its `codex-path/rg` + `codex-resources/`
+ *      helper exes), and also prepend `vendor/{triple}/codex-path` to PATH so
+ *      the bundled `rg.exe` is discoverable.
  *   2. The `@openai/codex` npm package resolved via `createRequire` —
  *      this is the path for `npm run dev` and tests, where node_modules
  *      lives next to the source and `process.execPath` IS real Node, so
@@ -68,12 +75,23 @@ export function resolveCodexBinary(): CodexBinaryResolution {
       if (triples.length > 0) {
         const triple = triples[0];
         const exeName = process.platform === "win32" ? "codex.exe" : "codex";
-        const nativeBin = join(vendorDir, triple, "codex", exeName);
+        // The native binary lives under `bin/` in the `@openai/codex` vendor
+        // tree — NOT `codex/`. This is exactly the path `codex/bin/codex.js`
+        // resolves; keep them in lockstep or a colocated SEA build silently
+        // falls through to the bare-`codex` PATH lookup and dies with
+        // `'codex' is not recognized` on the first spawn (#719).
+        const nativeBin = join(vendorDir, triple, "bin", exeName);
         if (existsSync(nativeBin)) {
-          // Prepend the sibling `path/` dir to PATH so codex can find its
-          // bundled ripgrep, matching what codex.js does itself.
-          const pathDir = join(vendorDir, triple, "path");
-          const extraEnv: Record<string, string> = {};
+          // Reproduce codex.js's spawn env for the direct native invocation.
+          // codex.js sets CODEX_MANAGED_PACKAGE_ROOT to the codex package root
+          // so the native binary can locate its `codex-path/rg` and
+          // `codex-resources/` helper exes; we spawn the binary directly, so
+          // we must set it ourselves. We also prepend the `codex-path/` dir to
+          // PATH as a belt-and-suspenders route to the bundled ripgrep.
+          const extraEnv: Record<string, string> = {
+            CODEX_MANAGED_PACKAGE_ROOT: codexRoot,
+          };
+          const pathDir = join(vendorDir, triple, "codex-path");
           if (existsSync(pathDir)) {
             extraEnv.PATH = pathDir + delimiter + (process.env.PATH ?? "");
           }
