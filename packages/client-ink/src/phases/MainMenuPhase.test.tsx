@@ -216,6 +216,59 @@ describe("MainMenuPhase", () => {
     expect(onSettingsApiKeys).toHaveBeenCalled();
   });
 
+  it("moves the caret to API Keys when apiKeyValid flips false after mount (#713)", async () => {
+    // The real launch path mounts the menu with apiKeyValid=true (optimistic
+    // default) and only flips it false once the async connection health check
+    // resolves. The caret must follow the mode change, not stay stranded on
+    // the now-disabled New Campaign.
+    const { rerender, lastFrame } = render(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: true })} />,
+    );
+    const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    expect(selected()).toContain("New Campaign");
+    rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
+    await vi.waitFor(() => expect(selected()).toContain("API Keys"));
+  });
+
+  it("tracks the shifting API Keys index when devModeEnabled loads late (#713)", async () => {
+    // devModeEnabled also arrives async (getMachineSettings), inserting
+    // "Add Content" above API Keys. The default caret must re-resolve to the
+    // new API Keys position, not point one row off.
+    const { rerender, lastFrame } = render(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: false })} />,
+    );
+    const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    await vi.waitFor(() => expect(selected()).toContain("API Keys"));
+    rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: true })} />);
+    await vi.waitFor(() => {
+      expect(selected()).toContain("API Keys");
+      expect(selected()).not.toContain("Add Content");
+    });
+  });
+
+  it("does not yank the caret away once the player has navigated (#713)", async () => {
+    // If the player has already moved the caret, a late apiKeyValid flip must
+    // respect their choice rather than snapping back to API Keys.
+    const props = defaultProps({ apiKeyValid: true, campaigns: [{ name: "X", path: "/x" }] });
+    const { stdin, rerender, lastFrame } = render(<MainMenuPhase {...props} />);
+    const frame = () => lastFrame() ?? "";
+    const selected = () => frame().split("\n").find((l) => l.includes("◆")) ?? "";
+    const DOWN = "[B";
+    // Move down to Continue Campaign — a deliberate caret move.
+    await vi.waitFor(() => {
+      if (selected().includes("New Campaign")) stdin.write(DOWN);
+      expect(selected()).toContain("Continue Campaign");
+    });
+    // Health check resolves invalid — the caret stays where the player left it.
+    rerender(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, campaigns: [{ name: "X", path: "/x" }] })} />,
+    );
+    await vi.waitFor(() => {
+      expect(frame()).toContain("API Keys"); // item now present…
+      expect(selected()).toContain("Continue Campaign"); // …but caret unmoved
+    });
+  });
+
   it("collapses the campaign list and advances to the next menu item when scrolling past the end", async () => {
     // Mirror of the up-arrow collapse at the top: down-arrow on the last
     // campaign should close the sub-list and land on the main-menu item

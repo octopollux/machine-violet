@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useInput, Text, Box, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
@@ -81,10 +81,14 @@ export function MainMenuPhase({
   // start the caret on that item — it's the one actionable next step, and the
   // default "New Campaign" is disabled until a key exists (#713). The initial
   // API Keys index mirrors the mainMenuItems build order below:
-  // New Campaign, [Continue Campaign], [Add Content], API Keys.
+  // New Campaign, [Continue Campaign], [Add Content], API Keys. An effect
+  // below keeps this in sync when the mode flips after mount.
   const [mainMenuIndex, setMainMenuIndex] = useState(() =>
     apiKeyValid ? 0 : 1 + (campaigns.length > 0 ? 1 : 0) + (devModeEnabled ? 1 : 0),
   );
+  // Once the player moves the caret themselves, stop auto-positioning it —
+  // their choice stands. Until then, the default tracks the current mode.
+  const userMovedCaret = useRef(false);
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
   /** Which column is active: 0=name (resume), 1=archive, 2=delete */
@@ -102,6 +106,23 @@ export function MainMenuPhase({
   useEffect(() => {
     setMainMenuIndex((i) => Math.min(i, mainMenuItems.length - 1));
   }, [mainMenuItems.length]);
+
+  // Keep the default caret on the actionable "API Keys" item in no-connection
+  // mode. The lazy initializer above only captures the state at mount, but
+  // `apiKeyValid` flips false asynchronously (the connection health check
+  // resolves after the menu is already showing) and `devModeEnabled` loads
+  // late too — both change where "API Keys" sits — so the default has to react
+  // to those prop changes, not just run once. Guarded by `userMovedCaret` so a
+  // late flip never yanks the caret out from under a player who has already
+  // navigated. (#713)
+  useEffect(() => {
+    if (userMovedCaret.current) return;
+    // Index derives from apiKeyValid + the item count; recompute when either
+    // shifts (both deps below). mainMenuItems itself is rebuilt every render,
+    // so we key on its length rather than the array identity.
+    const apiKeysIndex = mainMenuItems.indexOf("API Keys");
+    setMainMenuIndex(apiKeysIndex >= 0 ? apiKeysIndex : 0);
+  }, [apiKeyValid, mainMenuItems.length]);
 
   // The campaign sub-list stays expanded through an archive so the inline
   // "Archiving…" state is visible; when the archive lands the entry drops out
@@ -191,10 +212,12 @@ export function MainMenuPhase({
     }
 
     if (key.upArrow) {
+      userMovedCaret.current = true;
       setMainMenuIndex((i) => Math.max(0, i - 1));
       return;
     }
     if (key.downArrow) {
+      userMovedCaret.current = true;
       setMainMenuIndex((i) => Math.min(mainMenuItems.length - 1, i + 1));
       return;
     }
