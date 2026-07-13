@@ -301,9 +301,15 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       // the normal case.
       sweepStaleCodexHomesOnce(Date.now());
       const codexHome = allocateCodexHome("oauth");
-      await mkdir(codexHome, { recursive: true }).catch(() => { /* codex will retry/create; non-fatal */ });
       const codex = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}`, codexHome });
       try {
+        // `mkdir` sits INSIDE the try (not before it) for two reasons: the
+        // `finally` then always reaps the home even on an early bail, and this
+        // await honors the same cancellation contract as every boundary below
+        // — a cancel here returns before we spawn codex. `codex.stop()` in the
+        // `finally` is a safe no-op when start() never ran.
+        await mkdir(codexHome, { recursive: true }).catch(() => { /* codex will retry/create; non-fatal */ });
+        if (entry.status !== "pending") return;
         await codex.start();
         if (entry.status !== "pending") return;
         await codex.call("initialize", {
