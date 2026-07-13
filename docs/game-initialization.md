@@ -60,6 +60,8 @@ The main menu uses the full themed frame (same border components as the playing 
 
 "Continue Campaign" only appears in the main menu when at least one campaign exists.
 
+**No-connection mode.** When no valid API connection exists, an **API Keys** item appears in the menu (colored yellow, linking to Settings → API Keys) and the API-dependent items ("New Campaign", "Continue Campaign", "Add Content") are disabled with a "Requires a valid API key" hint. In this mode the default caret opens on **API Keys** rather than the disabled "New Campaign" — it points the player straight at the one required next step. Once a connection is valid the API Keys item disappears and the caret defaults to "New Campaign" as usual.
+
 Returning from a game via "Save & Exit" or "End Session" runs teardown (graceful shutdown + cache reset) and transitions back to this menu.
 
 #### Campaign sub-list columns
