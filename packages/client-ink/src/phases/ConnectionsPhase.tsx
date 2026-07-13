@@ -47,21 +47,22 @@ const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection", "Sign 
  * dedicated "Sign in with ChatGPT" entry in the Connections menu (no API
  * key paste; OAuth via the codex app-server).
  *
- * `openrouter` is intentionally absent too: the provider adapter still
- * exists engine-side (`createProviderFromConnection`), but OpenRouter has
- * never been validated end-to-end for the things MV depends on (reliable
- * tool use, subagents, ~300k-token context). Offering it here would imply
- * support we can't stand behind, so it's hidden for 1.1 pending a real
- * playtest. Re-add the row once that validation passes (issue #712).
+ * `openrouter` and `custom` are intentionally absent too. Both adapters
+ * still exist engine-side (`createProviderFromConnection`), but neither has
+ * been validated end-to-end for the things MV depends on (reliable tool use,
+ * subagents, ~300k-token context) — OpenRouter never, and `custom`
+ * OpenAI-compatible endpoints only as a best-effort escape hatch. Rather
+ * than ship untested top-level connection options in 1.1, both are hidden
+ * from the picker pending a real validation playtest. Re-add the rows once
+ * that validation passes (issue #712). The `needsBaseUrl` wizard step and
+ * both adapters are left intact so re-enabling is a one-row revert.
  *
- * The tested/supported providers are Anthropic and OpenAI (incl. the
- * ChatGPT-subscription path). "Custom" is offered but flagged untested —
- * an explicit "you can try" escape hatch for OpenAI-compatible endpoints.
+ * The tested/supported providers that remain are Anthropic and OpenAI
+ * (incl. the ChatGPT-subscription path via "Sign in with ChatGPT").
  */
 const PROVIDER_OPTIONS = [
   { id: "anthropic", label: "Anthropic", needsBaseUrl: false },
   { id: "openai-apikey", label: "OpenAI (API key)", needsBaseUrl: false },
-  { id: "custom", label: "Custom (OpenAI-compatible, untested)", needsBaseUrl: true },
 ] as const;
 
 const TIER_LABELS: Record<string, string> = {

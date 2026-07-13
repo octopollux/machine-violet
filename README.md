@@ -134,9 +134,9 @@ If you want this to change, you should ask Anthropic (nicely) to add support for
 <details>
 <summary>Will Machine Violet work with Ollama/local models/GLM 5.x/etc?</summary>
 
-You can try! We only test using OpenAI and Anthropic frontier models. It may work with the largest open-source models via an OpenAI-compatible API connection (the "Custom" provider) — untested, so playtesting reports are welcome!
+Not in this release. Machine Violet currently supports Anthropic and OpenAI (including the ChatGPT-subscription sign-in) — those are the only connection options we've validated and ship. Support for OpenAI-compatible / local endpoints is planned once we can test it end to end.
 
-Local models probably won't work, or won't work well. Machine Violet requires reliable tool use and about ~300k tokens of context window. Additionally, "big model smell" leads to a *much* better gameplay experience.
+Even then, local models probably won't work well: Machine Violet requires reliable tool use and about ~300k tokens of context window, and "big model smell" leads to a *much* better gameplay experience.
 </details>
 
 <details>
