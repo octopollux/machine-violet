@@ -77,7 +77,14 @@ export function MainMenuPhase({
   onQuit,
 }: MainMenuPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
-  const [mainMenuIndex, setMainMenuIndex] = useState(0);
+  // In no-connection mode ("API Keys" is shown because the key is invalid),
+  // start the caret on that item — it's the one actionable next step, and the
+  // default "New Campaign" is disabled until a key exists (#713). The initial
+  // API Keys index mirrors the mainMenuItems build order below:
+  // New Campaign, [Continue Campaign], [Add Content], API Keys.
+  const [mainMenuIndex, setMainMenuIndex] = useState(() =>
+    apiKeyValid ? 0 : 1 + (campaigns.length > 0 ? 1 : 0) + (devModeEnabled ? 1 : 0),
+  );
   const [expandedCampaigns, setExpandedCampaigns] = useState(false);
   const [campaignSelectIndex, setCampaignSelectIndex] = useState(0);
   /** Which column is active: 0=name (resume), 1=archive, 2=delete */

@@ -180,6 +180,42 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).not.toContain("Requires a valid API key");
   });
 
+  it("defaults the caret to API Keys in no-connection mode (#713)", () => {
+    // The disabled "New Campaign" is a dead first stop; the caret should land
+    // on the one actionable item instead.
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
+    const selected = (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    expect(selected).toContain("API Keys");
+  });
+
+  it("defaults the caret to API Keys past Continue Campaign / Add Content (#713)", () => {
+    // The initial index must track the menu build order — with campaigns and
+    // dev mode both present, API Keys sits below those extra items.
+    const props = defaultProps({
+      apiKeyValid: false,
+      campaigns: [{ name: "X", path: "/x" }],
+      devModeEnabled: true,
+    });
+    const { lastFrame } = render(<MainMenuPhase {...props} />);
+    const selected = (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    expect(selected).toContain("API Keys");
+  });
+
+  it("keeps the default caret on New Campaign when the API key is valid (#713)", () => {
+    const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: true })} />);
+    const selected = (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    expect(selected).toContain("New Campaign");
+  });
+
+  it("selects API Keys with Enter on the default caret in no-connection mode (#713)", () => {
+    const onSettingsApiKeys = vi.fn();
+    const { stdin } = render(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, onSettingsApiKeys })} />,
+    );
+    stdin.write("\r"); // Enter on the default (API Keys) item
+    expect(onSettingsApiKeys).toHaveBeenCalled();
+  });
+
   it("collapses the campaign list and advances to the next menu item when scrolling past the end", async () => {
     // Mirror of the up-arrow collapse at the top: down-arrow on the last
     // campaign should close the sub-list and land on the main-menu item
