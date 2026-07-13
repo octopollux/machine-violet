@@ -260,11 +260,14 @@ for (const { src, dest, filter, exclude } of assets) {
 // there first (see its colocated-path resolution).
 //
 // Layout matches what codex.js expects when its `require.resolve` of the
-// optional-dep package fails (bin/codex.js:92):
+// optional-dep package fails (bin/codex.js falls back to __dirname/../vendor):
 //   dist/codex/bin/codex.js
 //   dist/codex/package.json
-//   dist/codex/vendor/{triple}/codex/codex[.exe]
-//   dist/codex/vendor/{triple}/path/rg[.exe]
+//   dist/codex/vendor/{triple}/bin/codex[.exe]
+//   dist/codex/vendor/{triple}/codex-path/rg[.exe]
+//   dist/codex/vendor/{triple}/codex-resources/   (helper exes)
+// binary.ts resolves the native binary from this same tree — the subdir
+// names must stay in lockstep with the `@openai/codex` package (see #719).
 //
 // Each build runs on its own platform's runner (windows-latest,
 // macos-latest, ubuntu-latest), so `npm ci` only installs the matching
@@ -311,7 +314,7 @@ console.log(`  Version: ${version}`);
  *       next to the wrapper. Inside our SEA build, no such node_modules
  *       exists, so this branch always fails at runtime.
  *   (b) Falls back to `path.join(__dirname, "..", "vendor", triple,
- *       "codex", "codex[.exe]")` — works if we colocate the vendor tree
+ *       "bin", "codex[.exe]")` — works if we colocate the vendor tree
  *       with the wrapper. This is the path we feed.
  *
  * Per-platform mapping mirrors `bin/codex.js` PLATFORM_PACKAGE_BY_TARGET.
