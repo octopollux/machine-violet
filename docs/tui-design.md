@@ -794,7 +794,7 @@ A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM
 **Model Assignments** — shows the three model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks). Each tier displays the currently assigned model and connection label. Enter on a tier enters the model picker, which lists all models from all connections; Enter there assigns the selected model + connection to that tier.
 
 **Add Connection wizard** — a multi-step flow:
-1. Provider selection: Anthropic, OpenAI (API key), OpenRouter, Custom (OpenAI-compatible). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry.
+1. Provider selection: Anthropic, OpenAI (API key), Custom (OpenAI-compatible, untested). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry. `openrouter` is also absent from the picker: the adapter still exists engine-side, but OpenRouter is hidden pending an end-to-end validation playtest (issue #712) so we don't imply support we can't stand behind. Re-add the row once it's validated.
 2. API key entry (text input, Enter to advance).
 3. Label entry (optional friendly name, Enter to advance).
 4. Base URL entry — only shown for the `custom` provider. Escape backs up one step at each stage.

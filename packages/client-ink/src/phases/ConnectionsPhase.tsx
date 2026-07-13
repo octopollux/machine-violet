@@ -46,12 +46,22 @@ const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection", "Sign 
  * Note `openai-chatgpt` is intentionally absent here — it goes through a
  * dedicated "Sign in with ChatGPT" entry in the Connections menu (no API
  * key paste; OAuth via the codex app-server).
+ *
+ * `openrouter` is intentionally absent too: the provider adapter still
+ * exists engine-side (`createProviderFromConnection`), but OpenRouter has
+ * never been validated end-to-end for the things MV depends on (reliable
+ * tool use, subagents, ~300k-token context). Offering it here would imply
+ * support we can't stand behind, so it's hidden for 1.1 pending a real
+ * playtest. Re-add the row once that validation passes (issue #712).
+ *
+ * The tested/supported providers are Anthropic and OpenAI (incl. the
+ * ChatGPT-subscription path). "Custom" is offered but flagged untested —
+ * an explicit "you can try" escape hatch for OpenAI-compatible endpoints.
  */
 const PROVIDER_OPTIONS = [
   { id: "anthropic", label: "Anthropic", needsBaseUrl: false },
   { id: "openai-apikey", label: "OpenAI (API key)", needsBaseUrl: false },
-  { id: "openrouter", label: "OpenRouter", needsBaseUrl: false },
-  { id: "custom", label: "Custom (OpenAI-compatible)", needsBaseUrl: true },
+  { id: "custom", label: "Custom (OpenAI-compatible, untested)", needsBaseUrl: true },
 ] as const;
 
 const TIER_LABELS: Record<string, string> = {
