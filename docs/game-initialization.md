@@ -92,7 +92,7 @@ Enter confirms the selected button; **ESC always cancels**. While the modal is o
 
 ### Step 2: Setup Conversation
 
-The setup agent welcomes the player with flair and offers two paths via `present_choices`:
+The setup agent welcomes the player with flair and offers three ways in via `present_choices` — **Quick Start**, **Full Setup**, and **"Describe a game you want to play"** (the last label color-highlighted, per issue #725, so the player always knows a bundled seed isn't required):
 
 #### Quick Start Path
 
@@ -119,7 +119,11 @@ Conversational flow — the agent asks about each topic one or two at a time:
 9. Game system
 10. Mechanics handling — **only when a light/ultra-light system was chosen**: the agent asks whether the player wants to use the mechanics themselves (`player-facing`) or have the DM run them silently behind the scenes (`dm-managed`, the default). Recorded as `config.json` `mechanics_mode`. Skipped for crunchy systems (implicitly player-facing) and pure-narrative campaigns. See [rules-systems.md](rules-systems.md#mechanics-mode-player-facing-vs-dm-managed).
 
-Both paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
+#### Describe-Your-Own Path (custom campaign)
+
+The player brings their own premise and the agent builds the campaign from scratch — no bundled seed. The agent warns the player up front that this takes a few minutes, then constructs the world against the shared campaign-construction craft (the [`CampaignConstruction`](../packages/engine/src/prompts/include/CampaignConstruction.md) prompt include — the same design bars documented in [seed-authoring.md](seed-authoring.md), issue #725). Because there is no seed, there are no forks: wherever a seed would branch, the agent just asks the player and commits the one path. Everything it builds routes into the finalize free-form fields — the DM-facing world (place, location skeleton, cast, mystery shape and reveal order, pacing) into `campaign_detail`, turn one into `opening_scene`, the player's own words and tone into `handoff_note`. No `world_slug`/`fork_selections` are emitted, so Step 3's seed-materialization (below) is skipped; the DM grows entities on demand from the `campaign_detail` brief. The player can also drop into this path implicitly by free-form describing a game at any point.
+
+All paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
 
 ### Step 3: World Setup (behind the scenes)
 
