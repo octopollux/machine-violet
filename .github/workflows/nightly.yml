@@ -86,6 +86,11 @@ jobs:
           # Enable portable mode (settings stored next to exe, not in %APPDATA%)
           touch dist/terminal/.portable
 
+          # Seed MV's default terminal config (window size + Ottosson theme).
+          # Portable mode reads settings/ next to WindowsTerminal.exe.
+          mkdir -p dist/terminal/settings
+          cp assets/windows-terminal/settings.json dist/terminal/settings/settings.json
+
           # Include Windows Terminal's MIT license (third-party notice)
           if [ -f dist/terminal/LICENSE ]; then
             mv dist/terminal/LICENSE dist/terminal/LICENSE-windows-terminal.txt

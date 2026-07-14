@@ -1,0 +1,36 @@
+{
+    "$schema": "https://aka.ms/terminal-profiles-schema",
+    "$help": "Default config for the Windows Terminal that Machine Violet bundles (portable mode). Copied to terminal/settings/settings.json at build time; see .github/workflows and docs/installation.md. Only applies when MV auto-relaunches into its bundled terminal — a user's own terminal is never touched.",
+    "initialCols": 100,
+    "initialRows": 60,
+    "profiles": {
+        "defaults": {
+            "colorScheme": "Ottosson"
+        }
+    },
+    "schemes": [
+        {
+            "name": "Ottosson",
+            "background": "#000000",
+            "foreground": "#BEBEBE",
+            "cursorColor": "#FFFFFF",
+            "selectionBackground": "#92A4FD",
+            "black": "#000000",
+            "red": "#BE2C21",
+            "green": "#3FAE3A",
+            "yellow": "#BE9A4A",
+            "blue": "#204DBE",
+            "purple": "#BB54BE",
+            "cyan": "#00A7B2",
+            "white": "#BEBEBE",
+            "brightBlack": "#808080",
+            "brightRed": "#FF3E30",
+            "brightGreen": "#58EA51",
+            "brightYellow": "#FFC944",
+            "brightBlue": "#2F6AFF",
+            "brightPurple": "#FC74FF",
+            "brightCyan": "#00E1F0",
+            "brightWhite": "#FFFFFF"
+        }
+    ]
+}

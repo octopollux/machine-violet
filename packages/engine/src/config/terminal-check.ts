@@ -98,10 +98,26 @@ function shouldUpgradeTerminal(): boolean {
 
 /**
  * Find the best available Windows Terminal binary.
- * Returns the path to wt.exe / WindowsTerminal.exe, or null.
+ * Returns the path to WindowsTerminal.exe / wt.exe, or null.
  */
 export function findWindowsTerminal(): string | null {
-  // 1. System-installed wt.exe (Store, winget, MSIX)
+  // 1. Bundled portable Windows Terminal (next to our exe). Preferred over a
+  //    system install for two reasons:
+  //      - It's the only WT we can pre-configure. wt.exe has no "use this
+  //        settings file" flag, so our default config (terminal/settings/
+  //        settings.json — window size + Ottosson color scheme) only takes
+  //        effect when the launched terminal is our own portable copy.
+  //      - It's the pinned Preview 1.25 build with the Kitty-keyboard input
+  //        fix, so every packaged user gets it regardless of what (possibly
+  //        older) WT they have installed.
+  //    Only present in packaged builds; dev falls through to the system WT.
+  if (isCompiled()) {
+    const bundled = join(dirname(process.execPath), "terminal", "WindowsTerminal.exe");
+    if (existsSync(bundled)) return bundled;
+  }
+
+  // 2. System-installed wt.exe (Store, winget, MSIX) — dev runs, or a fallback
+  //    if the bundled terminal is somehow missing.
   try {
     const result = execFileSync("where.exe", ["wt.exe"], {
       encoding: "utf-8",
@@ -111,12 +127,6 @@ export function findWindowsTerminal(): string | null {
     const firstLine = result.trim().split(/\r?\n/)[0];
     if (firstLine) return firstLine;
   } catch { /* not found */ }
-
-  // 2. Bundled portable Windows Terminal (next to our exe)
-  if (isCompiled()) {
-    const bundled = join(dirname(process.execPath), "terminal", "WindowsTerminal.exe");
-    if (existsSync(bundled)) return bundled;
-  }
 
   return null;
 }
