@@ -27,7 +27,9 @@ Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollu
 
 ### Terminal requirements
 
-Use **Windows Terminal (Preview 1.25+)** for the best experience. PowerShell ISE is not supported. If Machine Violet is launched from bare `cmd.exe` or by double-click, it auto-relaunches inside Windows Terminal when one is available. The portable zip bundles a copy of Windows Terminal so it works out of the box.
+Use **Windows Terminal (Preview 1.25+)** for the best experience. PowerShell ISE is not supported. If Machine Violet is launched from bare `cmd.exe` or by double-click, it auto-relaunches inside Windows Terminal when one is available. Both the installer and the portable zip bundle a copy of Windows Terminal so it works out of the box.
+
+When it auto-relaunches, Machine Violet uses its **own bundled terminal** (configured with a 100×60 window and the *Ottosson* color scheme — see `assets/windows-terminal/settings.json`) in preference to a system-installed Windows Terminal, so the game looks the same on every machine. If you instead run `MachineViolet.exe` from a terminal you already have open, it stays there and leaves your terminal's own configuration untouched.
 
 ## macOS (Apple Silicon) / Linux (x64)
 
