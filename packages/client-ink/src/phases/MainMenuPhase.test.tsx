@@ -14,6 +14,19 @@ function makeTheme() {
   return resolveTheme(def, "exploration", "#8888aa");
 }
 
+/**
+ * Wait budget for assertions about where the caret SETTLES (#713).
+ *
+ * Settling takes a React effect plus an ink repaint, and ink throttles its
+ * writes — so the frame the assertion reads is always a few async hops behind
+ * the prop change. Under the full suite's file parallelism the process gets
+ * starved enough to blow vi.waitFor's 1s default, which surfaced as a flake
+ * that failed in the 204-file run but passed the file in isolation. These
+ * assertions are about where the caret LANDS, never how fast it gets there,
+ * so give them room. Same pattern as CampaignSettingsModal.test.tsx.
+ */
+const CARET_SETTLE = { timeout: 5000, interval: 20 } as const;
+
 function defaultProps(overrides?: Partial<MainMenuPhaseProps>): MainMenuPhaseProps {
   return {
     theme: makeTheme(),
@@ -227,7 +240,7 @@ describe("MainMenuPhase", () => {
     const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
     expect(selected()).toContain("New Campaign");
     rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
-    await vi.waitFor(() => expect(selected()).toContain("API Keys"));
+    await vi.waitFor(() => expect(selected()).toContain("API Keys"), CARET_SETTLE);
   });
 
   it("tracks the shifting API Keys index when devModeEnabled loads late (#713)", async () => {
@@ -238,12 +251,12 @@ describe("MainMenuPhase", () => {
       <MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: false })} />,
     );
     const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
-    await vi.waitFor(() => expect(selected()).toContain("API Keys"));
+    await vi.waitFor(() => expect(selected()).toContain("API Keys"), CARET_SETTLE);
     rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: true })} />);
     await vi.waitFor(() => {
       expect(selected()).toContain("API Keys");
       expect(selected()).not.toContain("Add Content");
-    });
+    }, CARET_SETTLE);
   });
 
   it("does not yank the caret away once the player has navigated (#713)", async () => {
@@ -266,7 +279,7 @@ describe("MainMenuPhase", () => {
     await vi.waitFor(() => {
       expect(frame()).toContain("API Keys"); // item now present…
       expect(selected()).toContain("Continue Campaign"); // …but caret unmoved
-    });
+    }, CARET_SETTLE);
   });
 
   it("collapses the campaign list and advances to the next menu item when scrolling past the end", async () => {
