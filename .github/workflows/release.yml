@@ -106,9 +106,18 @@ jobs:
           WT_SHA256="ba5b75eb769e99221e68fe4bfb3580ed1ade81f24b70334de4cb4742edf1b017"
           echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
 
-          # Extract into dist/terminal/
-          mkdir -p dist/terminal
-          unzip -q wt-portable.zip -d dist/terminal
+          # Extract into dist/terminal/. The zip wraps its payload in a single
+          # top-level `terminal-<version>/` directory, so extracting straight
+          # into dist/terminal/ buries the exe one level too deep. Flatten it:
+          # findWindowsTerminal() probes exactly `<exeDir>/terminal/
+          # WindowsTerminal.exe`, and portable mode only reads `.portable` and
+          # `settings/` when they sit next to the exe.
+          rm -rf wt-extract
+          mkdir -p wt-extract dist/terminal
+          unzip -q wt-portable.zip -d wt-extract
+          WT_SRC="$(dirname "$(find wt-extract -name WindowsTerminal.exe | head -1)")"
+          mv "$WT_SRC"/* dist/terminal/
+          rm -rf wt-extract
 
           # Enable portable mode (settings stored next to exe, not in %APPDATA%)
           touch dist/terminal/.portable
@@ -122,6 +131,14 @@ jobs:
           if [ -f dist/terminal/LICENSE ]; then
             mv dist/terminal/LICENSE dist/terminal/LICENSE-windows-terminal.txt
           fi
+
+          # Fail the build if the layout drifts. findWindowsTerminal() probes
+          # these paths with existsSync and SILENTLY falls back to a system
+          # Windows Terminal when they're missing, so a wrong layout ships as
+          # "the app won't launch from the Start Menu" instead of a build error.
+          for f in dist/terminal/WindowsTerminal.exe dist/terminal/settings/settings.json dist/terminal/.portable; do
+            test -f "$f" || { echo "::error::bundled Windows Terminal layout wrong: missing $f"; exit 1; }
+          done
 
           echo "Bundled Windows Terminal ${WT_VERSION} ($(du -sh dist/terminal | cut -f1))"
 
