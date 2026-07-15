@@ -90,26 +90,24 @@ const anthropicMod = await import("@anthropic-ai/sdk") as any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const openaiMod = await import("openai") as any;
 
-const mockAnthropicCreate: ReturnType<typeof vi.fn> = anthropicMod.__mockMessages.create;
+const mockAnthropicStream: ReturnType<typeof vi.fn> = anthropicMod.__mockMessages.stream;
 const mockResponsesCreate: ReturnType<typeof vi.fn> = openaiMod.__mockResponses.create;
 
 const { createAnthropicProvider } = await import("./anthropic.js");
 const { createOpenAIProvider } = await import("./openai.js");
 
 /**
- * Shape the Anthropic `messages.create` mock to mirror the real SDK: the
- * provider consumes the call via `.withResponse()` (to read rate-limit
- * headers), so the mock returns an object exposing that method rather than a
- * bare resolved Message. Headers are empty here — header capture is exercised
- * in anthropic.usage.test.ts.
+ * Shape the Anthropic `messages.stream` mock to mirror the real SDK: the
+ * provider routes every call — streaming or not — through the streaming
+ * transport (issue #712) and reads the final buffered message via
+ * `finalMessage()`, with rate-limit headers on `.response`. Headers are empty
+ * here — header capture is exercised in anthropic.usage.test.ts.
  */
 function mockAnthropicResponse(message: unknown): void {
-  mockAnthropicCreate.mockReturnValue({
-    withResponse: () => Promise.resolve({
-      data: message,
-      response: { headers: new Headers() },
-      request_id: "req_test",
-    }),
+  mockAnthropicStream.mockReturnValue({
+    on: () => {},
+    finalMessage: () => Promise.resolve(message),
+    response: { headers: new Headers() },
   });
 }
 
@@ -163,7 +161,7 @@ anthropicEntry.encodeTurn2 = async (turn1Content) => {
       { role: "user", content: "and 3+3?" },
     ],
   }));
-  return mockAnthropicCreate.mock.calls.at(-1)?.[0];
+  return mockAnthropicStream.mock.calls.at(-1)?.[0];
 };
 anthropicEntry.assertReplayed = (encoded) => {
   // The assistant message (index 1) must contain a native Anthropic

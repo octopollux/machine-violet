@@ -103,8 +103,13 @@ async function anthropicChat(
   // attach them via an unknown cast that resolves to the same shape the
   // typed methods accept. `as unknown as ...` keeps the overload resolution
   // correctly disambiguating Message vs Stream return types.
+  //
+  // Every call — streaming or not — goes over `client.messages.stream`. Even
+  // non-streaming callers (subagents with no onDelta) buffer the streamed
+  // result rather than calling the non-streaming create(): the SDK refuses a
+  // non-streaming request whose max_tokens could exceed the 10-minute ceiling,
+  // which thinking-enabled subagent calls routinely trip. See the else branch.
   const streamParams = { ...apiParams, ...diagnosticsParams } as unknown as Anthropic.MessageStreamParams;
-  const createParams = { ...apiParams, ...diagnosticsParams, stream: false } as unknown as Anthropic.MessageCreateParamsNonStreaming;
 
   if (streaming && onDelta) {
     const stream = client.messages.stream(streamParams, requestOptions);
@@ -115,14 +120,18 @@ async function anthropicChat(
     // resolves.
     captureRateLimits(stream.response?.headers, rateLimitState);
   } else {
-    // withResponse() surfaces the raw HTTP response alongside the parsed
-    // Message so we can read the `anthropic-ratelimit-*` headers; awaiting it
-    // is otherwise identical to awaiting create() directly.
-    const { data, response: httpResponse } = await client.messages
-      .create(createParams, requestOptions)
-      .withResponse();
-    response = data;
-    captureRateLimits(httpResponse.headers, rateLimitState);
+    // Non-streaming callers (subagents, which pass no onDelta) still go over
+    // the streaming transport internally, then buffer the final message. A
+    // *non-streaming* create() is refused by the SDK when max_tokens is large
+    // enough that the request could exceed the 10-minute ceiling — and thinking
+    // bumps max_tokens to the model max (see toAnthropicParams), so heavy
+    // subagent calls trip that guard and throw before any HTTP request. The
+    // streaming endpoint has no such ceiling; finalMessage() returns the
+    // identical Message shape and `stream.response` still carries the
+    // `anthropic-ratelimit-*` headers, so nothing downstream changes. (#712)
+    const stream = client.messages.stream(streamParams, requestOptions);
+    response = await stream.finalMessage();
+    captureRateLimits(stream.response?.headers, rateLimitState);
   }
 
   // Cursor advances on success only — a thrown error leaves the prior id in
