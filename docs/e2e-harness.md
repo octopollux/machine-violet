@@ -303,6 +303,25 @@ Both accept the same flags:
 - `--keep` skips cleanup of the temporary campaigns directory. The path
   is logged at shutdown so you can poke around the resulting campaign
   files.
+- `--binary <path>` drives a **packaged binary** (an installed or portable
+  build) instead of the from-source launcher:
+
+  ```bash
+  npm run smoketest -- --binary "$LOCALAPPDATA/MachineViolet/current/MachineViolet.exe"
+  ```
+
+  The exe is compiled, so `isCompiled()` is true and it resolves its config
+  dir the real way (`%APPDATA%\MachineViolet`) using your actual saved
+  connections — that's the point: it proves the *shipped artifact* works,
+  not just the source tree. Campaigns still go to a temp dir, so it won't
+  touch real saves. Close any interactive instance first; two builds sharing
+  the config dir will contend over codex.
+
+  Reach for this when validating a release candidate by hand. The packaged
+  binary is otherwise only exercised by offline golden replay
+  (`replay-golden --binary`), which invokes it directly and never touches the
+  launch path or a live provider — the gap that let the bundled-Windows-Terminal
+  bug (#729) ship an app that couldn't start from the Start Menu.
 
 On success: exit 0, single-line `✔ OK <probe> (<n>s)` summary.
 
@@ -482,8 +501,9 @@ await runProbe({
 });
 ```
 
-`runProbe` handles argv parsing (`--stdio`, `--keep`), the launch, the
-error dump on failure, and clean shutdown.
+`runProbe` handles argv parsing (`--stdio`, `--keep`, `--binary`), the launch,
+the error dump on failure, and clean shutdown. Every probe gets `--binary` for
+free — no probe-side code needed to target a packaged build.
 
 Conventions:
 - **No naive sleeps.** Reach for `waitForState` family helpers. If you find
