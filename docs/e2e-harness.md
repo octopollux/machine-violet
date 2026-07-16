@@ -159,7 +159,20 @@ For "did I break it?", reach for **Tier 2** (`/replay-goldens`), not a live prob
 keeps the launcher + sidecar alive in a **detached background process** that
 outlives each command, so you submit one turn per invocation across as many
 invocations as the game lasts. State (ports, pid, and a read cursor) lives in a
-session file under the system temp dir — one session at a time.
+session file under `<tmpdir>/mvplay/<session-id>/`. Sessions are isolated per id,
+so multiple run concurrently (parallel playtests / recordings, #696): pass
+`--session <id>` (or set `MVPLAY_SESSION`) on every command, default `"default"`;
+`mvplay list` shows all live sessions. Each session also gets its own ephemeral
+ports and `CODEX_HOME`, so concurrent codex sessions don't contend. Ports are
+random-picked (no free-port probe), which is fine for one session; for **bulk
+concurrent dispatch** hand each session a disjoint `--port-base <N>` (engine `N`,
+sidecar `N+1`) so starts can't collide. One more isolation axis: **campaigns.**
+The default temp dir is already per-session, but a shared `--data-dir` is *not* —
+and setup writes to a shared `__setup__` scratch dir inside it, so concurrent
+fresh setups in one `--data-dir` corrupt each other. Give each session its own
+(`--data-dir <root>/<id>`) unless they only resume distinct existing campaigns.
+The `playtest-sweep` skill is the dispatcher playbook for fanning out N live
+playtests across subagents this way.
 
 This exists because `runProbe` kills the process the moment its scripted body
 returns; nothing survives between an agent's tool calls, so there's no session
@@ -290,6 +303,25 @@ Both accept the same flags:
 - `--keep` skips cleanup of the temporary campaigns directory. The path
   is logged at shutdown so you can poke around the resulting campaign
   files.
+- `--binary <path>` drives a **packaged binary** (an installed or portable
+  build) instead of the from-source launcher:
+
+  ```bash
+  npm run smoketest -- --binary "$LOCALAPPDATA/MachineViolet/current/MachineViolet.exe"
+  ```
+
+  The exe is compiled, so `isCompiled()` is true and it resolves its config
+  dir the real way (`%APPDATA%\MachineViolet`) using your actual saved
+  connections — that's the point: it proves the *shipped artifact* works,
+  not just the source tree. Campaigns still go to a temp dir, so it won't
+  touch real saves. Close any interactive instance first; two builds sharing
+  the config dir will contend over codex.
+
+  Reach for this when validating a release candidate by hand. The packaged
+  binary is otherwise only exercised by offline golden replay
+  (`replay-golden --binary`), which invokes it directly and never touches the
+  launch path or a live provider — the gap that let the bundled-Windows-Terminal
+  bug (#729) ship an app that couldn't start from the Start Menu.
 
 On success: exit 0, single-line `✔ OK <probe> (<n>s)` summary.
 
@@ -469,8 +501,9 @@ await runProbe({
 });
 ```
 
-`runProbe` handles argv parsing (`--stdio`, `--keep`), the launch, the
-error dump on failure, and clean shutdown.
+`runProbe` handles argv parsing (`--stdio`, `--keep`, `--binary`), the launch,
+the error dump on failure, and clean shutdown. Every probe gets `--binary` for
+free — no probe-side code needed to target a packaged build.
 
 Conventions:
 - **No naive sleeps.** Reach for `waitForState` family helpers. If you find

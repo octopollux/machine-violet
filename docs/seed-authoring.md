@@ -31,6 +31,18 @@ cares about its opening.
 
 ## What makes a seed good — the design bars
 
+> **Shared with the setup agent.** The portable, mechanism-neutral form of these
+> bars also ships to the in-game **setup agent** as the
+> [`CampaignConstruction`](../packages/engine/src/prompts/include/CampaignConstruction.md)
+> prompt include — so a player who *describes their own game* gets a campaign built
+> to the same bar, not a lesser one (issue #725). That file is the runtime edition
+> of the craft below; this section is the seed-authoring edition, which layers the
+> `.mvworld` *mechanics* (forks, includes, `setup_detail` vs `detail`) on top. When
+> a bar's underlying craft changes, update both; when only the seed-schema mechanics
+> change, this doc alone. The key difference: where a seed encodes a branch as a
+> **player fork**, the setup agent has no forks — it just asks the player and writes
+> the single chosen path into `campaign_detail`.
+
 Each bar below is a reason a seed gets **enriched** (most), or **disabled as a
 rebuild candidate** (a loved concept that doesn't yet clear a bar), or **set
 aside**. A clever premise is necessary, not sufficient.

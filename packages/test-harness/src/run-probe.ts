@@ -49,14 +49,20 @@ export interface RunProbeOptions {
 interface ParsedArgs {
   stdio: "inherit" | "buffer" | "ignore";
   keep: boolean;
+  binary?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
   let stdio: "inherit" | "buffer" | "ignore" = "buffer";
   let keep = false;
-  for (const arg of argv) {
+  let binary: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg === "--keep") keep = true;
-    else if (arg.startsWith("--stdio=")) {
+    else if (arg === "--binary") {
+      binary = argv[++i];
+      if (!binary) fail("--binary requires a path");
+    } else if (arg.startsWith("--stdio=")) {
       const v = arg.slice("--stdio=".length);
       if (v === "inherit" || v === "buffer" || v === "ignore") stdio = v;
       else fail(`Unknown --stdio value: ${v}`);
@@ -67,16 +73,22 @@ function parseArgs(argv: string[]): ParsedArgs {
       fail(`Unknown arg: ${arg}`);
     }
   }
-  return { stdio, keep };
+  return { stdio, keep, binary };
 }
 
 function printUsage(): void {
   process.stderr.write(
-    "Usage: <probe-script> [--stdio=inherit|buffer|ignore] [--keep]\n\n" +
+    "Usage: <probe-script> [--stdio=inherit|buffer|ignore] [--keep] [--binary <path>]\n\n" +
     "  --stdio=inherit  forward launcher stdout/stderr live (debugging)\n" +
     "  --stdio=buffer   capture to memory (default; dump on failure)\n" +
     "  --stdio=ignore   drop launcher output entirely\n" +
-    "  --keep           don't clean up the tmp campaigns dir on exit\n",
+    "  --keep           don't clean up the tmp campaigns dir on exit\n" +
+    "  --binary <path>  drive the PACKAGED binary (the installed/portable exe)\n" +
+    "                   instead of the from-source launcher. The exe is compiled,\n" +
+    "                   so it resolves its config dir the real way (%APPDATA%\\\n" +
+    "                   MachineViolet) and uses your actual saved connections —\n" +
+    "                   which is the point: it proves the shipped artifact works,\n" +
+    "                   not just the source tree. Campaigns still go to a temp dir.\n",
   );
 }
 
@@ -97,7 +109,10 @@ export async function runProbe(opts: RunProbeOptions): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   process.stderr.write(`▶ ${opts.title}\n  (${opts.name})\n`);
 
-  const harness = await Harness.launch({ stdio: args.stdio });
+  const harness = await Harness.launch({
+    stdio: args.stdio,
+    ...(args.binary ? { executable: { command: args.binary } } : {}),
+  });
   const log = (msg: string) => process.stderr.write(`  ${msg}\n`);
   const ctx: ProbeContext = { harness, log };
 

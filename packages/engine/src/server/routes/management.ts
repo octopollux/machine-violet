@@ -7,6 +7,7 @@
  * Prefix: /manage
  */
 import { join } from "node:path";
+import { mkdir, rm } from "node:fs/promises";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
 import {
@@ -20,7 +21,7 @@ import { createProviderFromConnection } from "../../providers/index.js";
 import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
 import {
   CodexRpcClient, startChatGptThirdPartyOAuth, pushChatGptAuthTokens, getAccount,
-  listModels, getCodexClientInfo,
+  listModels, getCodexClientInfo, allocateCodexHome, sweepStaleCodexHomesOnce,
 } from "../../providers/openai-chatgpt/index.js";
 import type { OAuthFlow } from "../../providers/openai-chatgpt/index.js";
 import {
@@ -289,8 +290,26 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       // each await boundary and bail before persisting the connection.
       // The `finally` block always stops the codex subprocess so the
       // partial work doesn't leak the loopback port either way.
-      const codex = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}` });
+      // Isolate this short-lived codex in its own CODEX_HOME, exactly as
+      // session providers do (providers/index.ts). Without it this subprocess
+      // shares the default `~/.codex` SQLite state runtime, so a re-sign-in
+      // while a game session is live — or two overlapping model-discovery
+      // spawns — can contend and crash the loser with `code=1`
+      // `(code: 1546) disk I/O error` on Windows (see codex-home.ts / #699).
+      // The date-sweep backstop reaps any home a crash-skipped `finally` leaked
+      // (idempotent + fire-and-forget); the `finally` below removes this one in
+      // the normal case.
+      sweepStaleCodexHomesOnce(Date.now());
+      const codexHome = allocateCodexHome("oauth");
+      const codex = new CodexRpcClient({ sessionId: `oauth-${randomBytes(4).toString("hex")}`, codexHome });
       try {
+        // `mkdir` sits INSIDE the try (not before it) for two reasons: the
+        // `finally` then always reaps the home even on an early bail, and this
+        // await honors the same cancellation contract as every boundary below
+        // — a cancel here returns before we spawn codex. `codex.stop()` in the
+        // `finally` is a safe no-op when start() never ran.
+        await mkdir(codexHome, { recursive: true }).catch(() => { /* codex will retry/create; non-fatal */ });
+        if (entry.status !== "pending") return;
         await codex.start();
         if (entry.status !== "pending") return;
         await codex.call("initialize", {
@@ -368,6 +387,11 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
         entry.error = err instanceof Error ? err.message : String(err);
       } finally {
         await codex.stop().catch(() => { /* ignore */ });
+        // Remove this subprocess's isolated home. Retry on Windows: a home
+        // whose codex was just SIGKILLed can hold briefly-locked SQLite
+        // handles as the OS tears the process down (mirrors provider dispose).
+        await rm(codexHome, { recursive: true, force: true, maxRetries: 6, retryDelay: 150 })
+          .catch(() => { /* best-effort; the date-sweep backstop reaps leftovers */ });
       }
     }).catch((err: unknown) => {
       if (entry.status === "cancelled") return;

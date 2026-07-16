@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -81,6 +81,25 @@ describe("saveConnectionStore", () => {
     const loaded = loadConnectionStore(tempDir);
     expect(loaded.connections).toHaveLength(1);
     expect(loaded.connections[0]).toMatchObject(conn);
+  });
+
+  it("writes atomically — no temp file is left behind (#696 parallel-safe)", () => {
+    const empty: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    saveConnectionStore(tempDir, empty);
+    // The atomic write stages a `.connections.json.<pid>.<rand>.tmp` then renames
+    // it over the target; on success nothing temp should remain in the dir.
+    const leftovers = readdirSync(tempDir).filter((f) => f.startsWith(".connections.json.") && f.endsWith(".tmp"));
+    expect(leftovers).toEqual([]);
+    expect(readdirSync(tempDir)).toContain("connections.json");
+  });
+
+  it("stays valid JSON across many back-to-back saves (crash/interleave surrogate)", () => {
+    const store: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    for (let i = 0; i < 20; i++) saveConnectionStore(tempDir, store);
+    // Every intermediate state was a complete file (rename is atomic), so the
+    // final read must parse cleanly — never a half-written truncation.
+    expect(() => loadConnectionStore(tempDir)).not.toThrow();
+    expect(loadConnectionStore(tempDir).connections).toEqual([]);
   });
 });
 

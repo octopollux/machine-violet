@@ -1191,12 +1191,6 @@ export class SessionManager {
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
     }
 
-    // Welcome message
-    this.broadcast({
-      type: "narrative:chunk",
-      data: { text: `Welcome back to ${config.name}.`, kind: "system" },
-    });
-
     // Session recap is delivered via sessionRecap in the state:snapshot above;
     // the client renders it as SessionRecapModal, not narrative text.
 

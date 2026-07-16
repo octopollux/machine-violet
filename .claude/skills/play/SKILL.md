@@ -38,10 +38,17 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | `pick <N\|text>` | Select a choice by 1-based number or by label substring. |
 | `wait [--for beat\|handoff\|choices] [--timeout SEC]` | Block until a new beat lands, print it, exit. **Run in background.** |
 | `log [--tail N]` | Tail the launcher log (crash diagnostics). |
+| `list` | List all sessions (id, pid, port, liveness). |
 | `stop` | Kill the session. |
 
-One session at a time (state lives under the system temp dir). Read-back is over
-the sidecar's HTTP `/screen` + `/state` — nothing blocks on stdio.
+**Concurrent sessions.** Every command takes a global `--session <id>` (or the
+`MVPLAY_SESSION` env var); omit it for the single `"default"` session, which is
+unchanged. Distinct ids run fully isolated — separate state file, launcher log,
+temp campaigns dir, ephemeral ports, and per-session `CODEX_HOME` — so multiple
+playtests / golden recordings run at once. `mvplay list` shows them all; each
+`start`/`say`/`wait`/`stop`/… must carry the same `--session <id>` to target the
+right one. Read-back is over the sidecar's HTTP `/screen` + `/state` — nothing
+blocks on stdio.
 
 ## Temp dir vs. the user's live campaigns (`--live`)
 
@@ -70,6 +77,15 @@ mvplay start --live          # menu now lists the user's real campaigns
 
 The startup banner prints the resolved dir and this warning whenever real data
 is in play — read it and confirm it's the dir you meant.
+
+> **Concurrent sessions isolate their *campaign files* only if their campaigns
+> dirs differ.** (They still share the engine config dir — `connections.json` —
+> but that write is made atomic, so it's concurrency-safe.) Setup writes to a
+> shared `__setup__` scratch dir *inside* the campaigns dir, so two concurrent
+> sessions must not share one `--data-dir` while running setup — give each its own
+> (`--data-dir <root>/<id>`) or use the per-session temp default. Resuming
+> *distinct existing* campaigns from a shared dir is fine. See the `playtest-sweep`
+> skill for bulk dispatch.
 
 ## The turn loop
 

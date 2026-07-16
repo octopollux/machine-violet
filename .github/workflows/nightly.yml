@@ -63,35 +63,7 @@ jobs:
       - name: Bundle Windows Terminal portable
         if: matrix.os == 'windows-latest'
         shell: bash
-        run: |
-          # Download Windows Terminal Preview portable ZIP from GitHub releases.
-          # Preview 1.25+ adds Kitty keyboard protocol support, which fixes
-          # Backspace/Home/End input corruption on Windows (ConPTY bug).
-          WT_VERSION="1.25.622.0"
-          WT_TAG="v${WT_VERSION}"
-          WT_ZIP="Microsoft.WindowsTerminalPreview_${WT_VERSION}_x64.zip"
-          WT_URL="https://github.com/microsoft/terminal/releases/download/${WT_TAG}/${WT_ZIP}"
-
-          echo "Downloading Windows Terminal portable ${WT_VERSION}..."
-          curl -fSL -o wt-portable.zip "$WT_URL"
-
-          # Verify integrity (update hash when bumping WT_VERSION)
-          WT_SHA256="ba5b75eb769e99221e68fe4bfb3580ed1ade81f24b70334de4cb4742edf1b017"
-          echo "$WT_SHA256  wt-portable.zip" | sha256sum -c -
-
-          # Extract into dist/terminal/
-          mkdir -p dist/terminal
-          unzip -q wt-portable.zip -d dist/terminal
-
-          # Enable portable mode (settings stored next to exe, not in %APPDATA%)
-          touch dist/terminal/.portable
-
-          # Include Windows Terminal's MIT license (third-party notice)
-          if [ -f dist/terminal/LICENSE ]; then
-            mv dist/terminal/LICENSE dist/terminal/LICENSE-windows-terminal.txt
-          fi
-
-          echo "Bundled Windows Terminal ${WT_VERSION} ($(du -sh dist/terminal | cut -f1))"
+        run: bash scripts/ci/bundle-windows-terminal.sh
 
       - name: Azure login (OIDC)
         if: matrix.os == 'windows-latest'
@@ -595,14 +567,20 @@ jobs:
             end
 
             def install
-              libexec.install "MachineViolet"
-              libexec.install "prompts" if Dir.exist?("prompts")
-              libexec.install "themes" if Dir.exist?("themes")
-              libexec.install "systems" if Dir.exist?("systems")
+              # Install the whole extracted tree. The binary resolves prompts/,
+              # themes/, systems/, worlds/, personalities/, config/, assets/,
+              # the vendored codex/ runtime and node_modules/ (sharp) relative
+              # to its own location, and reads version.json for --version.
+              # Cherry-picking a subset silently breaks those at runtime —
+              # notably ChatGPT sign-in, which spawns codex/vendor/.../bin/codex.
+              libexec.install Dir["*"]
 
               chmod 0755, libexec/"MachineViolet"
-              # Expose as lowercase `machine-violet` for CLI convention
-              (bin/"machine-violet").write_env_script libexec/"MachineViolet"
+              # Expose as lowercase `machine-violet` for CLI convention.
+              # A symlink (not write_env_script) keeps process.execPath pointing
+              # into libexec, which is what the colocated asset + codex lookups
+              # resolve against.
+              bin.install_symlink libexec/"MachineViolet" => "machine-violet"
             end
 
             test do

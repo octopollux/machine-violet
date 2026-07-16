@@ -33,6 +33,7 @@ import {
   closeSync,
   readFileSync,
   writeFileSync,
+  readdirSync,
   rmSync,
 } from "node:fs";
 import { tmpdir, homedir } from "node:os";
@@ -46,11 +47,68 @@ import type { RecordedInput, FullStackGolden } from "./golden.js";
 // Session file
 // ---------------------------------------------------------------------------
 
-/** One interactive session at a time, under the system temp dir. */
-export const SESSION_DIR = join(tmpdir(), "mvplay");
-const SESSION_FILE = join(SESSION_DIR, "session.json");
-const LAUNCHER_LOG = join(SESSION_DIR, "launcher.log");
-const CAMPAIGNS_DIR = join(SESSION_DIR, "campaigns");
+/**
+ * Each interactive session gets its own subdir under this root, keyed by a
+ * session id (default "default"). Concurrent sessions — parallel playtests or
+ * golden recordings — stay fully isolated: separate state file, launcher log,
+ * and temp campaigns dir, and (via ephemeral ports + per-session CODEX_HOME)
+ * separate processes. Select a session with the `--session <id>` CLI flag or
+ * the MVPLAY_SESSION env var; omit both for the "default" session, which keeps
+ * single-session usage byte-for-byte unchanged. (#696)
+ */
+const SESSIONS_ROOT = join(tmpdir(), "mvplay");
+export const DEFAULT_SESSION_ID = "default";
+
+/** Absolute paths for one session, derived from its id. */
+export interface SessionPaths {
+  id: string;
+  dir: string;
+  file: string;
+  log: string;
+  campaignsDir: string;
+}
+
+/**
+ * Strip anything not filesystem-safe so an id can't escape SESSIONS_ROOT. Slashes
+ * are removed by the char class; `.` / `..` survive it but would resolve to the
+ * root or its PARENT via join(), so they're mapped to the default explicitly.
+ */
+function sanitizeSessionId(id: string): string {
+  const clean = id.replace(/[^A-Za-z0-9._-]/g, "").slice(0, 64);
+  if (clean === "" || clean === "." || clean === "..") return DEFAULT_SESSION_ID;
+  return clean;
+}
+
+/** Resolve the target session id: explicit arg → MVPLAY_SESSION env → default. */
+export function resolveSessionId(explicit?: string): string {
+  return sanitizeSessionId(explicit || process.env.MVPLAY_SESSION || DEFAULT_SESSION_ID);
+}
+
+/**
+ * Assign a session's engine + sidecar ports. A `portBase` pins them
+ * deterministically (base / base+1) so a bulk dispatcher can hand out disjoint,
+ * collision-free ports; without one they're random-picked and only guaranteed
+ * distinct from each other (fine for a single ad-hoc session).
+ */
+export function resolvePorts(portBase?: number): { serverPort: number; agentPort: number } {
+  if (portBase != null) return { serverPort: portBase, agentPort: portBase + 1 };
+  const serverPort = pickEphemeralPort();
+  let agentPort = pickEphemeralPort();
+  while (agentPort === serverPort) agentPort = pickEphemeralPort();
+  return { serverPort, agentPort };
+}
+
+/** Compute a session's paths from its id (pure — no I/O). */
+export function sessionPaths(id: string): SessionPaths {
+  const dir = join(SESSIONS_ROOT, id);
+  return {
+    id,
+    dir,
+    file: join(dir, "session.json"),
+    log: join(dir, "launcher.log"),
+    campaignsDir: join(dir, "campaigns"),
+  };
+}
 
 /**
  * The user's REAL, machine-scope data root — where the installed app and
@@ -94,24 +152,26 @@ interface SessionFile {
   inputs?: RecordedInput[];
 }
 
-function readSession(): SessionFile | null {
-  if (!existsSync(SESSION_FILE)) return null;
+function readSession(paths: SessionPaths): SessionFile | null {
+  if (!existsSync(paths.file)) return null;
   try {
-    return JSON.parse(readFileSync(SESSION_FILE, "utf8")) as SessionFile;
+    return JSON.parse(readFileSync(paths.file, "utf8")) as SessionFile;
   } catch {
     return null;
   }
 }
 
-function writeSession(s: SessionFile): void {
-  writeFileSync(SESSION_FILE, JSON.stringify(s, null, 2));
+function writeSession(paths: SessionPaths, s: SessionFile): void {
+  writeFileSync(paths.file, JSON.stringify(s, null, 2));
 }
 
-function requireSession(): SessionFile {
-  const s = readSession();
+function requireSession(paths: SessionPaths): SessionFile {
+  const s = readSession(paths);
   if (!s) {
+    const suffix = paths.id === DEFAULT_SESSION_ID ? "" : ` --session ${paths.id}`;
     throw new Error(
-      "No mvplay session. Run `mvplay start` first.",
+      `No mvplay session${paths.id === DEFAULT_SESSION_ID ? "" : ` "${paths.id}"`}. ` +
+      `Run \`mvplay start${suffix}\` first.`,
     );
   }
   return s;
@@ -306,6 +366,20 @@ export interface StartOptions {
    * behavior with a custom location. Overrides `live`.
    */
   dataDir?: string;
+  /**
+   * Session id to run under (default "default"). Distinct ids get isolated
+   * state/log/temp-campaigns dirs, so multiple sessions run concurrently. Also
+   * settable via the MVPLAY_SESSION env var. (#696)
+   */
+  session?: string;
+  /**
+   * Assign this session's ports deterministically instead of picking at random:
+   * engine on `portBase`, sidecar on `portBase + 1`. For BULK concurrent starts
+   * (a dispatcher fanning out playtests), hand each session a disjoint base
+   * (e.g. 30000, 30002, 30004, …) so ports can't collide — the default random
+   * pick has no free-port probe and a loser just fails to launch. (#696)
+   */
+  portBase?: number;
 }
 
 /**
@@ -314,12 +388,15 @@ export interface StartOptions {
  * screen (the main menu).
  */
 export async function start(opts: StartOptions = {}): Promise<void> {
-  const existing = readSession();
+  const paths = sessionPaths(resolveSessionId(opts.session));
+  const existing = readSession(paths);
   if (existing && isAlive(existing.pid)) {
     if (!opts.fresh) {
+      const suffix = paths.id === DEFAULT_SESSION_ID ? "" : ` --session ${paths.id}`;
       throw new Error(
-        `A session is already running (pid ${existing.pid}, port ${existing.agentPort}). ` +
-        `Use \`mvplay stop\` first, or \`mvplay start --fresh\` to replace it.`,
+        `A session${paths.id === DEFAULT_SESSION_ID ? "" : ` "${paths.id}"`} is already ` +
+        `running (pid ${existing.pid}, port ${existing.agentPort}). ` +
+        `Use \`mvplay stop${suffix}\` first, or \`mvplay start${suffix} --fresh\` to replace it.`,
       );
     }
     killTree(existing.pid);
@@ -331,19 +408,15 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   // dir (isolated, safe). --data-dir / --live: the user's REAL campaigns.
   const usingRealData = opts.dataDir != null || opts.live === true;
   const dataRoot = opts.dataDir != null ? resolve(opts.dataDir) : machineDataRoot();
-  const campaignsDir = usingRealData ? join(dataRoot, "campaigns") : CAMPAIGNS_DIR;
+  const campaignsDir = usingRealData ? join(dataRoot, "campaigns") : paths.campaignsDir;
 
-  mkdirSync(SESSION_DIR, { recursive: true });
+  mkdirSync(paths.dir, { recursive: true });
   // Only create the temp campaigns dir. Never conjure the user's real data dir
   // — if --live/--data-dir points somewhere that doesn't exist, surface an
   // empty menu rather than silently creating a stray tree.
-  if (!usingRealData) mkdirSync(CAMPAIGNS_DIR, { recursive: true });
+  if (!usingRealData) mkdirSync(paths.campaignsDir, { recursive: true });
 
-  const serverPort = pickEphemeralPort();
-  let agentPort = pickEphemeralPort();
-  // Distinct ports — a collision would make the second listener fail to bind
-  // (or the sidecar check attach to the engine). 1-in-10000, but cheap to rule out.
-  while (agentPort === serverPort) agentPort = pickEphemeralPort();
+  const { serverPort, agentPort } = resolvePorts(opts.portBase);
   const player = opts.player ?? "Player";
   const launchedAt = Date.now();
 
@@ -360,7 +433,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   // Detached: the child must outlive THIS cli process. Its stdout/stderr go
   // to a log file (we have no live pipe to read once we exit). stdin is
   // ignored — the sidecar injects keystrokes via a mock TTY, not our stdin.
-  const logFd = openSync(LAUNCHER_LOG, "w");
+  const logFd = openSync(paths.log, "w");
   const child = spawn(process.execPath, [...LAUNCHER_NODE_ARGS], {
     env,
     cwd,
@@ -380,7 +453,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     serverPort,
     agentPort,
     campaignsDir,
-    launcherLog: LAUNCHER_LOG,
+    launcherLog: paths.log,
     player,
     launchedAt,
     readCursor: 0,
@@ -397,7 +470,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   let ready = false;
   while (Date.now() < deadline) {
     if (!isAlive(child.pid)) {
-      const tail = tailFile(LAUNCHER_LOG, 30);
+      const tail = tailFile(paths.log, 30);
       throw new Error(
         `Launcher exited before the sidecar came up. Recent log:\n${tail}`,
       );
@@ -412,13 +485,17 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     killTree(child.pid);
     throw new Error(
       `Sidecar did not become reachable on port ${agentPort} within ${timeoutMs}ms. ` +
-      `Log tail:\n${tailFile(LAUNCHER_LOG, 30)}`,
+      `Log tail:\n${tailFile(paths.log, 30)}`,
     );
   }
 
-  writeSession(session);
+  writeSession(paths, session);
 
-  process.stdout.write(`✔ session started (pid ${child.pid}, sidecar :${agentPort})\n`);
+  const idTag = paths.id === DEFAULT_SESSION_ID ? "" : ` [${paths.id}]`;
+  process.stdout.write(`✔ session started${idTag} (pid ${child.pid}, sidecar :${agentPort})\n`);
+  if (paths.id !== DEFAULT_SESSION_ID) {
+    process.stdout.write(`  target it with \`--session ${paths.id}\` (or MVPLAY_SESSION=${paths.id}).\n`);
+  }
   if (usingRealData) {
     process.stdout.write(
       `\n⚠️  LIVE DATA — playing against the user's REAL campaigns dir:\n` +
@@ -443,15 +520,15 @@ export async function start(opts: StartOptions = {}): Promise<void> {
 }
 
 /** Print the rendered screen. */
-export async function screen(ansi = false): Promise<void> {
-  const s = requireSession();
+export async function screen(ansi = false, sessionId?: string): Promise<void> {
+  const s = requireSession(sessionPaths(resolveSessionId(sessionId)));
   const out = await getScreen(s, ansi);
   process.stdout.write(out.replace(/\n+$/, "") + "\n");
 }
 
 /** Print a compact state summary. */
-export async function state(): Promise<void> {
-  const s = requireSession();
+export async function state(sessionId?: string): Promise<void> {
+  const s = requireSession(sessionPaths(resolveSessionId(sessionId)));
   const snap = await getState(s);
   process.stdout.write(summarizeState(snap, s.readCursor) + "\n");
 }
@@ -460,8 +537,9 @@ export async function state(): Promise<void> {
  * Print narrative lines. By default shows only what's new since the read
  * cursor and advances it; `--all` shows everything (also advancing).
  */
-export async function narrative(opts: { all?: boolean } = {}): Promise<void> {
-  const s = requireSession();
+export async function narrative(opts: { all?: boolean } = {}, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = requireSession(paths);
   const snap = await getState(s);
   const from = opts.all ? 0 : s.readCursor;
   const body = formatNarrative(snap.narrativeLines, from);
@@ -470,7 +548,7 @@ export async function narrative(opts: { all?: boolean } = {}): Promise<void> {
     process.stdout.write("\nchoices:\n" + formatChoices(snap.activeChoices) + "\n");
   }
   s.readCursor = snap.narrativeLines.length;
-  writeSession(s);
+  writeSession(paths, s);
 }
 
 /**
@@ -480,8 +558,9 @@ export async function narrative(opts: { all?: boolean } = {}): Promise<void> {
  * so a subsequent `wait` won't mistake a lingering stale overlay for a new
  * beat.
  */
-export async function say(text: string): Promise<void> {
-  const s = requireSession();
+export async function say(text: string, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = requireSession(paths);
   const snap = await getState(s);
   const baseline = snap.narrativeLines.length;
   const hadChoices = !!snap.activeChoices;
@@ -509,7 +588,7 @@ export async function say(text: string): Promise<void> {
     ok = await inputAccepted(s, baseline, 4000);
   }
   if (ok && s.recording) (s.inputs ??= []).push({ kind: "say", text });
-  writeSession(s);
+  writeSession(paths, s);
 
   if (ok) {
     process.stdout.write(`✔ submitted: ${JSON.stringify(text)}\n`);
@@ -523,10 +602,11 @@ export async function say(text: string): Promise<void> {
 }
 
 /** Send a single named key (return, up, down, escape, tab, ...). */
-export async function key(name: string): Promise<void> {
-  const s = requireSession();
+export async function key(name: string, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = requireSession(paths);
   await postKey(s, name);
-  if (s.recording) { (s.inputs ??= []).push({ kind: "key", name }); writeSession(s); }
+  if (s.recording) { (s.inputs ??= []).push({ kind: "key", name }); writeSession(paths, s); }
   process.stdout.write(`✔ key: ${name}\n`);
 }
 
@@ -538,8 +618,9 @@ export async function key(name: string): Promise<void> {
  * overlay's initial selection or whether the short-list custom input was
  * auto-focused.
  */
-export async function pick(query: string): Promise<void> {
-  const s = requireSession();
+export async function pick(query: string, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = requireSession(paths);
   const snap = await getState(s);
   if (!snap.activeChoices) {
     throw new Error("No choice overlay is currently presented. Use `mvplay state` to check.");
@@ -584,7 +665,7 @@ export async function pick(query: string): Promise<void> {
     ok = await inputAccepted(s, baseline, 4000);
   }
   if (ok && s.recording) (s.inputs ??= []).push({ kind: "pick", index, label: labels[index] });
-  writeSession(s);
+  writeSession(paths, s);
 
   if (ok) {
     process.stdout.write(`✔ picked #${index + 1}: ${JSON.stringify(labels[index])}\n`);
@@ -620,8 +701,9 @@ export interface WaitOptions {
  * Exits 0 on settle, 1 on timeout (printing the current state + log tail so
  * the agent can diagnose without re-running).
  */
-export async function wait(opts: WaitOptions = {}): Promise<void> {
-  const s = requireSession();
+export async function wait(opts: WaitOptions = {}, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = requireSession(paths);
   const forWhat = opts.for ?? "beat";
   // Guard against NaN/Infinity/<=0 sneaking in from CLI parsing — any of those
   // would make the deadline NaN and trip an immediate bogus timeout.
@@ -707,13 +789,14 @@ export async function wait(opts: WaitOptions = {}): Promise<void> {
   s.lastChoiceFp = settledSnap.activeChoices ? choiceFp(settledSnap.activeChoices) : s.lastChoiceFp;
   s.lastTurnSeq = settledSnap.currentTurn?.seq ?? s.lastTurnSeq;
   s.lastCampaignId = settledSnap.currentTurn?.campaignId ?? s.lastCampaignId;
-  writeSession(s);
+  writeSession(paths, s);
 }
 
 /** Tail the detached launcher's log file (crash diagnostics). */
-export async function log(tailLines = 40): Promise<void> {
-  const s = readSession();
-  const path = s?.launcherLog ?? LAUNCHER_LOG;
+export async function log(tailLines = 40, sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = readSession(paths);
+  const path = s?.launcherLog ?? paths.log;
   if (!existsSync(path)) {
     process.stdout.write("(no launcher log yet)\n");
     return;
@@ -722,8 +805,8 @@ export async function log(tailLines = 40): Promise<void> {
 }
 
 /** Report whether a session is alive and its vitals. */
-export async function status(): Promise<void> {
-  const s = readSession();
+export async function status(sessionId?: string): Promise<void> {
+  const s = readSession(sessionPaths(resolveSessionId(sessionId)));
   if (!s) { process.stdout.write("no session\n"); return; }
   const alive = isAlive(s.pid);
   process.stdout.write(
@@ -751,8 +834,8 @@ export async function status(): Promise<void> {
  * `mvplay record <scenario>`; pull the tape BEFORE `mvplay stop`, since teardown
  * force-kills the engine and its in-memory tape with it.
  */
-export async function saveTape(outPath: string): Promise<void> {
-  const s = requireSession();
+export async function saveTape(outPath: string, sessionId?: string): Promise<void> {
+  const s = requireSession(sessionPaths(resolveSessionId(sessionId)));
   if (!s.recording) {
     throw new Error(
       "This session is not recording. Start it with `mvplay record <scenario>` to capture a tape.",
@@ -799,13 +882,42 @@ export async function saveTape(outPath: string): Promise<void> {
   );
 }
 
-/** Kill the session process tree and remove the session file. */
-export async function stop(): Promise<void> {
-  const s = readSession();
+/** Kill the session process tree and remove the session dir. */
+export async function stop(sessionId?: string): Promise<void> {
+  const paths = sessionPaths(resolveSessionId(sessionId));
+  const s = readSession(paths);
   if (!s) { process.stdout.write("no session to stop\n"); return; }
   if (isAlive(s.pid)) killTree(s.pid);
-  try { rmSync(SESSION_FILE); } catch { /* ignore */ }
-  process.stdout.write(`✔ stopped session (pid ${s.pid})\n`);
+  // Remove the whole session dir (state file, launcher log, temp campaigns) so
+  // a stopped session leaves nothing behind for `list` to show as stale.
+  try { rmSync(paths.dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  const idTag = paths.id === DEFAULT_SESSION_ID ? "" : ` [${paths.id}]`;
+  process.stdout.write(`✔ stopped session${idTag} (pid ${s.pid})\n`);
+}
+
+/**
+ * List every session dir under the sessions root with liveness/vitals. The
+ * point of parallel sessions is you can't remember them all — this is how you
+ * find the one you want (or reap dead ones). (#696)
+ */
+export async function list(): Promise<void> {
+  if (!existsSync(SESSIONS_ROOT)) { process.stdout.write("(no sessions)\n"); return; }
+  const ids = readdirSync(SESSIONS_ROOT, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+  const rows: string[] = [];
+  for (const id of ids) {
+    const s = readSession(sessionPaths(id));
+    if (!s) continue;
+    const alive = isAlive(s.pid);
+    rows.push(
+      `${alive ? "●" : "○"} ${id.padEnd(20)} pid=${String(s.pid).padEnd(7)} ` +
+      `:${s.agentPort} ${alive ? "alive" : "dead "}` +
+      (s.recording ? `  ● recording "${s.recording}"` : ""),
+    );
+  }
+  process.stdout.write((rows.length ? rows.join("\n") : "(no sessions)") + "\n");
 }
 
 // ---------------------------------------------------------------------------

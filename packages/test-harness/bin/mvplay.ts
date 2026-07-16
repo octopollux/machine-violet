@@ -37,6 +37,7 @@ import {
   pick,
   wait,
   log,
+  list,
   status,
   stop,
   saveTape,
@@ -51,6 +52,7 @@ Commands:
                                     Like start, but tape every LLM call (MV_TAPE_MODE=record).
                                     Play the scenario, then \`save-tape\`.
   save-tape <path>                  Pull the recorded tape and write a golden to <path>.
+  list                              List all sessions (id, pid, port, liveness).
   status                            Is a session alive? Show its vitals.
   screen [--ansi]                   Print the rendered terminal screen.
   state                             Print a compact state summary (engine/turn/choices).
@@ -63,8 +65,20 @@ Commands:
   log [--tail N]                    Tail the launcher log (crash diagnostics).
   stop                              Kill the session.
 
+Global:
+  --session <id>                    Target a named session (default "default"; also
+                                    settable via MVPLAY_SESSION). Distinct ids run
+                                    fully isolated, so sessions play concurrently.
+  --port-base <N>                   (start/record) Assign ports deterministically:
+                                    engine N, sidecar N+1. For bulk concurrent
+                                    dispatch, give each session a disjoint base
+                                    (30000, 30002, …) so ports can't collide.
+                                    Omit to pick at random (fine for one session).
+
 Notes:
-  - One session at a time (under the system temp dir).
+  - Sessions are isolated per --session id (state/log/temp-campaigns under the
+    system temp dir); omit it for the single "default" session. Use 'list' to see
+    all live sessions.
   - 'wait' is the slow one (a DM turn is 1-5 min). Launch it with run_in_background
     so you're re-invoked on exit instead of blocking a tool call.
   - By default you play in a throwaway temp campaigns dir (isolated, safe).
@@ -89,7 +103,7 @@ function positionals(args: string[]): string[] {
     const a = args[i];
     if (a.startsWith("--")) {
       // Skip a value for known value-taking flags.
-      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail" || a === "--data-dir") i++;
+      if (a === "--player" || a === "--for" || a === "--timeout" || a === "--tail" || a === "--data-dir" || a === "--session" || a === "--port-base") i++;
       continue;
     }
     out.push(a);
@@ -100,6 +114,9 @@ function positionals(args: string[]): string[] {
 async function main(): Promise<void> {
   const [cmd, ...rest] = process.argv.slice(2);
   const pos = positionals(rest);
+  // Which session to target (default "default"). Threaded into every command so
+  // concurrent sessions stay isolated; falls back to MVPLAY_SESSION in the driver.
+  const session = opt(rest, "session");
 
   switch (cmd) {
     case "start":
@@ -108,6 +125,8 @@ async function main(): Promise<void> {
         fresh: flag(rest, "fresh"),
         live: flag(rest, "live"),
         dataDir: opt(rest, "data-dir"),
+        session,
+        portBase: opt(rest, "port-base") ? Number(opt(rest, "port-base")) : undefined,
       });
       break;
     case "record": {
@@ -119,57 +138,62 @@ async function main(): Promise<void> {
         fresh: flag(rest, "fresh"),
         live: flag(rest, "live"),
         dataDir: opt(rest, "data-dir"),
+        session,
+        portBase: opt(rest, "port-base") ? Number(opt(rest, "port-base")) : undefined,
       });
       break;
     }
     case "save-tape": {
       const out = pos[0];
       if (!out) throw new Error(`save-tape needs an output path: mvplay save-tape path/to/scene.golden.json`);
-      await saveTape(out);
+      await saveTape(out, session);
       break;
     }
+    case "list":
+      await list();
+      break;
     case "status":
-      await status();
+      await status(session);
       break;
     case "screen":
-      await screen(flag(rest, "ansi"));
+      await screen(flag(rest, "ansi"), session);
       break;
     case "state":
-      await state();
+      await state(session);
       break;
     case "narrative":
-      await narrative({ all: flag(rest, "all") });
+      await narrative({ all: flag(rest, "all") }, session);
       break;
     case "say": {
       const text = pos.join(" ");
       if (!text) throw new Error(`say needs text: mvplay say "I open the door"`);
-      await say(text);
+      await say(text, session);
       break;
     }
     case "key": {
       const name = pos[0];
       if (!name) throw new Error(`key needs a name: mvplay key return`);
-      await key(name);
+      await key(name, session);
       break;
     }
     case "pick": {
       const query = pos.join(" ");
       if (!query) throw new Error(`pick needs a number or label: mvplay pick 1`);
-      await pick(query);
+      await pick(query, session);
       break;
     }
     case "wait": {
       const forRaw = opt(rest, "for");
       const forWhat = forRaw === "handoff" || forRaw === "choices" ? forRaw : "beat";
       const timeoutSec = opt(rest, "timeout") ? Number(opt(rest, "timeout")) : undefined;
-      await wait({ for: forWhat, timeoutSec });
+      await wait({ for: forWhat, timeoutSec }, session);
       break;
     }
     case "log":
-      await log(opt(rest, "tail") ? Number(opt(rest, "tail")) : undefined);
+      await log(opt(rest, "tail") ? Number(opt(rest, "tail")) : undefined, session);
       break;
     case "stop":
-      await stop();
+      await stop(session);
       break;
     case undefined:
     case "help":

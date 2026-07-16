@@ -389,16 +389,11 @@ The passage forks ahead.
                             ESC dismiss
 ```
 
-**`present_choices`** — The DM's tool for this. Two modes:
+Choices reach the player two independent ways:
 
-No parameters (default): A Haiku subagent reads recent context and generates 2-3 reasonable options. Cheap, fast, doesn't need to be brilliant — freeform is always available. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type and press Enter without navigating.
+Engine-suggested (background): after a DM turn, *if the DM did not present choices itself*, the engine may auto-generate 2-3 options via the `choice-generator` subagent and deliver them as a synthetic `present_choices` command (`maybeGenerateSuggestedChoices`). Gated by the campaign's Choices Frequency setting (`never`/`rarely`/`sometimes`/`often`/`always`) with optional per-player overrides. Cheap, fast, doesn't need to be brilliant — freeform is always available. When fewer than 5 options are shown, focus defaults to "Enter your own" so the player can freely type and press Enter without navigating.
 
-```
-present_choices({})
-→ subagent generates options from recent context, displays modal
-```
-
-Explicit choices: The DM sets specific options when it matters narratively. Optional `descriptions` provide per-choice detail shown in a fixed-height region (3 rows) that updates as the player highlights each option.
+DM-authored (the `present_choices` tool): the DM sets specific options when it matters narratively, passing `prompt` and `choices`. Optional `descriptions` provide per-choice detail shown in a fixed-height region (3 rows) that updates as the player highlights each option. Note the DM's tool does **not** auto-generate: calling it with no `choices` shows an all-but-empty modal *and* sets `dmProvidedChoicesThisTurn`, which suppresses the engine-suggested path above for that turn. So the DM authors real options or leaves the tool alone and lets the background path offer them.
 
 ```
 present_choices({
@@ -799,7 +794,7 @@ A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM
 **Model Assignments** — shows the three model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks). Each tier displays the currently assigned model and connection label. Enter on a tier enters the model picker, which lists all models from all connections; Enter there assigns the selected model + connection to that tier.
 
 **Add Connection wizard** — a multi-step flow:
-1. Provider selection: Anthropic, OpenAI (API key), OpenRouter, Custom (OpenAI-compatible). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry.
+1. Provider selection: Anthropic, OpenAI (API key). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry. `openrouter` and `custom` are also absent from the picker: both adapters still exist engine-side, but neither is validated end-to-end, so they're hidden for 1.1 pending a validation playtest (issue #712) rather than shipping untested top-level connection options. The `needsBaseUrl` step (base-URL entry, step 4 below) is currently unreachable as a result but kept for the re-enable. Re-add the rows once validated.
 2. API key entry (text input, Enter to advance).
 3. Label entry (optional friendly name, Enter to advance).
 4. Base URL entry — only shown for the `custom` provider. Escape backs up one step at each stage.

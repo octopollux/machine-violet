@@ -13,8 +13,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatParams } from "./types.js";
 
-// Mock the SDK so createAnthropicProvider builds against a fake client whose
-// messages.create(...).withResponse() returns headers we control.
+// Mock the SDK so createAnthropicProvider builds against a fake client. The
+// provider routes every call — streaming or not — through messages.stream()
+// (issue #712), so the rate-limit headers we control ride on the stream's
+// `.response.headers`.
 vi.mock("@anthropic-ai/sdk", () => {
   const messages = { create: vi.fn(), stream: vi.fn() };
   class MockAnthropic {
@@ -29,7 +31,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const anthropicMod = await import("@anthropic-ai/sdk") as any;
-const mockCreate: ReturnType<typeof vi.fn> = anthropicMod.__mockMessages.create;
+const mockStream: ReturnType<typeof vi.fn> = anthropicMod.__mockMessages.stream;
 
 const {
   createAnthropicProvider,
@@ -53,14 +55,12 @@ function fakeMessage(): Anthropic.Message {
   } as unknown as Anthropic.Message;
 }
 
-/** Make create() return the SDK's withResponse() shape with the given headers. */
+/** Make stream() return a fake MessageStream whose response carries the headers. */
 function mockResponseHeaders(headers: Headers): void {
-  mockCreate.mockReturnValue({
-    withResponse: () => Promise.resolve({
-      data: fakeMessage(),
-      response: { headers },
-      request_id: "req_test",
-    }),
+  mockStream.mockReturnValue({
+    on: () => {},
+    finalMessage: () => Promise.resolve(fakeMessage()),
+    response: { headers },
   });
 }
 
@@ -85,7 +85,7 @@ function baseParams(): ChatParams {
 }
 
 beforeEach(() => {
-  mockCreate.mockReset();
+  mockStream.mockReset();
 });
 
 // ---------------------------------------------------------------------------

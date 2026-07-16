@@ -4,6 +4,7 @@ import type { ResolvedTheme } from "../themes/types.js";
 import { ThemedHorizontalBorder, ThemedSideFrame } from "./ThemedFrame.js";
 import { useStarfield, StarfieldRows } from "./Starfield.js";
 import type { StarfieldConfig } from "./Starfield.js";
+import { RenderZone } from "../render-meter.js";
 
 export interface FullScreenFrameProps {
   theme: ResolvedTheme;
@@ -95,6 +96,7 @@ export function FullScreenFrame({
   const grid = useStarfield(contentWidth, contentHeight, sfConfig);
 
   return (
+    <RenderZone id="frame">
     <Box flexDirection="column" width={columns} height={rows}>
       <ThemedHorizontalBorder
         theme={theme}
@@ -153,5 +155,6 @@ export function FullScreenFrame({
         position="bottom"
       />
     </Box>
+    </RenderZone>
   );
 }

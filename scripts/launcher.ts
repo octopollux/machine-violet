@@ -20,6 +20,8 @@
  *   MV_PLAYER     — Player name (default "Player")
  *   MV_CAMPAIGN   — Campaign ID to auto-start
  *   MV_AGENT_PORT — Port for the dev-only agent sidecar
+ *   MV_REACT_PERF_TRACK — set to 1 to keep React's dev DevTools Performance
+ *                 Track on (off by default; leaving it on OOMs long dev sessions — #694)
  *   ANTHROPIC_API_KEY — Required for the engine
  */
 import { join } from "node:path";
@@ -29,6 +31,19 @@ import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/pla
 import { configDir } from "../packages/engine/src/utils/paths.js";
 import { loadEnv } from "../packages/engine/src/config/first-launch.js";
 import { checkTerminal } from "../packages/engine/src/config/terminal-check.js";
+import { versionBanner } from "../packages/engine/src/config/app-version.js";
+import { disableReactPerfTrackUnlessRequested } from "../packages/client-ink/src/react-perf-track.js";
+
+// --- Version flag ---
+// Must precede every other startup step, and especially checkTerminal(): both
+// install.sh and the Homebrew formula's `test do` shell out to `--version` from
+// a non-TTY, where the terminal guard exits 1 with "cannot run in this
+// terminal". Left unhandled, `--version` fell through to a normal boot — it
+// launched the whole game on a TTY and printed the guard error off one.
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(versionBanner());
+  process.exit(0);
+}
 
 // --- Velopack lifecycle hooks (Windows install/update/uninstall) ---
 // Must run before any server/client startup. Exits the process if a hook fires.
@@ -36,6 +51,14 @@ handleVelopackHook();
 
 // --- Load environment ---
 loadEnv();
+
+// --- Disable React's dev "Performance Track" unless profiling (#694) ---
+// Must run BEFORE the client (and its Ink/react-reconciler graph) is dynamically
+// imported below, so the reconciler captures the neutralized probe on first eval.
+// See react-perf-track.ts for the full rationale; opt back in with
+// MV_REACT_PERF_TRACK=1 to profile React renders. The imported helper is a
+// zero-import leaf, so this static import does not pull Ink into --server builds.
+disableReactPerfTrackUnlessRequested(process.env);
 
 // --- Parse args ---
 const serverOnly = process.argv.includes("--server");

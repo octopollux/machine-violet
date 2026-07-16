@@ -458,16 +458,19 @@ export function PlayingPhase() {
     }
   });
 
+  const keyHints: KeyHint[] = useMemo(() => [
+    { label: "\u21E5", active: characterPaneOpen },
+  ], [characterPaneOpen]);
+
   // --- Render ---
+  // NB: keep every hook above this early return. Shrinking the terminal flips
+  // `tooSmall`, and any hook rendered only on the non-tiny path would change the
+  // hook count between renders ("Rendered fewer hooks than expected").
   if (tooSmall) {
     return <TerminalTooSmall columns={cols} rows={rows} />;
   }
 
   const conversationPaneTop = visibleElements.topFrame ? theme.asset.height : 0;
-
-  const keyHints: KeyHint[] = useMemo(() => [
-    { label: "\u21E5", active: characterPaneOpen },
-  ], [characterPaneOpen]);
 
   // Active client-driven modal data (character sheet, compendium, notes, swatch)
   const am = activeModal as Record<string, unknown> | null;

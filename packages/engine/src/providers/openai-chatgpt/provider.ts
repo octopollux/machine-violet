@@ -36,7 +36,7 @@ import type {
   ImageEffort, ImageAspect,
 } from "../types.js";
 import type { UsageStatus } from "@machine-violet/shared";
-import { readFile, readdir, stat, rm } from "node:fs/promises";
+import { readFile, readdir, stat, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { CodexRpcClient } from "./rpc.js";
@@ -81,6 +81,19 @@ export interface OpenAIChatGptProviderOptions {
    * without a token store.
    */
   tokenStore?: ChatGptTokenStore;
+  /**
+   * Override for codex's home dir (`CODEX_HOME`, default `~/.codex`). Set to a
+   * per-session dir to isolate this provider's codex subprocess from every other
+   * one — codex initializes a single SQLite state runtime under its home, and
+   * concurrent subprocesses sharing `~/.codex` contend on it and crash (`code=1`,
+   * `disk I/O error`). Safe to isolate because we push ChatGPT tokens over RPC,
+   * not from `<home>/auth.json` — so an empty home still authenticates (verify
+   * this assumption before relying on it: `bin/codex-home-isolation.ts`). When
+   * set, the provider `mkdir`s the dir before spawn and removes it on
+   * `dispose()`. Leave undefined to use codex's default `~/.codex` (the
+   * no-tokenStore/env-key flow needs that home's `auth.json`).
+   */
+  codexHome?: string;
 }
 
 export function createOpenAIChatGptProvider(opts: OpenAIChatGptProviderOptions = {}): OpenAIChatGptProvider {
@@ -101,6 +114,17 @@ export function createOpenAIChatGptProvider(opts: OpenAIChatGptProviderOptions =
  */
 type ThreadToolDispatcher = (call: NormalizedToolCall) => Promise<DynamicToolCallResponse>;
 
+/**
+ * Per-turn mutable progress flag threaded from {@link OpenAIChatGptProvider.runTurn}
+ * into {@link OpenAIChatGptProvider.runTurnOnce}. `toolDispatched` flips true the
+ * instant any MV tool runs this turn; the retry loop reads it to decide whether a
+ * mid-turn subprocess death is safe to replay (no tool ran → safe) or must defer
+ * to the manual retry path (a tool's side effects may have persisted).
+ */
+interface TurnProgress {
+  toolDispatched: boolean;
+}
+
 export class OpenAIChatGptProvider implements LLMProvider {
   readonly providerId = "openai-chatgpt";
 
@@ -111,6 +135,15 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private readonly sessionId?: string;
   private readonly cwd: string;
   private readonly tokenStore?: ChatGptTokenStore;
+  /**
+   * Configured `CODEX_HOME` override (per-session isolation dir), or undefined to
+   * use codex's default `~/.codex`. When set we `mkdir` it before spawn, spawn
+   * codex with `CODEX_HOME` pointing here (via the RPC client), and remove it on
+   * `dispose()`. Distinct from {@link codexHome} below, which is the home codex
+   * REPORTS at the handshake — when an override is set the two are equal. See
+   * {@link OpenAIChatGptProviderOptions.codexHome}.
+   */
+  private readonly codexHomeDir?: string;
   /**
    * codex's home dir, learned from the `initialize` handshake. The image_gen
    * skill writes every rendered PNG to `<codexHome>/generated_images/<thread
@@ -157,6 +190,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.sessionId = opts.sessionId;
     this.cwd = opts.cwd ?? process.cwd();
     this.tokenStore = opts.tokenStore;
+    this.codexHomeDir = opts.codexHome;
   }
 
   // -----------------------------------------------------------------------
@@ -212,10 +246,25 @@ export class OpenAIChatGptProvider implements LLMProvider {
   /** Shut down the subprocess. Called by session-manager at session end. */
   async dispose(): Promise<void> {
     const rpc = this.rpc;
-    if (!rpc) return;
     this.rpc = null;
     this.startPromise = null;
-    await rpc.stop();
+    // Stop the subprocess first (awaits its `exit`), THEN remove our isolation
+    // home — by now nothing is writing to it. Only remove a home WE own (an
+    // explicit override); never touch the default `~/.codex`. Best-effort: a
+    // leftover temp home is harmless and the date-sweep will reap it later, so a
+    // failed removal must not fail dispose.
+    if (rpc) await rpc.stop();
+    if (this.codexHomeDir) {
+      // `maxRetries`/`retryDelay` matter on Windows: `rpc.stop()` awaits the
+      // process `exit`, but the OS releases the SQLite WAL/shm file handles a
+      // beat LATER, so an immediate rm loses the race with EBUSY/EPERM. Node's
+      // built-in retry backs off across that window (≤ ~1s total) so the common
+      // graceful path actually cleans up, instead of leaking to the date-sweep.
+      // Still best-effort — a leftover temp home is harmless and the sweep reaps
+      // any that survive, so a failed removal must never fail dispose.
+      await rm(this.codexHomeDir, { recursive: true, force: true, maxRetries: 6, retryDelay: 150 })
+        .catch(() => { /* reaped later by the date-sweep */ });
+    }
   }
 
   /**
@@ -662,8 +711,30 @@ export class OpenAIChatGptProvider implements LLMProvider {
     if (this.startPromise) return this.startPromise;
 
     this.startPromise = (async () => {
-      const client = new CodexRpcClient({ sessionId: this.sessionId });
+      // Ensure the isolation home exists before spawn (codex would create it, but
+      // pre-creating removes a startup race and gives cleanup a definite target).
+      if (this.codexHomeDir) {
+        await mkdir(this.codexHomeDir, { recursive: true }).catch(() => { /* codex will retry/create; non-fatal */ });
+      }
+      const client = new CodexRpcClient({ sessionId: this.sessionId, codexHome: this.codexHomeDir });
       await client.start();
+
+      // If this subprocess exits on its own AFTER a successful start — a codex
+      // crash/panic (code=1) or OOM, NOT our own dispose() — drop the reference
+      // so the next call respawns a fresh subprocess. Without this, `this.rpc`
+      // stays latched to the corpse and every later call throws "codex
+      // app-server has exited," leaving the session unrecoverable in place (the
+      // root of the unrecoverable first-turn crash). Guarded by identity so a
+      // late exit from an already-replaced client can't clobber a newer one.
+      // dispose() nulls `this.rpc` before stop(), so this is a no-op there. A
+      // startup-time exit (before `this.rpc` is set below) is handled by the
+      // catch around this block, not here — the guard is simply false then.
+      client.on("exit", (info: { code: number | null; signal: NodeJS.Signals | null }) => {
+        if (this.rpc !== client) return;
+        this.rpc = null;
+        this.startPromise = null;
+        log.subprocessReset({ code: info.code, signal: info.signal, sessionId: this.sessionId });
+      });
 
       const init = await client.call<InitializeResult>("initialize", {
         clientInfo: getCodexClientInfo(),
@@ -863,6 +934,22 @@ export class OpenAIChatGptProvider implements LLMProvider {
   // Turn execution
   // -----------------------------------------------------------------------
 
+  /**
+   * Run one DM/subagent turn, transparently retrying ONCE if the codex
+   * subprocess dies before any MV tool has run this turn.
+   *
+   * The heavy first turn is the likeliest place for codex to crash on its own
+   * (`code=1`). Before this retry a mid-turn death latched a dead subprocess
+   * (see the exit listener in {@link ensureStarted}) and the session was
+   * unrecoverable in place. Now the listener drops the corpse and this loop
+   * respawns (via a fresh `ensureStarted`) and replays the turn a single time.
+   *
+   * We auto-retry ONLY when no MV tool dispatched this turn: a tool may have
+   * persisted side effects (scribe writes, a rendered image), and blindly
+   * replaying the turn could double-apply them — so a post-tool death falls
+   * through to the manual "Press Enter to retry" path where the player decides.
+   * Bounded to a single auto-retry; a second consecutive death throws.
+   */
   private async runTurn(params: ChatParams, onDelta?: (text: string) => void): Promise<ChatResult> {
     if (params.tools?.length && !params.dispatchTool) {
       throw new Error(
@@ -871,8 +958,42 @@ export class OpenAIChatGptProvider implements LLMProvider {
       );
     }
 
-    const client = await this.ensureStarted();
+    for (let attempt = 1; ; attempt++) {
+      const client = await this.ensureStarted();
+      const progress: TurnProgress = { toolDispatched: false };
+      try {
+        return await this.runTurnOnce(client, params, onDelta, progress);
+      } catch (err) {
+        // A subprocess death surfaces either as our typed CodexProcessExitedError
+        // (codex died after turn/start returned — the onSubprocessExit path) or
+        // as any error thrown while the client's `hasExited` is now true (codex
+        // died during an in-flight thread/start, inject, or turn/start call —
+        // rpc.ts rejects those pending calls with a plain Error). Both mean "the
+        // subprocess is gone; a fresh one may succeed."
+        const subprocessDied = err instanceof CodexProcessExitedError || client.hasExited;
+        if (!shouldAutoRetryTurn(subprocessDied, progress.toolDispatched, attempt)) throw err;
+        // The exit listener normally clears this.rpc already; do it defensively
+        // so the next ensureStarted definitely respawns rather than returning the
+        // corpse.
+        if (this.rpc === client) {
+          this.rpc = null;
+          this.startPromise = null;
+        }
+        log.turnRetryAfterExit({
+          code: err instanceof CodexProcessExitedError ? err.code : null,
+          signal: err instanceof CodexProcessExitedError ? err.signal : null,
+          sessionId: this.sessionId,
+        });
+      }
+    }
+  }
 
+  private async runTurnOnce(
+    client: CodexRpcClient,
+    params: ChatParams,
+    onDelta: ((text: string) => void) | undefined,
+    progress: TurnProgress,
+  ): Promise<ChatResult> {
     // Validate auth before opening a thread — fail fast with a clean error.
     const acct = await getAccount(client);
     if (!isChatGptAccount(acct)) {
@@ -1013,6 +1134,10 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // must use the strict Codex shape:
     //   { success: boolean, contentItems: [{type:"inputText", text}] }
     const dispatchForThread: ThreadToolDispatcher = async (call) => {
+      // Mark that a tool ran this turn: from here on a mid-turn subprocess death
+      // is NOT safe to auto-retry (the tool's side effects may have persisted).
+      // See runTurn's retry guard.
+      progress.toolDispatched = true;
       collected.onToolCall(call);
       watchdog.note();
       const dispatcher = params.dispatchTool;
@@ -1082,7 +1207,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     // subprocess alive but stalled, e.g. codex backing off on a 429, is not
     // covered here.)
     const onSubprocessExit = (info: { code: number | null; signal: string | null }): void => {
-      completionReject?.(new Error(`codex app-server exited mid-turn (code=${info.code} signal=${info.signal})`));
+      completionReject?.(new CodexProcessExitedError(info.code, info.signal));
       settleCompletion();
     };
     client.once("exit", onSubprocessExit);
@@ -1297,6 +1422,27 @@ const ASPECT_GUIDANCE: Record<ImageAspect, string> = {
  */
 export function shouldRetryImageRender(error: unknown, attempt: number, maxAttempts: number): boolean {
   return error instanceof ImageGenNoDataError && attempt < maxAttempts;
+}
+
+/**
+ * Auto-retry policy for a codex turn whose subprocess died: replay the turn iff
+ * ALL three hold —
+ *  - `subprocessDied` — the failure was a codex crash/OOM (a fresh process may
+ *    succeed), not a content/auth/schema failure (which a retry won't fix);
+ *  - `!toolDispatched` — no MV tool ran this turn, so no side effects (scribe
+ *    writes, a rendered image) persisted that a blind replay could double-apply;
+ *  - `attempt < 2` — bound to a single auto-retry so a persistently-broken codex
+ *    can't spin forever (a second death falls through to the manual retry path).
+ *
+ * Pure + exported so the policy is unit-tested without driving a live codex turn
+ * (mirrors {@link shouldRetryImageRender}). `attempt` is 1-based (first try = 1).
+ */
+export function shouldAutoRetryTurn(
+  subprocessDied: boolean,
+  toolDispatched: boolean,
+  attempt: number,
+): boolean {
+  return subprocessDied && !toolDispatched && attempt < 2;
 }
 
 /**
@@ -1996,6 +2142,30 @@ export class ImageGenNoDataError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ImageGenNoDataError";
+  }
+}
+
+/**
+ * Thrown by {@link OpenAIChatGptProvider} when the codex subprocess exits on its
+ * own *during* a turn — a crash/panic (`code=1`) or OOM, as opposed to our own
+ * `dispose()`. Distinct from {@link CodexTurnStalledError} (subprocess alive but
+ * silent) and {@link CodexTurnFailedError} (codex reported `status:"failed"`):
+ * here the process is simply gone. `runTurn` catches it to transparently respawn
+ * and replay the turn once (when no tool had run); if it escapes to the bridge,
+ * `classifyServerError` routes it to `retryable` so the manual retry overlay —
+ * which now respawns a fresh subprocess — can recover the session. Carries the
+ * exit `code`/`signal` for diagnostics.
+ */
+export class CodexProcessExitedError extends Error {
+  constructor(
+    public readonly code: number | null,
+    public readonly signal: string | null,
+  ) {
+    super(
+      `The model backend stopped unexpectedly (code=${code} signal=${signal}). ` +
+      `Your turn wasn't lost; try again in a moment.`,
+    );
+    this.name = "CodexProcessExitedError";
   }
 }
 

@@ -25,6 +25,7 @@ import {
   PlayerPaneSide,
 } from "./components/ThemedFrame.js";
 import { themeColor } from "./themes/color-resolve.js";
+import { RenderZone } from "./render-meter.js";
 import {
   getViewportTier,
   getVisibleElements,
@@ -249,19 +250,21 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
 
         <Box flexDirection="column" width={innerWidth + 2 * sidePadding} paddingLeft={sidePadding} paddingRight={sidePadding}>
           {/* Narrative Area */}
-          <NarrativeArea
-            ref={narrativeRef}
-            lines={narrativeLines}
-            maxRows={narRows}
-            quoteColor={quoteColor}
-            playerColor={playerColor}
-            width={innerWidth}
-            themeAsset={theme.asset}
-            separatorColor={separatorColor}
-            showVerbose={showVerbose}
-            viewportTop={conversationPaneTop}
-            mouseScrollOverrideRef={mouseScrollOverrideRef}
-          />
+          <RenderZone id="narrative">
+            <NarrativeArea
+              ref={narrativeRef}
+              lines={narrativeLines}
+              maxRows={narRows}
+              quoteColor={quoteColor}
+              playerColor={playerColor}
+              width={innerWidth}
+              themeAsset={theme.asset}
+              separatorColor={separatorColor}
+              showVerbose={showVerbose}
+              viewportTop={conversationPaneTop}
+              mouseScrollOverrideRef={mouseScrollOverrideRef}
+            />
+          </RenderZone>
 
           {/* Activity Line */}
           {elements.activityLine && (

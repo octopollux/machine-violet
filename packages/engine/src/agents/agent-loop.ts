@@ -180,29 +180,12 @@ async function runAgentLoopInternal(
         "or show them something, so they are waiting for THIS image. It renders inline " +
         "and appears in this same turn; the player waits the minute-or-two for it. Use " +
         "this ONLY when the player actually requested an image.\n" +
-        "Illustrate each place, object, or face only ONCE across the campaign: the " +
-        "renderer keeps no memory and has no 3D model, so it cannot reproduce a subject " +
-        "consistently, and a second render of something already shown will silently " +
-        "contradict it — keep a running list of what you've already illustrated in " +
-        "`dm_notes` (it survives scene changes). Favour new locations, plot objects, clues, " +
-        "and maps over faces, and keep any character (including the PC) out of frame unless " +
-        "they are truly the subject AND haven't appeared in the last seven images. These " +
-        "limits are lifted for a 'player_request' — draw whatever the player asked for. " +
-        "Provide a vivid descriptive prompt covering subject, composition, mood, " +
-        "and style. The caption (if any) should be composed into the image itself " +
-        "as a printed plate, not emitted as separate text. At most one image per turn. " +
-        "Default to `effort: \"quality\"` for scene snapshots and player-requested " +
-        "illustrations — a high-quality render that still comes back at reasonable speed. " +
-        "Drop to `\"standard\"` (medium) for quick or minor inserts where speed matters more. " +
-        "Reserve `\"showcase\"` for rare set-piece hero shots; it takes a bit longer. " +
-        "Use `aspect: \"landscape\"` for scenes, " +
-        "`\"portrait\"` for character close-ups, `\"square\"` for objects/symbols. " +
-        "When a specific player character is clearly the subject of the image, list " +
-        "their name in `reference_characters` so the render matches their established " +
-        "portrait (face, build, outfit). Only name characters who actually appear in " +
-        "THIS image, and only when their likeness matters — it adds noticeable render " +
-        "time and pulls the picture toward that person, so leave it off for wide " +
-        "scenes, crowds, or anyone whose exact look doesn't matter.",
+        "Background images follow the subject discipline in your directives — " +
+        "illustrate each subject only once, favour things and places over faces, " +
+        "track what you've illustrated in `dm_notes`. A 'player_request' is exempt: " +
+        "draw whatever the player asked for. " +
+        "Compose any caption into the image itself as a printed plate, not as " +
+        "separate text. At most one image per turn.",
       inputSchema: {
         type: "object",
         properties: {
@@ -228,7 +211,7 @@ async function runAgentLoopInternal(
           reference_characters: {
             type: "array",
             items: { type: "string" },
-            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. The portrait fixes identity, build, and outfit — NOT expression or pose, so always describe the character's facial expression for this moment in `prompt`, or the render inherits the portrait's neutral expression. Only include characters who actually appear in this image and whose likeness matters; omit otherwise. Names without a saved portrait are ignored.",
+            description: "Optional. Names of player characters whose established portrait should visually guide this render (image-to-image), so the depicted character matches their look. The portrait fixes identity, build, and outfit — NOT expression or pose, so always describe the character's facial expression for this moment in `prompt`, or the render inherits the portrait's neutral expression. Only include characters who actually appear in this image and whose likeness matters — a reference adds noticeable render time and pulls the whole picture toward that character, so leave it off for wide scenes, crowds, or anyone whose exact look doesn't matter. Names without a saved portrait are ignored.",
           },
         },
         required: ["prompt", "effort", "aspect"],

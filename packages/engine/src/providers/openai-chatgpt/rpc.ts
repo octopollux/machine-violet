@@ -84,6 +84,27 @@ const CODEX_LEAN_FLAGS = ["--disable", "plugins", "--disable", "shell_snapshot"]
  */
 const RPC_LARGE_LINE_LOG_MIN_BYTES = 256 * 1024;
 
+/**
+ * Turn a child_process spawn `error` into a message that says what to do about
+ * it. ENOENT here means no codex binary resolved at all — every candidate in
+ * `resolveCodexBinary()` missed and it fell through to a bare PATH lookup.
+ */
+export function spawnFailureError(binaryPath: string, err: NodeJS.ErrnoException): Error {
+  if (err.code === "ENOENT") {
+    return new Error(
+      `Codex runtime not installed: could not spawn \`${binaryPath}\`. ` +
+      `Reinstall Machine Violet, or install codex yourself (\`npm i -g @openai/codex\`) ` +
+      `or point CODEX_BIN at a codex executable.`,
+    );
+  }
+  if (err.code === "EACCES") {
+    return new Error(
+      `Codex runtime not executable: \`${binaryPath}\` exists but cannot be run (EACCES).`,
+    );
+  }
+  return new Error(`codex app-server failed to start (\`${binaryPath}\`): ${err.message}`);
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -93,6 +114,18 @@ export interface CodexRpcClientOptions {
   sessionId?: string;
   /** Codex CLI args after `app-server`. Default: empty (stdio transport). */
   extraArgs?: string[];
+  /**
+   * Override for codex's home directory (its `CODEX_HOME` env var; default
+   * `~/.codex`). codex initializes a single SQLite "state runtime" under this
+   * dir at startup, and concurrent subprocesses sharing one home CONTEND on that
+   * DB — on Windows the loser exits `code=1` with `(code: 1546) disk I/O error`
+   * (confirmed: a 4-wide simultaneous spawn against one `~/.codex` killed all
+   * four; staggered spawns never did). Pointing each concurrent subprocess at
+   * its own home removes the contention entirely. Auth still works from an empty
+   * home because MV pushes ChatGPT tokens over RPC (`pushChatGptAuthTokens`), not
+   * from `<home>/auth.json`. When absent, codex uses its default `~/.codex`.
+   */
+  codexHome?: string;
 }
 
 export class CodexRpcClient extends EventEmitter {
@@ -104,14 +137,22 @@ export class CodexRpcClient extends EventEmitter {
   private notifListeners = new Map<string, Set<NotificationHandler>>();
   private serverHandlers = new Map<string, ServerRequestHandler>();
   private exited = false;
+  /**
+   * Set when the spawn itself failed (see the `error` handler in
+   * {@link startInternal}). Preferred over the generic "has exited" message so
+   * callers report *why* codex never came up.
+   */
+  private spawnError: Error | null = null;
   private startPromise: Promise<void> | null = null;
   private readonly sessionId?: string;
   private readonly extraArgs: string[];
+  private readonly codexHome?: string;
 
   constructor(opts: CodexRpcClientOptions = {}) {
     super();
     this.sessionId = opts.sessionId;
     this.extraArgs = opts.extraArgs ?? [];
+    this.codexHome = opts.codexHome;
   }
 
   /** Spawn the subprocess and resolve when it has emitted the first byte. */
@@ -125,14 +166,37 @@ export class CodexRpcClient extends EventEmitter {
     const bin = resolveCodexBinary();
     log.spawn({ binaryPath: bin.path, sessionId: this.sessionId });
 
+    // Spawn env: base process env, plus any binary-resolution additions (PATH
+    // augmentation for bundled `rg`), plus an optional CODEX_HOME override that
+    // isolates this subprocess's SQLite state runtime from every other codex —
+    // the fix for the shared-`~/.codex` contention crash (see codexHome docs).
+    const spawnEnv: NodeJS.ProcessEnv = { ...process.env, ...(bin.extraEnv ?? {}) };
+    if (this.codexHome) spawnEnv.CODEX_HOME = this.codexHome;
+
     this.proc = spawn(bin.path, [...bin.prefixArgs, "app-server", ...CODEX_LEAN_FLAGS, ...this.extraArgs], {
       // Pipe stderr (not `inherit`) so codex's own diagnostics land in the
       // engine log instead of vanishing to the terminal — see handleStderrLine.
       stdio: ["pipe", "pipe", "pipe"],
-      env: bin.extraEnv ? { ...process.env, ...bin.extraEnv } : process.env,
+      env: spawnEnv,
       // `.cmd` shims on Windows (used by PATH-resolved global installs) need
       // shell resolution. Bundled-mode invokes node directly so shell is off.
       shell: process.platform === "win32" && bin.source === "path",
+    });
+
+    // A spawn that never starts emits `error`, NOT `exit`: ENOENT when no codex
+    // binary resolves (the colocated probe missing + nothing on PATH), EACCES
+    // when it isn't executable. Node treats an `error` with no listener as an
+    // unhandled error event and tears the whole process down — so a missing
+    // codex runtime killed Machine Violet outright instead of surfacing a
+    // message. Funnel it into the same "subprocess is gone" path as `exit` so
+    // the provider's reset-and-respawn recovery applies unchanged.
+    this.proc.on("error", (err: NodeJS.ErrnoException) => {
+      this.exited = true;
+      this.spawnError = spawnFailureError(bin.path, err);
+      log.exit({ code: null, signal: null, sessionId: this.sessionId });
+      for (const p of this.pending.values()) p.reject(this.spawnError);
+      this.pending.clear();
+      this.emit("exit", { code: null, signal: null });
     });
 
     this.proc.on("exit", (code, signal) => {
@@ -297,8 +361,21 @@ export class CodexRpcClient extends EventEmitter {
   // Public API
   // -----------------------------------------------------------------------
 
+  /**
+   * Whether the subprocess has exited (either via our {@link stop} or on its
+   * own). Once true this client is dead for good — the owner must drop it and
+   * spawn a fresh one. Lets a caller decide, without matching on error message
+   * strings, whether a thrown error was a subprocess death worth respawning for.
+   */
+  get hasExited(): boolean {
+    return this.exited;
+  }
+
   /** Send a request and await the typed response. */
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    // A spawn failure is more specific than "exited" — report why codex never
+    // came up rather than implying it ran and died.
+    if (this.spawnError) throw this.spawnError;
     if (this.exited) throw new Error("codex app-server has exited; call stop()/start() to restart");
     if (!this.proc || !this.proc.stdin) throw new Error("codex app-server not started; call start() first");
     const id = this.nextId++;
