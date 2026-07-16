@@ -567,14 +567,20 @@ jobs:
             end
 
             def install
-              libexec.install "MachineViolet"
-              libexec.install "prompts" if Dir.exist?("prompts")
-              libexec.install "themes" if Dir.exist?("themes")
-              libexec.install "systems" if Dir.exist?("systems")
+              # Install the whole extracted tree. The binary resolves prompts/,
+              # themes/, systems/, worlds/, personalities/, config/, assets/,
+              # the vendored codex/ runtime and node_modules/ (sharp) relative
+              # to its own location, and reads version.json for --version.
+              # Cherry-picking a subset silently breaks those at runtime —
+              # notably ChatGPT sign-in, which spawns codex/vendor/.../bin/codex.
+              libexec.install Dir["*"]
 
               chmod 0755, libexec/"MachineViolet"
-              # Expose as lowercase `machine-violet` for CLI convention
-              (bin/"machine-violet").write_env_script libexec/"MachineViolet"
+              # Expose as lowercase `machine-violet` for CLI convention.
+              # A symlink (not write_env_script) keeps process.execPath pointing
+              # into libexec, which is what the colocated asset + codex lookups
+              # resolve against.
+              bin.install_symlink libexec/"MachineViolet" => "machine-violet"
             end
 
             test do
