@@ -9,6 +9,19 @@ Install from the shipped artifact the way a user does, auth from scratch, play. 
 
 **The whole point is to launch the app the way a user does.** Every automated gate we have (`verify-package`, the Velopack install-smoke, the agent sidecar) drives the binary in a way that bypasses `checkTerminal()` and makes no live provider call. If you automate this via the sidecar, you have rebuilt the blind spot and proven nothing new. **Double-click.**
 
+## Step 0: warn the user, before you touch anything
+
+This wipes local state repeatedly. **Say what's going, by name, and wait** — don't infer consent from "state is expendable" or "go ahead and clean it"; they're picturing config, not necessarily their campaigns.
+
+> Heads up — this smoke test wipes local state between each install method:
+> - **Campaigns** (`%USERPROFILE%\Documents\.machine-violet`, `%TEMP%\mvplay`) — **real, unrecoverable game data**
+> - **Config + saved connections** (`%APPDATA%\MachineViolet`) — you'll re-do the OAuth sign-in each round
+> - **Any installed build** (`%LOCALAPPDATA%\MachineViolet`)
+>
+> Back up anything you want to keep first, and tell me when to go.
+
+Then back it up yourself anyway, as a second net — enumerate what's actually on disk and zip it before the first uninstall. In the 1.1 pass this turned up 60 MB of playtest campaigns and rendered scenes nobody had in mind when they said "go ahead". Report where the backup landed.
+
 ## Pick the artifact
 
 Test the build that will *become* the release — normally today's **nightly**, which builds from `main` HEAD. Check what you're testing:
