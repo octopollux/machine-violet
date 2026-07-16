@@ -84,6 +84,27 @@ const CODEX_LEAN_FLAGS = ["--disable", "plugins", "--disable", "shell_snapshot"]
  */
 const RPC_LARGE_LINE_LOG_MIN_BYTES = 256 * 1024;
 
+/**
+ * Turn a child_process spawn `error` into a message that says what to do about
+ * it. ENOENT here means no codex binary resolved at all — every candidate in
+ * `resolveCodexBinary()` missed and it fell through to a bare PATH lookup.
+ */
+export function spawnFailureError(binaryPath: string, err: NodeJS.ErrnoException): Error {
+  if (err.code === "ENOENT") {
+    return new Error(
+      `Codex runtime not installed: could not spawn \`${binaryPath}\`. ` +
+      `Reinstall Machine Violet, or install codex yourself (\`npm i -g @openai/codex\`) ` +
+      `or point CODEX_BIN at a codex executable.`,
+    );
+  }
+  if (err.code === "EACCES") {
+    return new Error(
+      `Codex runtime not executable: \`${binaryPath}\` exists but cannot be run (EACCES).`,
+    );
+  }
+  return new Error(`codex app-server failed to start (\`${binaryPath}\`): ${err.message}`);
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -116,6 +137,12 @@ export class CodexRpcClient extends EventEmitter {
   private notifListeners = new Map<string, Set<NotificationHandler>>();
   private serverHandlers = new Map<string, ServerRequestHandler>();
   private exited = false;
+  /**
+   * Set when the spawn itself failed (see the `error` handler in
+   * {@link startInternal}). Preferred over the generic "has exited" message so
+   * callers report *why* codex never came up.
+   */
+  private spawnError: Error | null = null;
   private startPromise: Promise<void> | null = null;
   private readonly sessionId?: string;
   private readonly extraArgs: string[];
@@ -154,6 +181,22 @@ export class CodexRpcClient extends EventEmitter {
       // `.cmd` shims on Windows (used by PATH-resolved global installs) need
       // shell resolution. Bundled-mode invokes node directly so shell is off.
       shell: process.platform === "win32" && bin.source === "path",
+    });
+
+    // A spawn that never starts emits `error`, NOT `exit`: ENOENT when no codex
+    // binary resolves (the colocated probe missing + nothing on PATH), EACCES
+    // when it isn't executable. Node treats an `error` with no listener as an
+    // unhandled error event and tears the whole process down — so a missing
+    // codex runtime killed Machine Violet outright instead of surfacing a
+    // message. Funnel it into the same "subprocess is gone" path as `exit` so
+    // the provider's reset-and-respawn recovery applies unchanged.
+    this.proc.on("error", (err: NodeJS.ErrnoException) => {
+      this.exited = true;
+      this.spawnError = spawnFailureError(bin.path, err);
+      log.exit({ code: null, signal: null, sessionId: this.sessionId });
+      for (const p of this.pending.values()) p.reject(this.spawnError);
+      this.pending.clear();
+      this.emit("exit", { code: null, signal: null });
     });
 
     this.proc.on("exit", (code, signal) => {
@@ -330,6 +373,9 @@ export class CodexRpcClient extends EventEmitter {
 
   /** Send a request and await the typed response. */
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    // A spawn failure is more specific than "exited" — report why codex never
+    // came up rather than implying it ran and died.
+    if (this.spawnError) throw this.spawnError;
     if (this.exited) throw new Error("codex app-server has exited; call stop()/start() to restart");
     if (!this.proc || !this.proc.stdin) throw new Error("codex app-server not started; call start() first");
     const id = this.nextId++;

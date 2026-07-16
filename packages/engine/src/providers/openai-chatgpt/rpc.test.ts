@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { codexStderrLineWorthLogging } from "./rpc.js";
+import { codexStderrLineWorthLogging, spawnFailureError } from "./rpc.js";
 
 // codex's stderr (ANSI-stripped) is `<ts> <LEVEL> <target>: <msg>`. At
 // RUST_LOG=info the INFO span records alone hit 100k+ lines/turn (measured live
@@ -32,5 +32,35 @@ describe("codexStderrLineWorthLogging", () => {
     expect(codexStderrLineWorthLogging("thread 'main' panicked at 'boom', src/lib.rs:42")).toBe(true);
     expect(codexStderrLineWorthLogging("   3: codex_core::run")).toBe(true);
     expect(codexStderrLineWorthLogging("some bare diagnostic with no level")).toBe(true);
+  });
+});
+
+// A spawn that never starts emits `error`, not `exit`. With no `error` listener
+// Node tears the whole process down, so a missing codex runtime killed Machine
+// Violet outright — observed on a stock v1.1.0-rc.2 tarball, where "Sign in with
+// ChatGPT" died with `spawn codex ENOENT`. These messages are what the user
+// actually sees instead of a crash.
+describe("spawnFailureError", () => {
+  const errno = (code: string): NodeJS.ErrnoException =>
+    Object.assign(new Error(`spawn ${code}`), { code });
+
+  it("explains an ENOENT as a missing runtime, and names the remedies", () => {
+    const err = spawnFailureError("codex", errno("ENOENT"));
+    expect(err.message).toMatch(/Codex runtime not installed/);
+    expect(err.message).toContain("codex");
+    expect(err.message).toMatch(/CODEX_BIN/);
+  });
+
+  it("distinguishes a present-but-unrunnable binary (EACCES)", () => {
+    const err = spawnFailureError("/opt/mv/codex/vendor/x/bin/codex", errno("EACCES"));
+    expect(err.message).toMatch(/not executable/);
+    expect(err.message).toContain("/opt/mv/codex/vendor/x/bin/codex");
+    expect(err.message).not.toMatch(/not installed/);
+  });
+
+  it("falls back to the underlying message for other spawn failures", () => {
+    const err = spawnFailureError("codex", errno("EAGAIN"));
+    expect(err.message).toMatch(/failed to start/);
+    expect(err.message).toMatch(/EAGAIN/);
   });
 });

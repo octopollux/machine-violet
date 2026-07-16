@@ -31,7 +31,19 @@ import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/pla
 import { configDir } from "../packages/engine/src/utils/paths.js";
 import { loadEnv } from "../packages/engine/src/config/first-launch.js";
 import { checkTerminal } from "../packages/engine/src/config/terminal-check.js";
+import { versionBanner } from "../packages/engine/src/config/app-version.js";
 import { disableReactPerfTrackUnlessRequested } from "../packages/client-ink/src/react-perf-track.js";
+
+// --- Version flag ---
+// Must precede every other startup step, and especially checkTerminal(): both
+// install.sh and the Homebrew formula's `test do` shell out to `--version` from
+// a non-TTY, where the terminal guard exits 1 with "cannot run in this
+// terminal". Left unhandled, `--version` fell through to a normal boot — it
+// launched the whole game on a TTY and printed the guard error off one.
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(versionBanner());
+  process.exit(0);
+}
 
 // --- Velopack lifecycle hooks (Windows install/update/uninstall) ---
 // Must run before any server/client startup. Exits the process if a hook fires.
