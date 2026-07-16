@@ -33,8 +33,11 @@
  */
 export function coerceResourceKeys(raw: unknown): string[] {
   if (Array.isArray(raw)) {
-    // Elements are declared `string` but arrive unvalidated; a nested array or
-    // a number would otherwise poison lookups downstream as `[object Object]`.
+    // Elements are declared `string` but arrive unvalidated. Keep the scalars —
+    // a number is a plausible key, and `String(3)` is the key the DM meant.
+    // Drop everything else: an object would stringify to "[object Object]" and
+    // a nested array to its joined elements, either of which becomes a resource
+    // key that matches nothing and renders as garbage in the top frame.
     return raw
       .filter((k) => typeof k === "string" || typeof k === "number")
       .map((k) => String(k).trim())

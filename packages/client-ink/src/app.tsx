@@ -45,9 +45,14 @@ import type { ResolvedTheme, StyleVariant, ThemeDefinition } from "./tui/themes/
  *  Keys go through `coerceResourceKeys` rather than being iterated directly:
  *  a snapshot hydrated from a campaign saved before the tool boundary coerced
  *  (or any other path that slips a bare string in) would otherwise iterate the
- *  string's characters and render `S | t | r | e | s | s` for `"Stress"`. */
+ *  string's characters and render `S | t | r | e | s | s` for `"Stress"`.
+ *
+ *  The param is typed `string[] | string` deliberately. Nothing on the wire
+ *  guarantees the array — that unenforced assumption is what broke the line in
+ *  the first place — so the signature admits what can actually arrive rather
+ *  than restating the claim this function exists to defend against. */
 function formatResources(
-  displayResources: Record<string, string[]>,
+  displayResources: Record<string, string[] | string>,
   resourceValues: Record<string, Record<string, string>>,
 ): string[] {
   const result: string[] = [];
