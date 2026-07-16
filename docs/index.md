@@ -36,6 +36,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand the tape format / record a golden | [tape-format.md](tape-format.md), [golden-tapes.md](golden-tapes.md) |
 | Run the e2e tiers / live smoke against the full stack | [e2e-harness.md](e2e-harness.md) |
 | Cut a release / understand the branch + channel model | [releases.md](releases.md) |
+| Smoke-test the install methods before a cut | [releases.md](releases.md#pre-cut-verification-the-install-method-smoke-test), `/release-smoke` |
 | Update documentation after a code change | [maintenance.md](maintenance.md) |
 
 ## Document Layers
