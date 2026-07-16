@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { readAppVersion, versionBanner, versionFile, UNKNOWN_VERSION } from "./app-version.js";
 import { norm } from "../utils/paths.js";
 
