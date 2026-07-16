@@ -23,7 +23,7 @@ Download [**`MachineViolet-nightly-Setup.exe`**](https://github.com/octopollux/m
 
 ### Portable
 
-Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip), unzip anywhere, and run `MachineViolet.exe`. The portable build does not auto-update — re-download to upgrade.
+Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip), unzip anywhere, and run `Machine Violet.exe`. The portable build does not auto-update — re-download to upgrade.
 
 ### Terminal requirements
 
