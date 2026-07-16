@@ -1,5 +1,6 @@
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
+import { coerceResourceKeys } from "@machine-violet/shared";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.js";
 import { agentLoopStreaming } from "./agent-loop.js";
@@ -2394,8 +2395,11 @@ export class GameEngine {
             const amount = delta.details.amount as number;
             // Use the resource key from the delta (system-agnostic), or fall back
             // to the first display resource for backward compat with old deltas.
+            // Coerce before indexing: on a bare-string displayResources entry
+            // `[0]` is the first *character*, which would silently accrue the
+            // delta into a resource named "S".
             const key = (delta.details.resource as string | undefined)
-              ?? this.gameState.displayResources[target]?.[0]
+              ?? coerceResourceKeys(this.gameState.displayResources[target])[0]
               ?? "hp";
             const currentStr = values[key] ?? "0";
             const current = parseInt(currentStr, 10) || 0;

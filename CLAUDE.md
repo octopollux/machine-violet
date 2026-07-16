@@ -81,7 +81,9 @@ Type checks and unit tests do not prove a cross-cutting flow works — anything 
    npm run smoketest    # 7-12 min, live API — full setup→game walk
    ```
 
-For **live exploration** (feel out a personality/world, reproduce a bug by hand, or record a full-stack golden) drive the **`/play` skill** (`mvplay`) yourself turn-for-turn — being in the loop is the point; don't delegate to a subagent or a scripted probe. For a **repeatable live pass/fail** on one path (save/load round-trip, image-gen persisted), write a one-shot `runProbe` under `packages/test-harness/bin/`.
+All three tiers test a **tree**. Before a release cut there's a fourth thing that tests the **shipped artifact** on a real machine — install it via every install method, auth from scratch, play: the `/release-smoke` skill and [docs/releases.md](docs/releases.md#pre-cut-verification-the-install-method-smoke-test). Not optional, and not automatable: every packaged gate we have (`verify-package`, the Velopack install-smoke, the agent sidecar) reaches the binary in a way that bypasses `checkTerminal()` and makes no live provider call, so none of them ever launch the app the way a user does. That blind spot shipped a Windows build whose bundled terminal was never used, green across two RCs (#729).
+
+For **live exploration** (feel out a personality/world, reproduce a bug by hand, or record a full-stack golden) drive the **`/play` skill** (`mvplay`) yourself turn-for-turn — being in the loop is the point; don't delegate to a subagent or a scripted probe. For a **repeatable live pass/fail** on one path (save/load round-trip, image-gen persisted), write a one-shot `runProbe` under `packages/test-harness/bin/` — add `--binary <path>` to drive a packaged build instead of the source tree.
 
 Do not bypass the harness with a hand-rolled `setTimeout` or a "give it 5 minutes" wait — every wait is anchored to an observable state change. If you find yourself reaching for a timer, look in `Harness` for the `waitFor*` helper that fits.
 
@@ -96,6 +98,8 @@ Two long-lived branches: **`main`** (trunk, builds nightlies) and **`release`** 
 3. Port the fix to the *other* long-lived branch **only** when the bug was also reported there, or it's a regression in a shipped (released) version — then cherry-pick or re-apply by hand (both directions as appropriate). Otherwise default to the reported branch alone; don't raise porting routinely. When it *is* warranted, just do it and say so rather than asking.
 
 ### Cutting releases
+
+**Before promoting `main` → `release` for a cut, run the install-method smoke test** (`/release-smoke`, ~1h, live): install from the shipped artifact on a clean machine via every install method, auth from scratch, play a few turns. CI's packaged gates can't cover it — see above and [docs/releases.md](docs/releases.md#pre-cut-verification-the-install-method-smoke-test).
 
 All cuts dispatch GitHub workflows via `gh`. Common commands:
 

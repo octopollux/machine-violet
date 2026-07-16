@@ -151,6 +151,7 @@ materialization — is separate and lives in [format-spec.md §10](format-spec.m
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
 | openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
 | E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
+| Release process / pre-cut smoke | [releases.md](releases.md) | Channels, branches, cut commands; the pre-cut install-method smoke test (`/release-smoke`) and what CI's packaged gates can't see |
 | Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |
 | Tape format | [tape-format.md](tape-format.md) | On-disk tape schema, bucketing, ordinal matching, determinism normalization |
 | Seed authoring | [seed-authoring.md](seed-authoring.md) | Editorial playbook for bundled `.mvworld` seeds: design bars, review checklist, review-pass loop |

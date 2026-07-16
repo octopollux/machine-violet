@@ -8,6 +8,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
+import { coerceResourceKeys } from "@machine-violet/shared";
 import type { ChoicesData } from "@machine-violet/shared";
 import type { ActiveModal } from "@machine-violet/shared/types/tui.js";
 import { ApiClient } from "./api-client.js";
@@ -39,15 +40,25 @@ import {
 } from "./tui/themes/index.js";
 import type { ResolvedTheme, StyleVariant, ThemeDefinition } from "./tui/themes/index.js";
 
-/** Format display resources into "Key Value" strings for the top frame. */
+/** Format display resources into "Key Value" strings for the top frame.
+ *
+ *  Keys go through `coerceResourceKeys` rather than being iterated directly:
+ *  a snapshot hydrated from a campaign saved before the tool boundary coerced
+ *  (or any other path that slips a bare string in) would otherwise iterate the
+ *  string's characters and render `S | t | r | e | s | s` for `"Stress"`.
+ *
+ *  The param is typed `string[] | string` deliberately. Nothing on the wire
+ *  guarantees the array — that unenforced assumption is what broke the line in
+ *  the first place — so the signature admits what can actually arrive rather
+ *  than restating the claim this function exists to defend against. */
 function formatResources(
-  displayResources: Record<string, string[]>,
+  displayResources: Record<string, string[] | string>,
   resourceValues: Record<string, Record<string, string>>,
 ): string[] {
   const result: string[] = [];
   for (const [char, keys] of Object.entries(displayResources)) {
     const vals = resourceValues[char] ?? {};
-    for (const key of keys) {
+    for (const key of coerceResourceKeys(keys)) {
       const val = vals[key];
       result.push(val ? `${key} ${val}` : key);
     }

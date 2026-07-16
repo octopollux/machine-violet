@@ -2231,6 +2231,28 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     // No displayResources, no resource in delta → falls back to "hp"
     expect(state.resourceValues["Goblin"]["hp"]).toBe("-5");
   });
+
+  it("coerces a bare-string displayResources entry before taking the first key", async () => {
+    const state = mockState();
+    // A campaign saved before the tool boundary coerced carries the raw string.
+    // Indexing [0] on it yields "S" — the delta would accrue into a resource
+    // named after the first character.
+    (state.displayResources as Record<string, unknown>)["Luther"] = "Stress";
+    state.resourceValues["Luther"] = { Stress: "2" };
+
+    const provider = mockProvider([textMessage("ok")]);
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider, gameState: state, scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks,
+    });
+
+    const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
+    applyDeltas([{ type: "hp_change", target: "Luther", details: { amount: 1 } }]);
+
+    expect(state.resourceValues["Luther"]["Stress"]).toBe("3");
+    expect(state.resourceValues["Luther"]["S"]).toBeUndefined();
+  });
 });
 
 describe("content classifier refusal", () => {
