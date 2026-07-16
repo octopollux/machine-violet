@@ -27,6 +27,43 @@ We support **only the latest major**. There is no LTS line.
 
 Reproduce against the correct branch — a 1.0 user's bug must be reproduced on `release`, not `main`. `main` may have rewritten the code path and "I can't repro" usually means "I'm looking at the wrong tree."
 
+## Pre-cut verification (the install-method smoke test)
+
+**Do this before promoting `main` → `release` for a cut.** It is a human-driven, live pass over every install method on each platform: install from the shipped artifact on a *clean* machine, authenticate a provider from scratch, and play a few real turns. Budget an hour. The `/release-smoke` skill has the full procedure; this section is the why.
+
+**CI cannot do this, and it is worth being precise about why.** The packaged gates do real work — the Velopack smoke performs a genuine `Setup.exe --silent` install and `--uninstall`, and `verify-package` replays goldens against the built artifact on every OS. Credit where due: they catch SEA injection, asset vendoring, install layout, and manifest bugs.
+
+But **every one of them reaches the app through `replay-golden --binary`**, which spawns the exe directly. So no matter how real the install around it is, that path:
+
+- **bypasses `checkTerminal()`**, so nothing exercises the real launch (conhost detection, the Windows Terminal relaunch);
+- **never makes a live provider call**, so nothing exercises OAuth, codex spawn, or a real DM turn;
+- **runs against state CI just created**, so nothing exercises a stale config or an upgrade over an existing install.
+
+The agent sidecar (`--agent-port`) bypasses `checkTerminal()` too and bootstraps its own mock TTY, so driving a packaged binary over the sidecar — the natural way to automate this — rebuilds the same blind spot. **Nothing in CI launches the app the way a user does.**
+
+This is not hypothetical. In the 1.1 cycle the bundled Windows Terminal was shipped one directory below where `terminal-check.ts` probes for it. `existsSync` returned false, the code silently fell back to whatever system `wt.exe` the user had, and both packaged gates stayed green across two RCs. It took a literal double-click to find (#729). The class is general: **a silent fallback plus a gate that skips the fallback's trigger equals a bug that ships.**
+
+What to cover per platform:
+
+| Platform | Install methods |
+|---|---|
+| Windows | Velopack installer (`Setup.exe`), portable zip |
+| macOS / Linux | Homebrew, `install.sh`, tarball |
+
+Every platform must be exercised **on that platform** — much of what this catches is platform-specific by construction (the Windows Terminal bundling is gated on `matrix.os == 'windows-latest'`, and `findWindowsTerminal()` sits inside a `process.platform === "win32"` branch, so a macOS pass can neither confirm nor contradict it).
+
+Running the platforms in parallel (several machines, or several agents) works well — agree up front on the **same artifact** (same nightly / same tag; "it works on mine" is worthless if you built different trees), and hand findings off through an issue so nobody re-finds someone else's bug. See #734 for the shape.
+
+**Cleaning is a step in the procedure, not a precondition you inherit.** Wipe before the first method and between every method after it — establishing state and auth from nothing is part of what's under test, so a box that is merely *probably* clean tests the wrong thing. Do the wipe yourself and confirm it landed rather than reasoning about whether it was already done. Paths and the uninstall gotchas are in the `/release-smoke` skill.
+
+**Say so before you start.** This destroys local state: installed builds, saved connections, and **campaigns — which are real, unrecoverable user data**. Tell whoever owns the machine what's about to go, by name, and let them back up before the first uninstall. Don't infer consent from "state is expendable" — they may not have this dir in mind. Back up anything worth keeping yourself as a second net (the 1.1 pass turned up 60 MB of playtest campaigns nobody had thought about).
+
+And per method: clean state → install → launch **the way a user launches** (double-click / Start Menu / `machine-violet`, not a harness) → add a provider connection from scratch → play a few turns. Wipe state between methods; establishing state and auth cleanly is part of what's under test.
+
+Cover each **provider auth type** you ship, at least once across the matrix — API key and subscription/OAuth (`openai-chatgpt`) take entirely different code paths. The OAuth path is the one with the interesting failure modes (codex spawn, token refresh, `CODEX_HOME` isolation), and an ambient `OPENAI_API_KEY` in the environment auto-creates an `openai-apikey` connection that will quietly satisfy a smoke test *without touching codex at all* — check `connections.json` shows `"provider": "openai-chatgpt"` rather than trusting that a turn completed.
+
+Findings go to issues before the cut; anything that reaches the packaged product is a blocker by default, since RC testers install by hand and stable users can't.
+
 ## Cutting a release
 
 All cuts go through the [Cut Release](../.github/workflows/cut-release.yml) workflow (`Actions → Cut Release → Run workflow`).
@@ -62,6 +99,8 @@ The workflow:
 RC releases are marked `--prerelease` on GitHub, skip Discord, and skip the Homebrew formula bump. Stable releases do all three.
 
 **Publish is gated on packaging.** A `verify-package` matrix job sits between `build` and `release` (in both [release.yml](../.github/workflows/release.yml) and [nightly.yml](../.github/workflows/nightly.yml)): it replays recorded golden tapes against the built per-OS artifact — deterministic, offline, no API key — and a broken package (SEA injection, asset vendoring, boot, config-dir) fails the replay and blocks the release. The Velopack install/uninstall smoke (Windows) — install → replay the installed binary → uninstall — is also **blocking** (validated end-to-end via `test-build.yml`), so a broken installer blocks publish too. Full mechanics in [e2e-harness.md](e2e-harness.md#packaged-artifact-replay-gate-release--nightly-ci).
+
+**What that gate does *not* cover.** Both gates drive the binary via `replay-golden --binary`, which bypasses `checkTerminal()` and never makes a live provider call — so the real launch path and every live-auth path are unexercised, and a green `verify-package` says nothing about either. That is what [pre-cut verification](#pre-cut-verification-the-install-method-smoke-test) is for; don't read a green gate as "the packaged app works."
 
 ## Release-list hygiene
 

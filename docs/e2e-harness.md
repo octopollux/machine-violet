@@ -138,6 +138,29 @@ blocks publish like any other packaging failure.
 codex vendoring is covered instead by the build's vendoring step (which fails
 loudly if codex is missing) and the Tier-3 live smoketest.
 
+**Known gap (bigger, and worth internalizing): this gate never launches the app
+the way a user does.** Both jobs above reach the binary through
+`replay-golden --binary`, which spawns the exe directly — so `checkTerminal()`
+(conhost detection, the Windows Terminal relaunch) never runs, and no live
+provider call is ever made. The agent sidecar (`--agent-port`) *also* bypasses
+`checkTerminal()` and bootstraps its own mock TTY, so automating this over the
+sidecar reproduces the same blind spot. **A green `verify-package` means the
+package is well-formed, not that the app starts.**
+
+The 1.1 cycle shipped the proof: the bundled Windows Terminal landed one
+directory below where `terminal-check.ts` probes, `existsSync` returned false,
+the code silently fell back to a system `wt.exe`, and both gates stayed green
+across two RCs. Only a double-click found it (#729). Generalize the shape rather
+than the instance — **a silent fallback plus a gate that skips the fallback's
+trigger is a bug that ships.** When you add a fallback to a launch path, assume
+CI will not catch its failure and assert the layout at *build* time instead
+(cf. [`scripts/ci/bundle-windows-terminal.sh`](../scripts/ci/bundle-windows-terminal.sh)).
+
+Closing this gap is what the human [pre-cut install-method smoke
+test](releases.md#pre-cut-verification-the-install-method-smoke-test) (`/release-smoke`)
+is for — it is a *fourth* thing, outside the three tiers, because it tests the
+shipped artifact on a real machine rather than any tree.
+
 ## Two ways to use the live harness: scripted probes vs. interactive play
 
 Built on the same launcher + sidecar:
