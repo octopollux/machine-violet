@@ -711,6 +711,8 @@ The `_title` key is internal (extracted from the H1 heading) and never serialize
 
 **Value types:** All front matter values are strings on disk. Comma-separated values (like `display_resources` and `additional_names`) are stored as the raw string; consumers split on `, ` as needed.
 
+> **Note — `display_resources` has an array-shaped twin.** The same concept is a `string[]` in `state/resources.json` (§4.10), written by the `set_display_resources` tool. The string form here is what the DM sees when it writes a sheet, so it tends to carry that shape into the tool call; neither provider enforces the tool's `array` schema. Anything consuming display-resource keys — from either side — must route through `coerceResourceKeys` (see [`packages/shared/src/utils/resource-keys.ts`](../packages/shared/src/utils/resource-keys.ts)) rather than iterating the value directly, since a bare string iterates as characters and fails silently (`"Stress"` → `S | t | r | e | s | s` in the top frame).
+
 ### 6.3 Body Sections
 
 The body is free-form markdown. Character sheets commonly use these `##` sections (order is convention, not enforced):

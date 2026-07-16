@@ -1,3 +1,4 @@
+import { coerceResourceKeys } from "@machine-violet/shared";
 import type { NormalizedTool } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
 
@@ -568,15 +569,22 @@ const TOOL_DEFS: RegisteredTool[] = [
       inputSchema: {
         type: "object" as const,
         properties: {
-          character: { type: "string" },
-          resources: { type: "array", items: { type: "string" } },
+          character: { type: "string", description: "Character name" },
+          resources: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Resource keys as an array of separate strings, e.g. [\"HP\", \"Spell Slots\"] — "
+              + "one key per element, NOT the single comma-separated string used by the "
+              + "`display_resources` sheet front matter.",
+          },
         },
         required: ["character", "resources"],
       },
     },
     handler: (state, input) => {
       const character = input.character as string;
-      const resources = input.resources as string[];
+      const resources = coerceResourceKeys(input.resources);
       state.displayResources[character] = resources;
       return ok(JSON.stringify({ type: "set_display_resources", character, resources }));
     },
