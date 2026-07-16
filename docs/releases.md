@@ -54,7 +54,7 @@ Every platform must be exercised **on that platform** — much of what this catc
 
 Running the platforms in parallel (several machines, or several agents) works well — agree up front on the **same artifact** (same nightly / same tag; "it works on mine" is worthless if you built different trees), and hand findings off through an issue so nobody re-finds someone else's bug. See #734 for the shape.
 
-**The scarce resource is a genuinely clean machine, not a tester.** Verify clean rather than believing it — in the 1.1 pass the box was asserted clean and in fact held a five-week-old install plus a populated config dir, which would have quietly invalidated the whole first-run half of the test. The paths to check are in the `/release-smoke` skill; back up before wiping.
+**Cleaning is a step in the procedure, not a precondition you inherit.** Wipe before the first method and between every method after it — establishing state and auth from nothing is part of what's under test, so a box that is merely *probably* clean tests the wrong thing. Do the wipe yourself and confirm it landed rather than reasoning about whether it was already done. **Back up first**: campaigns are real user data, and keeping a copy of `connections.json` saves redoing the OAuth dance on every iteration. Paths and the uninstall gotchas are in the `/release-smoke` skill.
 
 And per method: clean state → install → launch **the way a user launches** (double-click / Start Menu / `machine-violet`, not a harness) → add a provider connection from scratch → play a few turns. Wipe state between methods; establishing state and auth cleanly is part of what's under test.
 

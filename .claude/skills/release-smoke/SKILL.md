@@ -23,7 +23,7 @@ Testing `release` (v*-rc.N) instead is valid but often misleading: `release` may
 
 ## Procedure (per install method)
 
-1. **Wipe.** Uninstall, then clear state. See "Clean state" below. Back up first.
+1. **Wipe, then verify the wipe.** Uninstall, clear state, and confirm each path below is actually gone — cleaning is your job every iteration, not a state you inherit or reason about. Back up first.
 2. **Install** from the downloaded artifact.
 3. **Verify the signature** (Windows): `Get-AuthenticodeSignature` → expect `Valid`, and confirm it's **timestamped** — Trusted Signing certs are short-lived (days), and the countersignature is what keeps the artifact verifying after expiry.
 4. **Launch as a user would** — double-click / Start Menu / `machine-violet` on PATH. Not a harness, not the sidecar.
