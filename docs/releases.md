@@ -31,13 +31,15 @@ Reproduce against the correct branch — a 1.0 user's bug must be reproduced on 
 
 **Do this before promoting `main` → `release` for a cut.** It is a human-driven, live pass over every install method on each platform: install from the shipped artifact on a *clean* machine, authenticate a provider from scratch, and play a few real turns. Budget an hour. The `/release-smoke` skill has the full procedure; this section is the why.
 
-**CI cannot do this, and it is important to understand exactly why.** Both packaged gates — `verify-package`'s golden replay and the Velopack install/uninstall smoke — invoke the binary through `replay-golden --binary`. That path:
+**CI cannot do this, and it is worth being precise about why.** The packaged gates do real work — the Velopack smoke performs a genuine `Setup.exe --silent` install and `--uninstall`, and `verify-package` replays goldens against the built artifact on every OS. Credit where due: they catch SEA injection, asset vendoring, install layout, and manifest bugs.
 
-- **bypasses `checkTerminal()`**, so nothing exercises the real launch path (conhost detection, the Windows Terminal relaunch);
+But **every one of them reaches the app through `replay-golden --binary`**, which spawns the exe directly. So no matter how real the install around it is, that path:
+
+- **bypasses `checkTerminal()`**, so nothing exercises the real launch (conhost detection, the Windows Terminal relaunch);
 - **never makes a live provider call**, so nothing exercises OAuth, codex spawn, or a real DM turn;
-- **runs on a machine CI just built**, so nothing exercises first-run state creation, a stale config, or an existing install.
+- **runs against state CI just created**, so nothing exercises a stale config or an upgrade over an existing install.
 
-The agent sidecar (`--agent-port`) bypasses `checkTerminal()` too, so driving a packaged binary over the sidecar — the natural way to automate this — has the same blind spot. **Nothing in CI launches the app the way a user does.**
+The agent sidecar (`--agent-port`) bypasses `checkTerminal()` too and bootstraps its own mock TTY, so driving a packaged binary over the sidecar — the natural way to automate this — rebuilds the same blind spot. **Nothing in CI launches the app the way a user does.**
 
 This is not hypothetical. In the 1.1 cycle the bundled Windows Terminal was shipped one directory below where `terminal-check.ts` probes for it. `existsSync` returned false, the code silently fell back to whatever system `wt.exe` the user had, and both packaged gates stayed green across two RCs. It took a literal double-click to find (#729). The class is general: **a silent fallback plus a gate that skips the fallback's trigger equals a bug that ships.**
 
@@ -47,6 +49,12 @@ What to cover per platform:
 |---|---|
 | Windows | Velopack installer (`Setup.exe`), portable zip |
 | macOS / Linux | Homebrew, `install.sh`, tarball |
+
+Every platform must be exercised **on that platform** — much of what this catches is platform-specific by construction (the Windows Terminal bundling is gated on `matrix.os == 'windows-latest'`, and `findWindowsTerminal()` sits inside a `process.platform === "win32"` branch, so a macOS pass can neither confirm nor contradict it).
+
+Running the platforms in parallel (several machines, or several agents) works well — agree up front on the **same artifact** (same nightly / same tag; "it works on mine" is worthless if you built different trees), and hand findings off through an issue so nobody re-finds someone else's bug. See #734 for the shape.
+
+**The scarce resource is a genuinely clean machine, not a tester.** Verify clean rather than believing it — in the 1.1 pass the box was asserted clean and in fact held a five-week-old install plus a populated config dir, which would have quietly invalidated the whole first-run half of the test. The paths to check are in the `/release-smoke` skill; back up before wiping.
 
 And per method: clean state → install → launch **the way a user launches** (double-click / Start Menu / `machine-violet`, not a harness) → add a provider connection from scratch → play a few turns. Wipe state between methods; establishing state and auth cleanly is part of what's under test.
 
