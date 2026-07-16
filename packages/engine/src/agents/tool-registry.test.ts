@@ -360,6 +360,34 @@ describe("ToolRegistry", () => {
     expect(parsed.type).toBe("set_display_resources");
   });
 
+  it("set_display_resources coerces a bare string to an array", () => {
+    // Neither provider enforces the `array` schema (both send strict:false), so
+    // a DM imitating the sheet's comma-separated `display_resources` front
+    // matter can hand us a string. Stored raw, it iterates as characters and
+    // the top frame renders `S | t | r | e | s | s`.
+    const reg = createTestRegistry();
+    const state = mockState();
+    const result = reg.dispatch(state, "set_display_resources", {
+      character: "Aldric",
+      resources: "Stress",
+    });
+    expect(result.is_error).toBeUndefined();
+    expect(state.displayResources["Aldric"]).toEqual(["Stress"]);
+    // The broadcast payload carries the coerced shape too — the client
+    // hydrates displayResources straight from this.
+    expect(JSON.parse(result.content).resources).toEqual(["Stress"]);
+  });
+
+  it("set_display_resources splits a comma-separated string into keys", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    reg.dispatch(state, "set_display_resources", {
+      character: "Aldric",
+      resources: "HP, Spell Slots",
+    });
+    expect(state.displayResources["Aldric"]).toEqual(["HP", "Spell Slots"]);
+  });
+
   it("set_resource_values stores and merges values on state", () => {
     const reg = createTestRegistry();
     const state = mockState();
