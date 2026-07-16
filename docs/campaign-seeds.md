@@ -342,6 +342,23 @@ _horror, mystery, fantasy, sci-fi, comedy_
 
 Your grandmother's estate includes a house, a fortune, and a locked room with your name on it.
 
+## Ho Ho Hollow
+
+_horror, comedy, modern, mystery_
+
+The big-box store seals at midnight on Christmas Eve, and the old dark of the season comes in through the seams — with a night to survive, a reason to work out, and nothing to hand but a store's worth of clearance merchandise.
+
+<details><summary>Setup choices</summary>
+
+**Why you're still here at midnight**
+
+- **The last customer** — You came in for one item — a card, a gift, the one thing you cannot walk through your own front door without — for someone who would absolutely notice it missing. You have been standing in the aisle for six minutes. The store closes in two.
+- **The closing cashier** — Register 12, eight minutes to the end of the worst shift of the year. Your drawer is counted, your coat is in your locker, and you know where everything in this store is except the part of it you are about to need.
+- **The new overnight guard** — Three weeks into the job. A maglite, a radio, a bank of monitors, and eleven hours of building to walk. It is the first Christmas Eve you have worked, and you were told it would be quiet.
+- **Third shift** — You were going to be in this building all night regardless — pallets to break down, an aisle to face, a truck at four. The doors sealing barely changes your plans.
+
+</details>
+
 ## HOA from Hell
 
 _modern, horror, comedy_
