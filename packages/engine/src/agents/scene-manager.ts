@@ -1201,7 +1201,7 @@ export function buildSceneAnchor(
     if (tail.length > 0) {
       lines.push(`Previous scene (${title}):`);
       lines.push(...tail);
-      lines.push("The Campaign Log and entity files carry the engine's distilled record of all prior scenes — it is authoritative.");
+      lines.push("The Campaign Log and entity files carry the engine's distilled record of all prior scenes — that record is authoritative.");
     }
   }
   if (alarmsFired.length > 0) {
