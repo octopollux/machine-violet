@@ -24,9 +24,11 @@ describe("model config", () => {
   });
 
   it("ignores malformed JSON", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     writeFileSync(join(testDir, "dev-config.jsonc"), "not json {{{");
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.large).toBe("claude-opus-4-6");
+    warn.mockRestore();
   });
 
   it("caches after first load", () => {
@@ -110,6 +112,60 @@ describe("model config", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort.dm).toBe("max");
     expect(config.effort.ooc).toBe("low");
+  });
+
+  it("tolerates a trailing comma before a closing brace (the #715 A/B bug)", () => {
+    // Exactly the shape that silently defaulted before: one uncommented field
+    // followed by a comma, then (comment-stripped) nothing but the closing brace.
+    writeFileSync(
+      join(testDir, "dev-config.jsonc"),
+      `{
+         "effort": {
+           "dm": "max"
+         },
+         // "pricing": { }
+       }`,
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.effort.dm).toBe("max");
+  });
+
+  it("tolerates a trailing comma on the last entry of a nested object", () => {
+    writeFileSync(
+      join(testDir, "dev-config.jsonc"),
+      `{ "effort": { "dm": "high", "ooc": "low", } }`,
+    );
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.effort.dm).toBe("high");
+    expect(config.effort.ooc).toBe("low");
+  });
+
+  it("does not strip a comma that lives inside a string value", () => {
+    // The trailing-comma remover must respect string state: a pricing key
+    // containing `,}` should survive intact.
+    writeFileSync(
+      join(testDir, "dev-config.jsonc"),
+      `{ "pricing": { "weird,}key": { "input": 1, "output": 2, "cacheWrite": 0, "cacheRead": 0 } } }`,
+    );
+    const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["weird,}key"]).toEqual({ input: 1, output: 2, cacheWrite: 0, cacheRead: 0 });
+  });
+
+  it("warns when a present config is unparseable (not silent)", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    writeFileSync(join(testDir, "dev-config.jsonc"), "{ this is not json");
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.large).toBe("claude-opus-4-6"); // still falls back to defaults
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("dev-config.jsonc");
+    warn.mockRestore();
+  });
+
+  it("does NOT warn when the config file is simply absent", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    loadModelConfig({ cwd: testDir, reset: true }); // testDir has no dev-config.jsonc
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("preserves // and /* */ inside string values", () => {
