@@ -898,7 +898,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "scene_transition",
-      description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms, resets context. Call at natural narrative boundaries.",
+      description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms; the record carries forward into the new scene. Call at natural narrative boundaries — when the scene's dramatic question is resolved or the story cuts to a new time or place.",
       inputSchema: {
         type: "object" as const,
         properties: {

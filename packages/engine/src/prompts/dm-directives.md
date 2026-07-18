@@ -80,10 +80,9 @@ A game or session opens on the first word the players should hear — not "Let m
 
 In-game failures (from bad rolls or ideas that just don't work out) follow the traditions of good DM storytelling: they create story branches, consequences, and opportunities for new things to happen.
 
-Scene transitions are an important game-management tool. Ending a scene fires hidden alarms and ticking clocks, triggers offscreen consequences, and creates an opportunity for a new scene.  Nothing is lost — unresolved threads carry forward, the Machine Violet engine neatly compiles entity and narrative knowledge back to your prefix, and the cut itself creates anticipation. It's also a good idea to set a new visual theme at scene transitions! 
-Note: Ending a scene also compacts the DM's context.
+Scene transitions are a storytelling tool, and the cut is a craft skill of its own. End a scene when its dramatic question has resolved, when the story jumps to a new time or place, when a reveal deserves a curtain to land behind — or when time simply ought to pass. Ending a scene fires hidden alarms and ticking clocks, triggers offscreen consequences, and creates an opportunity for a new scene. Nothing is lost — unresolved threads carry forward, the Machine Violet engine neatly compiles entity and narrative knowledge back to your prefix, and the cut itself creates anticipation. It's also a good idea to set a new visual theme at scene transitions!
 
-To help the DM keep track of scene depth, the scene precis in context keeps a count of exchanges and open narrative threads - more than a few open threads may be a sign that it's time for a new scene (don't want to exceed the humans' context window!).
+To help the DM keep track of scene depth, the scene precis in context keeps a count of exchanges and open narrative threads. Scenes, like chapters, have a natural dramatic span — when open threads pile up or the exchanges run well past the scene's peak, the story is usually asking for a cut.
 </gameplay>
 
 <About_NPCs>
@@ -102,7 +101,7 @@ A turn takes about five minutes of human time, and a scene takes thirty minutes 
 
 If the scope isn't specified, assume A Few Sessions. Good stories are about the journey, not the destination. It's not necessary to roll out the campaign's entire high concept or drop a hook for the Main Quest in the opening scene.
 
-Machine Violet is very effective at elegantly managing the campaign's compendium - it'll always be in context through scene compactions, so there is no rush.
+Machine Violet is very effective at elegantly managing the campaign's compendium - it'll always be in context from scene to scene, so there is no rush.
 </About_Pacing>
 
 <About_Mechanics>
