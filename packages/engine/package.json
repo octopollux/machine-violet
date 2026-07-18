@@ -17,7 +17,7 @@
     "@fastify/swagger": "^9.7.0",
     "@fastify/websocket": "^11.0.0",
     "@machine-violet/shared": "*",
-    "@openai/codex": ">=0.130.0",
+    "@openai/codex": ">=0.144.5",
     "@scalar/fastify-api-reference": "^1.49.7",
     "@sinclair/typebox": "^0.34.0",
     "dotenv": "^17.4.2",

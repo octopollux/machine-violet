@@ -33,8 +33,8 @@ const DEV_CONFIG_FILENAME = "dev-config.jsonc";
  * content inside double-quoted strings. Recognizes:
  *   - `//` to end-of-line
  *   - block comments delimited by slash-star and star-slash
- * Trailing commas are not supported — keep the file syntactically JSON once
- * comments are removed.
+ * Trailing commas are handled separately by {@link stripTrailingCommas}, which
+ * runs after this pass.
  *
  * Hand-rolled to avoid pulling in a JSONC parser dep for a single config file.
  * Single-quoted strings are not recognized (JSON doesn't allow them).
@@ -71,9 +71,83 @@ function stripJsoncComments(src: string): string {
   return out;
 }
 
+/**
+ * Remove trailing commas — a comma whose next non-whitespace character is a
+ * closing `}` or `]`. Runs after {@link stripJsoncComments}, so only whitespace
+ * can sit between the comma and the bracket. Commas inside strings are left
+ * untouched (string state is tracked exactly as in the comment stripper).
+ *
+ * Hand-authored `dev-config.jsonc` files routinely leave a trailing comma
+ * behind — e.g. uncommenting one field of a multi-field block. Before this,
+ * `JSON.parse` rejected it and the whole file was silently ignored, so the
+ * override appeared to do nothing (this bit the #715 model A/B test: a stray
+ * comma meant the DM ran at default effort, not the configured one).
+ */
+function stripTrailingCommas(src: string): string {
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      continue;
+    }
+    if (c === ",") {
+      let j = i + 1;
+      while (j < src.length && /\s/.test(src[j])) j++;
+      if (src[j] === "}" || src[j] === "]") continue; // drop the trailing comma
+    }
+    out += c;
+  }
+  return out;
+}
+
+/**
+ * Read + parse `dev-config.jsonc` from `dir`.
+ *
+ * Returns `undefined` when the file is simply absent (the common case — no
+ * override configured). Throws a descriptive error when the file *exists* but
+ * cannot be parsed, so callers can distinguish "no config" from "broken config"
+ * and surface the latter instead of silently falling back to defaults.
+ */
 function loadDevConfig(dir: string): unknown {
-  const raw = readFileSync(join(dir, DEV_CONFIG_FILENAME), "utf-8");
-  return JSON.parse(stripJsoncComments(raw));
+  let raw: string;
+  try {
+    raw = readFileSync(join(dir, DEV_CONFIG_FILENAME), "utf-8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw e;
+  }
+  try {
+    return JSON.parse(stripTrailingCommas(stripJsoncComments(raw)));
+  } catch (e) {
+    throw new Error(
+      `${DEV_CONFIG_FILENAME} in ${dir} is not valid JSONC and was ignored: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+      { cause: e },
+    );
+  }
+}
+
+/** Dirs we've already warned about, so a broken config warns once, not per-load. */
+const warnedConfigDirs = new Set<string>();
+
+/** Warn (once per dir) that a present-but-broken dev-config was ignored. */
+function warnBadDevConfig(dir: string, err: unknown): void {
+  if (warnedConfigDirs.has(dir)) return;
+  warnedConfigDirs.add(dir);
+  const msg = err instanceof Error ? err.message : String(err);
+  console.warn(`[machine-violet] ${msg} Using built-in defaults.`);
 }
 
 const DEFAULTS: ModelConfig = {
@@ -148,8 +222,10 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
         config.effort = { ...DEFAULTS.effort, ...map };
       }
     }
-  } catch {
-    // No dev-config.jsonc or invalid — use defaults
+  } catch (e) {
+    // A missing file returns undefined (no throw); reaching here means the file
+    // exists but couldn't be parsed. Warn rather than silently use defaults.
+    warnBadDevConfig(dir, e);
   }
 
   cached = config;
@@ -204,8 +280,9 @@ export function loadPricingConfig(opts?: { cwd?: string; reset?: boolean }): Rec
         }
       }
     }
-  } catch {
-    // No dev-config.jsonc or invalid — use defaults
+  } catch (e) {
+    // Present-but-unparseable config: warn instead of silently defaulting.
+    warnBadDevConfig(dir, e);
   }
 
   cachedPricing = pricing;

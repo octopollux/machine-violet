@@ -639,7 +639,7 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
 
-Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments are stripped before JSON parsing. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI.
+Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments and trailing commas are stripped before JSON parsing. A genuinely-absent file falls back to defaults silently; a file that is *present but unparseable* logs a one-time warning (rather than silently defaulting) so a typo'd override doesn't go unnoticed. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI.
 
 **Tier resolution:** at session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads `connections.json` and emits a `Record<ModelTier, TierProvider>` — three `{provider, model}` pairs, one per tier. The map threads through `GameEngine`, `SceneManager`, and `ResolveSession` so every subagent call routes through the connection assigned to its tier. Heterogeneous setups (e.g. Large=OpenAI, Medium=Anthropic) just work; subagents accept `model` as a required parameter and never fall back to `getModel(tier)` silently.
 
