@@ -46,6 +46,33 @@
       "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
+    "gpt-5.6-sol": {
+      "provider": "openai",
+      "displayName": "GPT-5.6 Sol",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "defaultTier": "large",
+      "pricing": { "input": 5, "output": 30, "cacheWrite": 6.25, "cacheRead": 0.50 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "gpt-5.6-terra": {
+      "provider": "openai",
+      "displayName": "GPT-5.6 Terra",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "defaultTier": "medium",
+      "pricing": { "input": 2.5, "output": 15, "cacheWrite": 3.125, "cacheRead": 0.25 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "gpt-5.6-luna": {
+      "provider": "openai",
+      "displayName": "GPT-5.6 Luna",
+      "contextWindow": 1050000,
+      "maxOutput": 128000,
+      "defaultTier": "small",
+      "pricing": { "input": 1, "output": 6, "cacheWrite": 1.25, "cacheRead": 0.10 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
     "gpt-5.5": {
       "provider": "openai",
       "displayName": "GPT-5.5",
@@ -122,6 +149,6 @@
   "tierDefaults": {
     "anthropic": { "large": "claude-opus-4-6", "medium": "claude-sonnet-4-6", "small": "claude-haiku-4-5-20251001" },
     "openai-apikey": { "large": "gpt-5.5", "medium": "gpt-5-mini", "small": "gpt-5-nano" },
-    "openai-chatgpt": { "large": "gpt-5.5", "medium": "gpt-5.4-mini", "small": "gpt-5.4-mini" }
+    "openai-chatgpt": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" }
   }
 }
