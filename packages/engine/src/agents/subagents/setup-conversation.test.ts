@@ -770,6 +770,20 @@ describe("createSetupConversation", () => {
     expect(systemPrompt).toContain("Choose race");    // from D&D
   });
 
+  it("system prompt tells setup to use names from the Name Inspiration lists", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
+
+    expect(systemPrompt).toContain(
+      "When inventing names, use names from the Name Inspiration lists.",
+    );
+    expect(systemPrompt).not.toContain("don't feel bound to this list");
+  });
+
   it("finalize_setup treats literal string 'null' system as null", async () => {
     const input = { ...FINALIZE_INPUT, system: "null" };
     const provider = mockProvider([

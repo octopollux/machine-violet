@@ -565,7 +565,14 @@ function buildSystemPrompt(
   // random content stays out of the cache-stamped Tier 1/2 prefix, which is
   // meant to stay byte-stable across sessions — putting it there would churn
   // that shared cached prefix for no benefit.
-  blocks.push({ text: "\n\n## Name Inspiration\n" + buildNameInspiration() });
+  // The DM's copy deliberately treats the sample as optional inspiration.
+  // Setup is different: it invents the campaign's initial character once, so
+  // replace that permissive framing with an explicit setup-only instruction.
+  const nameInspiration = buildNameInspiration().replace(
+    "For inspiration only — don't feel bound to this list:",
+    "When inventing names, use names from the Name Inspiration lists.",
+  );
+  blocks.push({ text: "\n\n## Name Inspiration\n" + nameInspiration });
 
   return blocks;
 }
