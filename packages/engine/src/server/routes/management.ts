@@ -57,8 +57,41 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return buildEffectiveConnections(stored, server.configDir);
   }
 
-  function persistAndReturn(store: ConnectionStore): ConnectionStore {
-    saveConnectionStore(server.configDir, store);
+  function persistAndReturn(
+    store: ConnectionStore,
+    changed: { tiers?: ReadonlySet<keyof ConnectionStore["tierAssignments"]>; image?: boolean } = {},
+  ): ConnectionStore {
+    // `getConnections()` intentionally omits dormant xAI records (#749).
+    // Merge them back before an unrelated settings write so hiding the new
+    // provider never destroys a manually saved credential. Preserve untouched
+    // xAI assignments on disk as well; buildEffectiveConnections() still
+    // clears them from the active/user-visible view.
+    const persisted = loadConnectionStore(server.configDir);
+    const dormant = persisted.connections.filter((connection) => connection.provider === "xai");
+    const dormantIds = new Set(dormant.map((connection) => connection.id));
+    const connections = [
+      ...store.connections,
+      ...dormant.filter((connection) => !store.connections.some((candidate) => candidate.id === connection.id)),
+    ];
+    const tierAssignments = { ...store.tierAssignments };
+    for (const tier of ["large", "medium", "small"] as const) {
+      const prior = persisted.tierAssignments[tier];
+      if (!changed.tiers?.has(tier) && prior && dormantIds.has(prior.connectionId)) {
+        tierAssignments[tier] = prior;
+      }
+    }
+    let imageAssignment = store.imageAssignment;
+    const priorImage = persisted.imageAssignment;
+    if (
+      !changed.image
+      && !imageAssignment
+      && priorImage
+      && dormantIds.has(priorImage.connectionId)
+      && tierAssignments.large?.connectionId === priorImage.connectionId
+    ) {
+      imageAssignment = priorImage;
+    }
+    saveConnectionStore(server.configDir, { connections, tierAssignments, imageAssignment });
     return buildEffectiveConnections(loadConnectionStore(server.configDir), server.configDir);
   }
 
@@ -91,7 +124,9 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Add a connection. `openai-chatgpt` excluded — uses OAuth login flow instead. */
-  const VALID_PROVIDERS = new Set<string>(["anthropic", "gemini", "openai-apikey", "openrouter", "xai", "custom"]);
+  // xAI is intentionally absent while Grok 4.5's native tool-call corruption
+  // is gated (#749). The provider implementation stays available for retesting.
+  const VALID_PROVIDERS = new Set<string>(["anthropic", "gemini", "openai-apikey", "openrouter", "custom"]);
 
   server.post("/connections", {
     schema: {
@@ -530,7 +565,13 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     if ("imageAssignment" in body) {
       store = setImageAssignment(store, body.imageAssignment ?? null, server.configDir);
     }
-    const effective = persistAndReturn(store);
+    const changedTiers = new Set(
+      (["large", "medium", "small"] as const).filter((tier) => body[tier] !== undefined),
+    );
+    const effective = persistAndReturn(store, {
+      tiers: changedTiers,
+      image: "imageAssignment" in body,
+    });
     return {
       tierAssignments: effective.tierAssignments,
       imageAssignment: effective.imageAssignment,
