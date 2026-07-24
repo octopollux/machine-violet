@@ -29,7 +29,7 @@ import { ArchivedCampaignsPhase } from "./phases/ArchivedCampaignsPhase.js";
 import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, ConnectionHealthResponse,
-  KnownModelInfo,
+  KnownImageModelInfo, KnownModelInfo, TierAssignmentEntry,
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import { setAgentClientState } from "./agent-state-ref.js";
@@ -116,8 +116,10 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Settings / management state
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
   const [tierAssignments, setTierAssignments] = useState<TierAssignmentsResponse>({ large: null, medium: null, small: null });
+  const [imageAssignment, setImageAssignment] = useState<TierAssignmentEntry | null>(null);
   const [connHealthResults, setConnHealthResults] = useState<Record<string, ConnectionHealthResponse>>({});
   const [knownModels, setKnownModels] = useState<Record<string, KnownModelInfo>>({});
+  const [knownImageModels, setKnownImageModels] = useState<Record<string, KnownImageModelInfo>>({});
   const [apiKeyValid, setApiKeyValid] = useState(true);
   const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
@@ -328,6 +330,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     api.listConnections().then((resp) => {
       setConnections(resp.connections);
       setTierAssignments(resp.tierAssignments);
+      setImageAssignment(resp.imageAssignment);
       if (resp.connections.length > 0) {
         setApiKeyValid(true);
         // Check health of first connection
@@ -449,9 +452,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     api.listConnections().then((resp) => {
       setConnections(resp.connections);
       setTierAssignments(resp.tierAssignments);
+      setImageAssignment(resp.imageAssignment);
     }).catch(() => { /* ignore */ });
     api.listKnownModels().then((resp) => {
       setKnownModels(resp.models);
+      setKnownImageModels(resp.imageModels);
     }).catch(() => { /* ignore */ });
   }, []);
 
@@ -611,24 +616,35 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         theme={theme}
         connections={connections}
         tierAssignments={tierAssignments}
+        imageAssignment={imageAssignment}
         healthResults={connHealthResults}
         knownModels={knownModels}
+        knownImageModels={knownImageModels}
         onAddConnection={(provider, apiKey, label, baseUrl) => {
           apiClientRef.current.addConnection(provider, apiKey, label, baseUrl).then((resp) => {
             setConnections(resp.connections);
             setTierAssignments(resp.tierAssignments);
+            setImageAssignment(resp.imageAssignment);
           }).catch(() => { /* ignore */ });
         }}
         onRemoveConnection={(id) => {
           apiClientRef.current.removeConnection(id).then((resp) => {
             setConnections(resp.connections);
             setTierAssignments(resp.tierAssignments);
+            setImageAssignment(resp.imageAssignment);
           }).catch(() => { /* ignore */ });
         }}
         onCheckHealth={handleCheckConnection}
         onSetTier={(tier, assignment) => {
           apiClientRef.current.setTierAssignments({ [tier]: assignment }).then((resp) => {
             setTierAssignments(resp.tierAssignments);
+            setImageAssignment(resp.imageAssignment);
+          }).catch(() => { /* ignore */ });
+        }}
+        onSetImage={(assignment) => {
+          apiClientRef.current.setTierAssignments({ imageAssignment: assignment }).then((resp) => {
+            setTierAssignments(resp.tierAssignments);
+            setImageAssignment(resp.imageAssignment);
           }).catch(() => { /* ignore */ });
         }}
         onStartChatGptLogin={() => apiClientRef.current.startChatGptLogin()}
@@ -638,6 +654,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           apiClientRef.current.listConnections().then((resp) => {
             setConnections(resp.connections);
             setTierAssignments(resp.tierAssignments);
+            setImageAssignment(resp.imageAssignment);
           }).catch(() => { /* ignore */ });
         }}
         onFetchUsage={(id) => apiClientRef.current.getConnectionUsage(id)}

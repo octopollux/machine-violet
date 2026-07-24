@@ -326,12 +326,14 @@ async function openaiGenerateImage(
 ): Promise<GenerateImageResult> {
   const effort = req.effort ?? "standard";
   const aspect = req.aspect ?? "square";
+  const model = req.imageModel ?? "gpt-image-2";
   const quality = EFFORT_TO_QUALITY[effort];
   const size = ASPECT_TO_SIZE[aspect];
   const references = req.referenceImages ?? [];
 
   // Diagnostic breadcrumb. The harness asserts on these.
   logEvent("image_gen:request", {
+    model,
     effort,
     aspect,
     quality,
@@ -365,17 +367,17 @@ async function openaiGenerateImage(
   // kicks in for the older dall-e-2/3 path, which doesn't accept low/medium/high
   // quality).
   //
-  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 / 1.5 at
-  // the same quality tiers — same call surface, sharper output, better prompt
-  // adherence. Launched 2026-04-21; SDK support added in openai@6.37. Rolling
-  // pointer rather than the dated snapshot (`gpt-image-2-2026-04-21`) so we ride
-  // future quality bumps without a code change.
+  // The provider default is `gpt-image-2`. It's a direct upgrade over
+  // gpt-image-1 / 1.5 at the same quality tiers — same call surface, sharper
+  // output, better prompt adherence. An explicit Large-paired image assignment
+  // overrides it; otherwise the rolling pointer lets us ride future quality
+  // bumps without a code change.
   for (let attempt = 1; ; attempt++) {
     let response: Awaited<ReturnType<typeof client.images.generate>>;
     try {
       response = referenceFiles
         ? await client.images.edit({
-            model: "gpt-image-2",
+            model,
             image: referenceFiles,
             prompt,
             quality,
@@ -384,7 +386,7 @@ async function openaiGenerateImage(
             n: 1,
           })
         : await client.images.generate({
-            model: "gpt-image-2",
+            model,
             prompt,
             quality,
             size,

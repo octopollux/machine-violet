@@ -12,7 +12,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  addConnection, removeConnection, setTierAssignment, updateConnectionModels,
+  addConnection, removeConnection, setImageAssignment, setTierAssignment, updateConnectionModels,
   maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
@@ -86,6 +86,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       connections: store.connections.map(serializeConnection),
       tierAssignments: store.tierAssignments,
+      imageAssignment: store.imageAssignment,
     };
   });
 
@@ -126,6 +127,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return reply.status(201).send({
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
     });
   });
 
@@ -149,6 +151,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
     };
   });
 
@@ -497,7 +500,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const store = getConnections();
-    return { tierAssignments: store.tierAssignments };
+    return {
+      tierAssignments: store.tierAssignments,
+      imageAssignment: store.imageAssignment,
+    };
   });
 
   /** Set tier assignments. */
@@ -509,15 +515,26 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async (request) => {
     let store = getConnections();
-    const body = (request.body as { large?: TierAssignment; medium?: TierAssignment; small?: TierAssignment }) ?? {};
+    const body = (request.body as {
+      large?: TierAssignment;
+      medium?: TierAssignment;
+      small?: TierAssignment;
+      imageAssignment?: TierAssignment | null;
+    }) ?? {};
     for (const tier of ["large", "medium", "small"] as const) {
       const assignment = body[tier];
       if (assignment) {
         store = setTierAssignment(store, tier, assignment.connectionId, assignment.modelId);
       }
     }
-    persistAndReturn(store);
-    return { tierAssignments: store.tierAssignments };
+    if ("imageAssignment" in body) {
+      store = setImageAssignment(store, body.imageAssignment ?? null, server.configDir);
+    }
+    const effective = persistAndReturn(store);
+    return {
+      tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
+    };
   });
 
   /** List all known models from the registry. */
@@ -528,7 +545,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const registry = loadModelRegistry(server.configDir);
-    return { models: registry.models };
+    return { models: registry.models, imageModels: registry.imageModels };
   });
 
   // -----------------------------------------------------------------------

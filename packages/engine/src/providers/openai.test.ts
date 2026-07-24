@@ -1283,6 +1283,26 @@ describe("OpenAI provider.generateImage", () => {
     }));
   });
 
+  it("uses an explicit image model override for generate and edit", async () => {
+    mockImages.generate.mockResolvedValue({ data: [{ b64_json: "GENERATED" }] });
+    mockImages.edit.mockResolvedValue({ data: [{ b64_json: "EDITED" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({ prompt: "icon", imageModel: "gpt-image-custom" });
+    await provider.generateImage!({
+      prompt: "revision",
+      imageModel: "gpt-image-custom",
+      referenceImages: [{ base64: "UE5H", mimeType: "image/png" }],
+    });
+
+    expect(mockImages.generate).toHaveBeenCalledWith(expect.objectContaining({
+      model: "gpt-image-custom",
+    }));
+    expect(mockImages.edit).toHaveBeenCalledWith(expect.objectContaining({
+      model: "gpt-image-custom",
+    }));
+  });
+
   it("returns base64 + revisedPrompt + effort/aspect used", async () => {
     mockImages.generate.mockResolvedValue({
       data: [{ b64_json: "ABCD", revised_prompt: "the actual prompt used" }],

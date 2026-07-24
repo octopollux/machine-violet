@@ -12,7 +12,12 @@
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-registry.js";
+import {
+  getImageModelsForProvider,
+  getModelsForProvider,
+  getTierDefaults,
+  modelFamilyFor,
+} from "./model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,6 +83,12 @@ export interface ConnectionStore {
   connections: AIConnection[];
   /** Model → connection mapping for each tier. */
   tierAssignments: TierAssignments;
+  /**
+   * Optional explicit image-model override. It must reference the exact
+   * connection assigned to Large; null preserves that provider's bundled
+   * default image model.
+   */
+  imageAssignment: TierAssignment | null;
 }
 
 export interface TierAssignments {
@@ -137,9 +148,14 @@ export function loadConnectionStore(appDir: string): ConnectionStore {
     return {
       connections: migrated,
       tierAssignments: parsed.tierAssignments ?? { large: null, medium: null, small: null },
+      imageAssignment: parsed.imageAssignment ?? null,
     };
   } catch {
-    return { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    return {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
   }
 }
 
@@ -147,6 +163,7 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
   const toSave: ConnectionStore = {
     connections: store.connections.filter((c) => c.source !== "env"),
     tierAssignments: store.tierAssignments,
+    imageAssignment: store.imageAssignment,
   };
   const target = join(appDir, STORE_FILENAME);
   // Atomic write: serialize to a unique temp file in the same dir, then rename
@@ -344,7 +361,26 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     }
   }
 
-  return { connections, tierAssignments };
+  // An explicit image model is valid only for the exact connection assigned
+  // to Large and only when that provider advertises the model in the separate
+  // image registry. Null means "use the provider-managed bundled default".
+  let imageAssignment = stored.imageAssignment ?? null;
+  const largeAssignment = tierAssignments.large;
+  if (
+    !imageAssignment
+    || !largeAssignment
+    || imageAssignment.connectionId !== largeAssignment.connectionId
+  ) {
+    imageAssignment = null;
+  } else {
+    const largeConnection = connections.find((c) => c.id === largeAssignment.connectionId);
+    const imageModels = largeConnection
+      ? getImageModelsForProvider(largeConnection.provider, configDir)
+      : {};
+    if (!imageModels[imageAssignment.modelId]) imageAssignment = null;
+  }
+
+  return { connections, tierAssignments, imageAssignment };
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +426,9 @@ export function removeConnection(store: ConnectionStore, connectionId: string): 
       tierAssignments[tier] = null;
     }
   }
-  return { connections, tierAssignments };
+  const imageAssignment =
+    store.imageAssignment?.connectionId === connectionId ? null : store.imageAssignment;
+  return { connections, tierAssignments, imageAssignment };
 }
 
 export function setTierAssignment(
@@ -399,13 +437,47 @@ export function setTierAssignment(
   connectionId: string,
   modelId: string,
 ): ConnectionStore {
+  const imageAssignment =
+    tier === "large"
+    && store.imageAssignment
+    && store.imageAssignment.connectionId !== connectionId
+      ? null
+      : store.imageAssignment;
   return {
     ...store,
+    imageAssignment,
     tierAssignments: {
       ...store.tierAssignments,
       [tier]: { connectionId, modelId },
     },
   };
+}
+
+/**
+ * Set or clear the explicit image-model override.
+ *
+ * The assignment must use the exact Large-tier connection. Registry/provider
+ * validation is repeated by buildEffectiveConnections, keeping persisted
+ * stale or hand-edited stores safe.
+ */
+export function setImageAssignment(
+  store: ConnectionStore,
+  assignment: TierAssignment | null,
+  configDir?: string,
+): ConnectionStore {
+  if (assignment && assignment.connectionId !== store.tierAssignments.large?.connectionId) {
+    return { ...store, imageAssignment: null };
+  }
+  if (assignment) {
+    const connection = store.connections.find((c) => c.id === assignment.connectionId);
+    if (
+      !connection
+      || !getImageModelsForProvider(connection.provider, configDir)[assignment.modelId]
+    ) {
+      return { ...store, imageAssignment: null };
+    }
+  }
+  return { ...store, imageAssignment: assignment };
 }
 
 export function updateConnectionModels(

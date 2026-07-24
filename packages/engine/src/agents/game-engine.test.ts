@@ -48,6 +48,7 @@ function makeEngine(params: {
   fileIO: FileIO;
   callbacks: EngineCallbacks;
   model?: string;
+  imageModel?: string;
   tierProviders?: Record<ModelTier, TierProvider>;
   gitIO?: import("../tools/git/index.js").GitIO;
   entityTree?: import("@machine-violet/shared/types/entities.js").EntityTree;
@@ -61,6 +62,7 @@ function makeEngine(params: {
     fileIO: params.fileIO,
     callbacks: params.callbacks,
     tierProviders,
+    imageModel: params.imageModel,
     gitIO: params.gitIO,
     entityTree: params.entityTree,
   });
@@ -387,11 +389,15 @@ describe("GameEngine", () => {
       fileIO: { ...mockFileIO(), writeBinaryFile: vi.fn(async () => {}) },
       callbacks,
       model: "claude-haiku-4-5-20251001",
+      imageModel: "grok-imagine-image-quality",
     });
 
     // Turn 1: the DM fires generate_image and finishes narrating while the
     // render is still gated. No image has surfaced yet...
     await engine.processInput("Aldric", "Show me the sword.");
+    expect(generateImage).toHaveBeenCalledWith(expect.objectContaining({
+      imageModel: "grok-imagine-image-quality",
+    }));
     expect(log.tuiCommands.some((c) => c.type === "display_image")).toBe(false);
     // ...and the turn yields straight to the player (waiting_input) even though
     // the render is still in flight — the render is detached and never parks the

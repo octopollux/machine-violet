@@ -18,7 +18,7 @@ import { openPath } from "../commands/open-path.js";
 import { copyToClipboard } from "../utils/clipboard.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, TierAssignmentEntry,
-  KnownModelInfo, ConnectionHealthResponse,
+  KnownImageModelInfo, KnownModelInfo, ConnectionHealthResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse, UsageResponse,
 } from "../api-client.js";
 import type { UsageSegment, FormattingNode } from "@machine-violet/shared";
@@ -32,6 +32,7 @@ type Screen =
   | "connections"
   | "tiers"
   | "tier-pick"
+  | "image-pick"
   | "add-provider"
   | "add-key"
   | "add-label"
@@ -69,6 +70,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const TIERS = ["large", "medium", "small"] as const;
+const ASSIGNMENT_ROWS = 4;
 
 // ---------------------------------------------------------------------------
 // Usage segment rendering
@@ -125,12 +127,15 @@ export interface ConnectionsPhaseProps {
   theme: ResolvedTheme;
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
+  imageAssignment: TierAssignmentEntry | null;
   healthResults: Record<string, ConnectionHealthResponse>;
   knownModels: Record<string, KnownModelInfo>;
+  knownImageModels: Record<string, KnownImageModelInfo>;
   onAddConnection: (provider: string, apiKey: string, label: string, baseUrl?: string) => void;
   onRemoveConnection: (id: string) => void;
   onCheckHealth: (id: string) => void;
   onSetTier: (tier: "large" | "medium" | "small", assignment: TierAssignmentEntry) => void;
+  onSetImage: (assignment: TierAssignmentEntry | null) => void;
   onBack: () => void;
   // ChatGPT-account OAuth login. The phase manages the polling loop
   // internally — `onStart` kicks it off and `onPoll` is called every ~2s
@@ -155,12 +160,15 @@ export function ConnectionsPhase({
   theme,
   connections,
   tierAssignments,
+  imageAssignment,
   healthResults,
   knownModels,
+  knownImageModels,
   onAddConnection,
   onRemoveConnection,
   onCheckHealth,
   onSetTier,
+  onSetImage,
   onBack,
   onStartChatGptLogin,
   onPollChatGptLogin,
@@ -174,6 +182,7 @@ export function ConnectionsPhase({
   const [connIndex, setConnIndex] = useState(0);
   const [tierIndex, setTierIndex] = useState(0);
   const [tierModelIndex, setTierModelIndex] = useState(0);
+  const [imageModelIndex, setImageModelIndex] = useState(0);
   const [addProviderIndex, setAddProviderIndex] = useState(0);
   const [addProvider, setAddProvider] = useState("");
   const [keyInput, setKeyInput] = useState("");
@@ -256,6 +265,22 @@ export function ConnectionsPhase({
   for (const conn of connections) {
     for (const m of conn.models) {
       allModels.push({ connectionId: conn.id, modelId: m.id, label: `${m.displayName} [${conn.label}]` });
+    }
+  }
+
+  // Image models are paired to the exact connection assigned to Large. The
+  // leading null option preserves the provider-managed bundled default.
+  const largeConnection = tierAssignments.large
+    ? connections.find((c) => c.id === tierAssignments.large?.connectionId)
+    : undefined;
+  const imageModels: { modelId: string | null; label: string }[] = [
+    { modelId: null, label: "Provider default (recommended)" },
+  ];
+  if (largeConnection) {
+    for (const [modelId, info] of Object.entries(knownImageModels)) {
+      if (info.provider === largeConnection.provider) {
+        imageModels.push({ modelId, label: info.displayName });
+      }
     }
   }
 
@@ -371,10 +396,16 @@ export function ConnectionsPhase({
     if (screen === "tiers") {
       if (key.escape) { setScreen("menu"); return; }
       if (key.upArrow) { setTierIndex((i) => Math.max(0, i - 1)); return; }
-      if (key.downArrow) { setTierIndex((i) => Math.min(2, i + 1)); return; }
-      if (key.return && allModels.length > 0) {
-        setTierModelIndex(0);
-        setScreen("tier-pick");
+      if (key.downArrow) { setTierIndex((i) => Math.min(ASSIGNMENT_ROWS - 1, i + 1)); return; }
+      if (key.return) {
+        if (tierIndex < TIERS.length && allModels.length > 0) {
+          setTierModelIndex(0);
+          setScreen("tier-pick");
+        } else if (tierIndex === TIERS.length && largeConnection) {
+          const currentIndex = imageModels.findIndex((m) => m.modelId === imageAssignment?.modelId);
+          setImageModelIndex(Math.max(0, currentIndex));
+          setScreen("image-pick");
+        }
       }
       return;
     }
@@ -387,6 +418,21 @@ export function ConnectionsPhase({
       if (key.return) {
         const model = allModels[tierModelIndex];
         if (model) onSetTier(TIERS[tierIndex], { connectionId: model.connectionId, modelId: model.modelId });
+        setScreen("tiers");
+      }
+      return;
+    }
+
+    // --- Image model picker ---
+    if (screen === "image-pick") {
+      if (key.escape) { setScreen("tiers"); return; }
+      if (key.upArrow) { setImageModelIndex((i) => Math.max(0, i - 1)); return; }
+      if (key.downArrow) { setImageModelIndex((i) => Math.min(imageModels.length - 1, i + 1)); return; }
+      if (key.return && largeConnection) {
+        const selected = imageModels[imageModelIndex];
+        onSetImage(selected?.modelId
+          ? { connectionId: largeConnection.id, modelId: selected.modelId }
+          : null);
         setScreen("tiers");
       }
       return;
@@ -605,6 +651,23 @@ export function ConnectionsPhase({
         </Text>,
       );
     }
+    const imageSelected = tierIndex === TIERS.length;
+    const imageName = imageAssignment
+      ? (knownImageModels[imageAssignment.modelId]?.displayName ?? imageAssignment.modelId)
+      : largeConnection
+        ? "Provider default"
+        : "(assign Large first)";
+    lines.push(
+      <Text key="image" color={imageSelected ? accent : fg}>
+        {imageSelected ? "\u25C6 " : "  "}Image generation
+      </Text>,
+    );
+    lines.push(
+      <Text key="image-val" color={imageSelected ? fg : dim}>
+        {"    "}{imageName}
+        {largeConnection ? <Text color={dim}>{" ["}{largeConnection.label}{"]"}</Text> : null}
+      </Text>,
+    );
     lines.push(<Text key="help" color={dim}> </Text>);
     lines.push(<Text key="help2" color={dim}>Enter = change model  Esc = back</Text>);
     return (
@@ -630,6 +693,26 @@ export function ConnectionsPhase({
     }
     return (
       <FullScreenFrame theme={theme} columns={cols} rows={termRows} title={`Select ${tier.charAt(0).toUpperCase() + tier.slice(1)} Model`} contentRows={lines.length}>
+        {lines}
+      </FullScreenFrame>
+    );
+  }
+
+  if (screen === "image-pick") {
+    const lines: React.ReactNode[] = [];
+    lines.push(<Text key="header" color={dim}>Select image model for {largeConnection?.label}:</Text>);
+    lines.push(<Text key="sep"> </Text>);
+    for (let i = 0; i < imageModels.length; i++) {
+      const m = imageModels[i];
+      const selected = i === imageModelIndex;
+      lines.push(
+        <Text key={m.modelId ?? "provider-default"} color={selected ? accent : fg}>
+          {selected ? "\u25C6 " : "  "}{m.label}
+        </Text>,
+      );
+    }
+    return (
+      <FullScreenFrame theme={theme} columns={cols} rows={termRows} title="Select Image Model" contentRows={lines.length}>
         {lines}
       </FullScreenFrame>
     );

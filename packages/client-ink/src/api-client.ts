@@ -52,6 +52,7 @@ export interface ConnectionInfo {
 export interface ConnectionsResponse {
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
+  imageAssignment: TierAssignmentEntry | null;
 }
 
 export interface ConnectionHealthResponse {
@@ -80,6 +81,11 @@ export interface KnownModelInfo {
   defaultTier: string;
   pricing: { input: number; output: number; cacheWrite: number; cacheRead: number };
   capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean };
+}
+
+export interface KnownImageModelInfo {
+  provider: string;
+  displayName: string;
 }
 
 export class ApiClient {
@@ -247,15 +253,28 @@ export class ApiClient {
     return this.get(`/manage/connections/${encodeURIComponent(id)}/usage`);
   }
 
-  async getTierAssignments(): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+  async getTierAssignments(): Promise<{
+    tierAssignments: TierAssignmentsResponse;
+    imageAssignment: TierAssignmentEntry | null;
+  }> {
     return this.get("/manage/tiers");
   }
 
-  async setTierAssignments(assignments: Partial<TierAssignmentsResponse>): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+  async setTierAssignments(
+    assignments: Partial<TierAssignmentsResponse> & {
+      imageAssignment?: TierAssignmentEntry | null;
+    },
+  ): Promise<{
+    tierAssignments: TierAssignmentsResponse;
+    imageAssignment: TierAssignmentEntry | null;
+  }> {
     return this.fetch("/manage/tiers", { method: "PUT", body: assignments });
   }
 
-  async listKnownModels(): Promise<{ models: Record<string, KnownModelInfo> }> {
+  async listKnownModels(): Promise<{
+    models: Record<string, KnownModelInfo>;
+    imageModels: Record<string, KnownImageModelInfo>;
+  }> {
     return this.get("/manage/models");
   }
 

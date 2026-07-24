@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   getKnownModel,
+  getImageModelsForProvider,
   getMaxOutput,
   getTierDefaults,
   loadModelRegistry,
@@ -165,6 +166,26 @@ describe("Gemini registry", () => {
       large: "gemini-3.6-flash",
       medium: "gemini-3.5-flash",
       small: "gemini-3.5-flash-lite",
+    });
+  });
+});
+
+describe("image model registry", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("keeps selectable image models separate and keyed by connection provider", () => {
+    expect(getImageModelsForProvider("openai-apikey")).toEqual({
+      "gpt-image-2": { provider: "openai-apikey", displayName: "GPT Image 2" },
+    });
+    expect(getImageModelsForProvider("openai-chatgpt")).toEqual({});
+    expect(getImageModelsForProvider("xai")).toEqual({
+      "grok-imagine-image": { provider: "xai", displayName: "Grok Imagine" },
+      "grok-imagine-image-quality": { provider: "xai", displayName: "Grok Imagine Quality" },
+    });
+    expect(getImageModelsForProvider("gemini")).toEqual({
+      "gemini-3.1-flash-image": { provider: "gemini", displayName: "Nano Banana 2" },
     });
   });
 });

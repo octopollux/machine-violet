@@ -144,9 +144,9 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | File | Purpose |
 |---|---|
 | `models.ts` | `getModel("large" \| "medium" \| "small")` — tier model selection (cached; tests need `loadModelConfig({ reset: true })`) |
-| `connections.ts` | Multi-provider connection management: load/save/add/remove connections, tier assignments. Supports Anthropic, OpenAI, OpenRouter, custom providers. Persists to `connections.json` |
+| `connections.ts` | Multi-provider connection management: load/save/add/remove connections, text-tier assignments, and the optional exact-Large-paired image assignment. Persists to `connections.json` |
 | `discord.ts` | Discord integration settings: enabled/disabled state persisted to `discord-settings.json` (on by default) |
-| `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Pricing, capabilities, context windows, tier defaults per provider |
+| `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Separate text `models` and selectable `imageModels`, plus pricing, capabilities, context windows, and tier defaults per provider |
 | `personality-loader.ts` | `loadAllPersonalities()`, `getPersonality()` — loads `.mvdm` DM personality files from `personalities/` (bundled, strict) and `~/.machine-violet/personalities/` (user, lenient) |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
 | `first-launch.ts` | `.env` loading, config paths, API key format validation |
@@ -196,7 +196,7 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
 | `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Five items: API Keys (→ ConnectionsPhase), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
-| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small tier picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
+| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small text tiers plus a Large-provider-paired image-model picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
 | `DiscordSettingsPhase.tsx` | Full-screen Discord Rich Presence Enable/Disable toggle (title: "Discord"). Saves the choice to `discord-settings.json`; ESC returns without saving |
 
 ## Engine: prompts/ — Prompt Templates

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  removeConnection, upsertChatGptConnection,
+  removeConnection, setImageAssignment, setTierAssignment, upsertChatGptConnection,
 } from "./connections.js";
 import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
@@ -19,6 +19,15 @@ afterEach(() => {
 });
 
 describe("loadConnectionStore migration", () => {
+  it("migrates pre-image-selection stores to a null provider default", () => {
+    const legacy = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    };
+    writeFileSync(join(tempDir, "connections.json"), JSON.stringify(legacy));
+    expect(loadConnectionStore(tempDir).imageAssignment).toBeNull();
+  });
+
   it("rewrites legacy provider 'openai' to 'openai-apikey'", () => {
     const legacy = {
       connections: [
@@ -282,6 +291,93 @@ describe("buildEffectiveConnections", () => {
     });
     const conn = effective.connections.find((c) => c.id === "custom-1");
     expect(conn?.models).toEqual([{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }]);
+  });
+
+  it("keeps an explicit image model only on the exact Large-tier connection", () => {
+    const connection: AIConnection = {
+      id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
+      models: [{ id: "grok-4.5", displayName: "Grok 4.5", available: true }],
+      source: "manual", addedAt: "2026-07-24",
+    };
+    const assignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    const effective = buildEffectiveConnections({
+      connections: [connection],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image-quality" },
+    });
+    expect(effective.imageAssignment).toEqual({
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image-quality",
+    });
+  });
+
+  it("clears cross-provider, stale, or unregistered image assignments", () => {
+    const connection: AIConnection = {
+      id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test",
+      models: [{ id: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", available: true }],
+      source: "manual", addedAt: "2026-07-24",
+    };
+    const assignment = { connectionId: "openai-1", modelId: "gpt-5.6-sol" };
+    const effective = buildEffectiveConnections({
+      connections: [connection],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "openai-1", modelId: "grok-imagine-image" },
+    });
+    expect(effective.imageAssignment).toBeNull();
+  });
+});
+
+describe("image assignment operations", () => {
+  const openai: AIConnection = {
+    id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test",
+    models: [], source: "manual", addedAt: "",
+  };
+  const xai: AIConnection = {
+    id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
+    models: [], source: "manual", addedAt: "",
+  };
+
+  it("preserves the image model when Large changes model on the same connection", () => {
+    const store: ConnectionStore = {
+      connections: [openai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.5" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    };
+    expect(setTierAssignment(store, "large", "openai-1", "gpt-5.6-sol").imageAssignment)
+      .toEqual({ connectionId: "openai-1", modelId: "gpt-image-2" });
+  });
+
+  it("clears the image model when Large moves to another connection", () => {
+    const store: ConnectionStore = {
+      connections: [openai, xai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.6-sol" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    };
+    expect(setTierAssignment(store, "large", "xai-1", "grok-4.5").imageAssignment).toBeNull();
+  });
+
+  it("rejects an image assignment from any connection other than Large", () => {
+    const store: ConnectionStore = {
+      connections: [openai, xai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.6-sol" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: null,
+    };
+    expect(setImageAssignment(store, {
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image",
+    }).imageAssignment).toBeNull();
   });
 });
 

@@ -88,6 +88,8 @@ export class GameEngine {
    * via the `tierProvidersForTest` helper.
    */
   private tierProviders: Record<ModelTier, TierProvider>;
+  /** Explicit provider-native image model paired to the DM's Large connection. */
+  private readonly imageModel?: string;
   private registry: ToolRegistry;
   private gameState: GameState;
   private conversation: ConversationManager;
@@ -245,11 +247,13 @@ export class GameEngine {
      * synthesize a homogeneous map via `tierProvidersForTest`.
      */
     tierProviders: Record<ModelTier, TierProvider>;
+    imageModel?: string;
     gitIO?: GitIO;
     entityTree?: EntityTree;
   }) {
     this.provider = params.provider;
     this.tierProviders = params.tierProviders;
+    this.imageModel = params.imageModel;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -1594,6 +1598,7 @@ export class GameEngine {
         : [];
       const result = await generateImage({
         prompt: promptText,
+        ...(this.imageModel ? { imageModel: this.imageModel } : {}),
         effort,
         aspect,
         intent,
@@ -1742,6 +1747,7 @@ export class GameEngine {
       try {
         const result = await generateImage({
           prompt: buildPortraitRevisionPrompt(name, change),
+          ...(this.imageModel ? { imageModel: this.imageModel } : {}),
           effort: "standard",
           // The canonical portrait is the multi-angle landscape reference
           // sheet from setup; re-render in landscape so the revision keeps
