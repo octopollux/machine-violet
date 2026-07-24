@@ -4,6 +4,23 @@ The `openai.ts` adapter (`packages/engine/src/providers/openai.ts`) handles the 
 
 The adapter owns format translation between the engine's normalized message shape and OpenAI's wire formats: `tool_calls` carry `function.arguments` as a JSON string (vs Anthropic's parsed object), streaming events differ per API, and reasoning tokens and automatic prefix caching are handled per path.
 
+## Shipped OpenAI models
+
+`packages/engine/src/config/known-models.json` is the source of truth for the
+selectable OpenAI catalog. Both API-key and ChatGPT connections default to the
+current GPT-5.6 family: Sol for the large tier, Terra for medium, and Luna for
+small. GPT-5.5, GPT-5.5 Pro, the GPT-5.4 family (including mini and nano), and
+the retained GPT-5/4o models remain selectable with their published context,
+output, pricing, and capability metadata.
+
+GPT-5.5 Pro does not expose SSE streaming. When selected, `stream()` falls
+back to one non-streaming Responses request and emits the completed text as a
+single delta, so the engine-facing provider contract still works.
+
+The GPT-5.6 family supports a distinct `max` reasoning level. The normalized
+Machine Violet `max` effort maps to API `max` for `gpt-5.6*`; older models and
+compatible endpoints receive `xhigh`, preserving their supported ceiling.
+
 ## Responses API vs Chat Completions routing
 
 A single set drives the routing decision:

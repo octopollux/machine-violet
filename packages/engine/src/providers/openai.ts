@@ -28,7 +28,7 @@ import type {
 } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
 import { buildReferenceDirective } from "./image-reference-directive.js";
-import { supportsImageGeneration } from "../config/model-registry.js";
+import { getKnownModel, supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +40,18 @@ const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter"]);
 
 function useResponsesAPI(providerId: string): boolean {
   return RESPONSES_API_PROVIDERS.has(providerId);
+}
+
+/**
+ * Map Machine Violet's provider-neutral effort scale onto OpenAI's. GPT-5.6
+ * is the first shipped family where `max` is a distinct API level; older
+ * models and OpenAI-compatible providers continue to receive `xhigh`.
+ */
+function mapReasoningEffort(model: string, effort: NonNullable<ChatParams["thinking"]>["effort"]): ReasoningEffort {
+  if (effort === "max") {
+    return model.startsWith("gpt-5.6") ? "max" : "xhigh";
+  }
+  return effort ?? "medium";
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +298,8 @@ async function responsesChat(
 ): Promise<ChatResult> {
   const apiParams = toResponsesParams(params);
 
-  if (streaming && onDelta) {
+  const modelSupportsStreaming = getKnownModel(params.model)?.capabilities.streaming !== false;
+  if (streaming && onDelta && modelSupportsStreaming) {
     return responsesStream(client, apiParams, onDelta);
   }
 
@@ -295,7 +308,12 @@ async function responsesChat(
     rateLimitState,
   );
 
-  return fromResponsesResponse(response);
+  const result = fromResponsesResponse(response);
+  // A small number of selectable Responses API models (currently GPT-5.5
+  // Pro) do not support SSE. Preserve the provider's stream contract by
+  // issuing a non-streaming request and emitting the completed text once.
+  if (streaming && onDelta && result.text) onDelta(result.text);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -434,14 +452,8 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
   let reasoning: Reasoning | undefined;
   let include: OpenAI.Responses.ResponseIncludable[] | undefined;
   if (params.thinking?.effort) {
-    const effortMap: Record<string, ReasoningEffort> = {
-      low: "low",
-      medium: "medium",
-      high: "high",
-      max: "xhigh",
-    };
     reasoning = {
-      effort: effortMap[params.thinking.effort] ?? "medium",
+      effort: mapReasoningEffort(params.model, params.thinking.effort),
       summary: "concise",
     };
     include = ["reasoning.encrypted_content"];
@@ -902,13 +914,7 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
   // not an object. Map from our normalized effort levels.
   let reasoningEffort: ReasoningEffort | undefined;
   if (params.thinking?.effort) {
-    const effortMap: Record<string, ReasoningEffort> = {
-      low: "low",
-      medium: "medium",
-      high: "high",
-      max: "xhigh",
-    };
-    reasoningEffort = effortMap[params.thinking.effort] ?? "medium";
+    reasoningEffort = mapReasoningEffort(params.model, params.thinking.effort);
   }
 
   return {

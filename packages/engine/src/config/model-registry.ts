@@ -38,6 +38,12 @@ export interface ModelPricing {
 
 export interface ModelCapabilities {
   thinking: boolean;
+  /**
+   * Adaptive thinking cannot be disabled for this model. When true, callers
+   * must omit `thinking: { type: "disabled" }` and budget output tokens for
+   * reasoning even when no explicit effort override was requested.
+   */
+  alwaysAdaptiveThinking?: boolean;
   tools: boolean;
   streaming: boolean;
   caching: boolean;
@@ -147,9 +153,9 @@ export function getModelsForProvider(provider: string, configDir?: string): Reco
  * the model-family identifier used in {@link KnownModelEntry.provider}.
  *
  * We split the two namespaces because `openai-apikey` and `openai-chatgpt`
- * connections both reach the same family of GPT-5.x models, but each
- * connection-type has its own tier-defaults entry in `known-models.json`
- * (different defaults: ChatGPT auth doesn't expose `gpt-5-nano`).
+ * connections both reach the same family of GPT models, but each
+ * connection-type has its own tier-defaults entry in `known-models.json` so
+ * the defaults can diverge independently if either surface changes access.
  */
 export function modelFamilyFor(connectionProvider: string): string {
   if (connectionProvider === "openai-apikey" || connectionProvider === "openai-chatgpt") {

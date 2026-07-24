@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getMaxOutput, loadModelRegistry, supportsImageGeneration } from "./model-registry.js";
+import {
+  getKnownModel,
+  getMaxOutput,
+  getTierDefaults,
+  loadModelRegistry,
+  supportsImageGeneration,
+} from "./model-registry.js";
 
 /**
  * `getMaxOutput` is the single source of truth for `max_tokens` on every API
@@ -12,9 +18,10 @@ describe("getMaxOutput", () => {
     loadModelRegistry(undefined, { reset: true });
   });
 
-  it("returns the registry's maxOutput for a known model", () => {
-    // claude-opus-4-6 is shipped with maxOutput=128000 (the docs ceiling).
-    expect(getMaxOutput("claude-opus-4-6")).toBe(128000);
+  it("returns the registry's maxOutput for current Anthropic models", () => {
+    expect(getMaxOutput("claude-fable-5")).toBe(128000);
+    expect(getMaxOutput("claude-opus-4-8")).toBe(128000);
+    expect(getMaxOutput("claude-sonnet-5")).toBe(128000);
   });
 
   it("returns the registry's maxOutput for GPT-5.5 (the model that triggered this fix)", () => {
@@ -44,6 +51,50 @@ describe("getMaxOutput", () => {
   });
 });
 
+describe("current provider defaults and metadata", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("ships the current Anthropic tier family", () => {
+    expect(getTierDefaults("anthropic")).toEqual({
+      large: "claude-fable-5",
+      medium: "claude-sonnet-5",
+      small: "claude-haiku-4-5-20251001",
+    });
+    expect(getKnownModel("claude-fable-5")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      capabilities: { thinking: true, alwaysAdaptiveThinking: true },
+    });
+  });
+
+  it("ships GPT-5.6 as the API-key and ChatGPT tier family", () => {
+    const expected = {
+      large: "gpt-5.6-sol",
+      medium: "gpt-5.6-terra",
+      small: "gpt-5.6-luna",
+    };
+    expect(getTierDefaults("openai-apikey")).toEqual(expected);
+    expect(getTierDefaults("openai-chatgpt")).toEqual(expected);
+  });
+
+  it("uses current OpenAI context and output ceilings", () => {
+    expect(getKnownModel("gpt-5.4")).toMatchObject({
+      contextWindow: 1_050_000,
+      maxOutput: 128_000,
+    });
+    expect(getKnownModel("gpt-5.4-mini")).toMatchObject({
+      contextWindow: 400_000,
+      maxOutput: 128_000,
+    });
+    expect(getKnownModel("gpt-5.4-nano")).toMatchObject({
+      contextWindow: 400_000,
+      maxOutput: 128_000,
+    });
+  });
+});
+
 describe("supportsImageGeneration", () => {
   beforeEach(() => {
     loadModelRegistry(undefined, { reset: true });
@@ -55,6 +106,9 @@ describe("supportsImageGeneration", () => {
   });
 
   it("returns false for current Anthropic models (no inline image gen yet)", () => {
+    expect(supportsImageGeneration("claude-fable-5")).toBe(false);
+    expect(supportsImageGeneration("claude-opus-4-8")).toBe(false);
+    expect(supportsImageGeneration("claude-sonnet-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-7")).toBe(false);
     expect(supportsImageGeneration("claude-sonnet-4-6")).toBe(false);
     expect(supportsImageGeneration("claude-haiku-4-5-20251001")).toBe(false);

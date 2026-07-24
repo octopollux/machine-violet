@@ -37,7 +37,7 @@ Every operation has an explicit cost tier. This is the core economic constraint.
 |---|---|---|---|---|
 | T1 (Code) | None | Zero tokens | Dice, maps, clocks, cards, combat, persistence | `packages/engine/src/tools/` — pure functions |
 | T2 (Subagent) | Haiku or Sonnet | Cheap | Summarization, precis, changelogs, resolution, choices, entity writes | `packages/engine/src/agents/subagents/` — `spawnSubagent()` / `oneShot()` |
-| T3 (DM) | Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
+| T3 (DM) | Fable or Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
 
 Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")` returns baked-in defaults. Per-tier provider/model assignment lives in `connections.json` (managed via the Connections UI); `dev-config.jsonc` exposes optional dev-only `effort` and `pricing` overrides.
 
@@ -47,7 +47,9 @@ Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | 
 
 The Anthropic adapter (`packages/engine/src/providers/anthropic.ts`) implements extended thinking for capable models via `ThinkingConfigParam`.
 
-**Thinking config** (`toAnthropicParams`): thinking is enabled only for models whose `capabilities.thinking` flag is true in `known-models.json` (looked up via `getKnownModel`). When `ChatParams.thinking.effort` is set and the model supports thinking, the adapter sends `thinking: { type: 'adaptive' }` to the API; otherwise it sends `{ type: 'disabled' }`. For Opus models specifically (model id contains `opus`), an `output_config: { effort }` block is added alongside the thinking param. When thinking is active, `max_tokens` is boosted to `Math.max(params.maxTokens, model maxOutput)` (falling back to 16384 if the model has no `maxOutput`) so thinking tokens don't starve the response.
+**Thinking config** (`toAnthropicParams`): thinking is enabled only for models whose `capabilities.thinking` flag is true in `known-models.json` (looked up via `getKnownModel`). When `ChatParams.thinking.effort` is set and the model supports thinking, the adapter sends `thinking: { type: 'adaptive' }` plus `output_config: { effort }`; otherwise it sends `{ type: 'disabled' }`. Models marked `alwaysAdaptiveThinking` are the exception: their API rejects disabled thinking, so an unset effort omits the thinking field and inherits mandatory adaptive thinking. When thinking is active — explicitly or because the model requires it — `max_tokens` is boosted to `Math.max(params.maxTokens, model maxOutput)` (falling back to 16384 if the model has no `maxOutput`) so thinking tokens don't starve the response.
+
+The shipped Anthropic defaults are Claude Fable 5 (large), Claude Sonnet 5 (medium), and Claude Haiku 4.5 (small). Claude Opus 4.8 and retained 4.x models remain selectable. Fable 5 is marked always-adaptive; Sonnet 5 can still honor Machine Violet's explicit disabled mode when an agent has no configured effort.
 
 **Cross-turn reasoning state** (`fromAnthropicResponse` + `toAnthropicMessage`): The API returns `thinking` and `redacted_thinking` content blocks in its response. Both are captured verbatim into `assistantContent`:
 

@@ -325,6 +325,19 @@ describe("Responses API integration", () => {
     expect(callArgs.reasoning.effort).toBe("xhigh");
   });
 
+  it("preserves the distinct max effort supported by GPT-5.6", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      model: "gpt-5.6-sol",
+      thinking: { effort: "max" },
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.reasoning.effort).toBe("max");
+  });
+
   it("converts assistant tool_use messages to function_call input items", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 
@@ -704,6 +717,25 @@ describe("Responses API integration", () => {
   });
 
   describe("streaming", () => {
+    it("falls back to a completed response for models without SSE support", async () => {
+      mockResponses.create.mockResolvedValue(fakeResponse({ model: "gpt-5.5-pro" }));
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      const deltas: string[] = [];
+      const result = await provider.stream(
+        baseChatParams({ model: "gpt-5.5-pro" }),
+        (delta) => deltas.push(delta),
+      );
+
+      expect(mockResponses.stream).not.toHaveBeenCalled();
+      expect(mockResponses.create).toHaveBeenCalledWith(expect.objectContaining({
+        model: "gpt-5.5-pro",
+        stream: false,
+      }));
+      expect(deltas).toEqual(["Hi there!"]);
+      expect(result.text).toBe("Hi there!");
+    });
+
     it("emits text deltas and returns final response", async () => {
       const response = fakeResponse();
       const events = [
