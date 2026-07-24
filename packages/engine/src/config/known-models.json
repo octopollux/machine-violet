@@ -198,6 +198,60 @@
       "compactionThreshold": 800000,
       "pricing": { "input": 3, "output": 15, "cacheWrite": 0, "cacheRead": 0.3 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": false, "imageGeneration": false }
+    },
+    "grok-4.5": {
+      "provider": "xai",
+      "displayName": "Grok 4.5",
+      "contextWindow": 500000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "pricing": { "input": 2, "output": 6, "cacheWrite": 0, "cacheRead": 0.30 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "grok-4.3": {
+      "provider": "xai",
+      "displayName": "Grok 4.3",
+      "contextWindow": 1000000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "pricing": { "input": 1.25, "output": 2.50, "cacheWrite": 0, "cacheRead": 0.20 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "grok-build-0.1": {
+      "provider": "xai",
+      "displayName": "Grok Build 0.1",
+      "contextWindow": 256000,
+      "maxOutput": 16384,
+      "defaultTier": "medium",
+      "pricing": { "input": 1, "output": 2, "cacheWrite": 0, "cacheRead": 0.20 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "grok-4.20-0309-reasoning": {
+      "provider": "xai",
+      "displayName": "Grok 4.20 (Reasoning)",
+      "contextWindow": 1000000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "pricing": { "input": 1.25, "output": 2.50, "cacheWrite": 0, "cacheRead": 0.20 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "grok-4.20-0309-non-reasoning": {
+      "provider": "xai",
+      "displayName": "Grok 4.20 (Non-Reasoning)",
+      "contextWindow": 1000000,
+      "maxOutput": 16384,
+      "defaultTier": "small",
+      "pricing": { "input": 1.25, "output": 2.50, "cacheWrite": 0, "cacheRead": 0.20 },
+      "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "grok-4.20-multi-agent-0309": {
+      "provider": "xai",
+      "displayName": "Grok 4.20 Multi-Agent",
+      "contextWindow": 1000000,
+      "maxOutput": 16384,
+      "defaultTier": "large",
+      "pricing": { "input": 1.25, "output": 2.50, "cacheWrite": 0, "cacheRead": 0.20 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     }
   },
   "tierDefaults": {
@@ -208,6 +262,7 @@
       "large": "moonshotai/kimi-k3",
       "medium": "moonshotai/kimi-k3",
       "small": "moonshotai/kimi-k3"
-    }
+    },
+    "xai": { "large": "grok-4.5", "medium": "grok-4.3", "small": "grok-4.20-0309-non-reasoning" }
   }
 }

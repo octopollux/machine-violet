@@ -210,6 +210,7 @@ export const AddConnectionRequest = Type.Object({
     Type.Literal("anthropic"),
     Type.Literal("openai-apikey"),
     Type.Literal("openrouter"),
+    Type.Literal("xai"),
     Type.Literal("custom"),
   ]),
   apiKey: Type.String(),

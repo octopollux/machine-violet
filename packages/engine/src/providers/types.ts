@@ -40,7 +40,7 @@ export type ContentPart =
   /**
    * Encrypted reasoning blob produced by an OpenAI reasoning model on the
    * Responses API (with `include: ["reasoning.encrypted_content"]`) — i.e. the
-   * `openai-apikey` / `openrouter` providers. Persisted with the assistant turn
+   * `openai-apikey` / `openrouter` / `xai` providers. Persisted with the assistant turn
    * and replayed on subsequent turns so the model keeps its chain-of-thought
    * across calls without us setting `store: true`. The `encryptedContent`
    * payload is opaque; `summary` mirrors the human-readable reasoning summary we
@@ -159,6 +159,13 @@ export type ImageAspect = "portrait" | "landscape" | "square";
 /** Args accepted by {@link LLMProvider.generateImage}. */
 export interface GenerateImageRequest {
   prompt: string;
+  /**
+   * Optional provider-native image model override. Callers normally omit this
+   * and let the active provider choose its shipped default. This seam keeps
+   * image-model assignment separate from the chat model without forcing every
+   * provider to honor foreign model IDs.
+   */
+  imageModel?: string;
   /** Default: `"standard"`. */
   effort?: ImageEffort;
   /** Default: `"square"`. */

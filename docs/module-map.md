@@ -95,14 +95,14 @@ Token tracking, conversation window, prompt caching, state persistence.
 
 ## Engine: providers/ — LLM Provider Adapters
 
-Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
+Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, xAI, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
 
 | File | Purpose |
 |---|---|
 | `index.ts` | `createProviderFromConnection()` — factory that constructs the right provider from a stored `AIConnection` record |
 | `types.ts` | `LLMProvider` and `TierProvider` interfaces, `ChatParams`, `GenerateImageRequest`/`GenerateImageResult`, `ImageEffort` (`draft`/`standard`/`quality`/`showcase`), `ImageAspect` (`portrait`/`landscape`/`square`) |
 | `anthropic.ts` | `createAnthropicProvider()` — Anthropic SDK adapter; streaming, tool use, prompt caching, thinking blocks, rate-limit usage tracking (`anthropic-ratelimit-*` response headers → `getUsageStatus()`) |
-| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, image generation (text-to-image + `images.edit` reference conditioning + empty-render retry), rate-limit usage tracking (`x-ratelimit-*` response headers → `getUsageStatus()`) — see [openai-provider.md](openai-provider.md) |
+| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `xai` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, OpenAI + Grok Imagine generation/editing, and rate-limit tracking — see [openai-provider.md](openai-provider.md) |
 | `agent-loop-bridge.ts` | `runProviderLoop()` — provider-agnostic version of the agent turn loop: concurrent tool dispatch, TUI broadcast, deferred-sentinel logic, `cacheHints` for tool-definition cache_control. Returns normalized (not Anthropic-specific) types |
 | `image-reference-directive.ts` | `buildReferenceDirective()` — the shared "match the reference for identity, take pose/expression from the description" text appended to a reference-conditioned image prompt; used by both the `openai` (`images.edit`) and `openai-chatgpt` (codex) backends |
 | `orphan-patch.ts` | Heals conversation history with orphaned `tool_use` blocks by inserting deterministic synthetic `tool_result` stubs before replay 400s — see [error-recovery.md](error-recovery.md) |

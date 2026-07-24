@@ -613,11 +613,11 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 
 ```
 <appDir>/
-├── .env                      API keys (ANTHROPIC_API_KEY, etc.). Loaded at startup via first-launch.ts.
+├── .env                      API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY, etc.). Loaded at startup.
 ├── config.json               App-level config (home directory path, defaults).
 ├── api-keys.json             Manually added API keys (treated as secret, like .env).
-├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, custom.
-│                              Each connection: id, provider (anthropic | openai-apikey | openai-chatgpt | openrouter | custom), label,
+├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, xAI, custom.
+│                              Each connection: id, provider (anthropic | openai-apikey | openai-chatgpt | openrouter | xai | custom), label,
 │                              apiKey (empty for openai-chatgpt — Codex owns its own token store at ~/.codex/auth.json),
 │                              optional baseUrl, optional chatgptAccount, discovered models,
 │                              source (env/manual/oauth). Tier assignments (large/medium/small → connectionId + modelId).

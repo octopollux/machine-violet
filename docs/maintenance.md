@@ -149,7 +149,7 @@ materialization — is separate and lives in [format-spec.md §10](format-spec.m
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
-| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
+| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/xai/custom: Responses-vs-Completions routing, streaming reasoning, encrypted-reasoning replay, OpenAI + Grok Imagine |
 | E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
 | Release process / pre-cut smoke | [releases.md](releases.md) | Channels, branches, cut commands; the pre-cut install-method smoke test (`/release-smoke`) and what CI's packaged gates can't see |
 | Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |

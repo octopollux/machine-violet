@@ -58,7 +58,7 @@ The shipped Anthropic defaults are Claude Fable 5 (large), Claude Sonnet 5 (medi
 
 On subsequent turns, `toAnthropicMessage` emits both block types back to the API as `ThinkingBlockParam` and `RedactedThinkingBlockParam`, signature and data fields unchanged. The API auto-filters which blocks it needs and bills accordingly, so the adapter passes back everything captured rather than pruning manually. This round-trip is what lets the model continue its reasoning chain across turn boundaries rather than re-deriving context from scratch (issue #533). OpenAI `reasoning` blocks that may exist in shared history are skipped here — the Anthropic API rejects them.
 
-This cross-provider reasoning-preservation contract is pinned by `packages/engine/src/providers/preserves-thinking.contract.test.ts`, which tests the capture + replay path for the `anthropic`, `openai-apikey` (Responses API), and `openai-chatgpt` providers; `openrouter` and `custom` are registered as explicitly unsupported with documented rationale.
+This cross-provider reasoning-preservation contract is pinned by `packages/engine/src/providers/preserves-thinking.contract.test.ts`, which tests the capture + replay path for the `anthropic`, `openai-apikey` (Responses API), and `openai-chatgpt` providers; `openrouter` and `xai` share the tested Responses path, while `custom` is explicitly unsupported with documented rationale.
 
 ## State Architecture
 

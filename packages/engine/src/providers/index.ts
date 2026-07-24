@@ -66,6 +66,13 @@ export function createProviderFromConnection(conn: AIConnection, opts: CreatePro
         providerId: "openrouter",
       });
 
+    case "xai":
+      return createOpenAIProvider({
+        apiKey: conn.apiKey,
+        baseURL: "https://api.x.ai/v1",
+        providerId: "xai",
+      });
+
     case "custom":
       return createOpenAIProvider({
         apiKey: conn.apiKey,

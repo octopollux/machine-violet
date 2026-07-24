@@ -5,7 +5,7 @@
  * Replaces the single-provider api-keys.ts with multi-provider support.
  *
  * Connections are persisted to `connections.json` in the app config dir.
- * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY) auto-create
+ * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY) auto-create
  * connections at runtime via buildEffectiveConnections().
  */
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
@@ -17,7 +17,7 @@ import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-r
 // Types
 // ---------------------------------------------------------------------------
 
-export type ProviderType = "anthropic" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "custom";
+export type ProviderType = "anthropic" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "xai" | "custom";
 
 export interface DiscoveredModel {
   id: string;
@@ -97,6 +97,7 @@ export interface TierAssignment {
 const STORE_FILENAME = "connections.json";
 const ENV_ANTHROPIC_ID = "env-anthropic";
 const ENV_OPENAI_ID = "env-openai";
+const ENV_XAI_ID = "env-xai";
 
 function generateId(): string {
   return randomBytes(8).toString("hex");
@@ -232,6 +233,23 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
+  // Environment: xAI
+  const xaiKey = process.env.XAI_API_KEY;
+  if (xaiKey) {
+    const knownModels = getModelsForProvider("xai", configDir);
+    connections.push({
+      id: ENV_XAI_ID,
+      provider: "xai",
+      label: "xAI (env)",
+      apiKey: xaiKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
   // Manual connections — refresh models from the registry on every load.
   //
   // For registry-backed providers (anthropic, openai-apikey) the model list
@@ -318,7 +336,7 @@ export function addConnection(
 }
 
 export function removeConnection(store: ConnectionStore, connectionId: string): ConnectionStore {
-  if (connectionId === ENV_ANTHROPIC_ID || connectionId === ENV_OPENAI_ID) return store;
+  if (connectionId === ENV_ANTHROPIC_ID || connectionId === ENV_OPENAI_ID || connectionId === ENV_XAI_ID) return store;
   const connections = store.connections.filter((c) => c.id !== connectionId);
   // Clear tier assignments that referenced this connection
   const tierAssignments = { ...store.tierAssignments };

@@ -106,12 +106,15 @@ describe("saveConnectionStore", () => {
 describe("buildEffectiveConnections", () => {
   let savedAnthropic: string | undefined;
   let savedOpenai: string | undefined;
+  let savedXai: string | undefined;
 
   beforeEach(() => {
     savedAnthropic = process.env.ANTHROPIC_API_KEY;
     savedOpenai = process.env.OPENAI_API_KEY;
+    savedXai = process.env.XAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.XAI_API_KEY;
   });
 
   afterEach(() => {
@@ -119,6 +122,8 @@ describe("buildEffectiveConnections", () => {
     else process.env.ANTHROPIC_API_KEY = savedAnthropic;
     if (savedOpenai === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedOpenai;
+    if (savedXai === undefined) delete process.env.XAI_API_KEY;
+    else process.env.XAI_API_KEY = savedXai;
   });
 
   it("auto-creates an env connection for OPENAI_API_KEY with provider 'openai-apikey'", () => {
@@ -130,6 +135,21 @@ describe("buildEffectiveConnections", () => {
     const env = effective.connections.find((c) => c.source === "env" && c.provider === "openai-apikey");
     expect(env).toBeDefined();
     expect(env?.apiKey).toBe("sk-test-env");
+  });
+
+  it("auto-creates an env connection for XAI_API_KEY with current Grok models", () => {
+    process.env.XAI_API_KEY = "xai-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const env = effective.connections.find((c) => c.source === "env" && c.provider === "xai");
+    expect(env?.apiKey).toBe("xai-test-env");
+    expect(env?.models.map((m) => m.id)).toContain("grok-4.5");
+    expect(effective.tierAssignments.large).toEqual({
+      connectionId: "env-xai",
+      modelId: "grok-4.5",
+    });
   });
 
   it("refreshes a manual openai-apikey connection's models against the current registry", () => {
