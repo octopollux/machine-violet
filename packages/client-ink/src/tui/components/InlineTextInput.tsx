@@ -146,7 +146,7 @@ export interface InlineTextInputProps {
 /**
  * Uncontrolled text input with full cursor positioning.
  * Supports: left/right arrows, Home/End, Ctrl+A/E/U, backspace.
- * Clear by changing the React `key` prop.
+ * Clear with Ctrl+U or by changing the React `key` prop.
  */
 export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, maxLines, onChange, onCursorOffsetChange, onSubmit }: InlineTextInputProps) {
   const initialState: State = {

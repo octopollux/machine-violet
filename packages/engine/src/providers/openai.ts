@@ -54,7 +54,7 @@ function mapReasoningEffort(
   effort: NonNullable<ChatParams["thinking"]>["effort"],
 ): ReasoningEffort {
   if (effort === "max") {
-    if (model.startsWith("gpt-5.6")) return "max";
+    if (providerId === "openai-apikey" && model.startsWith("gpt-5.6")) return "max";
     // Grok 4.5 supports low/medium/high only. The multi-agent model retains
     // xhigh, while the rest of xAI's shipped family is clamped to its ceiling.
     if (providerId === "xai" && model !== "grok-4.20-multi-agent-0309") return "high";

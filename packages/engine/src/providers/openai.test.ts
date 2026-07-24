@@ -1033,6 +1033,19 @@ describe("Chat Completions integration (custom provider)", () => {
     expect(result.usage.cacheReadTokens).toBe(2);
   });
 
+  it("keeps max effort compatible on custom endpoints using an OpenAI model name", async () => {
+    mockCompletions.create.mockResolvedValue(fakeChatCompletion());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
+    await provider.chat(baseChatParams({
+      model: "gpt-5.6-sol",
+      thinking: { effort: "max" },
+    }));
+
+    const callArgs = mockCompletions.create.mock.calls[0][0];
+    expect(callArgs.reasoning_effort).toBe("xhigh");
+  });
+
   it("maps tool_calls finish reason", async () => {
     mockCompletions.create.mockResolvedValue(fakeChatCompletion({
       choices: [{

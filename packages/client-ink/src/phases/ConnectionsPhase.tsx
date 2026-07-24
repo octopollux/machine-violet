@@ -70,7 +70,7 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const TIERS = ["large", "medium", "small"] as const;
-const ASSIGNMENT_ROWS = 4;
+const ASSIGNMENT_ROWS = TIERS.length + 1;
 
 // ---------------------------------------------------------------------------
 // Usage segment rendering

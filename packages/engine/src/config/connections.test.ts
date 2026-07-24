@@ -86,6 +86,7 @@ describe("saveConnectionStore", () => {
     saveConnectionStore(tempDir, {
       connections: [conn],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const loaded = loadConnectionStore(tempDir);
     expect(loaded.connections).toHaveLength(1);
@@ -93,7 +94,11 @@ describe("saveConnectionStore", () => {
   });
 
   it("writes atomically — no temp file is left behind (#696 parallel-safe)", () => {
-    const empty: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    const empty: ConnectionStore = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
     saveConnectionStore(tempDir, empty);
     // The atomic write stages a `.connections.json.<pid>.<rand>.tmp` then renames
     // it over the target; on success nothing temp should remain in the dir.
@@ -103,7 +108,11 @@ describe("saveConnectionStore", () => {
   });
 
   it("stays valid JSON across many back-to-back saves (crash/interleave surrogate)", () => {
-    const store: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    const store: ConnectionStore = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
     for (let i = 0; i < 20; i++) saveConnectionStore(tempDir, store);
     // Every intermediate state was a complete file (rename is atomic), so the
     // final read must parse cleanly — never a half-written truncation.
@@ -155,6 +164,7 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const env = effective.connections.find((c) => c.source === "env" && c.provider === "openai-apikey");
     expect(env).toBeDefined();
@@ -166,6 +176,7 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const env = effective.connections.find((c) => c.source === "env" && c.provider === "xai");
     expect(env?.apiKey).toBe("xai-test-env");
@@ -181,6 +192,7 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const env = effective.connections.find((c) => c.id === "env-openrouter");
     expect(env).toMatchObject({
@@ -205,6 +217,7 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const env = effective.connections.find((c) => c.id === "env-gemini");
     expect(env).toMatchObject({
@@ -225,6 +238,7 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     expect(effective.connections.find((c) => c.id === "env-gemini")?.apiKey).toBe("gemini-test-env");
   });
@@ -244,6 +258,7 @@ describe("buildEffectiveConnections", () => {
         source: "manual", addedAt: "2026-01-01",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const conn = effective.connections.find((c) => c.id === "stale-openai");
     expect(conn).toBeDefined();
@@ -261,6 +276,7 @@ describe("buildEffectiveConnections", () => {
         source: "manual", addedAt: "2026-07-24",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const conn = effective.connections.find((c) => c.id === "openrouter-1");
     expect(conn?.models).toEqual([{
@@ -288,6 +304,7 @@ describe("buildEffectiveConnections", () => {
         source: "manual", addedAt: "2026-01-01",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const conn = effective.connections.find((c) => c.id === "custom-1");
     expect(conn?.models).toEqual([{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }]);
@@ -398,6 +415,7 @@ describe("removeConnection", () => {
         medium: null,
         small: null,
       },
+      imageAssignment: null,
     };
     expect(removeConnection(store, "env-openrouter")).toBe(store);
   });
@@ -421,6 +439,7 @@ describe("upsertChatGptConnection", () => {
     const store: ConnectionStore = {
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount(), [
       { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
@@ -457,6 +476,7 @@ describe("upsertChatGptConnection", () => {
         medium: null,
         small: null,
       },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "a@example.com" }), []);
     expect(result.replacedInPlace).toBe(true);
@@ -491,6 +511,7 @@ describe("upsertChatGptConnection", () => {
         addedAt: "",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "renamed@example.com" }), []);
     expect(store.connections[0].label).toBe("ChatGPT (renamed@example.com)");
@@ -529,6 +550,7 @@ describe("upsertChatGptConnection", () => {
         medium: { connectionId: "anth-conn", modelId: "claude" },
         small: { connectionId: "old-conn", modelId: "gpt-deprecated" },
       },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-B", email: "b@example.com" }), [
       { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
@@ -564,6 +586,7 @@ describe("upsertChatGptConnection", () => {
         },
       ],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A" }), []);
     expect(result.replacedInPlace).toBe(true);
