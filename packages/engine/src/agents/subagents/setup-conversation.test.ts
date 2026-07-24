@@ -295,6 +295,48 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.characterDetails).toBeNull();
   });
 
+  it("rejects a partial finalize_setup and lets the model repair the handoff", async () => {
+    // Real xAI regression: the model returned the schema-prefix campaign
+    // fields through campaign_scope but omitted the identity fields. The old
+    // fallback path scaffolded Player/Adventurer/The Unknown permanently.
+    const partial = {
+      genre: "Cinematic science-fantasy mystery",
+      system: "fate-accelerated",
+      campaign_name: "The Orrery of Storms",
+      campaign_premise: "A storm-battered observatory hangs above a gas giant.",
+      mood: "Tense but hopeful",
+      difficulty: "Balanced",
+      campaign_scope: "one-shot",
+    };
+    const repaired = {
+      ...partial,
+      dm_personality: "The Chronicler",
+      player_name: "Alex",
+      character_name: "Mara Voss",
+      character_description: "A disgraced cartographer summoned by a map that knows her name.",
+    };
+    const provider = mockProvider([
+      finalizeResponse(partial),
+      finalizeResponse(repaired),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(provider.stream).toHaveBeenCalledTimes(3);
+    expect(result.finalized).toMatchObject({
+      playerName: "Alex",
+      characterName: "Mara Voss",
+      personality: { name: "The Chronicler" },
+    });
+
+    const repairCall = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const serialized = JSON.stringify(repairCall.messages);
+    expect(serialized).toContain("finalize_setup rejected");
+    expect(serialized).toContain("dm_personality, player_name, character_name, character_description");
+    expect(serialized).toContain('"is_error":true');
+  });
+
   it("finalize_setup passes through handoff_note", async () => {
     const note = "Player leans noir-burnout. Wants ensemble scenes, not solo monologues.";
     const input = { ...FINALIZE_INPUT, handoff_note: note };

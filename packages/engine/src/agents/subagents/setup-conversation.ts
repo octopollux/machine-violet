@@ -87,6 +87,26 @@ interface ToolDispatchOutcome {
 
 // --- Tool definitions ---
 
+// These fields form the minimum safe setup→DM handoff. The tool schema asks
+// providers for additional required fields (handoff_note and opening_scene),
+// but those were introduced later and remain optional at runtime for replay
+// compatibility and the explicit DM-handled opening path. Never scaffold from
+// a call missing one of these core fields: model providers do occasionally
+// emit a schema-prefix object, and accepting it creates the visible fallback
+// identity Player/Adventurer/The Unknown instead of giving the model a chance
+// to repair its call.
+const CORE_FINALIZE_FIELDS = [
+  "genre",
+  "campaign_name",
+  "campaign_premise",
+  "mood",
+  "difficulty",
+  "dm_personality",
+  "player_name",
+  "character_name",
+  "character_description",
+] as const;
+
 const FINALIZE_TOOL: NormalizedTool = {
   name: "finalize_setup",
   description:
@@ -996,6 +1016,12 @@ export function createSetupConversation(
     };
   }
 
+  function missingCoreFinalizeFields(input: Record<string, unknown>): string[] {
+    return CORE_FINALIZE_FIELDS.filter((field) => (
+      typeof input[field] !== "string" || !(input[field] as string).trim()
+    ));
+  }
+
   /**
    * Run one player turn. Makes API calls in a loop, processing tool calls
    * every round, until one of three exit conditions:
@@ -1094,6 +1120,20 @@ export function createSetupConversation(
       if (call.name === "finalize_setup") {
         if (call.input._parse_error) {
           return { content: String(call.input._parse_error), isError: true };
+        }
+        const missingFields = missingCoreFinalizeFields(call.input);
+        if (missingFields.length > 0) {
+          logEvent("setup:finalize_rejected", {
+            model,
+            providerId: provider.providerId,
+            missingFields,
+          });
+          return {
+            content:
+              `finalize_setup rejected: missing required fields: ${missingFields.join(", ")}. `
+              + "Call finalize_setup again with every listed field populated; do not end setup.",
+            isError: true,
+          };
         }
         handleFinalize(call.input);
         return {
