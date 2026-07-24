@@ -1,7 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { buildNameInspiration } from "../name-inspiration.js";
+import { buildSetupNameInspiration } from "../name-inspiration.js";
 import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
@@ -565,14 +565,7 @@ function buildSystemPrompt(
   // random content stays out of the cache-stamped Tier 1/2 prefix, which is
   // meant to stay byte-stable across sessions — putting it there would churn
   // that shared cached prefix for no benefit.
-  // The DM's copy deliberately treats the sample as optional inspiration.
-  // Setup is different: it invents the campaign's initial character once, so
-  // replace that permissive framing with an explicit setup-only instruction.
-  const nameInspiration = buildNameInspiration().replace(
-    "For inspiration only — don't feel bound to this list:",
-    "When inventing names, use names from the Name Inspiration lists.",
-  );
-  blocks.push({ text: "\n\n## Name Inspiration\n" + nameInspiration });
+  blocks.push({ text: "\n\n## Name Inspiration\n" + buildSetupNameInspiration() });
 
   return blocks;
 }
