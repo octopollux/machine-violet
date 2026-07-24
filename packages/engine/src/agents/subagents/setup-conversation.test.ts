@@ -350,6 +350,37 @@ describe("createSetupConversation", () => {
     ]);
   });
 
+  it("retains a partial finalize payload across setup turns", async () => {
+    const withoutHandoff = Object.fromEntries(
+      Object.entries(FINALIZE_INPUT).filter(([key]) => key !== "handoff_note"),
+    );
+    const provider = mockProvider([
+      finalizeResponse(withoutHandoff),
+      textResponse("I still need to seal the handoff."),
+      finalizeResponse({ handoff_note: FINALIZE_INPUT.handoff_note }),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+
+    const first = await conv.start(noop);
+    expect(first.finalized).toBeUndefined();
+
+    const second = await conv.send("Continue.", noop);
+    expect(second.finalized).toMatchObject({
+      campaignName: FINALIZE_INPUT.campaign_name,
+      playerName: FINALIZE_INPUT.player_name,
+      characterName: FINALIZE_INPUT.character_name,
+      handoffNote: FINALIZE_INPUT.handoff_note,
+    });
+
+    const crossTurnRepair = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[2][0];
+    const repairTool = crossTurnRepair.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(repairTool.inputSchema.required).toEqual(["handoff_note"]);
+    expect(Object.keys(repairTool.inputSchema.properties)).toEqual(["handoff_note"]);
+  });
+
   it("finalize_setup passes through handoff_note", async () => {
     const note = "Player leans noir-burnout. Wants ensemble scenes, not solo monologues.";
     const input = { ...FINALIZE_INPUT, handoff_note: note };

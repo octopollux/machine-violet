@@ -726,6 +726,13 @@ export function createSetupConversation(
   const TOOLS: NormalizedTool[] = portraitLoopActive
     ? [...BASE_TOOLS, ...IMAGE_GEN_TOOLS]
     : BASE_TOOLS;
+  // A partial finalize repair may cross a runTurn boundary (for example when
+  // the provider emits a text-only response after receiving the validation
+  // error). Keep both the accepted payload and narrowed tool schema at
+  // conversation scope so the next player/setup turn can finish the repair
+  // without regenerating the large fields.
+  let activeTools = TOOLS;
+  let pendingFinalizeInput: Record<string, unknown> | undefined;
 
   // Breadcrumb so the harness can confirm setup-agent actually believes it
   // should be doing portraits. If this is false in a live image-gen smoke
@@ -1056,8 +1063,6 @@ export function createSetupConversation(
 
     const MAX_ROUNDS = 4;
     let text = "";
-    let activeTools = TOOLS;
-    let pendingFinalizeInput: Record<string, unknown> | undefined;
 
     /**
      * Once a provider has supplied most of finalize_setup, retain the accepted
