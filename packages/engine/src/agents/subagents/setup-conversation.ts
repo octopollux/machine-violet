@@ -87,14 +87,14 @@ interface ToolDispatchOutcome {
 
 // --- Tool definitions ---
 
-// These fields form the minimum safe setup→DM handoff. The tool schema asks
-// providers for additional required fields (handoff_note and opening_scene),
-// but those were introduced later and remain optional at runtime for replay
-// compatibility and the explicit DM-handled opening path. Never scaffold from
-// a call missing one of these core fields: model providers do occasionally
-// emit a schema-prefix object, and accepting it creates the visible fallback
-// identity Player/Adventurer/The Unknown instead of giving the model a chance
-// to repair its call.
+// These fields form the minimum safe setup→DM handoff. opening_scene was
+// introduced later and remains optional at runtime for replay compatibility
+// and the explicit DM-handled opening path. handoff_note is not optional: it
+// carries the player's own character/tone language into the first DM turn.
+// Never scaffold from a call missing one of these fields: model providers do
+// occasionally emit a schema-prefix object, and accepting it creates either
+// the visible fallback identity Player/Adventurer/The Unknown or an unprimed
+// DM instead of giving the model a chance to repair its call.
 const CORE_FINALIZE_FIELDS = [
   "genre",
   "campaign_name",
@@ -105,6 +105,7 @@ const CORE_FINALIZE_FIELDS = [
   "player_name",
   "character_name",
   "character_description",
+  "handoff_note",
 ] as const;
 
 const FINALIZE_TOOL: NormalizedTool = {
@@ -1185,7 +1186,27 @@ export function createSetupConversation(
         },
       };
 
-      const result = await streamWithRetry(provider, params, onDelta, onRetry);
+      // Grok sometimes emits operational self-talk as ordinary output_text
+      // alongside finalize_setup ("I'll send the complete payload now").
+      // xAI's real reasoning stream is already separated by the provider, so
+      // buffer its setup text until we know whether this is a finalize round.
+      // Finalize-round text is never useful player dialogue: rejected calls
+      // need a silent retry, while accepted calls get a dedicated farewell
+      // round from the tool result below.
+      let bufferedXaiText = "";
+      const result = await streamWithRetry(
+        provider,
+        params,
+        provider.providerId === "xai"
+          ? (delta) => { bufferedXaiText += delta; }
+          : onDelta,
+        onRetry,
+      );
+      const suppressXaiFinalizeText = provider.providerId === "xai"
+        && result.toolCalls.some((call) => call.name === "finalize_setup");
+      if (provider.providerId === "xai" && !suppressXaiFinalizeText && bufferedXaiText) {
+        onDelta(bufferedXaiText);
+      }
       // Portrait drafts are now persisted directly inside dispatchGenerateImage
       // when the model calls the generate_image function tool — no post-hoc
       // assistantContent scrape needed.
@@ -1254,7 +1275,7 @@ export function createSetupConversation(
       totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
       totalUsage.reasoningTokens += result.usage.reasoningTokens;
 
-      text += result.text;
+      if (!suppressXaiFinalizeText) text += result.text;
       if (result.thinkingText) dumpThinking("setup", round, result.thinkingText);
 
       // Append assistant message (thinking already stripped by provider)

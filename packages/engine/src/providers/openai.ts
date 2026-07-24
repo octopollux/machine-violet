@@ -44,6 +44,43 @@ function useResponsesAPI(providerId: string): boolean {
 }
 
 /**
+ * Grok 4.5 follows a tool schema's property order unusually strongly. In live
+ * setup calls, optional properties interleaved ahead of required identity
+ * fields caused it to stop after the optional prefix while still reporting a
+ * completed function call. Put required properties first for xAI so the
+ * constrained decoder reaches the full handoff before optional enrichment.
+ *
+ * This is order-only: the schema's required set and every property definition
+ * remain unchanged.
+ */
+function requiredPropertiesFirst(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = schema.properties;
+  const required = schema.required;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)
+      || !Array.isArray(required)) {
+    return schema;
+  }
+
+  const source = properties as Record<string, unknown>;
+  const ordered: Record<string, unknown> = {};
+  for (const name of required) {
+    if (typeof name === "string" && Object.hasOwn(source, name)) {
+      ordered[name] = source[name];
+    }
+  }
+  for (const [name, definition] of Object.entries(source)) {
+    if (!Object.hasOwn(ordered, name)) ordered[name] = definition;
+  }
+  return { ...schema, properties: ordered };
+}
+
+const XAI_OUTPUT_DISCIPLINE =
+  "Every normal-text token is delivered as final output to the caller. "
+  + "Keep planning in reasoning. Never emit meta-commentary about tools, configuration, "
+  + "payloads, retries, or what you are about to do as normal text. In a tool-call response, "
+  + "normal text must be final prose appropriate to your assigned role or empty.";
+
+/**
  * Map Machine Violet's provider-neutral effort scale onto OpenAI's. GPT-5.6
  * is the first shipped family where `max` is a distinct API level; older
  * models and OpenAI-compatible providers continue to receive `xhigh`.
@@ -615,8 +652,15 @@ function toResponsesParams(params: ChatParams, providerId: string): ResponsesPar
       type: "function" as const,
       name: t.name,
       description: t.description ?? undefined,
-      parameters: t.inputSchema as Record<string, unknown>,
-      strict: false,
+      parameters: (
+        providerId === "xai"
+          ? requiredPropertiesFirst(t.inputSchema as Record<string, unknown>)
+          : t.inputSchema
+      ) as Record<string, unknown>,
+      // xAI documents function schemas as implicitly strict. Be explicit so
+      // the request matches that contract; local validation remains the final
+      // safety net for providers that still return incomplete arguments.
+      strict: providerId === "xai",
     }));
     if (functionTools.length > 0) tools = functionTools;
   }
@@ -640,7 +684,9 @@ function toResponsesParams(params: ChatParams, providerId: string): ResponsesPar
   return {
     model: params.model,
     input,
-    instructions,
+    instructions: providerId === "xai"
+      ? [instructions, XAI_OUTPUT_DISCIPLINE].filter(Boolean).join("\n\n")
+      : instructions,
     ...(tools ? { tools } : {}),
     max_output_tokens: params.maxTokens,
     ...(reasoning ? { reasoning } : {}),

@@ -378,6 +378,63 @@ describe("Responses API integration", () => {
     expect(callArgs.prompt_cache_key).toBe("campaign-123");
   });
 
+  it("puts xAI required tool properties before optional properties", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({ model: "grok-4.5" }));
+
+    const provider = createOpenAIProvider({
+      apiKey: "test-key",
+      baseURL: "https://api.x.ai/v1",
+      providerId: "xai",
+    });
+    await provider.chat(baseChatParams({
+      model: "grok-4.5",
+      tools: [{
+        name: "finalize_setup",
+        description: "Finalize setup",
+        inputSchema: {
+          type: "object",
+          properties: {
+            genre: { type: "string" },
+            optional_system: { type: "string" },
+            character_name: { type: "string" },
+            optional_detail: { type: "string" },
+            handoff_note: { type: "string" },
+          },
+          required: ["genre", "character_name", "handoff_note"],
+        },
+      }],
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(Object.keys(callArgs.tools[0].parameters.properties)).toEqual([
+      "genre",
+      "character_name",
+      "handoff_note",
+      "optional_system",
+      "optional_detail",
+    ]);
+    expect(callArgs.tools[0].strict).toBe(true);
+  });
+
+  it("tells xAI to keep planning out of normal output text", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({ model: "grok-4.5" }));
+
+    const provider = createOpenAIProvider({
+      apiKey: "test-key",
+      baseURL: "https://api.x.ai/v1",
+      providerId: "xai",
+    });
+    await provider.chat(baseChatParams({
+      model: "grok-4.5",
+      systemPrompt: "Run the game.",
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.instructions).toContain("Run the game.");
+    expect(callArgs.instructions).toContain("Keep planning in reasoning.");
+    expect(callArgs.instructions).toContain("Never emit meta-commentary");
+  });
+
   it("converts assistant tool_use messages to function_call input items", async () => {
     mockResponses.create.mockResolvedValue(fakeResponse());
 

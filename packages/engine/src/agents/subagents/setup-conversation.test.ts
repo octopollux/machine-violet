@@ -140,6 +140,7 @@ const FINALIZE_INPUT = {
   player_name: "Alex",
   character_name: "Kael",
   character_description: "A scarred ranger seeking redemption",
+  handoff_note: "Alex wants Kael's hard-won competence and redemption arc preserved for the DM.",
 };
 
 const noop = () => {};
@@ -314,6 +315,7 @@ describe("createSetupConversation", () => {
       player_name: "Alex",
       character_name: "Mara Voss",
       character_description: "A disgraced cartographer summoned by a map that knows her name.",
+      handoff_note: "Alex wants Mara's cartographic competence and distrust of institutions preserved.",
     };
     const provider = mockProvider([
       finalizeResponse(partial),
@@ -351,10 +353,14 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.handoffNote).toBe(note);
   });
 
-  it("finalize_setup leaves handoffNote undefined when the model omits it", async () => {
-    // Defensive: the schema marks handoff_note required, but handleFinalize
-    // must not crash if the model misbehaves.
+  it("repairs finalize_setup when the model omits handoff_note", async () => {
+    // handleFinalize remains defensive for direct/replay callers even though
+    // live setup validation rejects this shape before it can reach the handler.
+    const withoutHandoff = Object.fromEntries(
+      Object.entries(FINALIZE_INPUT).filter(([key]) => key !== "handoff_note"),
+    );
     const provider = mockProvider([
+      finalizeResponse(withoutHandoff),
       finalizeResponse(FINALIZE_INPUT),
       textResponse("Onward!"),
     ]);
@@ -362,19 +368,60 @@ describe("createSetupConversation", () => {
     const result = await conv.start(noop);
 
     expect(result.finalized).toBeDefined();
-    expect(result.finalized!.handoffNote).toBeUndefined();
+    expect(result.finalized!.handoffNote).toBe(FINALIZE_INPUT.handoff_note);
   });
 
-  it("finalize_setup trims whitespace-only handoff_note to undefined", async () => {
+  it("repairs finalize_setup when handoff_note is blank", async () => {
     const input = { ...FINALIZE_INPUT, handoff_note: "   \n  \t  " };
     const provider = mockProvider([
       finalizeResponse(input),
+      finalizeResponse(FINALIZE_INPUT),
       textResponse("Onward!"),
     ]);
     const conv = createSetupConversation(provider, "claude-sonnet-4-6");
     const result = await conv.start(noop);
 
-    expect(result.finalized!.handoffNote).toBeUndefined();
+    expect(result.finalized!.handoffNote).toBe(FINALIZE_INPUT.handoff_note);
+  });
+
+  it("suppresses xAI finalize planning text while retrying an incomplete handoff", async () => {
+    const partial = {
+      genre: "Science fantasy",
+      campaign_name: "Meridian Spire",
+      campaign_premise: "An observatory hangs above a gas giant.",
+      mood: "Tense but hopeful",
+      difficulty: "Balanced",
+      dm_personality: "The Chronicler",
+      player_name: "Lyra Quill",
+      character_name: "Captain Lyra Quill",
+      character_description: "A defiant orbital archivist.",
+    };
+    const responses = [
+      { ...finalizeResponse(partial), text: "I'll send the complete payload now." },
+      {
+        ...finalizeResponse({
+          ...partial,
+          handoff_note: "Lyra wants grounded competence and wonder.",
+        }),
+        text: "Right. Full payload:",
+      },
+      textResponse("Everything is ready.\n\n---"),
+    ];
+    let callIdx = 0;
+    const provider = mockProvider([]);
+    provider.providerId = "xai";
+    provider.stream = vi.fn(async (_params, onDelta) => {
+      const response = responses[callIdx++];
+      if (response.text) onDelta(response.text);
+      return response;
+    });
+    const deltas: string[] = [];
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start((delta) => deltas.push(delta));
+
+    expect(result.finalized?.characterName).toBe("Captain Lyra Quill");
+    expect(result.text).toBe("Everything is ready.\n\n---");
+    expect(deltas.join("")).toBe("Everything is ready.\n\n---");
   });
 
   it("finalize_setup passes through opening_scene", async () => {
