@@ -214,8 +214,9 @@ export function toAnthropicParams(params: ChatParams): {
   // special case: adaptive thinking is always on and the API rejects
   // `thinking: { type: "disabled" }`, so omit the field when the caller has
   // no explicit effort. Other models, including Opus 5, retain Machine
-  // Violet's null=disabled behavior. Opus 5 accepts disabled thinking when
-  // effort is high or below; omitting output_config uses its high default.
+  // Violet's null=disabled behavior and omit output_config, so Opus 5 uses
+  // its high default. An explicit effort enables adaptive thinking and sends
+  // output_config; Opus 5 also accepts max effort in that adaptive path.
   const modelInfo = getKnownModel(params.model);
   const supportsThinking = modelInfo?.capabilities?.thinking ?? false;
   const alwaysAdaptiveThinking = modelInfo?.capabilities?.alwaysAdaptiveThinking === true;
