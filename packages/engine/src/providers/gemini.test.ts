@@ -151,6 +151,26 @@ describe("toGeminiParams", () => {
 });
 
 describe("Gemini response normalization", () => {
+  it("continues the agent loop when a completed interaction contains a function call", () => {
+    const result = fromGeminiInteraction({
+      id: "int-completed-tool",
+      status: "completed",
+      steps: [{
+        type: "function_call",
+        id: "call-completed",
+        name: "lookup",
+        arguments: { key: "alarm" },
+      }],
+    });
+
+    expect(result.stopReason).toBe("tool_use");
+    expect(result.toolCalls).toEqual([{
+      id: "call-completed",
+      name: "lookup",
+      input: { key: "alarm" },
+    }]);
+  });
+
   it("normalizes thought, text, function calls, stop reason, and usage", () => {
     const result = fromGeminiInteraction({
       id: "int-1",
@@ -267,7 +287,7 @@ describe("Gemini provider", () => {
     }));
   });
 
-  it("assembles streamed function arguments and returns tool_use", async () => {
+  it("assembles streamed function arguments from a completed interaction and returns tool_use", async () => {
     mockCreate.mockResolvedValueOnce((async function* () {
       yield {
         event_type: "interaction.created",
@@ -289,9 +309,11 @@ describe("Gemini provider", () => {
         delta: { type: "arguments_delta", arguments: "20}" },
       };
       yield {
-        event_type: "interaction.status_update",
-        interaction_id: "int-tool",
-        status: "requires_action",
+        event_type: "interaction.completed",
+        interaction: {
+          id: "int-tool",
+          status: "completed",
+        },
       };
     })());
 

@@ -60,6 +60,10 @@ TUI immediately; function arguments, thought summaries, signatures, status,
 and usage are assembled into the same `ChatResult` shape as a non-streaming
 call.
 
+Gemini can attach function-call steps to an interaction whose overall status is
+already `completed`. The adapter treats any function call as a tool-use stop so
+the bridge executes it and requests the follow-up narration.
+
 Reasoning effort maps directly to Gemini `thinking_level`:
 
 | MV effort | Gemini |

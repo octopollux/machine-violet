@@ -12,6 +12,7 @@ type Action =
   | { type: "move-cursor-right" }
   | { type: "move-cursor-start" }
   | { type: "move-cursor-end" }
+  | { type: "clear" }
   | { type: "insert"; text: string }
   | { type: "delete" }
   | { type: "forward-delete" };
@@ -26,6 +27,8 @@ export function reducer(state: State, action: Action): State {
       return { ...state, cursorOffset: 0 };
     case "move-cursor-end":
       return { ...state, cursorOffset: state.value.length };
+    case "clear":
+      return { value: "", cursorOffset: 0 };
     case "insert":
       return {
         ...state,
@@ -142,7 +145,7 @@ export interface InlineTextInputProps {
 
 /**
  * Uncontrolled text input with full cursor positioning.
- * Supports: left/right arrows, Home/End, Ctrl+A/E, backspace.
+ * Supports: left/right arrows, Home/End, Ctrl+A/E/U, backspace.
  * Clear by changing the React `key` prop.
  */
 export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled = false, defaultValue = "", availableWidth, placeholder, wrap, maxLines, onChange, onCursorOffsetChange, onSubmit }: InlineTextInputProps) {
@@ -244,6 +247,12 @@ export const InlineTextInput = React.memo(function InlineTextInput({ isDisabled 
     // Ctrl+E → end of line (readline/emacs convention)
     if (key.ctrl && input === "e") {
       processAction({ type: "move-cursor-end" });
+      return;
+    }
+    // Ctrl+U → clear the line. The E2E/mvplay retry guard relies on this to
+    // remove text whose Enter key was dropped before it safely resubmits.
+    if (key.ctrl && input === "u") {
+      processAction({ type: "clear" });
       return;
     }
     if (key.leftArrow) {

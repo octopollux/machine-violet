@@ -522,6 +522,48 @@ describe("runProviderLoop with internal-dispatch providers", () => {
   });
 });
 
+describe("runProviderLoop tool-call precedence", () => {
+  it("dispatches surfaced tool calls and follows up even when stopReason is end", async () => {
+    const toolHandler = vi.fn(() => ({ content: "17" }));
+    const provider: LLMProvider = {
+      providerId: "test-end-with-tools",
+      chat: vi.fn()
+        .mockResolvedValueOnce({
+          ...textPlusToolResult("", "roll_dice"),
+          stopReason: "end" as const,
+        })
+        .mockResolvedValueOnce(textResult("You rolled a 17.")),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "Roll" },
+    ], {
+      name: "test",
+      model: "test-model",
+      maxTokens: 100,
+      stream: false,
+      toolHandler,
+    });
+
+    expect(toolHandler).toHaveBeenCalledOnce();
+    expect(toolHandler).toHaveBeenCalledWith("roll_dice", {});
+    expect(provider.chat).toHaveBeenCalledTimes(2);
+    const secondRoundMessages = vi.mocked(provider.chat).mock.calls[1][0].messages;
+    expect(secondRoundMessages.at(-2)).toEqual({
+      role: "user",
+      content: [{
+        type: "tool_result",
+        tool_use_id: "toolu_1",
+        content: "17",
+        is_error: false,
+      }],
+    });
+    expect(result.text).toBe("You rolled a 17.");
+  });
+});
+
 describe("runProviderLoop round-boundary rollback", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });

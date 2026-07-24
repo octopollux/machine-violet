@@ -349,7 +349,10 @@ export function fromGeminiInteraction(interaction: GeminiInteraction): ChatResul
     thinkingText: thinkingText || undefined,
     toolCalls,
     usage: mapGeminiUsage(interaction.usage),
-    stopReason: mapGeminiStopReason(interaction.status),
+    // Gemini can return function_call steps with a completed interaction
+    // instead of requires_action. A function call always needs another bridge
+    // round after its result, regardless of the enclosing interaction status.
+    stopReason: toolCalls.length > 0 ? "tool_use" : mapGeminiStopReason(interaction.status),
     assistantContent,
   };
 }
