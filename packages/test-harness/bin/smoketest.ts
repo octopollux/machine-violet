@@ -207,13 +207,21 @@ async function submitOnePlayerTurnAndAwaitResponse(
   log(`  Submitting: ${JSON.stringify(action)}`);
   await harness.submitText(action);
 
-  // The contribute call should flip the turn to "processing" or "resolved"
-  // and engineState to "dm_thinking" within a few seconds.
+  // The contribute call normally exposes `dm_thinking`, but that state is
+  // transient and can be hidden behind the deferred-work barrier (notably when
+  // a scribe from the preceding turn is still settling). In single-player
+  // auto-commit mode `currentTurn` is also null between turns, so a sequence
+  // comparison alone cannot prove the second submit was observed. Narrative
+  // growth is the durable fallback: if the whole DM turn completes between
+  // polls, it still proves processing started and finished.
   log("  Waiting for DM to start thinking...");
   await harness.waitForState(
-    (s) => s.engineState === "dm_thinking" || (s.currentTurn?.seq ?? 0) > baselineSeq,
+    (s) =>
+      s.engineState === "dm_thinking" ||
+      (s.currentTurn?.seq ?? 0) > baselineSeq ||
+      s.narrativeLines.length > baselineLines,
     {
-      description: "DM begins processing after player turn submit",
+      description: "DM begins processing or completes after player turn submit",
       timeoutMs: DEFAULT_TURN_TIMEOUT_MS,
     },
   );
