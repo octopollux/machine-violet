@@ -46,9 +46,9 @@ Machine Violet is open-source software that **runs on your own computer**. It us
 <details>
 <summary>Which AI model should I use?</summary>
 
-Machine Violet is tested against the latest models from **Anthropic** (Claude) and **OpenAI** (ChatGPT).
+Machine Violet is tested against current models from **Anthropic** (Claude), **OpenAI** (ChatGPT), and **OpenRouter** (Kimi K3).
 
-Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI and Anthropic.
+Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI, Anthropic, and OpenRouter. Developers can provide `OPENROUTER_API_KEY` in the environment or `.env`; it becomes an ephemeral connection and is not copied into `connections.json`.
 
 Additionally, OpenAI supports image generation! Anthropic does not.
 </details>

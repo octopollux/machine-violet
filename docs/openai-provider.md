@@ -21,6 +21,14 @@ The GPT-5.6 family supports a distinct `max` reasoning level. The normalized
 Machine Violet `max` effort maps to API `max` for `gpt-5.6*`; older models and
 compatible endpoints receive `xhigh`, preserving their supported ceiling.
 
+## OpenRouter environment connection
+
+At startup, `OPENROUTER_API_KEY` creates an `env-openrouter` connection with
+the shipped model list and tier defaults. Like the Anthropic and OpenAI
+environment connections, it is rebuilt from the process environment on every
+load, cannot be deleted in the UI, and is filtered out of `connections.json` so
+the key is never persisted there.
+
 ## OpenRouter model support
 
 The shipped OpenRouter model is `moonshotai/kimi-k3`, selected for every tier.

@@ -613,7 +613,8 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 
 ```
 <appDir>/
-├── .env                      API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY, etc.). Loaded at startup.
+├── .env                      API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, XAI_API_KEY, etc.).
+│                              Loaded at startup; each present key becomes an ephemeral, non-persisted connection.
 ├── config.json               App-level config (home directory path, defaults).
 ├── api-keys.json             Manually added API keys (treated as secret, like .env).
 ├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, xAI, custom.

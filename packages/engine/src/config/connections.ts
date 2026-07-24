@@ -5,8 +5,9 @@
  * Replaces the single-provider api-keys.ts with multi-provider support.
  *
  * Connections are persisted to `connections.json` in the app config dir.
- * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY) auto-create
- * connections at runtime via buildEffectiveConnections().
+ * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY,
+ * XAI_API_KEY) auto-create connections at runtime via
+ * buildEffectiveConnections().
  */
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -98,6 +99,7 @@ const STORE_FILENAME = "connections.json";
 const ENV_ANTHROPIC_ID = "env-anthropic";
 const ENV_OPENAI_ID = "env-openai";
 const ENV_XAI_ID = "env-xai";
+const ENV_OPENROUTER_ID = "env-openrouter";
 
 function generateId(): string {
   return randomBytes(8).toString("hex");
@@ -250,6 +252,23 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
+  // Environment: OpenRouter
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey) {
+    const knownModels = getModelsForProvider("openrouter", configDir);
+    connections.push({
+      id: ENV_OPENROUTER_ID,
+      provider: "openrouter",
+      label: "OpenRouter (env)",
+      apiKey: openrouterKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
   // Manual connections — refresh models from the registry on every load.
   //
   // For registry-backed providers (anthropic, openai-apikey) the model list
@@ -336,7 +355,12 @@ export function addConnection(
 }
 
 export function removeConnection(store: ConnectionStore, connectionId: string): ConnectionStore {
-  if (connectionId === ENV_ANTHROPIC_ID || connectionId === ENV_OPENAI_ID || connectionId === ENV_XAI_ID) return store;
+  if (
+    connectionId === ENV_ANTHROPIC_ID
+    || connectionId === ENV_OPENAI_ID
+    || connectionId === ENV_OPENROUTER_ID
+    || connectionId === ENV_XAI_ID
+  ) return store;
   const connections = store.connections.filter((c) => c.id !== connectionId);
   // Clear tier assignments that referenced this connection
   const tierAssignments = { ...store.tierAssignments };

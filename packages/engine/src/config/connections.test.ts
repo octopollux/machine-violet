@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  upsertChatGptConnection,
+  removeConnection, upsertChatGptConnection,
 } from "./connections.js";
 import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
@@ -107,14 +107,17 @@ describe("buildEffectiveConnections", () => {
   let savedAnthropic: string | undefined;
   let savedOpenai: string | undefined;
   let savedXai: string | undefined;
+  let savedOpenrouter: string | undefined;
 
   beforeEach(() => {
     savedAnthropic = process.env.ANTHROPIC_API_KEY;
     savedOpenai = process.env.OPENAI_API_KEY;
     savedXai = process.env.XAI_API_KEY;
+    savedOpenrouter = process.env.OPENROUTER_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.XAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   afterEach(() => {
@@ -124,6 +127,8 @@ describe("buildEffectiveConnections", () => {
     else process.env.OPENAI_API_KEY = savedOpenai;
     if (savedXai === undefined) delete process.env.XAI_API_KEY;
     else process.env.XAI_API_KEY = savedXai;
+    if (savedOpenrouter === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = savedOpenrouter;
   });
 
   it("auto-creates an env connection for OPENAI_API_KEY with provider 'openai-apikey'", () => {
@@ -149,6 +154,30 @@ describe("buildEffectiveConnections", () => {
     expect(effective.tierAssignments.large).toEqual({
       connectionId: "env-xai",
       modelId: "grok-4.5",
+    });
+  });
+
+  it("auto-creates an ephemeral OpenRouter connection from OPENROUTER_API_KEY", () => {
+    process.env.OPENROUTER_API_KEY = "sk-or-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const env = effective.connections.find((c) => c.id === "env-openrouter");
+    expect(env).toMatchObject({
+      provider: "openrouter",
+      label: "OpenRouter (env)",
+      apiKey: "sk-or-test-env",
+      source: "env",
+    });
+    expect(env?.models).toEqual([{
+      id: "moonshotai/kimi-k3",
+      displayName: "MoonshotAI: Kimi K3",
+      available: true,
+    }]);
+    expect(effective.tierAssignments.large).toEqual({
+      connectionId: "env-openrouter",
+      modelId: "moonshotai/kimi-k3",
     });
   });
 
@@ -214,6 +243,28 @@ describe("buildEffectiveConnections", () => {
     });
     const conn = effective.connections.find((c) => c.id === "custom-1");
     expect(conn?.models).toEqual([{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }]);
+  });
+});
+
+describe("removeConnection", () => {
+  it("does not remove the environment-derived OpenRouter connection", () => {
+    const store: ConnectionStore = {
+      connections: [{
+        id: "env-openrouter", provider: "openrouter", label: "OpenRouter (env)",
+        apiKey: "sk-or-test-env", models: [{
+          id: "moonshotai/kimi-k3",
+          displayName: "MoonshotAI: Kimi K3",
+          available: true,
+        }],
+        source: "env", addedAt: "",
+      }],
+      tierAssignments: {
+        large: { connectionId: "env-openrouter", modelId: "moonshotai/kimi-k3" },
+        medium: null,
+        small: null,
+      },
+    };
+    expect(removeConnection(store, "env-openrouter")).toBe(store);
   });
 });
 
