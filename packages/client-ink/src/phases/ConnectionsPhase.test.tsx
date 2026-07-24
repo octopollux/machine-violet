@@ -55,22 +55,19 @@ async function openProviderPicker(props?: Partial<ConnectionsPhaseProps>) {
 }
 
 describe("ConnectionsPhase provider picker", () => {
-  it("offers only the validated providers (Anthropic, OpenAI API key)", async () => {
+  it("offers the validated providers, including OpenRouter", async () => {
     const { lastFrame } = await openProviderPicker();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Anthropic");
     expect(frame).toContain("OpenAI (API key)");
+    expect(frame).toContain("OpenRouter (Kimi K3)");
   });
 
-  // Regression guard for #712: OpenRouter and Custom (OpenAI-compatible) were
-  // pulled from the picker for 1.1 because neither is validated end-to-end.
-  // The engine-side adapters still exist, so it's easy to accidentally
-  // re-surface them here — this test fails if either row comes back before
-  // the post-1.1 validation playtest re-enables it deliberately.
-  it("does not offer the unvalidated OpenRouter or Custom providers", async () => {
+  it("offers custom endpoints only with explicit experimental/untested messaging", async () => {
     const { lastFrame } = await openProviderPicker();
     const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("OpenRouter");
-    expect(frame).not.toContain("Custom");
+    expect(frame).toContain("Custom endpoint");
+    expect(frame).toContain("experimental");
+    expect(frame).toContain("untested");
   });
 });

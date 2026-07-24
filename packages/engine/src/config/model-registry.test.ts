@@ -30,6 +30,10 @@ describe("getMaxOutput", () => {
     expect(getMaxOutput("gpt-5.5")).toBe(128000);
   });
 
+  it("returns OpenRouter Kimi K3's conservative output ceiling", () => {
+    expect(getMaxOutput("moonshotai/kimi-k3")).toBe(32768);
+  });
+
   it("returns the fallback for unknown models", () => {
     // Generous fallback so unregistered models don't get truncated; not so
     // high that an out-of-control loop bleeds money before something else
@@ -112,6 +116,10 @@ describe("supportsImageGeneration", () => {
     expect(supportsImageGeneration("claude-opus-4-7")).toBe(false);
     expect(supportsImageGeneration("claude-sonnet-4-6")).toBe(false);
     expect(supportsImageGeneration("claude-haiku-4-5-20251001")).toBe(false);
+  });
+
+  it("returns false for OpenRouter Kimi K3 (multimodal input, text output only)", () => {
+    expect(supportsImageGeneration("moonshotai/kimi-k3")).toBe(false);
   });
 
   it("returns false for unknown models — safer default than assuming yes", () => {

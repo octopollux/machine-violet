@@ -156,6 +156,29 @@ describe("buildEffectiveConnections", () => {
     expect(ids).toContain("gpt-4o-mini");
   });
 
+  it("refreshes OpenRouter with the shipped Kimi K3 model and assigns every tier", () => {
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "openrouter-1", provider: "openrouter", label: "OpenRouter",
+        apiKey: "sk-or-test", models: [],
+        source: "manual", addedAt: "2026-07-24",
+      }],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const conn = effective.connections.find((c) => c.id === "openrouter-1");
+    expect(conn?.models).toEqual([{
+      id: "moonshotai/kimi-k3",
+      displayName: "MoonshotAI: Kimi K3",
+      available: true,
+    }]);
+    for (const tier of ["large", "medium", "small"] as const) {
+      expect(effective.tierAssignments[tier]).toEqual({
+        connectionId: "openrouter-1",
+        modelId: "moonshotai/kimi-k3",
+      });
+    }
+  });
+
   it("leaves a manual custom-provider connection's models alone (no registry entries to refresh against)", () => {
     // Custom OpenAI-compatible endpoints (Ollama, vLLM, llama.cpp, …)
     // have no registry entries, so we must preserve whatever the user

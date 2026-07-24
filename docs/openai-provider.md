@@ -1,4 +1,4 @@
-# openai.ts Provider (openai-apikey and openrouter)
+# openai.ts Provider (OpenAI, OpenRouter, and custom endpoints)
 
 The `openai.ts` adapter (`packages/engine/src/providers/openai.ts`) handles the `openai-apikey` and `openrouter` connection types, plus any `custom` OpenAI-compatible endpoint. It wraps the official OpenAI SDK and talks directly to `api.openai.com`, `openrouter.ai`, or a local server. It is distinct from the `openai-chatgpt` provider (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md)), which drives the Codex app-server subprocess over JSON-RPC for ChatGPT-account auth.
 
@@ -21,6 +21,42 @@ The GPT-5.6 family supports a distinct `max` reasoning level. The normalized
 Machine Violet `max` effort maps to API `max` for `gpt-5.6*`; older models and
 compatible endpoints receive `xhigh`, preserving their supported ceiling.
 
+## OpenRouter model support
+
+The shipped OpenRouter model is `moonshotai/kimi-k3`, selected for every tier.
+As of the 2026-07-24 validation:
+
+- Moonshot released Kimi K3 on 2026-07-16 as its flagship generalist for
+  long-horizon coding, knowledge work, reasoning, and agent orchestration.
+- OpenRouter serves the exact slug with a 1,048,576-token context at $3 / $15
+  per million input/output tokens.
+- A live adapter probe completed a function-tool call and result round trip, a
+  streamed response, and a 305,114-input-token request.
+- Kimi K3 accepts text and image input but emits text only. It does **not**
+  provide image generation, so Machine Violet does not register
+  `generate_image` for an OpenRouter-backed Kimi K3 session.
+
+The last-two-week comparison also included three newer OpenRouter arrivals. All
+three passed live tool-call and streaming probes, but they are poorer defaults
+for a general-purpose tabletop DM:
+
+- `poolside/laguna-s-2.1` (OpenRouter 2026-07-21) is the newest and cheapest,
+  but Poolside positions it specifically as a coding-agent model.
+- `meituan/longcat-2.0` (OpenRouter 2026-07-20) targets coding, repository
+  changes, and long-horizon problem solving rather than creative general use.
+- `thinkingmachines/inkling` (OpenRouter 2026-07-17) is a strong multimodal
+  generalist, but its published capability results trail Kimi's current
+  flagship on key reasoning and agentic measures.
+
+Kimi K3 therefore wins on task fit and frontier capability rather than merely
+the latest catalog timestamp. Sources:
+[Moonshot Kimi K3 release](https://www.kimi.com/code/docs/en/kimi-code/whats-new.html#kimi-k3-july-16-2026),
+[Moonshot product overview](https://www.moonshot.ai/),
+[Poolside Laguna S 2.1 model card](https://huggingface.co/poolside/Laguna-S-2.1),
+[Meituan LongCat 2.0 model card](https://huggingface.co/meituan-longcat/LongCat-2.0),
+[Thinking Machines Inkling release](https://thinkingmachines.ai/news/introducing-inkling/),
+and [OpenRouter live model metadata](https://openrouter.ai/api/v1/models/moonshotai/kimi-k3/endpoints).
+
 ## Responses API vs Chat Completions routing
 
 A single set drives the routing decision:
@@ -31,7 +67,12 @@ const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter"]);
 
 `useResponsesAPI(providerId)` returns true for `openai-apikey` and `openrouter`, and the provider routes those through `client.responses.*` (the OpenAI Responses API). For any other provider id — i.e. `custom` OpenAI-compatible endpoints such as Ollama, vLLM, or llama.cpp — it returns false and the provider falls back to `client.chat.completions.*` (the Chat Completions API), which custom endpoints are assumed to implement. The routing gate is consulted in `chat()`/`stream()` dispatch and again in `healthCheck()`, which probes whichever API the provider would actually use.
 
-The same gate also decides image-generation capability: `generateImage` is only wired (and `getCapabilities().imageGeneration` only true) on the Responses API path, because the Chat Completions fallback has no Images API equivalent. See [image-generation.md](image-generation.md) for the image pipeline itself.
+Responses routing and image routing are deliberately separate. `generateImage`
+is wired only for `openai-apikey`, whose implementation targets OpenAI's Images
+API and pins `gpt-image-2`. OpenRouter uses the Responses API for chat but does
+not inherit OpenAI image support; its shipped Kimi K3 model has text-only
+output. Custom Chat Completions endpoints likewise have no guaranteed Images
+API. See [image-generation.md](image-generation.md) for the image pipeline.
 
 ## Streaming reasoning: SDK accumulator bug workaround
 
@@ -71,7 +112,7 @@ The Chat Completions fallback (custom OpenAI-compatible endpoints) supports tool
 
 ## Image generation: text-to-image, image-to-image, and retry
 
-`generateImage` (Responses-API providers only) pins `gpt-image-2`. With no reference images it calls `client.images.generate` (text-to-image). When the caller supplies `referenceImages` — the DM naming `reference_characters`, or `update_portrait` conditioning on the character's current portrait — the adapter switches to `client.images.edit`: each portrait's base64 is turned into an `Uploadable` via `toFile` and passed as the `image` array, conditioning the render on them (image-to-image). The shared reference directive (`buildReferenceDirective`, `packages/engine/src/providers/image-reference-directive.ts`) is appended to the prompt so the edit takes identity from the reference but pose/expression/setting from the description — this brings the API-key path to parity with the codex path's reference conditioning (see [image-generation.md](image-generation.md), Reference conditioning). Without it, `update_portrait` on this provider would render an unrelated character rather than revising the existing one.
+`generateImage` (direct OpenAI API-key connections only) pins `gpt-image-2`. With no reference images it calls `client.images.generate` (text-to-image). When the caller supplies `referenceImages` — the DM naming `reference_characters`, or `update_portrait` conditioning on the character's current portrait — the adapter switches to `client.images.edit`: each portrait's base64 is turned into an `Uploadable` via `toFile` and passed as the `image` array, conditioning the render on them (image-to-image). The shared reference directive (`buildReferenceDirective`, `packages/engine/src/providers/image-reference-directive.ts`) is appended to the prompt so the edit takes identity from the reference but pose/expression/setting from the description — this brings the API-key path to parity with the codex path's reference conditioning (see [image-generation.md](image-generation.md), Reference conditioning). Without it, `update_portrait` on this provider would render an unrelated character rather than revising the existing one.
 
 A 200 response carrying no image bytes is treated as transient and retried up to 3 attempts (mirroring the codex path's empty-render retry); a thrown error is terminal, since the SDK already retries transient network / 5xx on its own.
 

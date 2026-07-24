@@ -47,22 +47,16 @@ const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection", "Sign 
  * dedicated "Sign in with ChatGPT" entry in the Connections menu (no API
  * key paste; OAuth via the codex app-server).
  *
- * `openrouter` and `custom` are intentionally absent too. Both adapters
- * still exist engine-side (`createProviderFromConnection`), but neither has
- * been validated end-to-end for the things MV depends on (reliable tool use,
- * subagents, ~300k-token context) — OpenRouter never, and `custom`
- * OpenAI-compatible endpoints only as a best-effort escape hatch. Rather
- * than ship untested top-level connection options in 1.1, both are hidden
- * from the picker pending a real validation playtest. Re-add the rows once
- * that validation passes (issue #712). The `needsBaseUrl` wizard step and
- * both adapters are left intact so re-enabling is a one-row revert.
- *
- * The tested/supported providers that remain are Anthropic and OpenAI
- * (incl. the ChatGPT-subscription path via "Sign in with ChatGPT").
+ * OpenRouter is validated with the shipped Kimi K3 model. Custom
+ * OpenAI-compatible endpoints remain inherently variable, so the UI exposes
+ * that escape hatch with an explicit experimental/untested label instead of
+ * implying support for every Ollama, vLLM, or llama.cpp configuration.
  */
 const PROVIDER_OPTIONS = [
   { id: "anthropic", label: "Anthropic", needsBaseUrl: false },
   { id: "openai-apikey", label: "OpenAI (API key)", needsBaseUrl: false },
+  { id: "openrouter", label: "OpenRouter (Kimi K3)", needsBaseUrl: false },
+  { id: "custom", label: "Custom endpoint (experimental — untested)", needsBaseUrl: true },
 ] as const;
 
 const TIER_LABELS: Record<string, string> = {

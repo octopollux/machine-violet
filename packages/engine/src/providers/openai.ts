@@ -54,6 +54,17 @@ function mapReasoningEffort(model: string, effort: NonNullable<ChatParams["think
   return effort ?? "medium";
 }
 
+/**
+ * Only the direct OpenAI connection owns the OpenAI Images API contract.
+ * OpenRouter also exposes a Responses-compatible endpoint, but its selected
+ * chat model may be served by any vendor and image generation is a separate
+ * model/API capability. Never route a non-OpenAI model to the pinned
+ * `gpt-image-2` implementation below.
+ */
+function useOpenAIImagesAPI(providerId: string): boolean {
+  return providerId === "openai-apikey";
+}
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
@@ -95,10 +106,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
   return {
     providerId,
     getCapabilities: (model) => ({
-      // Only the Responses API path supports inline image generation. The
-      // Chat Completions fallback (custom OpenAI-compatible endpoints) has
-      // no `image_generation` tool, regardless of model.
-      imageGeneration: useResponsesAPI(providerId) && supportsImageGeneration(model),
+      imageGeneration: useOpenAIImagesAPI(providerId) && supportsImageGeneration(model),
     }),
     chat: (params) => openaiChat(client, providerId, params, false, undefined, rateLimitState),
     stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta, rateLimitState),
@@ -107,10 +115,9 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
       rateLimitState.limits
         ? rateLimitsToUsageStatus(rateLimitState.limits, rateLimitState.capturedAt)
         : null,
-    // Only the Responses API path supports image generation; the Chat
-    // Completions fallback (custom OpenAI-compatible endpoints) has no
-    // Images API equivalent, so leave generateImage undefined there.
-    ...(useResponsesAPI(providerId) ? { generateImage: (req) => openaiGenerateImage(client, req) } : {}),
+    // Image generation is vendor-paired. OpenRouter's selected Kimi K3 model
+    // is text-output-only, and custom endpoints have no guaranteed Images API.
+    ...(useOpenAIImagesAPI(providerId) ? { generateImage: (req) => openaiGenerateImage(client, req) } : {}),
   };
 }
 

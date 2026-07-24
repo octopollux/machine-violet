@@ -94,6 +94,12 @@ describe("OpenAI provider — Responses API", () => {
       expect(provider.providerId).toBe("openrouter");
     });
 
+    it("does not expose OpenAI image generation through OpenRouter", () => {
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openrouter" });
+      expect(provider.getCapabilities("moonshotai/kimi-k3").imageGeneration).toBe(false);
+      expect(provider.generateImage).toBeUndefined();
+    });
+
     it("defaults providerId to openai-apikey", () => {
       const provider = createOpenAIProvider({ apiKey: "test-key" });
       expect(provider.providerId).toBe("openai-apikey");

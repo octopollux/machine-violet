@@ -188,11 +188,26 @@
       "defaultTier": "small",
       "pricing": { "input": 0.15, "output": 0.6, "cacheWrite": 0, "cacheRead": 0.075 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "moonshotai/kimi-k3": {
+      "provider": "openrouter",
+      "displayName": "MoonshotAI: Kimi K3",
+      "contextWindow": 1048576,
+      "maxOutput": 32768,
+      "defaultTier": "large",
+      "compactionThreshold": 800000,
+      "pricing": { "input": 3, "output": 15, "cacheWrite": 0, "cacheRead": 0.3 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": false, "imageGeneration": false }
     }
   },
   "tierDefaults": {
     "anthropic": { "large": "claude-fable-5", "medium": "claude-sonnet-5", "small": "claude-haiku-4-5-20251001" },
     "openai-apikey": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" },
-    "openai-chatgpt": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" }
+    "openai-chatgpt": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" },
+    "openrouter": {
+      "large": "moonshotai/kimi-k3",
+      "medium": "moonshotai/kimi-k3",
+      "small": "moonshotai/kimi-k3"
+    }
   }
 }

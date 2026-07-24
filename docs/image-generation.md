@@ -8,7 +8,7 @@ The DM can render illustrated images — a character reference sheet during setu
 
 Image-gen is enabled for a turn iff:
 
-- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API) and for `openai-chatgpt` (routes to codex's built-in `image_gen` skill — see [Provider backends](#provider-backends)). False for everything else (Anthropic, and the Chat Completions fallback used by custom OpenAI-compatible endpoints).
+- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API) and for `openai-chatgpt` (routes to codex's built-in `image_gen` skill — see [Provider backends](#provider-backends)). False for everything else: Anthropic, custom OpenAI-compatible endpoints, and OpenRouter's shipped Kimi K3 model (which understands images as input but emits text only).
 - **Campaign preference** — `gameState.config.image_generation !== "off"`. The setup-agent asks the player a yes/no consent question right after world + system selection ([game-initialization.md](game-initialization.md)). The choice is stored in `config.json` and can be flipped per-campaign from the ESC menu's "Image generation" toggle.
 
 When either is false, the `generate_image` tool is omitted from the DM's toolset and the model has no way to invoke it. There is no "graceful fallback" path on the model side — the model simply doesn't see the tool.
