@@ -310,7 +310,6 @@ describe("createSetupConversation", () => {
       campaign_scope: "one-shot",
     };
     const repaired = {
-      ...partial,
       dm_personality: "The Chronicler",
       player_name: "Alex",
       character_name: "Mara Voss",
@@ -335,8 +334,20 @@ describe("createSetupConversation", () => {
     const repairCall = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
     const serialized = JSON.stringify(repairCall.messages);
     expect(serialized).toContain("finalize_setup rejected");
-    expect(serialized).toContain("dm_personality, player_name, character_name, character_description");
+    expect(serialized).toContain(
+      "dm_personality, player_name, character_name, character_description, handoff_note",
+    );
     expect(serialized).toContain('"is_error":true');
+    const repairTool = repairCall.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(Object.keys(repairTool.inputSchema.properties)).toEqual([
+      "dm_personality",
+      "player_name",
+      "character_name",
+      "character_description",
+      "handoff_note",
+    ]);
   });
 
   it("finalize_setup passes through handoff_note", async () => {
@@ -400,7 +411,6 @@ describe("createSetupConversation", () => {
       { ...finalizeResponse(partial), text: "I'll send the complete payload now." },
       {
         ...finalizeResponse({
-          ...partial,
           handoff_note: "Lyra wants grounded competence and wonder.",
         }),
         text: "Right. Full payload:",

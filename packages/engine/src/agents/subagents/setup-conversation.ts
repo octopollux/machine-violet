@@ -1056,6 +1056,35 @@ export function createSetupConversation(
 
     const MAX_ROUNDS = 4;
     let text = "";
+    let activeTools = TOOLS;
+    let pendingFinalizeInput: Record<string, unknown> | undefined;
+
+    /**
+     * Once a provider has supplied most of finalize_setup, retain the accepted
+     * fields and narrow the next round's schema to only what was missing.
+     * Grok otherwise tends to regenerate the very large campaign_detail while
+     * repeatedly omitting a short late field such as handoff_note.
+     */
+    function setFinalizeRepairSchema(missingFields: string[]): void {
+      const allProperties = FINALIZE_TOOL.inputSchema.properties as Record<string, unknown>;
+      const properties = Object.fromEntries(
+        missingFields
+          .filter((field) => Object.hasOwn(allProperties, field))
+          .map((field) => [field, allProperties[field]]),
+      );
+      const repairTool: NormalizedTool = {
+        ...FINALIZE_TOOL,
+        description:
+          "Repair the prior finalize_setup call. Already accepted fields are retained. "
+          + `Call this with only these missing fields: ${missingFields.join(", ")}.`,
+        inputSchema: {
+          type: "object",
+          properties,
+          required: missingFields,
+        },
+      };
+      activeTools = TOOLS.map((tool) => tool.name === FINALIZE_TOOL.name ? repairTool : tool);
+    }
 
     // Per-turn state set by `dispatchTool` for providers that own tool
     // dispatch internally (openai-chatgpt — codex's `item/tool/call` server
@@ -1122,8 +1151,13 @@ export function createSetupConversation(
         if (call.input._parse_error) {
           return { content: String(call.input._parse_error), isError: true };
         }
-        const missingFields = missingCoreFinalizeFields(call.input);
+        const mergedInput = pendingFinalizeInput
+          ? { ...pendingFinalizeInput, ...call.input }
+          : call.input;
+        const missingFields = missingCoreFinalizeFields(mergedInput);
         if (missingFields.length > 0) {
+          pendingFinalizeInput = mergedInput;
+          setFinalizeRepairSchema(missingFields);
           logEvent("setup:finalize_rejected", {
             model,
             providerId: provider.providerId,
@@ -1132,11 +1166,14 @@ export function createSetupConversation(
           return {
             content:
               `finalize_setup rejected: missing required fields: ${missingFields.join(", ")}. `
-              + "Call finalize_setup again with every listed field populated; do not end setup.",
+              + "The fields already supplied are retained. Call finalize_setup again with only "
+              + "the listed missing fields populated; do not end setup.",
             isError: true,
           };
         }
-        handleFinalize(call.input);
+        pendingFinalizeInput = undefined;
+        activeTools = TOOLS;
+        handleFinalize(mergedInput);
         return {
           content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
           isError: false,
@@ -1154,7 +1191,7 @@ export function createSetupConversation(
         maxTokens: getMaxOutput(model),
         systemPrompt,
         messages,
-        tools: TOOLS,
+        tools: activeTools,
         thinking,
         cacheHints,
         // Per-call dispatch for providers that own the tool loop internally
