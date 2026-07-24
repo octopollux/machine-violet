@@ -151,7 +151,7 @@ function warnBadDevConfig(dir: string, err: unknown): void {
 }
 
 const DEFAULTS: ModelConfig = {
-  large: "claude-fable-5",
+  large: "claude-opus-5",
   medium: "claude-sonnet-5",
   small: "claude-haiku-4-5-20251001",
   effort: {
@@ -175,6 +175,7 @@ export interface ModelPricing {
 
 const DEFAULT_PRICING: Record<string, ModelPricing> = {
   "claude-fable-5":              { input: 10,   output: 50,  cacheWrite: 12.5,  cacheRead: 1.00 },
+  "claude-opus-5":               { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-opus-4-8":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-sonnet-5":             { input: 2,    output: 10,  cacheWrite: 2.5,   cacheRead: 0.20 },
   "claude-opus-4-7":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },

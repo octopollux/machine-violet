@@ -34,6 +34,27 @@ function stampedIndexes(mapped: ReturnType<typeof toAnthropicParams>["messages"]
 }
 
 describe("toAnthropicParams: current adaptive-thinking models", () => {
+  it("preserves null=disabled for Opus 5 at the API's default high effort", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-opus-5",
+      maxTokens: 4096,
+    }));
+    expect(out.thinking).toEqual({ type: "disabled" });
+    expect(out).not.toHaveProperty("output_config");
+    expect(out.max_tokens).toBe(4096);
+  });
+
+  it("sends Opus 5 max effort using adaptive thinking", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-opus-5",
+      maxTokens: 4096,
+      thinking: { effort: "max" },
+    }));
+    expect(out.thinking).toEqual({ type: "adaptive" });
+    expect(out.output_config).toEqual({ effort: "max" });
+    expect(out.max_tokens).toBe(128000);
+  });
+
   it("sends effort for Sonnet 5 instead of limiting output_config to Opus", () => {
     const out = toAnthropicParams(baseParams({
       model: "claude-sonnet-5",

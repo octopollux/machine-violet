@@ -213,8 +213,9 @@ export function toAnthropicParams(params: ChatParams): {
   // Thinking config — only enable for models that support it. Fable 5 is a
   // special case: adaptive thinking is always on and the API rejects
   // `thinking: { type: "disabled" }`, so omit the field when the caller has
-  // no explicit effort. Other models retain Machine Violet's null=disabled
-  // behavior instead of inheriting a provider default that may change.
+  // no explicit effort. Other models, including Opus 5, retain Machine
+  // Violet's null=disabled behavior. Opus 5 accepts disabled thinking when
+  // effort is high or below; omitting output_config uses its high default.
   const modelInfo = getKnownModel(params.model);
   const supportsThinking = modelInfo?.capabilities?.thinking ?? false;
   const alwaysAdaptiveThinking = modelInfo?.capabilities?.alwaysAdaptiveThinking === true;

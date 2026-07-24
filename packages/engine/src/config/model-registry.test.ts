@@ -21,6 +21,7 @@ describe("getMaxOutput", () => {
 
   it("returns the registry's maxOutput for current Anthropic models", () => {
     expect(getMaxOutput("claude-fable-5")).toBe(128000);
+    expect(getMaxOutput("claude-opus-5")).toBe(128000);
     expect(getMaxOutput("claude-opus-4-8")).toBe(128000);
     expect(getMaxOutput("claude-sonnet-5")).toBe(128000);
   });
@@ -63,9 +64,15 @@ describe("current provider defaults and metadata", () => {
 
   it("ships the current Anthropic tier family", () => {
     expect(getTierDefaults("anthropic")).toEqual({
-      large: "claude-fable-5",
+      large: "claude-opus-5",
       medium: "claude-sonnet-5",
       small: "claude-haiku-4-5-20251001",
+    });
+    expect(getKnownModel("claude-opus-5")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      pricing: { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+      capabilities: { thinking: true },
     });
     expect(getKnownModel("claude-fable-5")).toMatchObject({
       contextWindow: 1_000_000,
@@ -118,6 +125,7 @@ describe("supportsImageGeneration", () => {
 
   it("returns false for current Anthropic models (no inline image gen yet)", () => {
     expect(supportsImageGeneration("claude-fable-5")).toBe(false);
+    expect(supportsImageGeneration("claude-opus-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-8")).toBe(false);
     expect(supportsImageGeneration("claude-sonnet-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-7")).toBe(false);
