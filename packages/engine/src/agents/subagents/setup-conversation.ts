@@ -1,7 +1,7 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { buildNameInspiration } from "../name-inspiration.js";
+import { buildSetupNameInspiration } from "../name-inspiration.js";
 import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
@@ -565,7 +565,7 @@ function buildSystemPrompt(
   // random content stays out of the cache-stamped Tier 1/2 prefix, which is
   // meant to stay byte-stable across sessions — putting it there would churn
   // that shared cached prefix for no benefit.
-  blocks.push({ text: "\n\n## Name Inspiration\n" + buildNameInspiration() });
+  blocks.push({ text: "\n\n## Name Inspiration\n" + buildSetupNameInspiration() });
 
   return blocks;
 }
