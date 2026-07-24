@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { getMaxOutput, loadModelRegistry, supportsImageGeneration } from "./model-registry.js";
+import {
+  getKnownModel,
+  getImageModelsForProvider,
+  getMaxOutput,
+  getTierDefaults,
+  loadModelRegistry,
+  supportsImageGeneration,
+} from "./model-registry.js";
 
 /**
  * `getMaxOutput` is the single source of truth for `max_tokens` on every API
@@ -12,15 +19,20 @@ describe("getMaxOutput", () => {
     loadModelRegistry(undefined, { reset: true });
   });
 
-  it("returns the registry's maxOutput for a known model", () => {
-    // claude-opus-4-6 is shipped with maxOutput=128000 (the docs ceiling).
-    expect(getMaxOutput("claude-opus-4-6")).toBe(128000);
+  it("returns the registry's maxOutput for current Anthropic models", () => {
+    expect(getMaxOutput("claude-fable-5")).toBe(128000);
+    expect(getMaxOutput("claude-opus-4-8")).toBe(128000);
+    expect(getMaxOutput("claude-sonnet-5")).toBe(128000);
   });
 
   it("returns the registry's maxOutput for GPT-5.5 (the model that triggered this fix)", () => {
     // gpt-5.5 ships with maxOutput=128000 — the largest of any current model.
     // The setup-finalize truncation bug was that we passed 1024, not 128000.
     expect(getMaxOutput("gpt-5.5")).toBe(128000);
+  });
+
+  it("returns OpenRouter Kimi K3's conservative output ceiling", () => {
+    expect(getMaxOutput("moonshotai/kimi-k3")).toBe(32768);
   });
 
   it("returns the fallback for unknown models", () => {
@@ -44,6 +56,50 @@ describe("getMaxOutput", () => {
   });
 });
 
+describe("current provider defaults and metadata", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("ships the current Anthropic tier family", () => {
+    expect(getTierDefaults("anthropic")).toEqual({
+      large: "claude-fable-5",
+      medium: "claude-sonnet-5",
+      small: "claude-haiku-4-5-20251001",
+    });
+    expect(getKnownModel("claude-fable-5")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      capabilities: { thinking: true, alwaysAdaptiveThinking: true },
+    });
+  });
+
+  it("ships GPT-5.6 as the API-key and ChatGPT tier family", () => {
+    const expected = {
+      large: "gpt-5.6-sol",
+      medium: "gpt-5.6-terra",
+      small: "gpt-5.6-luna",
+    };
+    expect(getTierDefaults("openai-apikey")).toEqual(expected);
+    expect(getTierDefaults("openai-chatgpt")).toEqual(expected);
+  });
+
+  it("uses current OpenAI context and output ceilings", () => {
+    expect(getKnownModel("gpt-5.4")).toMatchObject({
+      contextWindow: 1_050_000,
+      maxOutput: 128_000,
+    });
+    expect(getKnownModel("gpt-5.4-mini")).toMatchObject({
+      contextWindow: 400_000,
+      maxOutput: 128_000,
+    });
+    expect(getKnownModel("gpt-5.4-nano")).toMatchObject({
+      contextWindow: 400_000,
+      maxOutput: 128_000,
+    });
+  });
+});
+
 describe("supportsImageGeneration", () => {
   beforeEach(() => {
     loadModelRegistry(undefined, { reset: true });
@@ -54,13 +110,82 @@ describe("supportsImageGeneration", () => {
     expect(supportsImageGeneration("gpt-4o")).toBe(true);
   });
 
+  it("returns true for Gemini text models paired with Nano Banana", () => {
+    expect(supportsImageGeneration("gemini-3.6-flash")).toBe(true);
+    expect(supportsImageGeneration("gemini-3.5-flash")).toBe(true);
+    expect(supportsImageGeneration("gemini-3.5-flash-lite")).toBe(true);
+  });
+
   it("returns false for current Anthropic models (no inline image gen yet)", () => {
+    expect(supportsImageGeneration("claude-fable-5")).toBe(false);
+    expect(supportsImageGeneration("claude-opus-4-8")).toBe(false);
+    expect(supportsImageGeneration("claude-sonnet-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-7")).toBe(false);
     expect(supportsImageGeneration("claude-sonnet-4-6")).toBe(false);
     expect(supportsImageGeneration("claude-haiku-4-5-20251001")).toBe(false);
   });
 
+  it("returns false for OpenRouter Kimi K3 (multimodal input, text output only)", () => {
+    expect(supportsImageGeneration("moonshotai/kimi-k3")).toBe(false);
+  });
+
   it("returns false for unknown models — safer default than assuming yes", () => {
     expect(supportsImageGeneration("model-that-does-not-exist")).toBe(false);
+  });
+});
+
+describe("Gemini registry", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("ships the current stable Gemini text models with documented limits and pricing", () => {
+    const models = loadModelRegistry().models;
+    expect(models["gemini-3.6-flash"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    });
+    expect(models["gemini-3.5-flash"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 1.5, output: 9, cacheRead: 0.15 },
+    });
+    expect(models["gemini-3.5-flash-lite"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 0.3, output: 2.5, cacheRead: 0.03 },
+    });
+  });
+
+  it("assigns 3.6 Flash / 3.5 Flash / 3.5 Flash-Lite across large/medium/small", () => {
+    expect(getTierDefaults("gemini")).toEqual({
+      large: "gemini-3.6-flash",
+      medium: "gemini-3.5-flash",
+      small: "gemini-3.5-flash-lite",
+    });
+  });
+});
+
+describe("image model registry", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("keeps selectable image models separate and keyed by connection provider", () => {
+    expect(getImageModelsForProvider("openai-apikey")).toEqual({
+      "gpt-image-2": { provider: "openai-apikey", displayName: "GPT Image 2" },
+    });
+    expect(getImageModelsForProvider("openai-chatgpt")).toEqual({});
+    expect(getImageModelsForProvider("xai")).toEqual({
+      "grok-imagine-image": { provider: "xai", displayName: "Grok Imagine" },
+      "grok-imagine-image-quality": { provider: "xai", displayName: "Grok Imagine Quality" },
+    });
+    expect(getImageModelsForProvider("gemini")).toEqual({
+      "gemini-3.1-flash-image": { provider: "gemini", displayName: "Nano Banana 2" },
+    });
   });
 });

@@ -37,17 +37,25 @@ Every operation has an explicit cost tier. This is the core economic constraint.
 |---|---|---|---|---|
 | T1 (Code) | None | Zero tokens | Dice, maps, clocks, cards, combat, persistence | `packages/engine/src/tools/` — pure functions |
 | T2 (Subagent) | Haiku or Sonnet | Cheap | Summarization, precis, changelogs, resolution, choices, entity writes | `packages/engine/src/agents/subagents/` — `spawnSubagent()` / `oneShot()` |
-| T3 (DM) | Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
+| T3 (DM) | Fable or Opus | Expensive | Narration, scene direction, NPC dialogue | `packages/engine/src/agents/agent-loop.ts` — main conversation |
 
-Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")` returns baked-in defaults. Per-tier provider/model assignment lives in `connections.json` (managed via the Connections UI); `dev-config.jsonc` exposes optional dev-only `effort` and `pricing` overrides.
+Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | "medium" | "small")` returns baked-in defaults. Per-tier provider/model assignment lives in `connections.json` (managed via the Connections UI); the same store carries an optional `imageAssignment`. An explicit image model is always paired to the exact Large-tier connection and is cleared when Large moves to another connection. A null assignment preserves the renderer's provider-managed default. Text models and selectable image models live in separate `models` / `imageModels` sections of `known-models.json`; `dev-config.jsonc` exposes optional dev-only `effort` and `pricing` overrides.
 
-**Provider routing:** every model call is paired `{provider, model}` — a `TierProvider` (`packages/engine/src/providers/types.ts`). At session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads the connection store and produces `Record<ModelTier, TierProvider>`, which threads through `GameEngine`, `SceneManager`, and `ResolveSession` to every subagent dispatch site. This guarantees that a heterogeneous setup (e.g. Large=OpenAI, Medium=Anthropic) routes each tier's call through its own connection — sending an Anthropic model ID through an OpenAI client would crash. Subagents accept `model` as a required parameter; there is no silent fallback to `getModel(tier)`.
+**Provider routing:** every model call is paired `{provider, model}` — a `TierProvider` (`packages/engine/src/providers/types.ts`). At session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads the connection store and produces `Record<ModelTier, TierProvider>`, which threads through `GameEngine`, `SceneManager`, and `ResolveSession` to every subagent dispatch site. The resolver also returns the optional Large-paired `imageModel`; setup portraits, DM scene images, and portrait revisions pass it through `GenerateImageRequest.imageModel`. This guarantees that a heterogeneous setup (e.g. Large=OpenAI, Medium=Anthropic) routes each tier's call through its own connection — sending an Anthropic model ID through an OpenAI client would crash. Subagents accept `model` as a required parameter; there is no silent fallback to `getModel(tier)`.
+
+The `gemini` adapter uses Google's Interactions API in stateless mode. Gemini
+`thought` steps and function-call signatures are preserved in normalized
+history and replayed unchanged, while SSE step events normalize to the same
+streaming/tool/usage contract used by the other providers. See
+[gemini-provider.md](gemini-provider.md).
 
 ## Anthropic Provider: Thinking and Reasoning Preservation
 
 The Anthropic adapter (`packages/engine/src/providers/anthropic.ts`) implements extended thinking for capable models via `ThinkingConfigParam`.
 
-**Thinking config** (`toAnthropicParams`): thinking is enabled only for models whose `capabilities.thinking` flag is true in `known-models.json` (looked up via `getKnownModel`). When `ChatParams.thinking.effort` is set and the model supports thinking, the adapter sends `thinking: { type: 'adaptive' }` to the API; otherwise it sends `{ type: 'disabled' }`. For Opus models specifically (model id contains `opus`), an `output_config: { effort }` block is added alongside the thinking param. When thinking is active, `max_tokens` is boosted to `Math.max(params.maxTokens, model maxOutput)` (falling back to 16384 if the model has no `maxOutput`) so thinking tokens don't starve the response.
+**Thinking config** (`toAnthropicParams`): thinking is enabled only for models whose `capabilities.thinking` flag is true in `known-models.json` (looked up via `getKnownModel`). When `ChatParams.thinking.effort` is set and the model supports thinking, the adapter sends `thinking: { type: 'adaptive' }` plus `output_config: { effort }`; otherwise it sends `{ type: 'disabled' }`. Models marked `alwaysAdaptiveThinking` are the exception: their API rejects disabled thinking, so an unset effort omits the thinking field and inherits mandatory adaptive thinking. When thinking is active — explicitly or because the model requires it — `max_tokens` is boosted to `Math.max(params.maxTokens, model maxOutput)` (falling back to 16384 if the model has no `maxOutput`) so thinking tokens don't starve the response.
+
+The shipped Anthropic defaults are Claude Fable 5 (large), Claude Sonnet 5 (medium), and Claude Haiku 4.5 (small). Claude Opus 4.8 and retained 4.x models remain selectable. Fable 5 is marked always-adaptive; Sonnet 5 can still honor Machine Violet's explicit disabled mode when an agent has no configured effort.
 
 **Cross-turn reasoning state** (`fromAnthropicResponse` + `toAnthropicMessage`): The API returns `thinking` and `redacted_thinking` content blocks in its response. Both are captured verbatim into `assistantContent`:
 
@@ -56,7 +64,7 @@ The Anthropic adapter (`packages/engine/src/providers/anthropic.ts`) implements 
 
 On subsequent turns, `toAnthropicMessage` emits both block types back to the API as `ThinkingBlockParam` and `RedactedThinkingBlockParam`, signature and data fields unchanged. The API auto-filters which blocks it needs and bills accordingly, so the adapter passes back everything captured rather than pruning manually. This round-trip is what lets the model continue its reasoning chain across turn boundaries rather than re-deriving context from scratch (issue #533). OpenAI `reasoning` blocks that may exist in shared history are skipped here — the Anthropic API rejects them.
 
-This cross-provider reasoning-preservation contract is pinned by `packages/engine/src/providers/preserves-thinking.contract.test.ts`, which tests the capture + replay path for the `anthropic`, `openai-apikey` (Responses API), and `openai-chatgpt` providers; `openrouter` and `custom` are registered as explicitly unsupported with documented rationale.
+This cross-provider reasoning-preservation contract is pinned by `packages/engine/src/providers/preserves-thinking.contract.test.ts`, which tests the capture + replay path for the `anthropic`, `openai-apikey` (Responses API), and `openai-chatgpt` providers; `openrouter` and `xai` share the tested Responses path, while `custom` is explicitly unsupported with documented rationale.
 
 ## State Architecture
 

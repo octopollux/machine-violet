@@ -24,12 +24,15 @@ function defaultProps(overrides?: Partial<ConnectionsPhaseProps>): ConnectionsPh
     theme: makeTheme(),
     connections: [],
     tierAssignments,
+    imageAssignment: null,
     healthResults: {},
     knownModels: {},
+    knownImageModels: {},
     onAddConnection: vi.fn(),
     onRemoveConnection: vi.fn(),
     onCheckHealth: vi.fn(),
     onSetTier: vi.fn(),
+    onSetImage: vi.fn(),
     onBack: vi.fn(),
     ...overrides,
   };
@@ -55,22 +58,72 @@ async function openProviderPicker(props?: Partial<ConnectionsPhaseProps>) {
 }
 
 describe("ConnectionsPhase provider picker", () => {
-  it("offers only the validated providers (Anthropic, OpenAI API key)", async () => {
+  it("offers the validated providers, including Gemini, xAI, and OpenRouter", async () => {
     const { lastFrame } = await openProviderPicker();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Anthropic");
+    expect(frame).toContain("Google Gemini");
     expect(frame).toContain("OpenAI (API key)");
+    expect(frame).toContain("xAI");
+    expect(frame).toContain("OpenRouter (Kimi K3)");
   });
 
-  // Regression guard for #712: OpenRouter and Custom (OpenAI-compatible) were
-  // pulled from the picker for 1.1 because neither is validated end-to-end.
-  // The engine-side adapters still exist, so it's easy to accidentally
-  // re-surface them here — this test fails if either row comes back before
-  // the post-1.1 validation playtest re-enables it deliberately.
-  it("does not offer the unvalidated OpenRouter or Custom providers", async () => {
+  it("offers custom endpoints only with explicit experimental/untested messaging", async () => {
     const { lastFrame } = await openProviderPicker();
     const frame = lastFrame() ?? "";
-    expect(frame).not.toContain("OpenRouter");
-    expect(frame).not.toContain("Custom");
+    expect(frame).toContain("Custom endpoint");
+    expect(frame).toContain("experimental");
+    expect(frame).toContain("untested");
+  });
+});
+
+describe("ConnectionsPhase image model picker", () => {
+  it("offers only image models belonging to the exact Large connection provider", async () => {
+    const onSetImage = vi.fn();
+    const rendered = render(<ConnectionsPhase {...defaultProps({
+      connections: [{
+        id: "xai-1",
+        provider: "xai",
+        label: "xAI",
+        masked: "***",
+        models: [{ id: "grok-4.5", displayName: "Grok 4.5", available: true }],
+        source: "manual",
+        addedAt: "",
+      }],
+      tierAssignments: {
+        large: { connectionId: "xai-1", modelId: "grok-4.5" },
+        medium: null,
+        small: null,
+      },
+      knownImageModels: {
+        "gpt-image-2": { provider: "openai-apikey", displayName: "GPT Image 2" },
+        "grok-imagine-image": { provider: "xai", displayName: "Grok Imagine" },
+      },
+      onSetImage,
+    })} />);
+    const press = async (key: string) => {
+      rendered.stdin.write(key);
+      await new Promise((r) => setTimeout(r, 20));
+    };
+
+    await press(DOWN); // Model Assignments
+    await press(ENTER);
+    await press(DOWN);
+    await press(DOWN);
+    await press(DOWN); // Image generation row
+    await press(ENTER);
+
+    await vi.waitFor(() => expect(rendered.lastFrame()).toContain("Select Image Model"));
+    const frame = rendered.lastFrame() ?? "";
+    expect(frame).toContain("Provider default");
+    expect(frame).toContain("Grok Imagine");
+    expect(frame).not.toContain("GPT Image 2");
+
+    await press(DOWN);
+    await press(ENTER);
+    expect(onSetImage).toHaveBeenCalledWith({
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image",
+    });
   });
 });

@@ -16,7 +16,7 @@ export interface ModelConfig {
   /**
    * Per-agent effort configuration.
    * Keys are agent names (e.g. "dm", "ooc", "scene-summarizer").
-   * Values: effort level string, or null to omit (API default).
+   * Values: effort level string, or null to disable when the provider permits.
    * The "default" key serves as fallback for unconfigured agents.
    */
   effort: Record<string, EffortLevel | null>;
@@ -151,8 +151,8 @@ function warnBadDevConfig(dir: string, err: unknown): void {
 }
 
 const DEFAULTS: ModelConfig = {
-  large: "claude-opus-4-6",
-  medium: "claude-sonnet-4-6",
+  large: "claude-fable-5",
+  medium: "claude-sonnet-5",
   small: "claude-haiku-4-5-20251001",
   effort: {
     "default": null,
@@ -174,6 +174,9 @@ export interface ModelPricing {
 }
 
 const DEFAULT_PRICING: Record<string, ModelPricing> = {
+  "claude-fable-5":              { input: 10,   output: 50,  cacheWrite: 12.5,  cacheRead: 1.00 },
+  "claude-opus-4-8":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
+  "claude-sonnet-5":             { input: 2,    output: 10,  cacheWrite: 2.5,   cacheRead: 0.20 },
   "claude-opus-4-7":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-opus-4-6":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-sonnet-4-6":           { input: 3,    output: 15,  cacheWrite: 3.75,  cacheRead: 0.30 },
@@ -245,7 +248,9 @@ export function getModel(tier: ModelTier): ModelId {
  *
  * When effort is set, the caller should send `output_config: { effort }`
  * and omit `thinking` (the API handles thinking implicitly).
- * When effort is null, the caller should send `thinking: { type: "disabled" }`.
+ * When effort is null, providers disable thinking when the selected model
+ * permits it. Always-adaptive models ignore that preference because their API
+ * rejects disabled thinking.
  */
 export function getEffortConfig(agentName: string): EffortConfig {
   const map = loadModelConfig().effort;

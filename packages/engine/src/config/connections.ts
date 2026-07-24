@@ -5,19 +5,25 @@
  * Replaces the single-provider api-keys.ts with multi-provider support.
  *
  * Connections are persisted to `connections.json` in the app config dir.
- * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY) auto-create
+ * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY /
+ * GEMINI_API_KEY, OPENROUTER_API_KEY, XAI_API_KEY) auto-create
  * connections at runtime via buildEffectiveConnections().
  */
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-registry.js";
+import {
+  getImageModelsForProvider,
+  getModelsForProvider,
+  getTierDefaults,
+  modelFamilyFor,
+} from "./model-registry.js";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ProviderType = "anthropic" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "custom";
+export type ProviderType = "anthropic" | "gemini" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "xai" | "custom";
 
 export interface DiscoveredModel {
   id: string;
@@ -77,6 +83,12 @@ export interface ConnectionStore {
   connections: AIConnection[];
   /** Model → connection mapping for each tier. */
   tierAssignments: TierAssignments;
+  /**
+   * Optional explicit image-model override. It must reference the exact
+   * connection assigned to Large; null preserves that provider's bundled
+   * default image model.
+   */
+  imageAssignment: TierAssignment | null;
 }
 
 export interface TierAssignments {
@@ -96,7 +108,10 @@ export interface TierAssignment {
 
 const STORE_FILENAME = "connections.json";
 const ENV_ANTHROPIC_ID = "env-anthropic";
+const ENV_GEMINI_ID = "env-gemini";
 const ENV_OPENAI_ID = "env-openai";
+const ENV_XAI_ID = "env-xai";
+const ENV_OPENROUTER_ID = "env-openrouter";
 
 function generateId(): string {
   return randomBytes(8).toString("hex");
@@ -133,9 +148,14 @@ export function loadConnectionStore(appDir: string): ConnectionStore {
     return {
       connections: migrated,
       tierAssignments: parsed.tierAssignments ?? { large: null, medium: null, small: null },
+      imageAssignment: parsed.imageAssignment ?? null,
     };
   } catch {
-    return { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    return {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
   }
 }
 
@@ -143,6 +163,7 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
   const toSave: ConnectionStore = {
     connections: store.connections.filter((c) => c.source !== "env"),
     tierAssignments: store.tierAssignments,
+    imageAssignment: store.imageAssignment,
   };
   const target = join(appDir, STORE_FILENAME);
   // Atomic write: serialize to a unique temp file in the same dir, then rename
@@ -232,6 +253,59 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
+  // Environment: xAI
+  const xaiKey = process.env.XAI_API_KEY;
+  if (xaiKey) {
+    const knownModels = getModelsForProvider("xai", configDir);
+    connections.push({
+      id: ENV_XAI_ID,
+      provider: "xai",
+      label: "xAI (env)",
+      apiKey: xaiKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
+  // Environment: OpenRouter
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey) {
+    const knownModels = getModelsForProvider("openrouter", configDir);
+    connections.push({
+      id: ENV_OPENROUTER_ID,
+      provider: "openrouter",
+      label: "OpenRouter (env)",
+      apiKey: openrouterKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
+  // Environment: Google Gemini. GOOGLE_API_KEY is the deployment-facing name
+  // used by Machine Violet; GEMINI_API_KEY is also accepted because it is the
+  // name used throughout Google's Gemini Developer API quickstarts.
+  const geminiKey = process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    const knownModels = getModelsForProvider("gemini", configDir);
+    connections.push({
+      id: ENV_GEMINI_ID,
+      provider: "gemini",
+      label: "Gemini (env)",
+      apiKey: geminiKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
   // Manual connections — refresh models from the registry on every load.
   //
   // For registry-backed providers (anthropic, openai-apikey) the model list
@@ -287,7 +361,26 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     }
   }
 
-  return { connections, tierAssignments };
+  // An explicit image model is valid only for the exact connection assigned
+  // to Large and only when that provider advertises the model in the separate
+  // image registry. Null means "use the provider-managed bundled default".
+  let imageAssignment = stored.imageAssignment ?? null;
+  const largeAssignment = tierAssignments.large;
+  if (
+    !imageAssignment
+    || !largeAssignment
+    || imageAssignment.connectionId !== largeAssignment.connectionId
+  ) {
+    imageAssignment = null;
+  } else {
+    const largeConnection = connections.find((c) => c.id === largeAssignment.connectionId);
+    const imageModels = largeConnection
+      ? getImageModelsForProvider(largeConnection.provider, configDir)
+      : {};
+    if (!imageModels[imageAssignment.modelId]) imageAssignment = null;
+  }
+
+  return { connections, tierAssignments, imageAssignment };
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +411,13 @@ export function addConnection(
 }
 
 export function removeConnection(store: ConnectionStore, connectionId: string): ConnectionStore {
-  if (connectionId === ENV_ANTHROPIC_ID || connectionId === ENV_OPENAI_ID) return store;
+  if (
+    connectionId === ENV_ANTHROPIC_ID
+    || connectionId === ENV_GEMINI_ID
+    || connectionId === ENV_OPENAI_ID
+    || connectionId === ENV_OPENROUTER_ID
+    || connectionId === ENV_XAI_ID
+  ) return store;
   const connections = store.connections.filter((c) => c.id !== connectionId);
   // Clear tier assignments that referenced this connection
   const tierAssignments = { ...store.tierAssignments };
@@ -327,7 +426,9 @@ export function removeConnection(store: ConnectionStore, connectionId: string): 
       tierAssignments[tier] = null;
     }
   }
-  return { connections, tierAssignments };
+  const imageAssignment =
+    store.imageAssignment?.connectionId === connectionId ? null : store.imageAssignment;
+  return { connections, tierAssignments, imageAssignment };
 }
 
 export function setTierAssignment(
@@ -336,13 +437,47 @@ export function setTierAssignment(
   connectionId: string,
   modelId: string,
 ): ConnectionStore {
+  const imageAssignment =
+    tier === "large"
+    && store.imageAssignment
+    && store.imageAssignment.connectionId !== connectionId
+      ? null
+      : store.imageAssignment;
   return {
     ...store,
+    imageAssignment,
     tierAssignments: {
       ...store.tierAssignments,
       [tier]: { connectionId, modelId },
     },
   };
+}
+
+/**
+ * Set or clear the explicit image-model override.
+ *
+ * The assignment must use the exact Large-tier connection. Registry/provider
+ * validation is repeated by buildEffectiveConnections, keeping persisted
+ * stale or hand-edited stores safe.
+ */
+export function setImageAssignment(
+  store: ConnectionStore,
+  assignment: TierAssignment | null,
+  configDir?: string,
+): ConnectionStore {
+  if (assignment && assignment.connectionId !== store.tierAssignments.large?.connectionId) {
+    return { ...store, imageAssignment: null };
+  }
+  if (assignment) {
+    const connection = store.connections.find((c) => c.id === assignment.connectionId);
+    if (
+      !connection
+      || !getImageModelsForProvider(connection.provider, configDir)[assignment.modelId]
+    ) {
+      return { ...store, imageAssignment: null };
+    }
+  }
+  return { ...store, imageAssignment: assignment };
 }
 
 export function updateConnectionModels(

@@ -200,6 +200,7 @@ export const TierAssignmentSchema = Type.Object({
 export const ConnectionsListResponse = Type.Object({
   connections: Type.Array(SerializedConnection),
   tierAssignments: Type.Unknown(),
+  imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
 });
 
 export const AddConnectionRequest = Type.Object({
@@ -208,8 +209,10 @@ export const AddConnectionRequest = Type.Object({
   // not by submitting an API key here.
   provider: Type.Union([
     Type.Literal("anthropic"),
+    Type.Literal("gemini"),
     Type.Literal("openai-apikey"),
     Type.Literal("openrouter"),
+    Type.Literal("xai"),
     Type.Literal("custom"),
   ]),
   apiKey: Type.String(),
@@ -261,16 +264,19 @@ export const UpdateModelsRequest = Type.Object({
 
 export const TiersResponse = Type.Object({
   tierAssignments: Type.Unknown(),
+  imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
 });
 
 export const SetTiersRequest = Type.Object({
   large: Type.Optional(TierAssignmentSchema),
   medium: Type.Optional(TierAssignmentSchema),
   small: Type.Optional(TierAssignmentSchema),
+  imageAssignment: Type.Optional(Type.Union([TierAssignmentSchema, Type.Null()])),
 });
 
 export const ModelsResponse = Type.Object({
   models: Type.Unknown(),
+  imageModels: Type.Unknown(),
 });
 
 export const ArchiveResponse = Type.Object({

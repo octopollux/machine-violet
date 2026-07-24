@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildTierProviders } from "./tier-resolver.js";
+import { buildTierProviders, buildTierProvidersWithCache } from "./tier-resolver.js";
 import { loadModelConfig, getModel } from "./models.js";
 import { createAnthropicProvider } from "../providers/anthropic.js";
 import * as codex from "../providers/openai-chatgpt/index.js";
@@ -49,6 +49,22 @@ describe("buildTierProviders", () => {
 
     // Fallback thunk untouched — every tier resolved via assignment.
     expect(fallbackThunk).not.toHaveBeenCalled();
+  });
+
+  it("threads the explicit Large-paired image model alongside tier resolution", () => {
+    const assignment = { connectionId: "openai-1", modelId: "gpt-5.6-sol" };
+    const store: ConnectionStore = {
+      connections: [
+        { id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test", models: [], source: "manual", addedAt: "" },
+      ],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    };
+    const resolution = buildTierProvidersWithCache(
+      store,
+      () => createAnthropicProvider("sk-fallback"),
+    );
+    expect(resolution.imageModel).toBe("gpt-image-2");
   });
 
   it("falls back to the thunk for unassigned tiers and invokes it lazily once", () => {

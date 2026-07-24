@@ -37,6 +37,8 @@ import { getModel } from "./models.js";
  */
 export interface TierProviderResolution {
   tiers: Record<ModelTier, TierProvider>;
+  /** Explicit image-model override paired to the Large-tier connection. */
+  imageModel?: string;
   /**
    * Map of connectionId → provider instance for every connection that
    * actually backs an assigned tier. Used by callers (e.g. session-manager)
@@ -102,6 +104,10 @@ export function buildTierProvidersWithCache(
       medium: resolveTier("medium"),
       small: resolveTier("small"),
     },
+    ...(connStore.imageAssignment
+      && connStore.imageAssignment.connectionId === connStore.tierAssignments.large?.connectionId
+      ? { imageModel: connStore.imageAssignment.modelId }
+      : {}),
     byConnectionId: providerCache,
   };
 }

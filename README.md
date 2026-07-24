@@ -46,9 +46,9 @@ Machine Violet is open-source software that **runs on your own computer**. It us
 <details>
 <summary>Which AI model should I use?</summary>
 
-Machine Violet is tested against the latest models from **Anthropic** (Claude) and **OpenAI** (ChatGPT).
+Machine Violet is tested against current models from **Anthropic** (Claude), **OpenAI** (ChatGPT), and **OpenRouter** (Kimi K3).
 
-Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI and Anthropic.
+Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI, Anthropic, and OpenRouter. Developers can provide `OPENROUTER_API_KEY` in the environment or `.env`; it becomes an ephemeral connection and is not copied into `connections.json`.
 
 Additionally, OpenAI supports image generation! Anthropic does not.
 </details>
@@ -134,9 +134,9 @@ If you want this to change, you should ask Anthropic (nicely) to add support for
 <details>
 <summary>Will Machine Violet work with Ollama/local models/GLM 5.x/etc?</summary>
 
-Not offered in this release. The app's connection picker only lets you add Anthropic and OpenAI (including the ChatGPT-subscription sign-in) — those are the connection types we've validated. Adding OpenAI-compatible / local endpoints through the UI is planned once we can test it end to end. (If you carried over a custom endpoint from an earlier build it still loads; it's just no longer offered as a new option.)
+OpenRouter is supported with the shipped **MoonshotAI: Kimi K3** model. Kimi K3 is a frontier, tool-capable generalist with enough context for Machine Violet; the app configures it automatically when you add an OpenRouter connection.
 
-Even then, local models probably won't work well: Machine Violet requires reliable tool use and about ~300k tokens of context window, and "big model smell" leads to a *much* better gameplay experience.
+You can also add a custom OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, and similar), but that path is explicitly **experimental and untested**. Endpoint behavior varies, and Machine Violet requires reliable tool use and about ~300k tokens of context window. Most local models will not meet both requirements, and "big model smell" leads to a *much* better gameplay experience.
 </details>
 
 <details>

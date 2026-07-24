@@ -578,8 +578,10 @@ export async function runProviderLoop(
     // Append assistant message (without thinking blocks)
     workingMessages.push({ role: "assistant", content: result.assistantContent });
 
-    // No tool calls → done
-    if (result.toolCalls.length === 0 || result.stopReason === "end") {
+    // No tool calls → done. Tool calls take precedence over the provider's
+    // stop reason: some APIs can report a completed/end status while still
+    // returning function calls that require dispatch and a follow-up round.
+    if (result.toolCalls.length === 0) {
       break;
     }
 

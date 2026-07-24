@@ -1,4 +1,9 @@
-import { createOpenAIProvider, parseOpenAIRateLimits, rateLimitsToUsageStatus } from "./openai.js";
+import {
+  createOpenAIProvider,
+  parseOpenAIRateLimits,
+  rateLimitsToUsageStatus,
+  XAI_IMAGE_MODELS,
+} from "./openai.js";
 import type { ChatParams, NormalizedMessage } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -79,7 +84,7 @@ function fakeChatCompletion(overrides: Record<string, unknown> = {}) {
 }
 
 // =========================================================================
-// Responses API path (openai-apikey, openrouter)
+// Responses API path (openai-apikey, openrouter, xai)
 // =========================================================================
 
 describe("OpenAI provider — Responses API", () => {
@@ -92,6 +97,12 @@ describe("OpenAI provider — Responses API", () => {
     it("routes openrouter to Responses API", () => {
       const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openrouter" });
       expect(provider.providerId).toBe("openrouter");
+    });
+
+    it("does not expose OpenAI image generation through OpenRouter", () => {
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openrouter" });
+      expect(provider.getCapabilities("moonshotai/kimi-k3").imageGeneration).toBe(false);
+      expect(provider.generateImage).toBeUndefined();
     });
 
     it("defaults providerId to openai-apikey", () => {
@@ -130,6 +141,7 @@ vi.mock("openai", () => {
     generate: vi.fn(),
     edit: vi.fn(),
   };
+  const mockPost = vi.fn();
   // toFile is a named export the provider uses to turn reference bytes into an
   // Uploadable for images.edit. Return a lightweight stand-in carrying the name
   // + mime so tests can assert what was uploaded.
@@ -144,6 +156,7 @@ vi.mock("openai", () => {
     responses = mockResponses;
     chat = { completions: mockCompletions };
     images = mockImages;
+    post = mockPost;
 
     static AuthenticationError = class extends Error { };
     static PermissionDeniedError = class extends Error { };
@@ -156,13 +169,20 @@ vi.mock("openai", () => {
     __mockResponses: mockResponses,
     __mockCompletions: mockCompletions,
     __mockImages: mockImages,
+    __mockPost: mockPost,
     __mockToFile: mockToFile,
   };
 });
 
 // Get the mock handles
+const {
+  __mockResponses: mockResponses,
+  __mockCompletions: mockCompletions,
+  __mockImages: mockImages,
+  __mockPost: mockPost,
+  __mockToFile: mockToFile,
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { __mockResponses: mockResponses, __mockCompletions: mockCompletions, __mockImages: mockImages, __mockToFile: mockToFile } = await import("openai") as any;
+} = await import("openai") as any;
 
 describe("Responses API integration", () => {
   beforeEach(() => {
@@ -323,6 +343,39 @@ describe("Responses API integration", () => {
 
     const callArgs = mockResponses.create.mock.calls[0][0];
     expect(callArgs.reasoning.effort).toBe("xhigh");
+  });
+
+  it("preserves the distinct max effort supported by GPT-5.6", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.chat(baseChatParams({
+      model: "gpt-5.6-sol",
+      thinking: { effort: "max" },
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.reasoning.effort).toBe("max");
+  });
+
+  it("routes xAI through Responses, clamps max reasoning, and sends the cache-affinity key", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({ model: "grok-4.5" }));
+
+    const provider = createOpenAIProvider({
+      apiKey: "test-key",
+      baseURL: "https://api.x.ai/v1",
+      providerId: "xai",
+    });
+    await provider.chat(baseChatParams({
+      model: "grok-4.5",
+      conversationId: "campaign-123",
+      thinking: { effort: "max" },
+    }));
+
+    const callArgs = mockResponses.create.mock.calls[0][0];
+    expect(callArgs.model).toBe("grok-4.5");
+    expect(callArgs.reasoning.effort).toBe("high");
+    expect(callArgs.prompt_cache_key).toBe("campaign-123");
   });
 
   it("converts assistant tool_use messages to function_call input items", async () => {
@@ -704,6 +757,25 @@ describe("Responses API integration", () => {
   });
 
   describe("streaming", () => {
+    it("falls back to a completed response for models without SSE support", async () => {
+      mockResponses.create.mockResolvedValue(fakeResponse({ model: "gpt-5.5-pro" }));
+
+      const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+      const deltas: string[] = [];
+      const result = await provider.stream(
+        baseChatParams({ model: "gpt-5.5-pro" }),
+        (delta) => deltas.push(delta),
+      );
+
+      expect(mockResponses.stream).not.toHaveBeenCalled();
+      expect(mockResponses.create).toHaveBeenCalledWith(expect.objectContaining({
+        model: "gpt-5.5-pro",
+        stream: false,
+      }));
+      expect(deltas).toEqual(["Hi there!"]);
+      expect(result.text).toBe("Hi there!");
+    });
+
     it("emits text deltas and returns final response", async () => {
       const response = fakeResponse();
       const events = [
@@ -961,6 +1033,19 @@ describe("Chat Completions integration (custom provider)", () => {
     expect(result.usage.cacheReadTokens).toBe(2);
   });
 
+  it("keeps max effort compatible on custom endpoints using an OpenAI model name", async () => {
+    mockCompletions.create.mockResolvedValue(fakeChatCompletion());
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
+    await provider.chat(baseChatParams({
+      model: "gpt-5.6-sol",
+      thinking: { effort: "max" },
+    }));
+
+    const callArgs = mockCompletions.create.mock.calls[0][0];
+    expect(callArgs.reasoning_effort).toBe("xhigh");
+  });
+
   it("maps tool_calls finish reason", async () => {
     mockCompletions.create.mockResolvedValue(fakeChatCompletion({
       choices: [{
@@ -1211,6 +1296,26 @@ describe("OpenAI provider.generateImage", () => {
     }));
   });
 
+  it("uses an explicit image model override for generate and edit", async () => {
+    mockImages.generate.mockResolvedValue({ data: [{ b64_json: "GENERATED" }] });
+    mockImages.edit.mockResolvedValue({ data: [{ b64_json: "EDITED" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "openai-apikey" });
+    await provider.generateImage!({ prompt: "icon", imageModel: "gpt-image-custom" });
+    await provider.generateImage!({
+      prompt: "revision",
+      imageModel: "gpt-image-custom",
+      referenceImages: [{ base64: "UE5H", mimeType: "image/png" }],
+    });
+
+    expect(mockImages.generate).toHaveBeenCalledWith(expect.objectContaining({
+      model: "gpt-image-custom",
+    }));
+    expect(mockImages.edit).toHaveBeenCalledWith(expect.objectContaining({
+      model: "gpt-image-custom",
+    }));
+  });
+
   it("returns base64 + revisedPrompt + effort/aspect used", async () => {
     mockImages.generate.mockResolvedValue({
       data: [{ b64_json: "ABCD", revised_prompt: "the actual prompt used" }],
@@ -1301,6 +1406,120 @@ describe("OpenAI provider.generateImage", () => {
   it("omits generateImage on the Chat Completions fallback (custom providers)", () => {
     const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "custom" });
     expect(provider.generateImage).toBeUndefined();
+  });
+});
+
+describe("xAI provider.generateImage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("maps standard generation to Grok Imagine JSON with base64 output", async () => {
+    mockPost.mockResolvedValue({
+      data: [{ b64_json: "GROK", mime_type: "image/jpeg" }],
+    });
+
+    const provider = createOpenAIProvider({
+      apiKey: "test-key",
+      baseURL: "https://api.x.ai/v1",
+      providerId: "xai",
+    });
+    const result = await provider.generateImage!({
+      prompt: "a moonlit citadel",
+      effort: "standard",
+      aspect: "landscape",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/images/generations", {
+      body: {
+        model: XAI_IMAGE_MODELS.standard,
+        prompt: "a moonlit citadel",
+        response_format: "b64_json",
+        resolution: "1k",
+        n: 1,
+        aspect_ratio: "3:2",
+      },
+    });
+    expect(result).toEqual({
+      base64: "GROK",
+      mimeType: "image/jpeg",
+      effortUsed: "standard",
+      aspectUsed: "landscape",
+    });
+  });
+
+  it("maps showcase to the quality model at 2K and honors an explicit model override", async () => {
+    mockPost.mockResolvedValue({ data: [{ b64_json: "QUALITY", mime_type: "image/png" }] });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "xai" });
+    const result = await provider.generateImage!({
+      prompt: "a painted dragon",
+      effort: "showcase",
+      aspect: "portrait",
+      imageModel: "grok-imagine-image-quality-latest",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/images/generations", {
+      body: expect.objectContaining({
+        model: "grok-imagine-image-quality-latest",
+        resolution: "2k",
+        aspect_ratio: "2:3",
+      }),
+    });
+    expect(result.mimeType).toBe("image/png");
+  });
+
+  it("uses xAI's JSON edit endpoint with base64 data URIs for references", async () => {
+    mockPost.mockResolvedValue({
+      data: [{ b64_json: "EDITED", mime_type: "image/jpeg", revised_prompt: "revised" }],
+    });
+
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "xai" });
+    const result = await provider.generateImage!({
+      prompt: "Xera draws her blade",
+      effort: "quality",
+      aspect: "landscape",
+      referenceImages: [{ base64: "UE5H", mimeType: "image/png", label: "Xera" }],
+    });
+
+    expect(mockPost).toHaveBeenCalledWith("/images/edits", {
+      body: expect.objectContaining({
+        model: XAI_IMAGE_MODELS.quality,
+        image: { type: "image_url", url: "data:image/png;base64,UE5H" },
+        response_format: "b64_json",
+      }),
+    });
+    const body = mockPost.mock.calls[0][1].body;
+    expect(body.aspect_ratio).toBeUndefined();
+    expect(body.prompt).toMatch(/established appearance of Xera/i);
+    expect(result.revisedPrompt).toBe("revised");
+  });
+
+  it("sends multiple references as JSON and preserves the requested aspect", async () => {
+    mockPost.mockResolvedValue({ data: [{ b64_json: "GROUP" }] });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "xai" });
+
+    await provider.generateImage!({
+      prompt: "the party regroups",
+      aspect: "landscape",
+      referenceImages: [
+        { base64: "AAAA", mimeType: "image/png", label: "Xera" },
+        { base64: "BBBB", mimeType: "image/webp", label: "Vera" },
+      ],
+    });
+
+    const body = mockPost.mock.calls[0][1].body;
+    expect(body.images).toHaveLength(2);
+    expect(body.aspect_ratio).toBe("3:2");
+    expect(body.prompt).toMatch(/established appearance of Xera and Vera/i);
+  });
+
+  it("bounds retries when xAI returns no image data", async () => {
+    mockPost.mockResolvedValue({ data: [] });
+    const provider = createOpenAIProvider({ apiKey: "test-key", providerId: "xai" });
+
+    await expect(provider.generateImage!({ prompt: "empty" })).rejects.toThrow(/xAI images returned no image data/i);
+    expect(mockPost).toHaveBeenCalledTimes(3);
   });
 });
 

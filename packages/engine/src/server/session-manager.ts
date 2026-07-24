@@ -591,18 +591,21 @@ export class SessionManager {
     const appConfigDir = configDir();
     this.providersByConnectionId.clear();
     let tierProviders: Record<ModelTier, TierProvider>;
+    let imageModel: string | undefined;
     const replayTiers = buildReplayTierProviders();
     if (replayTiers) {
       // Full-stack replay (E2E): every tier served from the tape at
       // MV_TAPE_PATH — no connection, no network, no key. byConnectionId
       // stays empty; a taped session has no management-route providers.
       tierProviders = replayTiers;
+      imageModel = undefined;
     } else {
       const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
       const { createAnthropicProvider } = await import("../providers/anthropic.js");
       const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
       // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
       tierProviders = wrapForRecording(tierResolution.tiers);
+      imageModel = tierResolution.imageModel;
       // Build the connectionId → provider lookup for management routes.
       for (const [connId, provider] of tierResolution.byConnectionId) {
         this.providersByConnectionId.set(connId, provider);
@@ -876,6 +879,7 @@ export class SessionManager {
     const engine = new GameEngine({
       provider,
       tierProviders,
+      imageModel,
       gameState: gs,
       scene,
       sessionState,

@@ -649,6 +649,8 @@ export function createSetupConversation(
    */
   fileIO?: FileIO,
   setupRoot?: string,
+  /** Explicit provider-native image model paired to the Large connection. */
+  imageModel?: string,
 ): SetupConversation {
   // Build per-session system prompt (randomizes seed/personality order).
   // Known players are injected right after the base prompt (before seeds/personalities)
@@ -775,6 +777,7 @@ export function createSetupConversation(
       // That's why the tool no longer exposes either knob.
       const result = await provider.generateImage({
         prompt: styledPrompt,
+        ...(imageModel ? { imageModel } : {}),
         effort: "standard",
         aspect: "landscape",
         intent: "character_portrait",
