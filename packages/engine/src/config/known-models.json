@@ -72,6 +72,36 @@
       "pricing": { "input": 1, "output": 5, "cacheWrite": 1.25, "cacheRead": 0.10 },
       "capabilities": { "thinking": false, "tools": true, "streaming": true, "caching": true, "imageGeneration": false }
     },
+    "gemini-3.6-flash": {
+      "provider": "gemini",
+      "displayName": "Gemini 3.6 Flash",
+      "contextWindow": 1048576,
+      "maxOutput": 65536,
+      "defaultTier": "large",
+      "compactionThreshold": 838861,
+      "pricing": { "input": 1.5, "output": 7.5, "cacheWrite": 0, "cacheRead": 0.15 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "gemini-3.5-flash": {
+      "provider": "gemini",
+      "displayName": "Gemini 3.5 Flash",
+      "contextWindow": 1048576,
+      "maxOutput": 65536,
+      "defaultTier": "medium",
+      "compactionThreshold": 838861,
+      "pricing": { "input": 1.5, "output": 9, "cacheWrite": 0, "cacheRead": 0.15 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
+    "gemini-3.5-flash-lite": {
+      "provider": "gemini",
+      "displayName": "Gemini 3.5 Flash-Lite",
+      "contextWindow": 1048576,
+      "maxOutput": 65536,
+      "defaultTier": "small",
+      "compactionThreshold": 838861,
+      "pricing": { "input": 0.3, "output": 2.5, "cacheWrite": 0, "cacheRead": 0.03 },
+      "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
+    },
     "gpt-5.6-sol": {
       "provider": "openai",
       "displayName": "GPT-5.6 Sol",
@@ -256,6 +286,7 @@
   },
   "tierDefaults": {
     "anthropic": { "large": "claude-fable-5", "medium": "claude-sonnet-5", "small": "claude-haiku-4-5-20251001" },
+    "gemini": { "large": "gemini-3.6-flash", "medium": "gemini-3.5-flash", "small": "gemini-3.5-flash-lite" },
     "openai-apikey": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" },
     "openai-chatgpt": { "large": "gpt-5.6-sol", "medium": "gpt-5.6-terra", "small": "gpt-5.6-luna" },
     "openrouter": {

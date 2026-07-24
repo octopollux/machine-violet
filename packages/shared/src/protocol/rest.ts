@@ -208,6 +208,7 @@ export const AddConnectionRequest = Type.Object({
   // not by submitting an API key here.
   provider: Type.Union([
     Type.Literal("anthropic"),
+    Type.Literal("gemini"),
     Type.Literal("openai-apikey"),
     Type.Literal("openrouter"),
     Type.Literal("xai"),

@@ -95,13 +95,14 @@ Token tracking, conversation window, prompt caching, state persistence.
 
 ## Engine: providers/ — LLM Provider Adapters
 
-Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, xAI, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
+Abstract provider layer: normalizes Anthropic, Gemini, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, xAI, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
 
 | File | Purpose |
 |---|---|
 | `index.ts` | `createProviderFromConnection()` — factory that constructs the right provider from a stored `AIConnection` record |
 | `types.ts` | `LLMProvider` and `TierProvider` interfaces, `ChatParams`, `GenerateImageRequest`/`GenerateImageResult`, `ImageEffort` (`draft`/`standard`/`quality`/`showcase`), `ImageAspect` (`portrait`/`landscape`/`square`) |
 | `anthropic.ts` | `createAnthropicProvider()` — Anthropic SDK adapter; streaming, tool use, prompt caching, thinking blocks, rate-limit usage tracking (`anthropic-ratelimit-*` response headers → `getUsageStatus()`) |
+| `gemini.ts` | `createGeminiProvider()` — official `@google/genai` Interactions adapter; stateless thought/signature replay, SSE streaming, function tools, usage normalization, and paired Nano Banana 2 image generation/editing — see [gemini-provider.md](gemini-provider.md) |
 | `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `xai` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, OpenAI + Grok Imagine generation/editing, and rate-limit tracking — see [openai-provider.md](openai-provider.md) |
 | `agent-loop-bridge.ts` | `runProviderLoop()` — provider-agnostic version of the agent turn loop: concurrent tool dispatch, TUI broadcast, deferred-sentinel logic, `cacheHints` for tool-definition cache_control. Returns normalized (not Anthropic-specific) types |
 | `image-reference-directive.ts` | `buildReferenceDirective()` — the shared "match the reference for identity, take pose/expression from the description" text appended to a reference-conditioned image prompt; used by both the `openai` (`images.edit`) and `openai-chatgpt` (codex) backends |

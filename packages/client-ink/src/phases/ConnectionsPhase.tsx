@@ -47,14 +47,15 @@ const MENU_ITEMS = ["Connections", "Model Assignments", "Add Connection", "Sign 
  * dedicated "Sign in with ChatGPT" entry in the Connections menu (no API
  * key paste; OAuth via the codex app-server).
  *
- * OpenRouter is validated with the shipped Kimi K3 model, and xAI with the
- * shipped Grok family. Custom
+ * Gemini, OpenRouter (with the shipped Kimi K3 model), and xAI (with the
+ * shipped Grok family) are validated first-class providers. Custom
  * OpenAI-compatible endpoints remain inherently variable, so the UI exposes
  * that escape hatch with an explicit experimental/untested label instead of
  * implying support for every Ollama, vLLM, or llama.cpp configuration.
  */
 const PROVIDER_OPTIONS = [
   { id: "anthropic", label: "Anthropic", needsBaseUrl: false },
+  { id: "gemini", label: "Google Gemini", needsBaseUrl: false },
   { id: "openai-apikey", label: "OpenAI (API key)", needsBaseUrl: false },
   { id: "xai", label: "xAI", needsBaseUrl: false },
   { id: "openrouter", label: "OpenRouter (Kimi K3)", needsBaseUrl: false },

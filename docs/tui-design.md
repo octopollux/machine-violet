@@ -794,7 +794,7 @@ A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM
 **Model Assignments** — shows the three model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks). Each tier displays the currently assigned model and connection label. Enter on a tier enters the model picker, which lists all models from all connections; Enter there assigns the selected model + connection to that tier.
 
 **Add Connection wizard** — a multi-step flow:
-1. Provider selection: Anthropic, OpenAI (API key), xAI. `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry. `openrouter` and `custom` are also absent from the picker: both adapters still exist engine-side, but neither is validated end-to-end, so they're hidden for 1.1 pending a validation playtest (issue #712). xAI uses the fixed official base URL and therefore proceeds directly from key to label.
+1. Provider selection: Anthropic, Google Gemini, OpenAI (API key), xAI, OpenRouter (Kimi K3), and Custom endpoint (experimental — untested). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry. xAI, Gemini, and OpenRouter use their fixed official base URLs and proceed directly from key to label; only custom endpoints continue to the base-URL step.
 2. API key entry (text input, Enter to advance).
 3. Label entry (optional friendly name, Enter to advance).
 4. Base URL entry — only shown for the `custom` provider. Escape backs up one step at each stage.

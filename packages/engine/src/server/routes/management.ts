@@ -90,7 +90,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   });
 
   /** Add a connection. `openai-chatgpt` excluded — uses OAuth login flow instead. */
-  const VALID_PROVIDERS = new Set<string>(["anthropic", "openai-apikey", "openrouter", "xai", "custom"]);
+  const VALID_PROVIDERS = new Set<string>(["anthropic", "gemini", "openai-apikey", "openrouter", "xai", "custom"]);
 
   server.post("/connections", {
     schema: {

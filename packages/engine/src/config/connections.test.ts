@@ -105,16 +105,22 @@ describe("saveConnectionStore", () => {
 
 describe("buildEffectiveConnections", () => {
   let savedAnthropic: string | undefined;
+  let savedGoogle: string | undefined;
+  let savedGemini: string | undefined;
   let savedOpenai: string | undefined;
   let savedXai: string | undefined;
   let savedOpenrouter: string | undefined;
 
   beforeEach(() => {
     savedAnthropic = process.env.ANTHROPIC_API_KEY;
+    savedGoogle = process.env.GOOGLE_API_KEY;
+    savedGemini = process.env.GEMINI_API_KEY;
     savedOpenai = process.env.OPENAI_API_KEY;
     savedXai = process.env.XAI_API_KEY;
     savedOpenrouter = process.env.OPENROUTER_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.XAI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
@@ -123,6 +129,10 @@ describe("buildEffectiveConnections", () => {
   afterEach(() => {
     if (savedAnthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = savedAnthropic;
+    if (savedGoogle === undefined) delete process.env.GOOGLE_API_KEY;
+    else process.env.GOOGLE_API_KEY = savedGoogle;
+    if (savedGemini === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = savedGemini;
     if (savedOpenai === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedOpenai;
     if (savedXai === undefined) delete process.env.XAI_API_KEY;
@@ -179,6 +189,35 @@ describe("buildEffectiveConnections", () => {
       connectionId: "env-openrouter",
       modelId: "moonshotai/kimi-k3",
     });
+  });
+
+  it("auto-creates a Gemini env connection from GOOGLE_API_KEY", () => {
+    process.env.GOOGLE_API_KEY = "google-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    const env = effective.connections.find((c) => c.id === "env-gemini");
+    expect(env).toMatchObject({
+      provider: "gemini",
+      label: "Gemini (env)",
+      apiKey: "google-test-env",
+      source: "env",
+    });
+    expect(env?.models.map((model) => model.id)).toEqual(expect.arrayContaining([
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
+    ]));
+  });
+
+  it("accepts GEMINI_API_KEY as the official quickstart alias", () => {
+    process.env.GEMINI_API_KEY = "gemini-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    });
+    expect(effective.connections.find((c) => c.id === "env-gemini")?.apiKey).toBe("gemini-test-env");
   });
 
   it("refreshes a manual openai-apikey connection's models against the current registry", () => {

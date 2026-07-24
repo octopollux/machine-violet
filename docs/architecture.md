@@ -43,6 +43,12 @@ Model selection: `packages/engine/src/config/models.ts` — `getModel("large" | 
 
 **Provider routing:** every model call is paired `{provider, model}` — a `TierProvider` (`packages/engine/src/providers/types.ts`). At session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads the connection store and produces `Record<ModelTier, TierProvider>`, which threads through `GameEngine`, `SceneManager`, and `ResolveSession` to every subagent dispatch site. This guarantees that a heterogeneous setup (e.g. Large=OpenAI, Medium=Anthropic) routes each tier's call through its own connection — sending an Anthropic model ID through an OpenAI client would crash. Subagents accept `model` as a required parameter; there is no silent fallback to `getModel(tier)`.
 
+The `gemini` adapter uses Google's Interactions API in stateless mode. Gemini
+`thought` steps and function-call signatures are preserved in normalized
+history and replayed unchanged, while SSE step events normalize to the same
+streaming/tool/usage contract used by the other providers. See
+[gemini-provider.md](gemini-provider.md).
+
 ## Anthropic Provider: Thinking and Reasoning Preservation
 
 The Anthropic adapter (`packages/engine/src/providers/anthropic.ts`) implements extended thinking for capable models via `ThinkingConfigParam`.

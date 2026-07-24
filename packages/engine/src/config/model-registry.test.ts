@@ -109,6 +109,12 @@ describe("supportsImageGeneration", () => {
     expect(supportsImageGeneration("gpt-4o")).toBe(true);
   });
 
+  it("returns true for Gemini text models paired with Nano Banana", () => {
+    expect(supportsImageGeneration("gemini-3.6-flash")).toBe(true);
+    expect(supportsImageGeneration("gemini-3.5-flash")).toBe(true);
+    expect(supportsImageGeneration("gemini-3.5-flash-lite")).toBe(true);
+  });
+
   it("returns false for current Anthropic models (no inline image gen yet)", () => {
     expect(supportsImageGeneration("claude-fable-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-8")).toBe(false);
@@ -124,5 +130,41 @@ describe("supportsImageGeneration", () => {
 
   it("returns false for unknown models — safer default than assuming yes", () => {
     expect(supportsImageGeneration("model-that-does-not-exist")).toBe(false);
+  });
+});
+
+describe("Gemini registry", () => {
+  beforeEach(() => {
+    loadModelRegistry(undefined, { reset: true });
+  });
+
+  it("ships the current stable Gemini text models with documented limits and pricing", () => {
+    const models = loadModelRegistry().models;
+    expect(models["gemini-3.6-flash"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 1.5, output: 7.5, cacheRead: 0.15 },
+    });
+    expect(models["gemini-3.5-flash"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 1.5, output: 9, cacheRead: 0.15 },
+    });
+    expect(models["gemini-3.5-flash-lite"]).toMatchObject({
+      provider: "gemini",
+      contextWindow: 1_048_576,
+      maxOutput: 65_536,
+      pricing: { input: 0.3, output: 2.5, cacheRead: 0.03 },
+    });
+  });
+
+  it("assigns 3.6 Flash / 3.5 Flash / 3.5 Flash-Lite across large/medium/small", () => {
+    expect(getTierDefaults("gemini")).toEqual({
+      large: "gemini-3.6-flash",
+      medium: "gemini-3.5-flash",
+      small: "gemini-3.5-flash-lite",
+    });
   });
 });

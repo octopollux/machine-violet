@@ -8,7 +8,7 @@ The DM can render illustrated images — a character reference sheet during setu
 
 Image-gen is enabled for a turn iff:
 
-- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API), `xai` + Grok models (routes to Grok Imagine), and `openai-chatgpt` (routes to codex's built-in `image_gen` skill — see [Provider backends](#provider-backends)). False for Anthropic, custom OpenAI-compatible endpoints, and OpenRouter's shipped Kimi K3 model (which understands images as input but emits text only).
+- **Provider capability** — `provider.getCapabilities(model).imageGeneration === true`. True for `openai-apikey` + `gpt-5` family (routes to `gpt-image-2` via the Images API), `xai` + Grok models (routes to Grok Imagine), `openai-chatgpt` (routes to codex's built-in `image_gen` skill), and `gemini` (routes to Nano Banana 2 — see [Provider backends](#provider-backends)). False for Anthropic, custom OpenAI-compatible endpoints, and OpenRouter's shipped Kimi K3 model (which understands images as input but emits text only).
 - **Campaign preference** — `gameState.config.image_generation !== "off"`. The setup-agent asks the player a yes/no consent question right after world + system selection ([game-initialization.md](game-initialization.md)). The choice is stored in `config.json` and can be flipped per-campaign from the ESC menu's "Image generation" toggle.
 
 When either is false, the `generate_image` tool is omitted from the DM's toolset and the model has no way to invoke it. There is no "graceful fallback" path on the model side — the model simply doesn't see the tool.
@@ -30,13 +30,14 @@ The legacy hosted-tool path (`image_generation_call` items in the Responses API)
 
 ## Provider backends
 
-`provider.generateImage(req)` is the single seam the dispatchers call. Three providers implement it, with different mechanics behind the same `GenerateImageRequest → GenerateImageResult` contract:
+`provider.generateImage(req)` is the single seam the dispatchers call. Four providers implement it, with different mechanics behind the same `GenerateImageRequest → GenerateImageResult` contract:
 
 | Provider | Mechanism | Auth / billing |
 |---|---|---|
 | `openai-apikey` | One `gpt-image-2` REST call (`openai.ts` `openaiGenerateImage`): `client.images.generate({ quality, size })` for text-to-image, or `client.images.edit({ image: [refs], quality, size })` when reference portraits are attached (image-to-image — see [Reference conditioning](#reference-conditioning-image-to-image)). Empty renders retry up to 3×. | Platform API key + credits. |
 | `xai` | Grok Imagine JSON calls (`openai.ts` `xaiGenerateImage`): `/images/generations` for text-to-image and `/images/edits` with base64 data-URI references for conditioning. Draft/standard use `grok-imagine-image`; quality/showcase use `grok-imagine-image-quality`; showcase requests 2K. Empty renders retry up to 3×. | xAI API key + credits. |
 | `openai-chatgpt` | Drives a **scoped codex turn** that calls codex's built-in `image_gen` skill, then harvests the `imageGeneration` item codex emits (`provider.ts` `generateImage`). | ChatGPT subscription — **no API key**; billed to the plan's Codex allocation. |
+| `gemini` | One Interactions call to Nano Banana 2 (`gemini-3.1-flash-image`), with reference images included as multimodal content for native editing/conditioning. Effort maps to `512`/`1K`/`2K`/`4K`; aspect maps to `2:3`/`3:2`/`1:1`. | Gemini Developer API key + project billing/quota. |
 
 The `openai-chatgpt` path is the happy path for most users (sign in with a ChatGPT subscription, no metered API spend). There is **no fallback** between providers: a ChatGPT-account DM never silently routes image-gen to a metered API-key provider. If the codex render fails, the dispatcher returns an `isError` tool_result the DM recovers from — it does not escalate to a more expensive backend.
 

@@ -5,9 +5,9 @@
  * Replaces the single-provider api-keys.ts with multi-provider support.
  *
  * Connections are persisted to `connections.json` in the app config dir.
- * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY,
- * XAI_API_KEY) auto-create connections at runtime via
- * buildEffectiveConnections().
+ * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY /
+ * GEMINI_API_KEY, OPENROUTER_API_KEY, XAI_API_KEY) auto-create
+ * connections at runtime via buildEffectiveConnections().
  */
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -18,7 +18,7 @@ import { getModelsForProvider, getTierDefaults, modelFamilyFor } from "./model-r
 // Types
 // ---------------------------------------------------------------------------
 
-export type ProviderType = "anthropic" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "xai" | "custom";
+export type ProviderType = "anthropic" | "gemini" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "xai" | "custom";
 
 export interface DiscoveredModel {
   id: string;
@@ -97,6 +97,7 @@ export interface TierAssignment {
 
 const STORE_FILENAME = "connections.json";
 const ENV_ANTHROPIC_ID = "env-anthropic";
+const ENV_GEMINI_ID = "env-gemini";
 const ENV_OPENAI_ID = "env-openai";
 const ENV_XAI_ID = "env-xai";
 const ENV_OPENROUTER_ID = "env-openrouter";
@@ -269,6 +270,25 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
+  // Environment: Google Gemini. GOOGLE_API_KEY is the deployment-facing name
+  // used by Machine Violet; GEMINI_API_KEY is also accepted because it is the
+  // name used throughout Google's Gemini Developer API quickstarts.
+  const geminiKey = process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    const knownModels = getModelsForProvider("gemini", configDir);
+    connections.push({
+      id: ENV_GEMINI_ID,
+      provider: "gemini",
+      label: "Gemini (env)",
+      apiKey: geminiKey,
+      models: Object.entries(knownModels).map(([id, m]) => ({
+        id, displayName: m.displayName, available: true,
+      })),
+      source: "env",
+      addedAt: "",
+    });
+  }
+
   // Manual connections — refresh models from the registry on every load.
   //
   // For registry-backed providers (anthropic, openai-apikey) the model list
@@ -357,6 +377,7 @@ export function addConnection(
 export function removeConnection(store: ConnectionStore, connectionId: string): ConnectionStore {
   if (
     connectionId === ENV_ANTHROPIC_ID
+    || connectionId === ENV_GEMINI_ID
     || connectionId === ENV_OPENAI_ID
     || connectionId === ENV_OPENROUTER_ID
     || connectionId === ENV_XAI_ID
