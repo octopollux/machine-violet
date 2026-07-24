@@ -884,7 +884,9 @@ export function createSetupConversation(
   }
 
   function handleFinalize(input: Record<string, unknown>): void {
-    const personalityName = (input.dm_personality as string) || "The Unknown";
+    const personalityName = typeof input.dm_personality === "string"
+      ? input.dm_personality.trim()
+      : "The Unknown";
     const customPrompt = input.dm_personality_prompt as string | undefined;
     const personality = getPersonality(personalityName, userPersonalitiesDir)
       ?? { name: personalityName, prompt_fragment: customPrompt || `You are ${personalityName}.` };
@@ -1026,8 +1028,17 @@ export function createSetupConversation(
 
   function missingCoreFinalizeFields(input: Record<string, unknown>): string[] {
     return CORE_FINALIZE_FIELDS.filter((field) => (
-      typeof input[field] !== "string" || !(input[field] as string).trim()
+      typeof input[field] !== "string"
+      || !(input[field] as string).trim()
+      || (field === "dm_personality" && !isSafePersonalityName(input[field] as string))
     ));
+  }
+
+  function isSafePersonalityName(value: string): boolean {
+    const name = value.trim();
+    return name.length <= 80
+      && !/[\p{Cc}\p{Cf}]/u.test(name)
+      && !/(?:prompt|name)[\s_-]*placeholder|remove[\s_-]*me/i.test(name);
   }
 
   /**
@@ -1170,7 +1181,7 @@ export function createSetupConversation(
           });
           return {
             content:
-              `finalize_setup rejected: missing required fields: ${missingFields.join(", ")}. `
+              `finalize_setup rejected: missing or invalid required fields: ${missingFields.join(", ")}. `
               + "The fields already supplied are retained. Call finalize_setup again with only "
               + "the listed missing fields populated; do not end setup.",
             isError: true,

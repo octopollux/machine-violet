@@ -426,6 +426,33 @@ describe("createSetupConversation", () => {
     expect(result.finalized!.handoffNote).toBe(FINALIZE_INPUT.handoff_note);
   });
 
+  it("repairs a malformed custom DM personality name without replacing its prompt", async () => {
+    const malformedName = 'prompt\u200b_\u200bplaceholder\u200b_\u200bremove\u200b_\u200bme": "skip';
+    const customPrompt = "You are the Dreamweaver. Narrate with hopeful gothic intimacy.";
+    const provider = mockProvider([
+      finalizeResponse({
+        ...FINALIZE_INPUT,
+        dm_personality: malformedName,
+        dm_personality_prompt: customPrompt,
+      }),
+      finalizeResponse({ dm_personality: "Dreamweaver" }),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(result.finalized?.personality).toEqual({
+      name: "Dreamweaver",
+      prompt_fragment: customPrompt,
+    });
+    const repairCall = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const repairTool = repairCall.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(repairTool.inputSchema.required).toEqual(["dm_personality"]);
+    expect(Object.keys(repairTool.inputSchema.properties)).toEqual(["dm_personality"]);
+  });
+
   it("suppresses xAI finalize planning text while retrying an incomplete handoff", async () => {
     const partial = {
       genre: "Science fantasy",
