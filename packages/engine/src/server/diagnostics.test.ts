@@ -124,6 +124,7 @@ describe("collectDiagnostics", () => {
     const manifest = JSON.parse(new TextDecoder().decode(entries!["manifest.json"]));
     expect(manifest.campaignName).toBe("Test Quest");
     expect(manifest.campaignSlug).toBe("my-campaign");
+    expect(manifest.scope).toBe("campaign");
     expect(typeof manifest.collectedAt).toBe("string");
     expect(manifest.platform).toBe(process.platform);
     // Absolute paths must NOT leak into the bundle.
@@ -177,6 +178,37 @@ describe("collectDiagnostics", () => {
     expect(keys.some((k) => k.startsWith(".debug/"))).toBe(false);
     expect(keys).toContain("campaign/config.json");
     expect(keys).toContain("manifest.json");
+  });
+
+  it("collects machine-level diagnostics without an active campaign", async () => {
+    const fs = makeMemFs({
+      "/home/.debug/engine.jsonl": "{\"event\":\"oauth:error\"}\n",
+      "/home/.debug/server.log": "noisy terminal output",
+      "/home/.debug/context/login.txt": "login context",
+    });
+    const result = await collectDiagnostics(undefined, "/home", fs.io);
+
+    expect(result.ok).toBe(true);
+    expect(result.path!).toMatch(/\/home\/diagnostics\/machine-violet-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.mvdiag$/);
+
+    const entries = unzipBinaryFiles(fs.files.get(norm(result.path!))!)!;
+    expect(Object.keys(entries)).toContain(".debug/engine.jsonl");
+    expect(Object.keys(entries)).toContain(".debug/context/login.txt");
+    expect(Object.keys(entries)).not.toContain(".debug/server.log");
+    expect(Object.keys(entries).some((key) => key.startsWith("campaign/"))).toBe(false);
+
+    const manifest = JSON.parse(new TextDecoder().decode(entries["manifest.json"]));
+    expect(manifest.scope).toBe("application");
+    expect(manifest.campaignName).toBeUndefined();
+    expect(manifest.campaignSlug).toBeUndefined();
+    expect(manifest.homeDir).toBeUndefined();
+  });
+
+  it("returns an error when no campaign or machine-level debug data exists", async () => {
+    const fs = makeMemFs({});
+    const result = await collectDiagnostics(undefined, "/home", fs.io);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/empty|unreadable|nothing/i);
   });
 
   it("returns an error when nothing can be collected", async () => {

@@ -192,7 +192,7 @@ export class ApiClient {
   }
 
   async diagnostics(): Promise<{ ok: boolean; path: string }> {
-    return this.fetch("/session/diagnostics", { method: "PUT" });
+    return this.fetch("/manage/diagnostics", { method: "PUT" });
   }
 
   async getSettings(): Promise<{ config: unknown }> {

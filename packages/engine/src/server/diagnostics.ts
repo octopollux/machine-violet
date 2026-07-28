@@ -1,15 +1,16 @@
 /**
  * Diagnostic bundle collection.
  *
- * Zips the active campaign folder together with the top-level `.debug/`
- * folder (engine.jsonl, context dumps) into a single archive for triage.
- * The campaign's own per-campaign `.debug/` is captured as part of the
- * campaign walk.
+ * Zips the active campaign folder (when one exists) together with the
+ * top-level `.debug/` folder (engine.jsonl, context dumps) into a single
+ * archive for triage. The campaign's own per-campaign `.debug/` is captured
+ * as part of the campaign walk.
  *
  * `server.log` (mirrored stdout/stderr) is intentionally excluded — it's
  * noisy and rarely useful for triage compared with `engine.jsonl`.
  *
- * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`
+ * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`, or
+ * `machine-violet-<timestamp>.mvdiag` when collected outside a campaign.
  * (a zip file with a Machine Violet-specific extension for easy
  * recognition in support inboxes — any zip tool can still read it).
  *
@@ -94,13 +95,14 @@ async function walkForDiagnostics(
  * username).
  */
 function buildManifest(args: {
-  campaignName: string;
-  campaignSlug: string;
+  campaignName?: string;
+  campaignSlug?: string;
 }): string {
   const manifest = {
     collectedAt: new Date().toISOString(),
-    campaignName: args.campaignName,
-    campaignSlug: args.campaignSlug,
+    scope: args.campaignSlug ? "campaign" : "application",
+    ...(args.campaignName ? { campaignName: args.campaignName } : {}),
+    ...(args.campaignSlug ? { campaignSlug: args.campaignSlug } : {}),
     platform: process.platform,
     nodeVersion: process.version,
   };
@@ -109,28 +111,32 @@ function buildManifest(args: {
 
 /**
  * Collect a diagnostics bundle. Includes:
- *  - The current campaign folder (under `campaign/`) — captures per-campaign
- *    `.debug/`, state, config, characters. The campaign's `.git/` is skipped.
+ *  - The current campaign folder (under `campaign/`) when one is active —
+ *    captures per-campaign `.debug/`, state, config, characters. The
+ *    campaign's `.git/` is skipped.
  *  - The top-level `.debug/` folder (under `.debug/`) — engine.jsonl,
  *    top-level context dumps. `server.log` is excluded.
  *  - A `manifest.json` at the root of the archive.
  *
- * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.mvdiag`.
+ * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.mvdiag`,
+ * or `machine-violet-<ts>.mvdiag` when no campaign is active.
  * If a file with that exact name already exists, the timestamp ensures
  * uniqueness; on collision (sub-second), an extra suffix is appended.
  */
 export async function collectDiagnostics(
-  campaignRoot: string,
+  campaignRoot: string | undefined,
   homeDir: string,
   io: ArchiveFileIO,
 ): Promise<DiagnosticsResult> {
   try {
     const fileMap: BinaryFileMap = {};
 
-    // 1. Walk the campaign folder (skips .git).
-    const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "");
-    for (const f of campaignFiles) {
-      fileMap[`campaign/${f.relativePath}`] = f.content;
+    // 1. Walk the campaign folder (skips .git) when a session is active.
+    if (campaignRoot) {
+      const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "");
+      for (const f of campaignFiles) {
+        fileMap[`campaign/${f.relativePath}`] = f.content;
+      }
     }
 
     // 2. Walk the top-level .debug folder (may not exist in test envs).
@@ -149,10 +155,13 @@ export async function collectDiagnostics(
     }
 
     // 3. Add manifest. Only safe-to-share metadata — no absolute paths.
-    const campaignName = await readCampaignName(norm(campaignRoot), io);
+    const campaignName = campaignRoot
+      ? await readCampaignName(norm(campaignRoot), io)
+      : undefined;
+    const campaignSlug = campaignRoot ? basename(norm(campaignRoot)) : undefined;
     fileMap["manifest.json"] = new TextEncoder().encode(buildManifest({
       campaignName,
-      campaignSlug: basename(norm(campaignRoot)),
+      campaignSlug,
     }));
 
     // 4. Zip.
@@ -166,7 +175,7 @@ export async function collectDiagnostics(
     await io.mkdir(outDir);
 
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const safeName = sanitizeFilename(campaignName);
+    const safeName = sanitizeFilename(campaignName ?? "machine-violet");
     let zipPath = norm(join(outDir, `${safeName}-${ts}.${BUNDLE_EXT}`));
 
     // Sub-second collision guard.

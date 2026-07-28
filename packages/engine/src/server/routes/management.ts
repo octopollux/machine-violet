@@ -6,7 +6,7 @@
  *
  * Prefix: /manage
  */
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdir, rm } from "node:fs/promises";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
@@ -32,6 +32,7 @@ import { norm } from "../../utils/paths.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
 import { loadMachineSettings, saveMachineSettings } from "../../config/machine-settings.js";
 import { createArchiveFileIO } from "../fileio.js";
+import { collectDiagnostics } from "../diagnostics.js";
 import {
   IdParams, NameParams, LoginIdParams,
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
@@ -39,7 +40,7 @@ import {
   ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
   DiscordSettings, MachineSettingsResponse, DeleteInfoResponse, ErrorResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
-  UsageResponse,
+  UsageResponse, DiagnosticsResponse,
 } from "@machine-violet/shared";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
@@ -553,6 +554,34 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // -----------------------------------------------------------------------
 
   const campaignsDir = () => server.sessionManager.getCampaignsDir();
+
+  // -----------------------------------------------------------------------
+  // Diagnostics
+  // -----------------------------------------------------------------------
+
+  /**
+   * Collect diagnostics whether or not a campaign session is active.
+   *
+   * This lives under /manage rather than /session so a player blocked at API
+   * setup or sign-in can still export engine logs. When a session is active,
+   * include that campaign exactly as the gameplay command historically did.
+   */
+  server.put("/diagnostics", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: DiagnosticsResponse, 500: ErrorResponse },
+    },
+  }, async (_request, reply) => {
+    const gs = server.sessionManager.getGameState();
+    const homeDir = gs?.homeDir ?? dirname(campaignsDir());
+    const io = createArchiveFileIO();
+    const result = await collectDiagnostics(gs?.campaignRoot, homeDir, io);
+
+    if (!result.ok || !result.path) {
+      return reply.status(500).send({ error: result.error ?? "Diagnostics collection failed." });
+    }
+    return { ok: true, path: result.path };
+  });
 
   /** Get info for delete confirmation dialog. */
   server.get("/campaigns/:id/delete-info", {
