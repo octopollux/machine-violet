@@ -179,10 +179,10 @@ const FINALIZE_SETUP_SCHEMA = Type.Object({
     ],
     description: "How you resolved the chosen world's forks (from load_world), as a map of forkId → optionId. Include an entry for EVERY fork the world declared: player forks (the option the player picked) and agent forks (the option you rolled or chose). Use the exact ids shown by load_world. Omit for fully custom campaigns or worlds with no forks.",
   })),
-  age_group: Type.Optional(stringEnum(
+  age_group: stringEnum(
     ["child", "teenager", "adult"] as const,
     { description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
-  )),
+  ),
   content_preferences: optionalNullableString(
     "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.",
   ),
@@ -1112,11 +1112,9 @@ export function createSetupConversation(
     const campaignName = input.campaign_name;
 
     // The explicit seed slug the agent passed (came from load_world — reliable).
-    // Sanitized to a clean slug to prevent path traversal. Empty when the
-    // campaign is fully custom (no world chosen). This is the *only* slug used
-    // to materialize a seed's inline content — we never fall back to a
-    // campaign-name-derived slug for materialization, which could pull in an
-    // unrelated bundled world that happens to share the name.
+    // Sanitized to a clean slug to prevent path traversal. This is the preferred
+    // seed identity; when absent, the back-compat path below may derive a slug
+    // from campaign_name only if the agent also supplied no campaign detail.
     const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
     const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 

@@ -138,6 +138,7 @@ const FINALIZE_INPUT = {
   difficulty: "Balanced",
   dm_personality: "The Chronicler",
   player_name: "Alex",
+  age_group: "adult",
   character_name: "Kael",
   character_description: "A scarred ranger seeking redemption",
   handoff_note: "Alex wants a character-first dark fantasy story about redemption.",
@@ -324,6 +325,21 @@ describe("createSetupConversation", () => {
     const retry = JSON.stringify(vi.mocked(provider.stream).mock.calls[1]?.[0]);
     expect(retry).toContain("/character_name");
     expect(retry).not.toContain("Adventurer");
+  });
+
+  it("finalize_setup rejects a missing age_group instead of bypassing content defaults", async () => {
+    const input: Record<string, unknown> = { ...FINALIZE_INPUT };
+    delete input.age_group;
+    const provider = mockProvider([
+      finalizeResponse(input),
+      textResponse("I need to retry with the established age group."),
+    ]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toBeUndefined();
+    const retry = JSON.stringify(vi.mocked(provider.stream).mock.calls[1]?.[0]);
+    expect(retry).toContain("/age_group");
   });
 
   it("finalize_setup rejects personality strings containing schema fragments", async () => {
