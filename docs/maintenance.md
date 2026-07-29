@@ -16,8 +16,18 @@ This project maintains a closed loop between code and documentation. When you ch
 ### Adding a new tool
 
 1. Register in `packages/engine/src/agents/tool-registry.ts`
-2. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
-3. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
+2. Define one executable TypeBox contract with `defineToolContract()` and derive both the provider schema and handler input type from it; do not add a separate runtime schema
+3. Classify it in `TOOL_CRITICALITY` (`advisory`, `reversible`, `durable`, `commit`, or `expensive`). The exact-coverage unit test must fail if this is omitted
+4. Declare only deterministic, intent-preserving repairs on that contract. Ambiguous shapes and missing required values must reject before the handler
+5. Add unit coverage for valid input, every repair, structural/semantic rejection, and no side effects on rejection. For a new failure class, add a provider-loop corrected-retry regression too
+6. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
+7. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
+
+The policy, logging contract, and examples live in
+[tool-input-contracts.md](tool-input-contracts.md). Setup-agent tools use the
+same validator at their separate dispatch boundary. Other bespoke subagent
+surfaces must pass an explicit policy for each advertised tool through
+`toolInputPolicies`. All require the same test coverage.
 
 ### Adding a new subagent
 

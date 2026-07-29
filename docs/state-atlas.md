@@ -658,6 +658,9 @@ The engine writes a structured, append-only JSONL event log to `../.debug/engine
 - **Turn lifecycle:** turn open, turn commit, turn resolve
 - **API calls:** model, tier, token counts, latency
 - **Subagent lifecycle:** spawn, complete, usage
+- **Tool input contracts:** allowlisted repairs and rejected calls, with
+  criticality, call correlation, stable issue codes, and shape-only
+  diagnostics (`tool_input:repaired`, `tool_input:rejected`)
 - **Errors:** unhandled exceptions, API failures
 
 The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an external reader — the campaign-explorer, a diagnostics bundle — sees each line the instant it lands; the per-event cost is microseconds and writes never throw. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.

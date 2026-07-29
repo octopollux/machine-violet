@@ -35,6 +35,7 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **No globals.** Tool handlers take explicit state objects.
 - **FileIO/GitIO interfaces** abstract all I/O. Never call `fs` directly in game logic.
 - Tool results use `ok(data)` / `err(message)` helpers.
+- **Tool inputs are untrusted.** Every tool call must pass the executable contract in `agents/tool-contract.ts` before its handler or persistence callbacks run. New tools use one TypeBox schema for provider JSON Schema, runtime validation, and inferred handler types; every registry tool needs an explicit `TOOL_CRITICALITY` entry. Coerce only a contract's documented, unambiguous representation slips; reject ambiguous input with actionable, privacy-safe diagnostics. See `docs/tool-input-contracts.md`.
 - Content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. Never import between them.
 
 ### TUI modals
@@ -47,6 +48,7 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **Model config:** tests must call `loadModelConfig({ reset: true })`.
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 - Anthropic client mocked via `vi.fn()`. FileIO mocked with in-memory `Record<string, string>`.
+- **Tool contract changes:** test valid input, each allowlisted repair, rejection before side effects, a corrected model retry, and structured log detail without raw free-form arguments. Keep the registry criticality/schema audit green.
 
 ### CPU-efficient iteration
 

@@ -149,6 +149,7 @@ The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../
 | [TUI Design](tui-design.md) | Layout, themes, responsive design, DM formatting |
 | [OpenAI Provider](openai-provider.md) | `openai.ts` adapter: Responses API vs Chat Completions routing, streaming-reasoning workaround, encrypted-reasoning replay |
 | [Tools Catalog](tools-catalog.md) | Tools by domain, signatures, tiers |
+| [Tool Input Contracts](tool-input-contracts.md) | Executable schemas, criticality, repair-vs-reject policy, diagnostics, and regression tests |
 | [Subagents Catalog](subagents-catalog.md) | Subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |

@@ -274,6 +274,19 @@ export interface NormalizedToolCall {
   input: Record<string, unknown>;
 }
 
+/**
+ * Diagnostic context for one executable tool call. Provider loops fill this
+ * at the dispatch boundary so validation logs can identify which agent/model
+ * produced a malformed call without putting user-authored argument values in
+ * the log.
+ */
+export interface ToolExecutionContext {
+  agent: string;
+  provider: string;
+  model: string;
+  callId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Caching
 // ---------------------------------------------------------------------------
