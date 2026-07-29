@@ -34,6 +34,7 @@ import type {
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import { setAgentClientState } from "./agent-state-ref.js";
 import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
+import { revealInExplorer } from "./commands/open-path.js";
 import {
   loadThemeDefinition,
   resolveTheme,
@@ -604,6 +605,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         onArchivedCampaigns={() => {
           apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
           setPhase("archived_campaigns");
+        }}
+        onExportDiagnostics={async () => {
+          const { path } = await apiClientRef.current.diagnostics();
+          revealInExplorer(path);
+          return path;
         }}
         onBack={() => setPhase("menu")}
       />

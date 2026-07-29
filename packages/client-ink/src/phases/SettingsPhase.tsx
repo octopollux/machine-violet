@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useInput, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
 import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
@@ -19,6 +19,8 @@ export interface SettingsPhaseProps {
   onApiKeys: () => void;
   onDiscord: () => void;
   onArchivedCampaigns: () => void;
+  /** Export diagnostics and resolve with the saved bundle's absolute path. */
+  onExportDiagnostics: () => Promise<string>;
   onBack: () => void;
 }
 
@@ -39,19 +41,47 @@ export function SettingsPhase({
   onApiKeys,
   onDiscord,
   onArchivedCampaigns,
+  onExportDiagnostics,
   onBack,
 }: SettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
   const [menuIndex, setMenuIndex] = useState(0);
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<{
+    text: string;
+    error: boolean;
+  } | null>(null);
+  const diagnosticsBusyRef = useRef(false);
   const navigatedRef = useRef(false);
+
+  const exportDiagnostics = useCallback(() => {
+    // The ref is the synchronous guard: repeated Enter events can arrive
+    // before React commits state, so state alone would allow duplicate bundles.
+    if (diagnosticsBusyRef.current) return;
+    diagnosticsBusyRef.current = true;
+    setDiagnosticsStatus({ text: "Saving diagnostics…", error: false });
+    void onExportDiagnostics()
+      .then((path) => {
+        setDiagnosticsStatus({ text: `Diagnostics saved: ${path}`, error: false });
+      })
+      .catch((err: unknown) => {
+        const raw = err instanceof Error ? err.message : String(err);
+        const message = raw.replace(/\s+/g, " ").trim();
+        setDiagnosticsStatus({ text: `Diagnostics failed: ${message}`, error: true });
+      })
+      .finally(() => { diagnosticsBusyRef.current = false; });
+  }, [onExportDiagnostics]);
 
   const items: MenuItem[] = useMemo(() => [
     { label: "API Keys", action: onApiKeys },
     { label: "Discord", action: onDiscord },
     { label: "Archived Campaigns", action: onArchivedCampaigns },
+    { label: "Export Diagnostics", action: exportDiagnostics },
     { label: "Enable Dev Mode", toggle: devModeEnabled ?? false, action: onToggleDevMode ?? noop },
     { label: "Show Debug Info", toggle: showVerbose ?? false, action: onToggleVerbose ?? noop },
-  ], [onApiKeys, onDiscord, onArchivedCampaigns, devModeEnabled, onToggleDevMode, showVerbose, onToggleVerbose]);
+  ], [
+    onApiKeys, onDiscord, onArchivedCampaigns, exportDiagnostics,
+    devModeEnabled, onToggleDevMode, showVerbose, onToggleVerbose,
+  ]);
 
   // Deep-link: if initialView is set, navigate once on mount
   useEffect(() => {
@@ -102,6 +132,14 @@ export function SettingsPhase({
         <Text color={markerColor}>{marker}</Text>
         <Text color={isSelected ? accentColor : undefined} bold={isSelected}>{` ${item.label}`}</Text>
         {suffix && <Text color={item.toggle ? "#66cc66" : dimColor} bold={item.toggle}>{suffix}</Text>}
+      </Text>,
+    );
+  }
+  if (diagnosticsStatus) {
+    menuLines.push(<Text key="diagnostics-spacer"> </Text>);
+    menuLines.push(
+      <Text key="diagnostics-status" color={diagnosticsStatus.error ? "red" : dimColor}>
+        {diagnosticsStatus.text}
       </Text>,
     );
   }

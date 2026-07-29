@@ -95,15 +95,21 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 - Otherwise, it pops the last exchange from conversation history and replays the original player input (with `skipTranscript: true`).
 - Both paths log a `dev` narrative line (visible when verbose display is enabled in Settings).
 
-### `/diagnostics` slash command
+### Diagnostics export
 
-The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, context dumps) into a single zip and reveals it in the OS file explorer:
+Use **Settings → Export Diagnostics** to create a support bundle at any time,
+including when no API connection is configured or sign-in has failed. During
+gameplay, the `/diagnostics` slash command provides the same export.
 
-- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag` (a zip with a Machine Violet-specific extension — any zip tool can still read it).
-- The bundle includes a `manifest.json` at the root with the collection timestamp, campaign name, platform, and Node version.
+When a campaign is active, the bundle contains the current campaign folder
+together with the top-level `.debug/` (engine.jsonl, context dumps). Before a
+campaign is active, it contains the top-level `.debug/` data only:
+
+- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag`, or `machine-violet-<timestamp>.mvdiag` outside a campaign (a zip with a Machine Violet-specific extension — any zip tool can still read it).
+- The bundle includes a `manifest.json` at the root with the collection timestamp, scope, platform, and Node version, plus campaign name/slug when applicable.
 - Per-campaign `.debug/` is captured as part of the campaign walk; the top-level `.debug/` is added under a `.debug/` prefix in the archive.
 - The top-level `.debug/server.log` (mirrored stdout/stderr) is excluded — it's noisy and rarely useful for triage compared with `engine.jsonl`.
-- Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The system message in the chat always prints the absolute path as a fallback when reveal is unavailable or silently fails.
+- Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The UI always prints the absolute path as a fallback when reveal is unavailable or silently fails.
 
 Use this when sending a triage bundle for a bug report.
 

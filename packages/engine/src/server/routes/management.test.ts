@@ -13,12 +13,25 @@ interface ArchiveResult { ok: boolean; zipPath?: string; error?: string }
 // Created via vi.hoisted so they exist before vi.mock's factory (hoisted to the
 // top of the module) references them. Both archive and restore are replaced with
 // controllable deferreds so a concurrent overlap is deterministic.
-const { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore } = vi.hoisted(() => {
+const {
+  archiveCampaignMock,
+  pending,
+  unarchiveCampaignMock,
+  pendingRestore,
+  collectDiagnosticsMock,
+} = vi.hoisted(() => {
   const pending: ((v: ArchiveResult) => void)[] = [];
   const archiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pending.push(res); }));
   const pendingRestore: ((v: ArchiveResult) => void)[] = [];
   const unarchiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pendingRestore.push(res); }));
-  return { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore };
+  const collectDiagnosticsMock = vi.fn();
+  return {
+    archiveCampaignMock,
+    pending,
+    unarchiveCampaignMock,
+    pendingRestore,
+    collectDiagnosticsMock,
+  };
 });
 
 // Keep the real module (the route relies on the real `archiveDir` for path
@@ -33,6 +46,10 @@ vi.mock("../../config/campaign-archive.js", async (importActual) => {
   };
 });
 
+vi.mock("../diagnostics.js", () => ({
+  collectDiagnostics: collectDiagnosticsMock,
+}));
+
 import { managementRoutes } from "./management.js";
 
 // In-process Fastify inject (no network) but boot can blow the 5s default
@@ -41,17 +58,95 @@ vi.setConfig({ testTimeout: 30_000 });
 
 const ARCHIVE_URL = "/campaigns/test-campaign/archive";
 
-async function buildApp(opts: { isBusy?: boolean } = {}): Promise<FastifyInstance> {
+async function buildApp(opts: {
+  isBusy?: boolean;
+  gameState?: { campaignRoot: string; homeDir: string } | null;
+  campaignsDir?: string;
+} = {}): Promise<FastifyInstance> {
   const app = Fastify();
   app.decorate("configDir", "/tmp/config");
   app.decorate("sessionManager", {
     isBusy: opts.isBusy ?? false,
-    getCampaignsDir: () => "/tmp/campaigns",
+    getCampaignsDir: () => opts.campaignsDir ?? "/tmp/campaigns",
+    getGameState: () => opts.gameState ?? null,
   } as never);
   await app.register(managementRoutes);
   await app.ready();
   return app;
 }
+
+describe("PUT /diagnostics — pre-session export", () => {
+  let app: FastifyInstance;
+
+  beforeEach(() => {
+    collectDiagnosticsMock.mockReset();
+    collectDiagnosticsMock.mockResolvedValue({
+      ok: true,
+      path: "/tmp/diagnostics/machine-violet.mvdiag",
+    });
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it("collects machine-level diagnostics when no game state exists", async () => {
+    app = await buildApp();
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      path: "/tmp/diagnostics/machine-violet.mvdiag",
+    });
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      undefined,
+      norm("/tmp"),
+      expect.any(Object),
+    );
+  });
+
+  it("includes the active campaign when a game state exists", async () => {
+    app = await buildApp({
+      gameState: {
+        campaignRoot: "/home/campaigns/test",
+        homeDir: "/home",
+      },
+    });
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      "/home/campaigns/test",
+      "/home",
+      expect.any(Object),
+    );
+  });
+
+  it("uses SessionManager's canonical home derivation for a trailing slash", async () => {
+    app = await buildApp({ campaignsDir: "/tmp/campaigns/" });
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      undefined,
+      norm("/tmp"),
+      expect.any(Object),
+    );
+  });
+
+  it("returns a useful error when collection fails", async () => {
+    collectDiagnosticsMock.mockResolvedValue({
+      ok: false,
+      error: "Nothing to collect",
+    });
+    app = await buildApp();
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).toBe("Nothing to collect");
+  });
+});
 
 describe("POST /campaigns/:id/archive — concurrency guard", () => {
   let app: FastifyInstance;
