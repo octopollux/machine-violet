@@ -42,6 +42,20 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("max-width: 120ch");
   });
 
+  it("leaves prose unwrapped so the browser can reflow it", () => {
+    const lines: NarrativeLine[] = [
+      {
+        kind: "dm",
+        text: "This deliberately long paragraph exceeds a twenty-column terminal but remains one semantic HTML block.",
+      },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines, 20));
+    expect(html.match(/<div class="dm">/g)).toHaveLength(1);
+    expect(html).toContain(
+      "This deliberately long paragraph exceeds a twenty-column terminal but remains one semantic HTML block.",
+    );
+  });
+
   it("renders DM lines with formatting", () => {
     const lines: NarrativeLine[] = [
       { kind: "dm", text: "The door <b>groans</b> open." },
@@ -76,7 +90,8 @@ describe("buildTranscriptHtml", () => {
     ];
     const html = buildTranscriptHtml(buildOpts(lines));
     expect(html).toContain('class="separator"');
-    expect(html).toContain("†");
+    expect(html).toContain('color:#666666">── † ──</div>');
+    expect(html).not.toContain('color:#666666"> ');
   });
 
   it("renders color tags as styled spans", () => {
@@ -106,6 +121,15 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("<i>last honest broker</i>");
     // The literal tag must not leak.
     expect(html).not.toContain("&lt;quote&gt;");
+  });
+
+  it("preserves explicit line breaks inside responsive blocks", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "<quote>ALERT<br>breach detected</quote>" },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines, 20));
+    expect(html.match(/<blockquote class="dm-quote">/g)).toHaveLength(1);
+    expect(html).toContain("ALERT<br>breach detected");
   });
 
   it("renders an ordered list with markers and hanging indent", () => {
@@ -146,6 +170,15 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("Consolas");
     expect(html).toContain("Menlo");
     expect(html).toContain("monospace");
+  });
+
+  it("bakes responsive padding and subtle scrollbars into the export", () => {
+    const html = buildTranscriptHtml(buildOpts([]));
+    expect(html).toContain("padding: 0 clamp(2px, 2vw, 1em)");
+    expect(html).toContain("scrollbar-width: thin");
+    expect(html).toContain("scrollbar-color: #666666 transparent");
+    expect(html).toContain("html:hover::-webkit-scrollbar-thumb");
+    expect(html).toContain("overflow-wrap: anywhere");
   });
 
   it("inlines image lines as base64 data: URIs when bytes are supplied", () => {
