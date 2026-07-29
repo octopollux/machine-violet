@@ -37,11 +37,39 @@ When it auto-relaunches, Machine Violet uses its **own bundled terminal** (confi
 
 The easiest install. Requires [Homebrew](https://brew.sh/).
 
+#### Stable channel
+
 ```bash
 brew install octopollux/mv-tap/machine-violet
 ```
 
 Then run `machine-violet` in your terminal. Upgrade later with `brew upgrade machine-violet`.
+
+#### Nightly channel
+
+Nightlies track the latest successful build from `main`:
+
+```bash
+brew install octopollux/mv-tap/machine-violet-nightly
+```
+
+Both formulas install the `machine-violet` command and cannot be installed at
+the same time. To switch channels, uninstall the current formula first:
+
+```bash
+# Stable → nightly
+brew uninstall machine-violet
+brew install octopollux/mv-tap/machine-violet-nightly
+
+# Nightly → stable
+brew uninstall machine-violet-nightly
+brew install octopollux/mv-tap/machine-violet
+```
+
+If you installed `machine-violet` before the channels were split, that formula
+tracked nightlies. It now tracks stable; `brew upgrade machine-violet` moves the
+installation to the current stable release. Switch formulas as shown above to
+keep receiving nightlies.
 
 ### Install script
 
@@ -66,7 +94,8 @@ Extract it, then run `./MachineViolet` from the extracted directory.
 
 - **Windows installer** — updates automatically in the background; no action needed.
 - **Windows portable** — re-download the zip and replace your copy.
-- **Homebrew** — `brew upgrade machine-violet`.
+- **Homebrew (stable)** — `brew upgrade machine-violet`.
+- **Homebrew (nightly)** — `brew upgrade machine-violet-nightly`.
 - **Install script** — re-run the `curl … | bash` command.
 - **Tarball** — download the latest tarball and replace the extracted directory.
 
@@ -74,5 +103,6 @@ Extract it, then run `./MachineViolet` from the extracted directory.
 
 - **Windows installer** — remove via *Settings → Apps → Installed apps*, or the Start Menu uninstall shortcut.
 - **Windows portable** — delete the unzipped folder.
-- **Homebrew** — `brew uninstall machine-violet`.
+- **Homebrew (stable)** — `brew uninstall machine-violet`.
+- **Homebrew (nightly)** — `brew uninstall machine-violet-nightly`.
 - **Install script / tarball** — delete the `machine-violet` symlink from `~/.local/bin` and the extracted directory.
