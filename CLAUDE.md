@@ -132,7 +132,7 @@ After completing a coding task, make a detailed commit; you'll need this history
 
 ## Code Review
 
-Once the user asks you to push and open a PR, **immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews exactly once but takes 2-10 minutes to arrive. The monitor polls `gh api` and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives.
+Once the user asks you to push and open a PR, **immediately start a runtime-native bounded wait for Copilot's review — do not ask first.** In Claude, dispatch the `Monitor` subagent subtype. In Codex, keep the wait inside one agent turn with a single long-lived polling process or equivalent native wait; **do not create a recurring heartbeat or automation that wakes the task for every poll.** Copilot reviews exactly once but takes 2-10 minutes to arrive. Poll `gh api` and exit once the review lands, with a 10-minute timeout so the watch ends even if the review never arrives.
 
 **The review isn't complete until Copilot's top-level summary comment appears.** Copilot always posts a default summary body on `/pulls/:n/reviews` exactly once per PR — that's the signal review is done. Inline comments alone don't count; if only inline comments have arrived, keep waiting until either the summary lands or the timeout fires. Don't act on a partial review.
 
