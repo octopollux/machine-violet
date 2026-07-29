@@ -102,7 +102,11 @@ export function buildTranscriptChoiceResolution(
   }
   if (
     response.kind === "option"
-    && (response.optionIndex < 0 || response.optionIndex >= presentation.choices.length)
+    && (
+      !Number.isInteger(response.optionIndex)
+      || response.optionIndex < 0
+      || response.optionIndex >= presentation.choices.length
+    )
   ) {
     throw new Error("Choice option index is out of range.");
   }
@@ -925,7 +929,7 @@ export class SessionManager {
       let routedCommand = cmd;
       if (cmd.type === "present_choices") {
         const presentation: TranscriptChoicePresentation = {
-          id: typeof cmd.id === "string" ? cmd.id : randomUUID(),
+          id: cmd.id == null ? randomUUID() : String(cmd.id),
           source: cmd.source === "suggestion_generator"
             ? "suggestion_generator"
             : "present_choices",

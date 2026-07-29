@@ -722,10 +722,13 @@ export class GameEngine {
     }
 
     const choiceHints = opts?.choiceContexts?.flatMap(({ presentation, resolution }) => {
-      if (resolution.kind !== "option") return [];
-      return [presentation.source === "suggestion_generator"
-        ? "[choice] Selected from generated suggestions; treat as intent, not a voice shift; don't mention the UI."
-        : `[choice] Selected option ${resolution.optionIndex + 1} from your presented choices.`];
+      if (
+        resolution.kind !== "option"
+        || presentation.source !== "suggestion_generator"
+      ) return [];
+      return [
+        "[choice] Selected from generated suggestions; treat as intent, not a voice shift; don't mention the UI.",
+      ];
     }) ?? [];
     preambleParts.push(...choiceHints);
 

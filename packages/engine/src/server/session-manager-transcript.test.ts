@@ -70,4 +70,20 @@ describe("buildTranscriptChoiceResolution", () => {
       "Open the door",
     )).toThrow("out of range");
   });
+
+  it.each([0.5, Number.NaN, undefined])(
+    "rejects malformed option index %s",
+    (optionIndex) => {
+      expect(() => buildTranscriptChoiceResolution(
+        presentation,
+        {
+          presentationId: "choice-1",
+          kind: "option",
+          optionIndex,
+        } as never,
+        "Aldric",
+        "Open the door",
+      )).toThrow("out of range");
+    },
+  );
 });

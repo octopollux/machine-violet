@@ -366,6 +366,46 @@ describe("GameEngine", () => {
     );
   });
 
+  it("does not inject provenance hints for DM-authored choices", async () => {
+    const provider = mockProvider([
+      textMessage("The sigils answer."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Touch the left sigil", {
+      choiceContexts: [{
+        presentation: {
+          id: "choice-1",
+          source: "present_choices",
+          prompt: "Which sigil?",
+          choices: ["◆ Touch the left sigil", "◆ Touch the right sigil"],
+        },
+        resolution: {
+          presentationId: "choice-1",
+          kind: "option",
+          optionIndex: 0,
+          playerId: "Aldric",
+          contributionText: "Touch the left sigil",
+        },
+      }],
+    });
+
+    const stream = provider.stream as ReturnType<typeof vi.fn>;
+    const messages = (stream.mock.calls[0][0] as {
+      messages: NormalizedMessage[];
+    }).messages;
+    expect(JSON.stringify(messages)).not.toContain("[choice]");
+  });
+
   it("does not replace deferred DM choices with generated suggestions", async () => {
     const state = mockState();
     state.config.choices.campaign_default = "always";
