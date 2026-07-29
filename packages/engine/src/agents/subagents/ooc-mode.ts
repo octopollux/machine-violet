@@ -393,6 +393,12 @@ export async function enterOOC(
     stream: !!onStream,
     tools,
     toolHandler,
+    toolInputPolicies: {
+      ...(options.registry?.getInputPolicies(OOC_EXCLUDED_FROM_REGISTRY) ?? {}),
+      find_references: { criticality: "advisory" },
+      validate_campaign: { criticality: "advisory" },
+      get_commit_log: { criticality: "advisory" },
+    },
     cacheHints: [{ target: "tools", ttl: "1h" }],
     tuiToolNames: TUI_TOOLS,
     onTuiCommand: options.onTuiCommand,

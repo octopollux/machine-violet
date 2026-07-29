@@ -96,7 +96,16 @@ describe("spawnSubagent", () => {
       toolHandler,
     }, "Aldric attacks G1 with longsword.");
 
-    expect(toolHandler).toHaveBeenCalledWith("roll_dice", { expression: "1d20+5" });
+    expect(toolHandler).toHaveBeenCalledWith(
+      "roll_dice",
+      { expression: "1d20+5" },
+      expect.objectContaining({
+        agent: "resolver",
+        provider: "test",
+        model: "claude-haiku-4-5-20251001",
+        callId: "toolu_test",
+      }),
+    );
     expect(result.text).toBe("Hit (23 vs AC 13). 9 slash. G1: 3/12 HP.");
     // Two API calls
     expect(result.usage.inputTokens).toBe(100);

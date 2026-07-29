@@ -10,6 +10,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | Understand the system architecture | [architecture.md](architecture.md) |
 | Find where code lives | [module-map.md](module-map.md) |
 | Look up a tool's signature or behavior | [tools-catalog.md](tools-catalog.md) |
+| Add or change a tool input contract | [tool-input-contracts.md](tool-input-contracts.md) |
 | Look up a subagent's contract | [subagents-catalog.md](subagents-catalog.md) |
 | Understand state shape and persistence | [state-atlas.md](state-atlas.md) |
 | Construct or validate a campaign on disk | [format-spec.md](format-spec.md) |

@@ -214,6 +214,10 @@ export async function searchCampaign(
     maxTokens: getMaxOutput(model),
     tools: SEARCH_TOOLS,
     toolHandler,
+    toolInputPolicies: {
+      grep_campaign: { criticality: "advisory" },
+      read_campaign_file: { criticality: "advisory" },
+    },
     cacheTools: true,
     maxToolRounds: 5,
   }, `Search query: ${input.query}`);

@@ -117,6 +117,27 @@ Use this when sending a triage bundle for a bug report.
 
 If a Haiku/Sonnet subagent call fails (during resolution, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
 
+### Invalid tool input
+
+Model-generated tool arguments are validated inside the engine before the
+handler runs. The boundary may apply a contract-local, deterministic repair
+when the intended representation is unambiguous; otherwise it returns an error
+tool result with JSON Pointer paths, expected and received shapes, and an
+explicit "No side effects were applied" guarantee. The agent can then correct
+and retry the call without persisting partial state.
+
+Structural JSON Schema validation is followed by semantic/cross-field checks.
+This catches failures a provider's strict schema cannot, such as embedded
+schema fragments in a display-name field, mismatched parallel arrays, or two
+competing `finalize_setup` calls. Required identity and commit fields are not
+silently invented.
+
+Each repair or rejection is logged as `tool_input:repaired` or
+`tool_input:rejected` in `.debug/engine.jsonl`, correlated with the agent,
+provider, model, call ID, and current span. Logs contain shape summaries and
+stable issue codes, not raw campaign prose. See
+[tool-input-contracts.md](tool-input-contracts.md).
+
 ### Malformed history (orphan & block-order patches)
 
 Conversation history can land on disk in shapes that no provider's strict validator will accept on replay. This is a separate failure mode from the in-flight retries above — the request gets a 400 before any work happens, so retrying doesn't help. `providers/orphan-patch.ts` heals the shapes inside the provider mappers, transparently to the rest of the engine.
