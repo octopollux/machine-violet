@@ -128,6 +128,130 @@ describe("buildTranscriptHtml", () => {
     expect(html).not.toContain("debug info");
   });
 
+  it("embeds transcript checkpoints as invisible machine-readable JSON", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "The gate falls." },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "state_checkpoint",
+          state: {
+            version: 1,
+            modelines: { Aldric: "Bruised" },
+            displayResources: { Aldric: ["HP", "Air"] },
+            resourceValues: { Aldric: { HP: "18/30", Air: "4/6" } },
+          },
+        },
+      },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines));
+    const match = html.match(
+      /<script id="machine-violet-transcript-metadata" type="application\/json">([^<]*)<\/script>/,
+    );
+    expect(match).not.toBeNull();
+    expect(JSON.parse(match![1])).toEqual({
+      format: "machine-violet-transcript-metadata",
+      version: 1,
+      checkpoints: [{
+        afterEntry: 1,
+        state: {
+          version: 1,
+          modelines: { Aldric: "Bruised" },
+          displayResources: { Aldric: ["HP", "Air"] },
+          resourceValues: { Aldric: { HP: "18/30", Air: "4/6" } },
+        },
+      }],
+      choices: [],
+    });
+    expect(html).not.toContain('class="metadata"');
+  });
+
+  it("escapes checkpoint text that could terminate the JSON script element", () => {
+    const lines: NarrativeLine[] = [{
+      kind: "metadata",
+      text: "",
+      event: {
+        type: "state_checkpoint",
+        state: {
+          version: 1,
+          modelines: { Aldric: "</script><script>alert(1)</script>" },
+          displayResources: {},
+          resourceValues: {},
+        },
+      },
+    }];
+    const html = buildTranscriptHtml(buildOpts(lines));
+    expect(html).not.toContain("</script><script>alert(1)</script>");
+    expect(html).toContain("\\u003c/script>");
+  });
+
+  it("joins formatted choice presentations with the accepted resolution", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "The sigils flare." },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choices_presented",
+          presentation: {
+            id: "choice-1",
+            source: "suggestion_generator",
+            prompt: "<i>What now?</i>",
+            choices: [
+              "◆ <b>Open</b> the door",
+              "◆ <color=#cc4444>Break</color> the seal",
+            ],
+            descriptions: ["Carefully.", "Violently."],
+          },
+        },
+      },
+      { kind: "player", text: "[Aldric] Open the door" },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choice_resolved",
+          resolution: {
+            presentationId: "choice-1",
+            kind: "option",
+            optionIndex: 0,
+            playerId: "Aldric",
+            contributionText: "Open the door",
+          },
+        },
+      },
+    ];
+
+    const html = buildTranscriptHtml(buildOpts(lines));
+    const match = html.match(
+      /<script id="machine-violet-transcript-metadata" type="application\/json">([^<]*)<\/script>/,
+    );
+    const metadata = JSON.parse(match![1]);
+    expect(metadata.choices).toEqual([{
+      id: "choice-1",
+      source: "suggestion_generator",
+      presentedAfterEntry: 1,
+      prompt: "<i>What now?</i>",
+      options: [
+        { index: 0, text: "◆ <b>Open</b> the door", description: "Carefully." },
+        {
+          index: 1,
+          text: "◆ <color=#cc4444>Break</color> the seal",
+          description: "Violently.",
+        },
+      ],
+      resolution: {
+        kind: "option",
+        playerId: "Aldric",
+        contributionText: "Open the door",
+        resolvedAfterEntry: 2,
+        optionIndex: 0,
+        optionText: "◆ <b>Open</b> the door",
+      },
+    }]);
+  });
+
   it("renders a <quote> block as a styled blockquote", () => {
     const lines: NarrativeLine[] = [
       { kind: "dm", text: "<quote>Here lies the <i>last honest broker</i>.</quote>" },

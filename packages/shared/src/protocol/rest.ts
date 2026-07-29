@@ -5,6 +5,7 @@
  * and the client (typed fetch wrappers).
  */
 import { Type, type Static } from "@sinclair/typebox";
+import { TranscriptChoiceResponse } from "./state.js";
 
 // --- Campaigns ---
 
@@ -53,6 +54,8 @@ export const ContributeRequest = Type.Object({
    *  choice modal (vs. typing free-form text). Used by setup so the agent
    *  can distinguish selection from dismissal+free-form. */
   fromChoice: Type.Optional(Type.Boolean()),
+  /** Exact presentation + option/custom provenance for choice UI responses. */
+  choiceResponse: Type.Optional(TranscriptChoiceResponse),
 });
 
 export const CommitResponse = Type.Object({

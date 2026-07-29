@@ -1,5 +1,9 @@
 import type { NormalizedMessage } from "../providers/types.js";
 import type { ContextConfig } from "@machine-violet/shared/types/config.js";
+import type {
+  TranscriptChoicePresentation,
+  TranscriptChoiceResolution,
+} from "@machine-violet/shared";
 import { estimateMessageTokens } from "./token-counter.js";
 
 /**
@@ -15,6 +19,11 @@ export interface ConversationExchange {
   toolResults: NormalizedMessage[];
   /** Estimated total tokens for this exchange */
   estimatedTokens: number;
+  /** Internal input provenance, intentionally omitted from stable DM messages. */
+  choiceContexts?: {
+    presentation: TranscriptChoicePresentation;
+    resolution: TranscriptChoiceResolution;
+  }[];
 }
 
 /**
@@ -34,13 +43,20 @@ export class ConversationManager {
     user: NormalizedMessage,
     assistant: NormalizedMessage,
     toolResults: NormalizedMessage[] = [],
+    choiceContexts?: ConversationExchange["choiceContexts"],
   ): DroppedExchange | null {
     const estimatedTokens =
       estimateMessageTokens(user) +
       estimateMessageTokens(assistant) +
       toolResults.reduce((sum, tr) => sum + estimateMessageTokens(tr), 0);
 
-    this.exchanges.push({ user, assistant, toolResults, estimatedTokens });
+    this.exchanges.push({
+      user,
+      assistant,
+      toolResults,
+      estimatedTokens,
+      ...(choiceContexts?.length ? { choiceContexts } : {}),
+    });
 
     // Enforce retention limits
     return this.enforceRetention();

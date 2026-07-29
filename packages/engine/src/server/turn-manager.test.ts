@@ -58,6 +58,20 @@ describe("TurnManager", () => {
       expect(contribution.fromChoice).toBe(true);
     });
 
+    it("threads structured choice provenance onto the contribution", () => {
+      tm.openTurn(["aldric"]);
+      const choiceResponse = {
+        presentationId: "choice-1",
+        kind: "option" as const,
+        optionIndex: 2,
+      };
+      const contribution = tm.contribute("aldric", "Open the door", "client", {
+        fromChoice: true,
+        choiceResponse,
+      });
+      expect(contribution.choiceResponse).toEqual(choiceResponse);
+    });
+
     it("omits fromChoice when not set", () => {
       tm.openTurn(["aldric"]);
       const contribution = tm.contribute("aldric", "I attack");

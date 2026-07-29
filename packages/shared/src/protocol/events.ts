@@ -7,6 +7,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import { TurnContribution, Turn } from "./turn.js";
 import { UsageStatus } from "./usage.js";
+import { TranscriptChoicePresentation, TranscriptMetadataEvent } from "./state.js";
 
 // --- Narrative ---
 
@@ -30,6 +31,12 @@ export const NarrativeCompleteEvent = Type.Object({
     text: Type.String(),
     playerAction: Type.Optional(Type.String()),
   }),
+});
+
+/** Invisible transcript metadata emitted in display-log order. */
+export const TranscriptMetadataWireEvent = Type.Object({
+  type: Type.Literal("transcript:metadata"),
+  data: TranscriptMetadataEvent,
 });
 
 // --- Turn lifecycle ---
@@ -63,12 +70,7 @@ export const TurnResolvedEvent = Type.Object({
 
 // --- Choices ---
 
-export const ChoicesData = Type.Object({
-  id: Type.String(),
-  prompt: Type.String(),
-  choices: Type.Array(Type.String()),
-  descriptions: Type.Optional(Type.Array(Type.String())),
-});
+export const ChoicesData = TranscriptChoicePresentation;
 
 export const ChoicesPresentedEvent = Type.Object({
   type: Type.Literal("choices:presented"),
@@ -227,6 +229,7 @@ export const ClientEvent = Type.Union([
 export const ServerEvent = Type.Union([
   NarrativeChunkEvent,
   NarrativeCompleteEvent,
+  TranscriptMetadataWireEvent,
   TurnOpenedEvent,
   TurnUpdatedEvent,
   TurnCommittedEvent,
@@ -245,6 +248,7 @@ export const ServerEvent = Type.Union([
 
 export type NarrativeChunkEvent = Static<typeof NarrativeChunkEvent>;
 export type NarrativeCompleteEvent = Static<typeof NarrativeCompleteEvent>;
+export type TranscriptMetadataWireEvent = Static<typeof TranscriptMetadataWireEvent>;
 export type TurnOpenedEvent = Static<typeof TurnOpenedEvent>;
 export type TurnUpdatedEvent = Static<typeof TurnUpdatedEvent>;
 export type TurnCommittedEvent = Static<typeof TurnCommittedEvent>;

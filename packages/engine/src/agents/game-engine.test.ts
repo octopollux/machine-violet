@@ -315,6 +315,158 @@ describe("GameEngine", () => {
     expect(engine.getState()).toBe("waiting_input");
   });
 
+  it("injects terse generated-choice provenance for one DM call only", async () => {
+    const provider = mockProvider([
+      textMessage("The door opens."),
+      textMessage("Beyond it, darkness."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Open the door", {
+      choiceContexts: [{
+        presentation: {
+          id: "choice-1",
+          source: "suggestion_generator",
+          prompt: "",
+          choices: ["◆ <b>Open</b> the door"],
+        },
+        resolution: {
+          presentationId: "choice-1",
+          kind: "option",
+          optionIndex: 0,
+          playerId: "Aldric",
+          contributionText: "Open the door",
+        },
+      }],
+    });
+    await engine.processInput("Aldric", "I peer into the dark.");
+
+    const stream = provider.stream as ReturnType<typeof vi.fn>;
+    const firstMessages = (stream.mock.calls[0][0] as {
+      messages: NormalizedMessage[];
+    }).messages;
+    expect(JSON.stringify(firstMessages)).toContain(
+      "Selected from generated suggestions; treat as intent, not a voice shift",
+    );
+
+    const secondMessages = (stream.mock.calls[1][0] as {
+      messages: NormalizedMessage[];
+    }).messages;
+    expect(JSON.stringify(secondMessages)).not.toContain(
+      "Selected from generated suggestions",
+    );
+  });
+
+  it("does not inject provenance hints for DM-authored choices", async () => {
+    const provider = mockProvider([
+      textMessage("The sigils answer."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider,
+      gameState: mockState(),
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "Touch the left sigil", {
+      choiceContexts: [{
+        presentation: {
+          id: "choice-1",
+          source: "present_choices",
+          prompt: "Which sigil?",
+          choices: ["◆ Touch the left sigil", "◆ Touch the right sigil"],
+        },
+        resolution: {
+          presentationId: "choice-1",
+          kind: "option",
+          optionIndex: 0,
+          playerId: "Aldric",
+          contributionText: "Touch the left sigil",
+        },
+      }],
+    });
+
+    const stream = provider.stream as ReturnType<typeof vi.fn>;
+    const messages = (stream.mock.calls[0][0] as {
+      messages: NormalizedMessage[];
+    }).messages;
+    expect(JSON.stringify(messages)).not.toContain("[choice]");
+  });
+
+  it("does not replace deferred DM choices with generated suggestions", async () => {
+    const state = mockState();
+    state.config.choices.campaign_default = "always";
+    const provider = mockProvider([
+      ...toolAndTextMessages(
+        "present_choices",
+        {
+          prompt: "The gate is rising. What now?",
+          choices: ["◆ Hold the line", "◆ Charge"],
+        },
+        "The gate rises.",
+      ),
+    ]);
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({
+      provider,
+      gameState: state,
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+
+    await engine.processInput("Aldric", "I ready my shield.");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(log.tuiCommands).toContainEqual(expect.objectContaining({
+      type: "present_choices",
+      prompt: "The gate is rising. What now?",
+    }));
+    expect(provider.stream).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not generate suggestions while a mode session is active", async () => {
+    const state = mockState();
+    state.config.choices.campaign_default = "always";
+    const provider = mockProvider([
+      textMessage("This narration is deliberately long enough to pass the suggestion threshold."),
+    ]);
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({
+      provider,
+      gameState: state,
+      scene: mockScene(),
+      sessionState: mockSessionState(),
+      fileIO: mockFileIO(),
+      callbacks,
+      model: "claude-haiku-4-5-20251001",
+    });
+    engine.setModeSession({
+      mode: "ooc",
+      send: vi.fn(),
+    } as never);
+
+    await engine.processInput("Aldric", "I ask for a pause.");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(provider.stream).toHaveBeenCalledTimes(1);
+  });
+
   it("handles tool calls and collects TUI commands", async () => {
     const provider = mockProvider([
       ...toolAndTextMessages("style_scene", { key_color: "#cc4444" }, "The mood shifts."),

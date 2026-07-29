@@ -381,6 +381,7 @@ interface PipelineLine {
   nodes: FormattingNode[];
   isSourceBoundary: boolean;
   intent?: ImageIntent;
+  metadata?: ProcessedLine["metadata"];
   listMarker?: string;
   listIndent?: number;
 }
@@ -454,6 +455,7 @@ export function processNarrativeLines(
         isSourceBoundary: true,
         // Carry image framing intent through the pipeline (only image lines have it).
         ...(srcLine.kind === "image" ? { intent: srcLine.intent } : {}),
+        ...(srcLine.kind === "metadata" ? { metadata: srcLine.event } : {}),
       });
       continue;
     }
@@ -636,6 +638,7 @@ export function processNarrativeLines(
         kind: line.kind,
         nodes: line.nodes,
         ...(line.intent ? { intent: line.intent } : {}),
+        ...(line.metadata ? { metadata: line.metadata } : {}),
         ...(line.listMarker !== undefined ? { listMarker: line.listMarker } : {}),
         ...(line.listIndent !== undefined ? { listIndent: line.listIndent } : {}),
       });
