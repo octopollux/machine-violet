@@ -94,6 +94,23 @@ describe("buildTranscriptHtml", () => {
     expect(html).not.toContain('color:#666666"> ');
   });
 
+  it("keeps separators within the exporting terminal width", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "separator", text: "---" },
+    ];
+    const opts = buildOpts(lines, 5);
+    opts.themeAsset = {
+      ...stubAsset(),
+      components: {
+        ...stubAsset().components,
+        turn_separator: { rows: ["ABCDEFGHIJ"], width: 10, height: 1 },
+      },
+    };
+    const html = buildTranscriptHtml(opts);
+    expect(html).toContain('color:#666666">ABCDE</div>');
+    expect(html).not.toContain("FGHIJ");
+  });
+
   it("renders color tags as styled spans", () => {
     const lines: NarrativeLine[] = [
       { kind: "dm", text: '<color=#cc0000>danger</color>' },

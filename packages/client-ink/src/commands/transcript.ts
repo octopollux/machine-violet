@@ -11,6 +11,7 @@ import { extname } from "node:path";
 import type { NarrativeLine, FormattingNode, FormattingTag, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import type { ThemeAsset } from "../tui/themes/types.js";
 import { processNarrativeLines } from "../tui/formatting.js";
+import { composeTurnSeparator } from "../tui/themes/composer.js";
 
 // ---------------------------------------------------------------------------
 // HTML escaping
@@ -227,10 +228,10 @@ export function buildTranscriptHtml(opts: TranscriptOptions): string {
   // is narrower than the exporting terminal, while `max-width` below preserves
   // the original terminal-width column on roomy screens.
   const processed = processNarrativeLines(narrativeLines, 0, quoteColor);
-  // The TUI needs composeTurnSeparator's space padding to center the motif in a
-  // physical terminal row. HTML already centers with CSS, so emitting only the
-  // motif avoids padded overflow in narrow viewports.
-  const separatorText = themeAsset.components.turn_separator.rows[0] ?? "──";
+  // Keep composeTurnSeparator's terminal-width truncation, but strip the space
+  // padding it adds for physical-row centering. HTML centers the motif with CSS,
+  // so padding would only create overflow in narrow viewports.
+  const separatorText = composeTurnSeparator(themeAsset, width).trim();
 
   const bodyLines = processed
     .map((line) => lineToHtml(line, { separatorText, separatorColor, playerColor, imageBytes }))
