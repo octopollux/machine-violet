@@ -128,7 +128,7 @@ Full flow, Velopack manifest details, Azure OIDC notes, and bootstrap history in
 
 ## Commit Hygiene
 
-After completing a coding task, make a detailed commit; you'll need this history later. **Commit freely, but only push and open a PR when the user explicitly asks for it.** Don't preemptively push or create PRs.
+After completing a coding task, make a detailed commit; you'll need this history later. **Commit freely, but only push and open a PR when the user explicitly asks for it.** Don't preemptively push or create PRs. When the user does ask for a PR, create it ready for review (non-draft) unless they explicitly request a draft.
 
 ## Code Review
 
