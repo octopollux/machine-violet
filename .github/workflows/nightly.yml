@@ -456,7 +456,7 @@ jobs:
           |---|---|
           | Tarball | [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/REPO_PLACEHOLDER/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
 
-          Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet`
+          Also available via Homebrew: `brew install octopollux/mv-tap/machine-violet-nightly`
           BODYEOF
           sed -i 's/^          //' nightly-body.md
           sed -i "s|REPO_PLACEHOLDER|${REPO}|g" nightly-body.md
@@ -527,10 +527,12 @@ jobs:
             fi
           done
 
-  update-homebrew:
+  update-homebrew-nightly:
     needs: [prepare, release]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+
       - name: Update Homebrew formula
         env:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -543,58 +545,18 @@ jobs:
           LINUX_SHA=$(curl -fsSL "$LINUX_URL" | sha256sum | cut -d' ' -f1)
 
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/octopollux/homebrew-mv-tap.git" tap
+
+          bash scripts/ci/render-homebrew-formula.sh \
+            nightly \
+            "$NIGHTLY_VERSION" \
+            "$DARWIN_URL" \
+            "$DARWIN_SHA" \
+            "$LINUX_URL" \
+            "$LINUX_SHA" \
+            tap/Formula/machine-violet-nightly.rb
+
           cd tap
-
-          cat > Formula/machine-violet.rb << 'FORMULA'
-          class MachineViolet < Formula
-            desc "AI Dungeon Master for tabletop RPGs"
-            homepage "https://github.com/octopollux/machine-violet"
-            version "NIGHTLY_VERSION_PLACEHOLDER"
-            license "MIT"
-
-            on_macos do
-              on_arm do
-                url "https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz"
-                sha256 "DARWIN_SHA_PLACEHOLDER"
-              end
-            end
-
-            on_linux do
-              on_intel do
-                url "https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz"
-                sha256 "LINUX_SHA_PLACEHOLDER"
-              end
-            end
-
-            def install
-              # Install the whole extracted tree. The binary resolves prompts/,
-              # themes/, systems/, worlds/, personalities/, config/, assets/,
-              # the vendored codex/ runtime and node_modules/ (sharp) relative
-              # to its own location, and reads version.json for --version.
-              # Cherry-picking a subset silently breaks those at runtime —
-              # notably ChatGPT sign-in, which spawns codex/vendor/.../bin/codex.
-              libexec.install Dir["*"]
-
-              chmod 0755, libexec/"MachineViolet"
-              # Expose as lowercase `machine-violet` for CLI convention.
-              # A symlink (not write_env_script) keeps process.execPath pointing
-              # into libexec, which is what the colocated asset + codex lookups
-              # resolve against.
-              bin.install_symlink libexec/"MachineViolet" => "machine-violet"
-            end
-
-            test do
-              assert_match "MachineViolet", shell_output("#{bin}/machine-violet --version")
-            end
-          end
-          FORMULA
-
-          sed -i "s/NIGHTLY_VERSION_PLACEHOLDER/${NIGHTLY_VERSION}/g" Formula/machine-violet.rb
-          sed -i "s/DARWIN_SHA_PLACEHOLDER/${DARWIN_SHA}/g" Formula/machine-violet.rb
-          sed -i "s/LINUX_SHA_PLACEHOLDER/${LINUX_SHA}/g" Formula/machine-violet.rb
-          sed -i 's/^          //' Formula/machine-violet.rb
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/machine-violet.rb
-          git diff --cached --quiet && echo "No changes" || (git commit -m "Update machine-violet nightly ($(date -u +%Y-%m-%d))" && git push)
+          git add Formula/machine-violet-nightly.rb
+          git diff --cached --quiet && echo "No changes" || (git commit -m "Update machine-violet-nightly ($(date -u +%Y-%m-%d))" && git push)

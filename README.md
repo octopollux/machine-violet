@@ -27,8 +27,8 @@ Self-contained binary — no runtime, no dependencies. Add an AI provider from t
 | Platform | Recommended | Alternatives |
 |---|---|---|
 | **Windows** | [**Setup.exe**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) — installs, auto-updates, code-signed | [Portable.zip](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
-| **macOS** (Apple Silicon) | `brew install octopollux/mv-tap/machine-violet` | [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
-| **Linux** (x64) | `brew install octopollux/mv-tap/machine-violet` | [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
+| **macOS** (Apple Silicon) | `brew install octopollux/mv-tap/machine-violet` (stable) | [nightly formula](docs/installation.md#nightly-channel) · [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
+| **Linux** (x64) | `brew install octopollux/mv-tap/machine-violet` (stable) | [nightly formula](docs/installation.md#nightly-channel) · [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
 
 [**Nightlies**](https://github.com/octopollux/machine-violet/releases/tag/nightly) are also available.
 
