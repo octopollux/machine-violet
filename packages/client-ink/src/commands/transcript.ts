@@ -1,9 +1,10 @@
 /**
  * Build an HTML transcript from the live narrative lines.
  *
- * Renders FormattingNode trees into inline-styled HTML that visually
- * matches the TUI output. The HTML is self-contained (inlined CSS,
- * no external dependencies) and opens cleanly in any browser.
+ * Renders FormattingNode trees into inline-styled HTML that preserves the
+ * exporting terminal's column width on roomy viewports and reflows when space
+ * is constrained. The HTML is self-contained (inlined CSS, no external
+ * dependencies) and opens cleanly in any browser.
  */
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
@@ -222,8 +223,15 @@ export function buildTranscriptHtml(opts: TranscriptOptions): string {
     themeAsset, separatorColor, playerColor, quoteColor, imageBytes,
   } = opts;
 
-  const processed = processNarrativeLines(narrativeLines, width, quoteColor);
-  const separatorText = composeTurnSeparator(themeAsset, width);
+  // Width 0 keeps the formatting/healing pipeline but disables terminal-row
+  // wrapping. The browser can then reflow each semantic line when its viewport
+  // is narrower than the exporting terminal, while `max-width` below preserves
+  // the original terminal-width column on roomy screens.
+  const processed = processNarrativeLines(narrativeLines, 0, quoteColor);
+  // Keep composeTurnSeparator's terminal-width truncation, but strip the space
+  // padding it adds for physical-row centering. HTML centers the motif with CSS,
+  // so padding would only create overflow in narrow viewports.
+  const separatorText = composeTurnSeparator(themeAsset, width).trim();
 
   const bodyLines = processed
     .map((line) => lineToHtml(line, { separatorText, separatorColor, playerColor, imageBytes }))
@@ -236,18 +244,39 @@ export function buildTranscriptHtml(opts: TranscriptOptions): string {
 <meta charset="utf-8">
 <title>${esc(campaignName)} — Transcript</title>
 <style>
+html {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+html:hover {
+  scrollbar-color: ${esc(separatorColor)} transparent;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 5px;
+}
+html:hover::-webkit-scrollbar-thumb {
+  background: ${esc(separatorColor)};
+}
 body {
   background: #000;
   color: #e0e0e0;
   font-family: 'Cascadia Mono', 'Cascadia Code', Consolas, Menlo, Monaco, 'Courier New', monospace;
   max-width: ${width}ch;
   margin: 2em auto;
-  padding: 0 1em;
+  padding: 0 clamp(2px, 2vw, 1em);
   line-height: 1.4;
 }
 div {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
   min-height: 1.4em;
 }
 .spacer { min-height: 1.4em; }
@@ -259,7 +288,7 @@ i { font-style: italic; }
 u { text-decoration: underline; }
 .dm-quote {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
   border-left: 2px solid #666;
   margin: 0;
   padding-left: 1ch;
@@ -267,7 +296,7 @@ u { text-decoration: underline; }
   font-style: italic;
   min-height: 1.4em;
 }
-.list-item { white-space: pre-wrap; word-wrap: break-word; }
+.list-item { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Image shadowbox: clicking a narrative image fills the viewport on black. */
 #shadowbox {
   display: none;
