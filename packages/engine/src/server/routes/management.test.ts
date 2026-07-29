@@ -61,12 +61,13 @@ const ARCHIVE_URL = "/campaigns/test-campaign/archive";
 async function buildApp(opts: {
   isBusy?: boolean;
   gameState?: { campaignRoot: string; homeDir: string } | null;
+  campaignsDir?: string;
 } = {}): Promise<FastifyInstance> {
   const app = Fastify();
   app.decorate("configDir", "/tmp/config");
   app.decorate("sessionManager", {
     isBusy: opts.isBusy ?? false,
-    getCampaignsDir: () => "/tmp/campaigns",
+    getCampaignsDir: () => opts.campaignsDir ?? "/tmp/campaigns",
     getGameState: () => opts.gameState ?? null,
   } as never);
   await app.register(managementRoutes);
@@ -118,6 +119,18 @@ describe("PUT /diagnostics — pre-session export", () => {
     expect(collectDiagnosticsMock).toHaveBeenCalledWith(
       "/home/campaigns/test",
       "/home",
+      expect.any(Object),
+    );
+  });
+
+  it("uses SessionManager's canonical home derivation for a trailing slash", async () => {
+    app = await buildApp({ campaignsDir: "/tmp/campaigns/" });
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      undefined,
+      norm("/tmp"),
       expect.any(Object),
     );
   });

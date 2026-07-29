@@ -6,7 +6,7 @@
  *
  * Prefix: /manage
  */
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { mkdir, rm } from "node:fs/promises";
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
@@ -573,7 +573,9 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async (_request, reply) => {
     const gs = server.sessionManager.getGameState();
-    const homeDir = gs?.homeDir ?? dirname(campaignsDir());
+    // Match SessionManager's canonical derivation exactly. `dirname()` differs
+    // when campaignsDir has a trailing slash or uses a non-standard layout.
+    const homeDir = gs?.homeDir ?? campaignsDir().replace(/[/\\]campaigns\/?$/, "");
     const io = createArchiveFileIO();
     const result = await collectDiagnostics(gs?.campaignRoot, homeDir, io);
 

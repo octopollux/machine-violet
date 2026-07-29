@@ -9,7 +9,7 @@
  * `server.log` (mirrored stdout/stderr) is intentionally excluded — it's
  * noisy and rarely useful for triage compared with `engine.jsonl`.
  *
- * Output: `<homeDir>/diagnostics/<campaignSlug>-<timestamp>.mvdiag`, or
+ * Output: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag`, or
  * `machine-violet-<timestamp>.mvdiag` when collected outside a campaign.
  * (a zip file with a Machine Violet-specific extension for easy
  * recognition in support inboxes — any zip tool can still read it).
@@ -118,7 +118,7 @@ function buildManifest(args: {
  *    top-level context dumps. `server.log` is excluded.
  *  - A `manifest.json` at the root of the archive.
  *
- * The bundle is written to `<homeDir>/diagnostics/<campaignSlug>-<ts>.mvdiag`,
+ * The bundle is written to `<homeDir>/diagnostics/<campaign-name>-<ts>.mvdiag`,
  * or `machine-violet-<ts>.mvdiag` when no campaign is active.
  * If a file with that exact name already exists, the timestamp ensures
  * uniqueness; on collision (sub-second), an extra suffix is appended.
