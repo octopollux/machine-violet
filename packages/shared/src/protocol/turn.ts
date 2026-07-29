@@ -5,6 +5,7 @@
  * multiple players (human or AI), and committed to trigger DM processing.
  */
 import { Type, type Static } from "@sinclair/typebox";
+import { TranscriptChoiceResponse } from "./state.js";
 
 export const TurnContribution = Type.Object({
   id: Type.String(),
@@ -17,6 +18,8 @@ export const TurnContribution = Type.Object({
    *  (vs. typing free-form text). Lets the setup agent distinguish a
    *  selection from a dismissal+free-form response for its tool_result. */
   fromChoice: Type.Optional(Type.Boolean()),
+  /** Stable choice-presentation provenance; supersedes text matching. */
+  choiceResponse: Type.Optional(TranscriptChoiceResponse),
 });
 
 export const Turn = Type.Object({

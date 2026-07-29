@@ -48,8 +48,8 @@ interface ChoiceOverlayProps {
   maxChoiceRows?: number;
   /** Initial selection index. 0 = "Enter your own" (always at the top); 1..choices.length = regular choices. */
   initialIndex?: number;
-  /** Called when the player selects a choice (text) or submits custom input. */
-  onSelect: (choice: string) => void;
+  /** Called with display-independent provenance for an option or custom input. */
+  onSelect: (selection: ChoiceOverlaySelection) => void;
   /** Called for PageUp/PageDown to scroll the narrative area behind the overlay. */
   onNarrativeScroll?: (delta: number) => void;
   /**
@@ -59,6 +59,10 @@ interface ChoiceOverlayProps {
    */
   isActive?: boolean;
 }
+
+export type ChoiceOverlaySelection =
+  | { kind: "option"; optionIndex: number; text: string }
+  | { kind: "custom"; text: string };
 
 /** Maximum visual rows available for choice items. */
 const MAX_CHOICE_ROWS = 5;
@@ -176,7 +180,7 @@ export function ChoiceOverlay({
         return;
       }
       const chosen = stripLeadingBullet(stripFormatting(choices[selectedIndex - 1]));
-      onSelect(chosen);
+      onSelect({ kind: "option", optionIndex: selectedIndex - 1, text: chosen });
       return;
     }
     if (key.pageUp || key.pageDown) {
@@ -189,7 +193,7 @@ export function ChoiceOverlay({
 
   const handleCustomInputSubmit = (value: string) => {
     if (!value.trim()) return;
-    onSelect(value.trim());
+    onSelect({ kind: "custom", text: value.trim() });
   };
 
   const hasDescriptions = descriptions != null && descriptions.length > 0;

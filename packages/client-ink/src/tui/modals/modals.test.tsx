@@ -308,6 +308,48 @@ describe("ChoiceOverlay", () => {
     expect(frame).not.toContain("</b>");
   });
 
+  it("returns the option index while submitting plain display text", async () => {
+    const onSelect = vi.fn();
+    const { stdin } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick"
+        choices={["◆ <b>Open</b> the door", "◆ Wait"]}
+        initialIndex={1}
+        onSelect={onSelect}
+      />,
+    );
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith({
+        kind: "option",
+        optionIndex: 0,
+        text: "Open the door",
+      });
+    });
+  });
+
+  it("distinguishes custom input from a listed option", async () => {
+    const onSelect = vi.fn();
+    const { stdin } = render(
+      <ChoiceOverlay
+        width={60}
+        prompt="Pick"
+        choices={["◆ Wait"]}
+        initialIndex={0}
+        onSelect={onSelect}
+      />,
+    );
+    stdin.write("I listen at the door");
+    stdin.write("\r");
+    await vi.waitFor(() => {
+      expect(onSelect).toHaveBeenCalledWith({
+        kind: "custom",
+        text: "I listen at the door",
+      });
+    });
+  });
+
   it("renders within 7 rows", () => {
     const { lastFrame } = render(
       <ChoiceOverlay

@@ -86,6 +86,18 @@ export type NarrativeLine =
   | { kind: "separator"; text: string; tag?: string }
   | { kind: "spacer"; text: string; tag?: string }
   /**
+   * Invisible, zero-height metadata associated with the transcript entries
+   * immediately before it. State-checkpoint events let the TUI rewind
+   * modelines/resources while scrolling; HTML exports preserve every event as
+   * machine-readable JSON.
+   */
+  | {
+      kind: "metadata";
+      text: "";
+      event: import("../protocol/state.js").TranscriptMetadataEvent;
+      tag?: string;
+    }
+  /**
    * Inline-rendered image, pushed when the engine emits a `display_image`
    * TUI command after persisting a generated PNG. `text` is the absolute
    * filesystem path the inline-image renderer loads (rendered via the
@@ -111,6 +123,8 @@ export type NarrativeLine =
 export interface ProcessedLine {
   kind: NarrativeLine["kind"] | "list";
   nodes: FormattingNode[];
+  /** Preserved only on invisible transcript metadata rows. */
+  metadata?: import("../protocol/state.js").TranscriptMetadataEvent;
   alignment?: "center" | "right";
   /**
    * Full column width an aligned row pads/centers within. Set on aligned rows

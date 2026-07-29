@@ -218,6 +218,9 @@ function routeTuiCommand(
         type: "choices:presented",
         data: {
           id: String(command.id ?? randomUUID()),
+          source: command.source === "suggestion_generator"
+            ? "suggestion_generator"
+            : "present_choices",
           prompt: String(command.prompt ?? ""),
           choices: (command.choices as string[]) ?? [],
           descriptions: command.descriptions as string[] | undefined,

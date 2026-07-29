@@ -533,7 +533,37 @@ Lives at the campaign root (not in `state/`). Present only during an in-progress
 
 Append-only rolling markdown log of human-readable engine activity. Each line is a rendered narrative or system event. Never cleared — grows for the lifetime of the campaign. Used to populate backscroll on session resume and for transcript export.
 
-This file is plain text (one line per entry). Not structured — not suitable for programmatic parsing.
+Most entries are plain text. Durable machine-readable facts are interleaved as
+invisible, versioned transcript-metadata events:
+
+```text
+<!--mv-transcript-meta:v1:<base64-encoded JSON event>-->
+```
+
+The decoded event is one of:
+
+- `state_checkpoint` — full `modelines`, `displayResources` (per-character
+  resource keys), and `resourceValues` maps after a successful gameplay turn.
+  Full snapshots make each checkpoint independently useful without replaying
+  deltas.
+- `choices_presented` — stable ID, source (`present_choices` or
+  `suggestion_generator`), prompt, ordered choices, and optional descriptions,
+  all preserved verbatim including formatting tags.
+- `choice_resolved` — presentation ID, player, plain contribution text, and
+  either the selected zero-based option index or `custom`.
+
+The marker is an HTML comment so Markdown readers do not display it; the TUI
+parser consumes it as a zero-height transcript entry. HTML transcript export
+folds these events into the non-rendering
+`machine-violet-transcript-metadata` JSON script block, with `checkpoints` and
+joined `choices` arrays. Unanswered or superseded presentations export with a
+null resolution. Malformed reserved markers are ignored rather than shown as
+narration. On the first resume of a campaign without state-checkpoint metadata,
+the engine appends one compatibility baseline at the end of its legacy
+history.
+
+All other lines remain human-readable and intentionally informal; consumers
+should only parse the explicitly versioned metadata markers.
 
 ---
 

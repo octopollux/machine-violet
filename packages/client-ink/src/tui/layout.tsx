@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Box } from "ink";
+import type { TranscriptStateCheckpoint } from "@machine-violet/shared";
 import type { ViewportDimensions, NarrativeLine } from "@machine-violet/shared/types/tui.js";
 import type { ToolGlyph } from "./activity.js";
 import type { ResolvedTheme } from "./themes/types.js";
@@ -78,6 +79,8 @@ export interface LayoutProps {
 
   /** Ref to NarrativeArea scroll handle */
   narrativeRef?: React.Ref<NarrativeAreaHandle>;
+  /** Historical modeline/resource state selected by narrative scrollback. */
+  onTranscriptStateChange?: (state: TranscriptStateCheckpoint | null) => void;
 
   /** Absolute top row of the conversation pane (forwarded to NarrativeArea as
    *  the image-crop viewport top). Equals PlayingPhase's conversationPaneTop. */
@@ -129,6 +132,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
     playerFrameColor = playerColor,
     turnIndicatorColor,
     narrativeRef,
+    onTranscriptStateChange,
     conversationPaneTop,
     mouseScrollOverrideRef,
     hideInputLine,
@@ -261,6 +265,7 @@ export const Layout = React.memo(function Layout(props: LayoutProps) {
               themeAsset={theme.asset}
               separatorColor={separatorColor}
               showVerbose={showVerbose}
+              onTranscriptStateChange={onTranscriptStateChange}
               viewportTop={conversationPaneTop}
               mouseScrollOverrideRef={mouseScrollOverrideRef}
             />

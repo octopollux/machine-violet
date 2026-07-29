@@ -10,6 +10,7 @@ import type {
   ServerEvent,
   NarrativeChunkEvent,
   NarrativeCompleteEvent,
+  TranscriptMetadataWireEvent,
   TurnOpenedEvent,
   TurnUpdatedEvent,
   TurnCommittedEvent,
@@ -139,6 +140,7 @@ export type StateUpdater = (fn: (prev: ClientState) => ClientState) => void;
 const PROGRESS_EVENT_TYPES: ReadonlySet<ServerEvent["type"]> = new Set([
   "narrative:chunk",
   "narrative:complete",
+  "transcript:metadata",
   "turn:opened",
   "turn:updated",
   "turn:committed",
@@ -171,6 +173,9 @@ export function createEventHandler(update: StateUpdater): (event: ServerEvent) =
         break;
       case "narrative:complete":
         handleNarrativeComplete(event, update);
+        break;
+      case "transcript:metadata":
+        handleTranscriptMetadata(event, update);
         break;
       case "turn:opened":
         handleTurnOpened(event, update);
@@ -247,6 +252,7 @@ function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     if (line.kind === "spacer") continue;
+    if (line.kind === "metadata") continue;
     if (line.kind === "dm" && line.text === "") continue;
     // Skip dev/system lines (e.g. verbose tool logs) — they can appear
     // between the player line and the first DM chunk without invalidating
@@ -271,10 +277,14 @@ function shouldInjectDmSeparator(lines: NarrativeLine[]): boolean {
  * the same paragraph-boundary role.
  */
 function withTurnSeparators(
-  source: readonly { kind: "dm" | "player"; text: string }[],
+  source: NonNullable<StateSnapshot["narrativeLines"]>,
 ): NarrativeLine[] {
   const out: NarrativeLine[] = [];
   for (const line of source) {
+    if (line.kind === "metadata") {
+      out.push(line);
+      continue;
+    }
     if (line.kind === "dm" && shouldInjectDmSeparator(out)) {
       out.push({ kind: "separator", text: "---" });
     }
@@ -283,12 +293,22 @@ function withTurnSeparators(
   return out;
 }
 
+function handleTranscriptMetadata(event: TranscriptMetadataWireEvent, update: StateUpdater): void {
+  update((prev) => ({
+    ...prev,
+    narrativeLines: [
+      ...prev.narrativeLines,
+      { kind: "metadata" as const, text: "" as const, event: event.data },
+    ],
+  }));
+}
+
 function handleNarrativeChunk(event: NarrativeChunkEvent, update: StateUpdater): void {
   const { text, kind } = event.data;
   // Narrative chunks never carry image lines — those arrive whole via the
   // `display_image` TUI command (see below). Excluding "image" from the
   // cast matches appendDelta's StreamableKind requirement.
-  const lineKind = (kind ?? "dm") as Exclude<NarrativeLine["kind"], "image">;
+  const lineKind = (kind ?? "dm") as Exclude<NarrativeLine["kind"], "image" | "metadata">;
 
   update((prev) => {
     let lines = prev.narrativeLines;
@@ -518,6 +538,11 @@ function handleStateSnapshot(event: StateSnapshotEvent, update: StateUpdater): v
       displayResources: snapshot.displayResources ?? prev.displayResources,
       resourceValues: snapshot.resourceValues ?? prev.resourceValues,
       modelines: snapshot.modelines ?? prev.modelines,
+      // Gameplay snapshots also carry the currently pending choice so a
+      // reconnect cannot lose the presentation ID required for resolution.
+      activeChoices: snapshot.mode === "play"
+        ? (snapshot.activeChoices ?? null)
+        : prev.activeChoices,
       // Authoritative transcript replace, when the server includes one.
       // Sent on connect (so reconnecting clients see history) and on retry
       // rollback (to discard a partial DM stream that's about to be
