@@ -912,6 +912,19 @@ describe("createSetupConversation", () => {
     expect(systemPrompt).not.toContain("don't feel bound to this list");
   });
 
+  it("system prompt makes The Chronicler the first DM personality option", async () => {
+    const provider = mockProvider([textResponse("Welcome!")]);
+    const conv = createSetupConversation(provider, "claude-sonnet-4-6");
+    await conv.start(noop);
+
+    const streamCalls = (provider.stream as ReturnType<typeof vi.fn>).mock.calls;
+    const systemPrompt = flattenSystem(streamCalls[0][0].systemPrompt);
+
+    expect(systemPrompt).toContain(
+      "When presenting personality choices, the first option is always The Chronicler.",
+    );
+  });
+
   it("finalize_setup treats literal string 'null' system as null", async () => {
     const input = { ...FINALIZE_INPUT, system: "null" };
     const provider = mockProvider([

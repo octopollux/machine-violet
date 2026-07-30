@@ -199,7 +199,7 @@ The setup agent reports every resolution in `finalize_setup.fork_selections` (`f
 
 ## DM Personalities
 
-The player picks a DM personality during setup — like choosing a narrator in Rimworld. Under the hood, this swaps a personality block into the DM's system prompt. The core DM prompt (role, rules, tool usage) stays the same; the personality block adjusts voice, pacing preferences, and storytelling tendencies.
+The player picks a DM personality during setup — like choosing a narrator in Rimworld. Whenever the setup agent presents personality choices, The Chronicler is always the first option. Under the hood, this swaps a personality block into the DM's system prompt. The core DM prompt (role, rules, tool usage) stays the same; the personality block adjusts voice, pacing preferences, and storytelling tendencies.
 
 Personalities are stored as short prompt fragments shipped with the app. Each is ~100-200 tokens — cheap enough to include in the cached prefix with no meaningful cost impact.
 
