@@ -725,19 +725,21 @@ export function ConnectionsPhase({
     lines.push(<Text key="header" color={dim}>Select model for {TIER_LABELS[tier]}:</Text>);
     lines.push(<Text key="sep"> </Text>);
     const visibleModelRows = termRows - theme.asset.height * 2 - lines.length;
-    const window = getScrollWindow(
+    const scrollWindow = getScrollWindow(
       tierModelIndex,
       allModels.length,
       visibleModelRows,
       tierModelScrollStartRef.current,
     );
-    tierModelScrollStartRef.current = window.start;
-    for (let i = window.start; i < window.end; i++) {
+    tierModelScrollStartRef.current = scrollWindow.start;
+    for (let i = scrollWindow.start; i < scrollWindow.end; i++) {
       const m = allModels[i];
       const selected = i === tierModelIndex;
-      const visibleIndex = i - window.start;
+      const visibleIndex = i - scrollWindow.start;
       const arrow = visibleIndex === 0 ? "\u25B2" : visibleIndex === 1 ? "\u25BC" : " ";
-      const arrowAvailable = visibleIndex === 0 ? window.canScrollUp : window.canScrollDown;
+      const arrowAvailable = visibleIndex === 0
+        ? scrollWindow.canScrollUp
+        : scrollWindow.canScrollDown;
       lines.push(
         <Text key={`${m.connectionId}-${m.modelId}`} color={selected ? accent : fg}>
           {visibleIndex < 2
@@ -761,19 +763,21 @@ export function ConnectionsPhase({
     lines.push(<Text key="header" color={dim}>Select image model for {largeConnection?.label}:</Text>);
     lines.push(<Text key="sep"> </Text>);
     const visibleModelRows = termRows - theme.asset.height * 2 - lines.length;
-    const window = getScrollWindow(
+    const scrollWindow = getScrollWindow(
       imageModelIndex,
       imageModels.length,
       visibleModelRows,
       imageModelScrollStartRef.current,
     );
-    imageModelScrollStartRef.current = window.start;
-    for (let i = window.start; i < window.end; i++) {
+    imageModelScrollStartRef.current = scrollWindow.start;
+    for (let i = scrollWindow.start; i < scrollWindow.end; i++) {
       const m = imageModels[i];
       const selected = i === imageModelIndex;
-      const visibleIndex = i - window.start;
+      const visibleIndex = i - scrollWindow.start;
       const arrow = visibleIndex === 0 ? "\u25B2" : visibleIndex === 1 ? "\u25BC" : " ";
-      const arrowAvailable = visibleIndex === 0 ? window.canScrollUp : window.canScrollDown;
+      const arrowAvailable = visibleIndex === 0
+        ? scrollWindow.canScrollUp
+        : scrollWindow.canScrollDown;
       lines.push(
         <Text key={m.modelId ?? "provider-default"} color={selected ? accent : fg}>
           {visibleIndex < 2
