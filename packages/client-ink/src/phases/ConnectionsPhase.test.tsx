@@ -127,3 +127,119 @@ describe("ConnectionsPhase image model picker", () => {
     });
   });
 });
+
+describe("ConnectionsPhase model picker scrolling", () => {
+  it("keeps the selected model visible and shows scroll availability arrows", async () => {
+    const onSetTier = vi.fn();
+    const models = Array.from({ length: 40 }, (_, i) => ({
+      id: `model-${i}`,
+      displayName: `Model ${i}`,
+      available: true,
+    }));
+    const rendered = render(<ConnectionsPhase {...defaultProps({
+      connections: [{
+        id: "many-models",
+        provider: "custom",
+        label: "Many Models",
+        masked: "***",
+        models,
+        source: "manual",
+        addedAt: "",
+      }],
+      onSetTier,
+    })} />);
+    const press = async (key: string) => {
+      rendered.stdin.write(key);
+      await new Promise((r) => setTimeout(r, 20));
+    };
+
+    await press(DOWN); // Model Assignments
+    await press(ENTER);
+    await press(ENTER); // Large model picker
+
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Select Large Model");
+      expect(frame).toContain("\u25B2");
+      expect(frame).toContain("\u25BC");
+      expect(frame).toContain("\u25C6 Model 0");
+      expect(frame).not.toContain("Model 39");
+    });
+
+    for (let i = 0; i < 39; i++) await press(DOWN);
+
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("\u25C6 Model 39");
+      expect(frame).not.toContain("Model 0 [Many Models]");
+    });
+
+    await press(ENTER);
+    expect(onSetTier).toHaveBeenCalledWith("large", {
+      connectionId: "many-models",
+      modelId: "model-39",
+    });
+  });
+
+  it("keeps the selected image model visible while scrolling", async () => {
+    const onSetImage = vi.fn();
+    const knownImageModels = Object.fromEntries(
+      Array.from({ length: 40 }, (_, i) => [
+        `image-${i}`,
+        { provider: "custom", displayName: `Image Model ${i}` },
+      ]),
+    );
+    const rendered = render(<ConnectionsPhase {...defaultProps({
+      connections: [{
+        id: "many-images",
+        provider: "custom",
+        label: "Many Images",
+        masked: "***",
+        models: [{ id: "text-model", displayName: "Text Model", available: true }],
+        source: "manual",
+        addedAt: "",
+      }],
+      tierAssignments: {
+        large: { connectionId: "many-images", modelId: "text-model" },
+        medium: null,
+        small: null,
+      },
+      knownImageModels,
+      onSetImage,
+    })} />);
+    const press = async (key: string) => {
+      rendered.stdin.write(key);
+      await new Promise((r) => setTimeout(r, 20));
+    };
+
+    await press(DOWN); // Model Assignments
+    await press(ENTER);
+    await press(DOWN);
+    await press(DOWN);
+    await press(DOWN); // Image generation
+    await press(ENTER);
+
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Select Image Model");
+      expect(frame).toContain("\u25B2");
+      expect(frame).toContain("\u25BC");
+      expect(frame).toContain("\u25C6 Provider default");
+      expect(frame).not.toContain("Image Model 39");
+    });
+
+    for (let i = 0; i < 40; i++) await press(DOWN);
+
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("\u25C6 Image Model 39");
+      expect(frame).not.toContain("Provider default");
+    });
+
+    await press(ENTER);
+    expect(onSetImage).toHaveBeenCalledWith({
+      connectionId: "many-images",
+      modelId: "image-39",
+    });
+  });
+});
