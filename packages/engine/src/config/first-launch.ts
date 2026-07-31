@@ -106,7 +106,10 @@ export function migrateConfigFromExeDir(): void {
 /**
  * Load .env from the best available location.
  * Priority: env var already set > config dir > exe directory (legacy) > cwd
- * No-op if ANTHROPIC_API_KEY is already in the environment.
+ *
+ * An ANTHROPIC_API_KEY already in the environment skips the .env *loading*
+ * only — the compiled-mode config migration below still runs, since it is
+ * unrelated to where the key came from (#768).
  */
 export function loadEnv(): void {
   // Migrate any config files left next to the exe from a prior version. This
