@@ -490,6 +490,26 @@ describe("createSetupConversation", () => {
     expect(Object.keys(repairTool.inputSchema.properties)).toEqual(["handoff_note"]);
   });
 
+  it("does not reintroduce a rejected unknown field on the finalize retry", async () => {
+    // The retained payload must hold schema-known properties only — otherwise
+    // an additionalProperties rejection is merged back in on every retry and
+    // the repair can never complete.
+    const provider = mockProvider([
+      finalizeResponse({ ...FINALIZE_INPUT, bogus_field: "surprise" }),
+      finalizeResponse({}),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toMatchObject({
+      campaignName: FINALIZE_INPUT.campaign_name,
+      characterName: FINALIZE_INPUT.character_name,
+    });
+    const rejection = JSON.stringify(vi.mocked(provider.stream).mock.calls[1]?.[0]);
+    expect(rejection).toContain("/bogus_field");
+  });
+
   it("finalize_setup passes through handoff_note", async () => {
     const note = "Player leans noir-burnout. Wants ensemble scenes, not solo monologues.";
     const input = { ...FINALIZE_INPUT, handoff_note: note };

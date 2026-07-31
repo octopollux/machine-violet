@@ -1368,8 +1368,13 @@ export function createSetupConversation(
           // as handoff_note — and a partial repair may cross a runTurn
           // boundary when the provider answers the error with text only
           // (pendingFinalizeInput/activeTools live at conversation scope
-          // for exactly that reason).
-          pendingFinalizeInput = effectiveInput;
+          // for exactly that reason). Retain only schema-known properties:
+          // an unknown-field rejection would otherwise be reintroduced by
+          // the merge on every retry, making the repair impossible.
+          const knownProperties = FINALIZE_TOOL.inputSchema.properties as Record<string, unknown>;
+          pendingFinalizeInput = Object.fromEntries(
+            Object.entries(effectiveInput).filter(([key]) => Object.hasOwn(knownProperties, key)),
+          );
           const repairFields = [...new Set(
             validation.issues
               .map((issue) => issue.path.split("/")[1])
