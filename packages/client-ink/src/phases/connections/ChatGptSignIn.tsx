@@ -12,11 +12,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { useInput, Box } from "ink";
 import type { ResolvedTheme } from "../../tui/themes/types.js";
 import { FullScreenFrame, hintBar, menuPalette } from "../../tui/components/index.js";
-import { CenteredModal } from "../../tui/modals/CenteredModal.js";
+import { CenteredModal, computeModalInnerWidth } from "../../tui/modals/CenteredModal.js";
 import { openPath } from "../../commands/open-path.js";
 import { copyToClipboard } from "../../utils/clipboard.js";
 import type { ChatGptLoginStartResponse, ChatGptLoginStatusResponse } from "../../api-client.js";
-import type { FormattingNode } from "@machine-violet/shared";
+import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 
 export interface ChatGptSignInProps {
   theme: ResolvedTheme;
@@ -106,6 +106,12 @@ export function ChatGptSignIn({
   const colored = (text: string, color: string): FormattingNode[] =>
     [{ type: "color" as const, color, content: [text] }];
 
+  const modalSizing = {
+    widthFraction: 0.6,
+    minWidth: 50,
+    maxWidth: Math.max(50, Math.floor(columns * 0.6)),
+  };
+
   const styled: FormattingNode[][] = [];
   let footer = ` ${hintBar("Esc cancel")} `;
 
@@ -117,14 +123,21 @@ export function ChatGptSignIn({
   } else if (status === "pending" || status === "success") {
     // Success unmounts via onSuccess in the same tick; render the pending
     // layout until the parent swaps screens so there is no flash.
+    footer = ` ${hintBar("o open in browser", "c copy URL", "Esc cancel")} `;
     styled.push(colored("Sign in by opening this URL in your browser:", pal.fg));
     styled.push([]);
-    styled.push(colored(loginInfo.authUrl, "#88ccff"));
+    // The URL has no spaces, so CenteredModal's word-wrap can't break it —
+    // an overlong row would soft-wrap at the ink layer and desync the
+    // modal's one-physical-line-per-row padding math. Pre-chunk it to the
+    // exact inner width the modal will render at.
+    const innerWidth = Math.max(1, computeModalInnerWidth(theme, columns, { ...modalSizing, footer }));
+    for (let i = 0; i < loginInfo.authUrl.length; i += innerWidth) {
+      styled.push(colored(loginInfo.authUrl.slice(i, i + innerWidth), "#88ccff"));
+    }
     styled.push([]);
     styled.push(colored("Waiting for browser authentication…", pal.dim));
     if (copyStatus === "copied") styled.push(colored("URL copied to clipboard.", "#88cc88"));
     else if (copyStatus === "failed") styled.push(colored("Clipboard unavailable.", "#cc4444"));
-    footer = ` ${hintBar("o open in browser", "c copy URL", "Esc cancel")} `;
   } else if (status === "cancelled") {
     styled.push(colored("Sign-in cancelled.", pal.dim));
     footer = ` ${hintBar("Esc back")} `;
@@ -151,9 +164,7 @@ export function ChatGptSignIn({
         width={columns}
         height={rows}
         title="Sign in with ChatGPT"
-        widthFraction={0.6}
-        minWidth={50}
-        maxWidth={Math.max(50, Math.floor(columns * 0.6))}
+        {...modalSizing}
         styledLines={styled}
         footer={footer}
       />
