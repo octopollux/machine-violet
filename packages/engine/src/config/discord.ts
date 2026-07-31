@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const STORE_FILENAME = "discord-settings.json";
@@ -23,7 +23,10 @@ export function loadDiscordSettings(appDir: string): DiscordSettings {
   }
 }
 
-/** Persist Discord settings to the config directory. */
+/** Persist Discord settings to the config directory. Creates it if needed. */
 export function saveDiscordSettings(appDir: string, settings: DiscordSettings): void {
+  // The config dir may not exist yet — any of its writers can be the first
+  // one on a fresh install (#768).
+  mkdirSync(appDir, { recursive: true, mode: 0o700 });
   writeFileSync(join(appDir, STORE_FILENAME), JSON.stringify(settings, null, 2) + "\n", "utf-8");
 }

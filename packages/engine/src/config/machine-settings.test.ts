@@ -1,48 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { readFileSync, writeFileSync } from "node:fs";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { loadMachineSettings, saveMachineSettings } from "./machine-settings.js";
 
-vi.mock("node:fs", () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-}));
-
-const mockRead = vi.mocked(readFileSync);
-const mockWrite = vi.mocked(writeFileSync);
+// Real fs against a temp dir (matching discord.test.ts / connections.test.ts)
+// rather than a `node:fs` module mock: the dir-creation behavior these settings
+// depend on (#768) is exactly what a mocked fs can't observe.
+let tempDir: string;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  tempDir = mkdtempSync(join(tmpdir(), "mv-machine-settings-test-"));
+});
+
+afterEach(() => {
+  rmSync(tempDir, { recursive: true, force: true });
 });
 
 describe("loadMachineSettings", () => {
   it("returns defaults when file is missing", () => {
-    mockRead.mockImplementation(() => { throw new Error("ENOENT"); });
-    expect(loadMachineSettings("/tmp")).toEqual({ devModeEnabled: false });
+    expect(loadMachineSettings(tempDir)).toEqual({ devModeEnabled: false });
   });
 
   it("returns defaults when file is corrupt", () => {
-    mockRead.mockReturnValue("not json" as never);
-    expect(loadMachineSettings("/tmp")).toEqual({ devModeEnabled: false });
+    writeFileSync(join(tempDir, "machine-settings.json"), "not json", "utf-8");
+    expect(loadMachineSettings(tempDir)).toEqual({ devModeEnabled: false });
   });
 
   it("loads saved settings", () => {
-    mockRead.mockReturnValue(JSON.stringify({ devModeEnabled: true }) as never);
-    expect(loadMachineSettings("/tmp")).toEqual({ devModeEnabled: true });
+    writeFileSync(join(tempDir, "machine-settings.json"), JSON.stringify({ devModeEnabled: true }), "utf-8");
+    expect(loadMachineSettings(tempDir)).toEqual({ devModeEnabled: true });
   });
 
   it("rejects non-boolean devModeEnabled", () => {
-    mockRead.mockReturnValue(JSON.stringify({ devModeEnabled: "yes" }) as never);
-    expect(loadMachineSettings("/tmp")).toEqual({ devModeEnabled: false });
+    writeFileSync(join(tempDir, "machine-settings.json"), JSON.stringify({ devModeEnabled: "yes" }), "utf-8");
+    expect(loadMachineSettings(tempDir)).toEqual({ devModeEnabled: false });
   });
 });
 
 describe("saveMachineSettings", () => {
   it("writes JSON to the correct path", () => {
-    saveMachineSettings("/tmp/cfg", { devModeEnabled: true });
-    expect(mockWrite).toHaveBeenCalledWith(
-      expect.stringContaining("machine-settings.json"),
-      expect.stringContaining('"devModeEnabled": true'),
-      "utf-8",
-    );
+    saveMachineSettings(tempDir, { devModeEnabled: true });
+    const raw = readFileSync(join(tempDir, "machine-settings.json"), "utf-8");
+    expect(JSON.parse(raw)).toEqual({ devModeEnabled: true });
+  });
+
+  it("round-trips through loadMachineSettings", () => {
+    saveMachineSettings(tempDir, { devModeEnabled: true });
+    expect(loadMachineSettings(tempDir)).toEqual({ devModeEnabled: true });
+  });
+
+  it("creates the config dir when it does not exist yet (#768)", () => {
+    const freshDir = join(tempDir, "MachineViolet");
+    saveMachineSettings(freshDir, { devModeEnabled: true });
+    expect(loadMachineSettings(freshDir)).toEqual({ devModeEnabled: true });
   });
 });

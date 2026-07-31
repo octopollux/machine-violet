@@ -12,7 +12,7 @@
  * xAI remains implemented for the Grok 4.6 retest tracked in #749, but is
  * deliberately absent from effective/user-visible connections until then.
  */
-import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import {
@@ -182,6 +182,13 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
     imageAssignment: store.imageAssignment,
   };
   const target = join(appDir, STORE_FILENAME);
+  // The config dir is not guaranteed to exist. On a fresh install the first
+  // thing a user does is connect a provider, so this is the very first write
+  // into it — nothing has created it yet, and the temp write below failed
+  // ENOENT (#768). 0o700 matches migrateConfigFromExeDir: the dir holds API
+  // keys and OAuth tokens. Recursive mkdir is idempotent, so the steady-state
+  // cost is one syscall per save.
+  mkdirSync(appDir, { recursive: true, mode: 0o700 });
   // Atomic write: serialize to a unique temp file in the same dir, then rename
   // over the target. A rename is atomic on a filesystem, so a reader — or a
   // concurrent writer, e.g. a second parallel mvplay session whose codex

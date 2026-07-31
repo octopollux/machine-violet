@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -105,6 +105,36 @@ describe("saveConnectionStore", () => {
     const leftovers = readdirSync(tempDir).filter((f) => f.startsWith(".connections.json.") && f.endsWith(".tmp"));
     expect(leftovers).toEqual([]);
     expect(readdirSync(tempDir)).toContain("connections.json");
+  });
+
+  it("creates the config dir when it does not exist yet (#768 fresh install)", () => {
+    // On a fresh install the first connection save is the first write into the
+    // config dir — nothing has created it. Before #768 the staged temp write
+    // threw ENOENT and the completed OAuth sign-in was lost.
+    const freshDir = join(tempDir, "MachineViolet");
+    expect(existsSync(freshDir)).toBe(false);
+    const conn: AIConnection = {
+      id: "fresh", provider: "openai-chatgpt", label: "ChatGPT",
+      apiKey: "", chatgptAccount: { id: "acct-1", email: "u@example.com" },
+      models: [], source: "oauth", addedAt: "2026-07-31T00:00:00.000Z",
+    };
+    expect(() => saveConnectionStore(freshDir, {
+      connections: [conn],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    })).not.toThrow();
+    expect(loadConnectionStore(freshDir).connections).toHaveLength(1);
+    expect(loadConnectionStore(freshDir).connections[0]).toMatchObject(conn);
+  });
+
+  it("creates missing intermediate dirs (config root itself absent)", () => {
+    const nested = join(tempDir, "a", "b", "MachineViolet");
+    saveConnectionStore(nested, {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    expect(readdirSync(nested)).toContain("connections.json");
   });
 
   it("stays valid JSON across many back-to-back saves (crash/interleave surrogate)", () => {
