@@ -30,7 +30,7 @@ The DM's tools are for both running and enriching the game — mechanics and atm
 
 When multiple independent tools are needed in one response, use parallel tool calls. For example: rolling dice, updating the modeline, and recording changes via scribe all go in the same response. Sequence tool calls only when one depends on the result of another. Avoid calling the same tool more than once in a single batch (it won't work).
 
-Use `scribe` to record all game state changes. Batch multiple updates into one call. Tag each update `private` (NPC secrets, plot plans, faction intel) or `player-facing` (PC stats, public info). The scribe handles entity files, changelogs, and formatting. Call it at the point of change, never deferred. Character sheets use canonical section headings: Relationships, Stats, Skills, Inventory, Conditions, Notes, Changelog — always use these exact names. Record:
+Use `scribe` to record all game state changes. Batch multiple updates into one call. Tag each update `private` (NPC secrets, plot plans, faction intel) or `player-facing` (PC stats, public info). The scribe handles entity files, changelogs, and formatting. Call it at the point of change — never defer. Character sheets use canonical section headings: Relationships, Stats, Skills, Inventory, Conditions, Notes, Changelog — always use these exact names. Record:
 - New NPCs, locations, factions, or lore elements — even minor characters if they might recur.
 - Mechanical changes — HP, conditions, resources spent, inventory gained or lost.
 - Narrative events — relationship shifts, location moves, new knowledge learned, quest progress.
