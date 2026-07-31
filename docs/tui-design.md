@@ -500,7 +500,7 @@ Player-accessible via ESC menu → Settings → Campaign Settings. The modal sho
 
 A final row, **Roll Back Game**, is an action rather than a setting: Enter opens a savepoint picker (`RollbackPickerModal`, fed by `GET /session/savepoints`) → confirmation (`RollbackConfirmModal`) → the `/rollback` command with the chosen commit oid. See [error-recovery.md](error-recovery.md#rollback) for the full rollback flow (incl. the pre-rollback backup).
 
-**Navigation:** ↑/↓ move between rows; ←/→ adjust the focused row. Enter commits all dirty changes and returns to the Game Menu. ESC cancels any unsaved changes and returns to the Game Menu. Changes round-trip to the engine via `PATCH /session/settings` and persist to `config.json`.
+**Navigation:** ↑/↓ move between rows; ←/→ adjust the focused row. Enter commits all dirty changes and closes; ESC cancels any unsaved changes and closes. Closing returns to **play**, not the Game Menu — ESC means "back to the game" everywhere, even for modals opened from the ESC menu. Changes round-trip to the engine via `PATCH /session/settings` and persist to `config.json`.
 
 **Code:** `packages/client-ink/src/tui/modals/CampaignSettingsModal.tsx`, wired in `packages/client-ink/src/phases/PlayingPhase.tsx` (callbacks `onChoicesFrequencyChange`, `onDmTurnLengthPctChange`, `onImageGenerationChange`). The bounds constants `DM_TURN_LENGTH_PCT_MIN` (50), `DM_TURN_LENGTH_PCT_MAX` (150), `DM_TURN_LENGTH_PCT_DEFAULT` (80), and `DM_TURN_LENGTH_PCT_STEP` (5) are exported from `packages/shared/src/types/config.ts`.
 
@@ -753,7 +753,7 @@ This fires before all other ESC handling in the input chain, so it works even wh
 
 The app phase state machine: main menu → playing → returning_to_menu → main menu (loop). Setup runs as a pseudo-campaign session inside `PlayingPhase` — there is no separate `SetupPhase` component. The engine sends a `session:transition` event when setup completes and the real campaign session begins, prompting the client to reset state and continue on the existing WebSocket connection.
 
-The main menu also branches to a set of out-of-game full-screen phases — `settings` and the sub-phases it reaches (`api_keys` / ConnectionsPhase, `discord_settings` / DiscordSettingsPhase, `archived_campaigns` / ArchivedCampaignsPhase). These are documented below.
+Out-of-game screens above the main menu are a **push/pop stack** (`menuStack` in `app.tsx`), not separate app phases: `settings`, `connections` / `connections_wizard` (the Connect to AI area), `discord_settings`, and `archived_campaigns`. Esc always pops one level; an empty stack is the main menu itself. The main-menu **Connect to AI** CTA (shown when no working AI connection exists) deep-links straight into the connect wizard (`connections_wizard`), and Esc from the wizard returns to the main menu — never to a screen the player didn't visit. These screens are documented below.
 
 **Code:** `packages/client-ink/src/phases/PlayingPhase.tsx`
 
@@ -773,11 +773,12 @@ During an active DM turn the engine emits `narrative:delta` WebSocket events at 
 
 ### Settings Screen
 
-Reachable from the main menu via the Settings entry. A full-screen `FullScreenFrame` page (title "Settings") with five navigable items (arrow keys + Enter, ESC to return):
+Reachable from the main menu via the Settings entry. A full-screen `FullScreenFrame` page (title "Settings") with six navigable items (arrow keys + Enter, ESC to return):
 
-- **API Keys** — navigates to the connections/provider wizard (ConnectionsPhase).
+- **Connect to AI** — opens the Connect to AI area at the connection list (see below).
 - **Discord** — navigates to Discord Rich Presence opt-in (DiscordSettingsPhase).
 - **Archived Campaigns** — navigates to the archived-campaigns list (ArchivedCampaignsPhase).
+- **Export Diagnostics** — writes a diagnostics bundle and shows the saved path (or failure) inline.
 - **Enable Dev Mode** — on/off toggle. When ON, the Engine Console entry appears in the in-game ESC menu. State persists to `machine-settings.json`.
 - **Show Debug Info** — on/off toggle. When ON, internal `dev`-tagged narrative lines (e.g. retry and rollback notices) are visible in the conversation pane. Session-scoped (not persisted to disk).
 
@@ -785,29 +786,34 @@ Toggle items display `ON` (green) or `OFF` (dim) as a suffix. The version string
 
 **Code:** `packages/client-ink/src/phases/SettingsPhase.tsx`
 
-### Connections Screen (ConnectionsPhase)
+### Connect to AI (`phases/connections/`)
 
-A full-screen out-of-game wizard (root title: "AI Connections") for managing LLM provider connections and model tier assignments, reached from Settings → API Keys. It uses `FullScreenFrame` for all sub-screens. The root menu has four items selectable with arrow keys + Enter; Escape from any sub-screen returns to the parent.
+The provider/auth area — one user-facing concept ("Connect to AI") used consistently for the Settings entry, every screen title, and the main-menu CTA. Raw provider ids never appear in copy; display names come from `phases/connections/providers.ts`. Internally the area (`ConnectionsArea`) runs its own small push/pop screen stack; Esc always pops, and popping the last screen leaves the area.
 
-**Connections list** — shows all configured connections. Each row displays a health indicator (`✔` valid / `⚠` rate-limited / `✘` invalid / `?` unchecked, color-coded), the connection label, provider, and model count. When a live usage snapshot is available (an active session backing that connection — Codex's plan rate-limit windows, or an Anthropic key's request/token rate-limit quota parsed from `anthropic-ratelimit-*` response headers), per-connection usage segments appear indented below the row — each segment shows label, value (percentage, balance, or token count), and a relative reset timer when the segment carries a reset time (Codex windows do; the Anthropic header-derived segments don't). Usage is fetched for all connections on mount and refreshed every 30 seconds. Hotkeys: `R` = recheck health, `D` = delete.
+**One selected provider drives the game.** The connection assigned to the Large tier is "in use"; applying a connection ("Use this connection", or the wizard's switch offer) sets *every* text tier to that provider's registry default models (`tierDefaults` from `GET /manage/models`) and resets the image model to the provider default. Tier assignments never mix providers. (A future provider-independent `narration` assignment class — e.g. ElevenLabs TTS — is deliberately outside this rule.)
 
-**Model Assignments** — shows the three text-model tiers (Large: DM narration, Medium: OOC / AI players, Small: mechanical tasks) plus Image generation. Each text tier displays the currently assigned model and connection label; Enter opens the all-connections text picker. Image generation is deliberately paired to the exact Large connection: its picker shows `Provider default` plus only the image models registered for that connection's provider. Selecting the default clears the explicit override; moving Large to another connection clears any prior image selection so a foreign provider model can never be routed through the new connection.
+**Connection list** (`ConnectionsList`) — the area's root screen. Each row shows a health glyph (`✔` valid / `⚠` rate-limited / `✘` invalid / `?` unchecked, color-coded), label, provider display name, and an `· in use` marker on the selected connection; live usage segments (Codex plan windows, Anthropic rate-limit headers) render indented beneath, refreshed every 30 s. Final rows: **＋ Add connection** (opens the wizard) and **Model assignments — advanced**. Enter opens per-connection detail.
 
-**Add Connection wizard** — a multi-step flow:
-1. Provider selection: Anthropic, Google Gemini, OpenAI (API key), OpenRouter (Kimi K3), and Custom endpoint (experimental — untested). `openai-chatgpt` is intentionally absent — it uses the dedicated "Sign in with ChatGPT" entry. Gemini and OpenRouter use their fixed official base URLs and proceed directly from key to label; only custom endpoints continue to the base-URL step. xAI is temporarily hidden pending the Grok 4.6 reliability retest in [#749](https://github.com/octopollux/machine-violet/issues/749).
-2. API key entry (text input, Enter to advance).
-3. Label entry (optional friendly name, Enter to advance).
-4. Base URL entry — only shown for the `custom` provider. Escape backs up one step at each stage.
+**Connection detail** (`ConnectionDetail`) — provider, health status (verbatim message), masked key, endpoint, usage, and actions: **Use this connection** (disabled with "already in use" when active), **Check connection**, **Delete connection**. Delete needs a second Enter to confirm; env-var connections show *why* they can't be deleted ("set by an environment variable — remove it from your environment instead") instead of silently refusing. Action failures surface inline in red.
 
-**Sign in with ChatGPT** — initiates OAuth via the codex app-server (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md) for the server-side flow). The TUI renders a `CenteredModal` overlay over the menu while authentication is in progress. States:
-- **Starting**: "Starting Codex subprocess and OAuth flow…" (before the server returns the auth URL).
-- **Pending**: shows the auth URL plus the footer `o open in browser · c copy URL · Esc cancel`. `o`/`O` opens the URL via the system browser; `c`/`C` copies it to the clipboard.
-- **Success**: "✔ Signed in [as email] [(planType)]." Returns on Enter or Esc; the connections list is refreshed.
-- **Cancelled / Error**: status message, returns on Enter or Esc.
-- Pressing Escape while pending sends a cancel request to the server before returning.
-The login status poll runs every 2 seconds while the chatgpt-login screen is active.
+**Model assignments** (`ModelAssignments`) — advanced, optional, and scoped to the in-use connection ("Models from <label> (<provider>)"). Tiers are named by role: **DM narration** (large), **Helpers & AI players** (medium), **Quick tasks** (small), **Scene images** (image). A tier matching the provider default renders as `Auto (<model>)`; an explicit override renders `<model> (override)`. Pickers list `Auto — <default> (recommended)` first, then only the in-use connection's models — never another connection's. The image picker keeps the long-standing pairing rule: image models must belong to the Large connection's provider, `Auto (provider default)` clears the override.
 
-**Code:** `packages/client-ink/src/phases/ConnectionsPhase.tsx`
+**Connect wizard** (`ConnectWizard`) — the linear setup flow, entered from the list's Add row or directly from the main-menu CTA. Title "Connect to AI", header "How will Machine Violet connect to AI?". The auth method is folded into the provider choice:
+
+1. **Provider picker** — OpenAI (ChatGPT) leads, badged `· recommended` (subscription pricing + bundled image generation); then the API-key providers by display name; Custom endpoint last, badged `· experimental` with "untested" in its description. Choosing ChatGPT starts the OAuth flow; everything else continues to key entry. xAI carries `hidden: true` in `providers.ts` — not offered pending the Grok 4.6 reliability retest ([#749](https://github.com/octopollux/machine-violet/issues/749)); flipping that flag un-hides it in one place.
+2. **Key entry** — input is masked (`•` except the last four characters); the screen names where to find a key (e.g. `platform.openai.com/api-keys`). Enter on an empty key shows an inline message instead of doing nothing. Custom endpoints add a base-URL step. There is **no label step** — the server derives the label from the provider display name ("OpenAI", "OpenAI (2)" on collision).
+3. **Validate on submit** — the wizard adds the connection and immediately health-checks it. Invalid key → the just-added connection is removed and the wizard bounces back to key entry with the provider's actual error (input preserved). Unverifiable (network/server error) → the connection is kept with a yellow "couldn't verify" result. Only a passing check reports `✔ Connected to <label>`.
+4. **Result** — if the new connection is now in use, shows "The DM will run on <model>". If another connection is in use, offers `Enter switch to <new> · K keep <current>` (switch applies the provider's default model set). Finishing always lands on the connection list.
+
+**Sign in with ChatGPT** (wizard step) — OAuth via the codex app-server (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md)). States: starting → pending (auth URL, `o open in browser · c copy URL · Esc cancel`, 2 s status poll) → success (`✔ Signed in as <email> (<plan>)`, straight into the wizard result) / cancelled / error. Esc while pending cancels server-side.
+
+**Error surfacing** — connection mutations in `app.tsx` (`addConnectionAsync`, `removeConnectionAsync`, `checkConnectionAsync`, `setTiersAsync`) are promise-returning; the screens await them and render failures inline. No connection mutation swallows an error.
+
+**Code:** `packages/client-ink/src/phases/connections/` — `ConnectionsArea.tsx` (stack + data), `ConnectionsList.tsx`, `ConnectionDetail.tsx`, `ModelAssignments.tsx`, `ConnectWizard.tsx`, `providers.ts` (all provider-facing copy), `usage-format.ts`.
+
+### Menu rendering conventions
+
+All full-screen menus render rows through the shared `buildMenuLines` / `menuPalette` helpers (`tui/components/MenuList.tsx`) — `◆`/`○` markers, accent selection, dim descriptions after ` — `, disabled/emphasis treatments — and key-hint footers use `hintBar(...)` with one grammar: `↑↓ select · Enter <verb> · Esc back`. Scrollable pickers share `getScrollWindow` (`tui/components/scroll-window.ts`). New menus must use these instead of hand-rolling markers.
 
 ### Discord Rich Presence (DiscordSettingsPhase)
 

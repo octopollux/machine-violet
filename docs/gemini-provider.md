@@ -6,7 +6,7 @@ model tiers and pairs Gemini text models with Google's native image model.
 
 ## Authentication and onboarding
 
-Add a Google Gemini connection from **Settings → API Keys → Add Connection →
+Add a Google Gemini connection from **Settings → Connect to AI → ＋ Add connection →
 Google Gemini**, then paste a Gemini Developer API key. The engine also creates
 an environment-backed connection automatically from `GOOGLE_API_KEY` or
 `GEMINI_API_KEY` (`GOOGLE_API_KEY` wins when both are present).

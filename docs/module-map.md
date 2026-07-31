@@ -188,7 +188,7 @@ PDF ingestion and content processing. **Completely separate from the rest of the
 
 ## Client: phases/ — App Lifecycle
 
-State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). The main menu also branches into settings and its sub-phases (api_keys, discord_settings, archived_campaigns). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
+State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). Out-of-game screens above the main menu are a push/pop stack (settings, connections / connections_wizard, discord_settings, archived_campaigns) — Esc pops one level. On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
 
 | File | Purpose |
 |---|---|
@@ -196,8 +196,8 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
-| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Five items: API Keys (→ ConnectionsPhase), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
-| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small text tiers plus a Large-provider-paired image-model picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
+| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Six items: Connect to AI (→ connections area), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Export Diagnostics (inline status), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
+| `connections/` | The Connect to AI area (title: "Connect to AI"): `ConnectionsArea.tsx` (push/pop screen stack + data plumbing), `ConnectionsList.tsx` (list-first root: health glyphs, usage segments, in-use marker, add/advanced rows), `ConnectionDetail.tsx` (use/check/delete with confirm + env explanation), `ModelAssignments.tsx` (role-named tiers, `Auto (<model>)` defaults, pickers scoped to the in-use connection), `ConnectWizard.tsx` (provider picker with ChatGPT OAuth folded in and recommended, masked key entry, validate-on-submit), `providers.ts` (provider display copy) |
 | `DiscordSettingsPhase.tsx` | Full-screen Discord Rich Presence Enable/Disable toggle (title: "Discord"). Saves the choice to `discord-settings.json`; ESC returns without saving |
 
 ## Engine: prompts/ — Prompt Templates

@@ -88,6 +88,13 @@ export interface KnownImageModelInfo {
   displayName: string;
 }
 
+/** Per-provider default model ids for each tier, from the model registry. */
+export interface ProviderTierDefaults {
+  large?: string;
+  medium?: string;
+  small?: string;
+}
+
 export class ApiClient {
   private baseUrl: string;
   private playerId: string;
@@ -276,6 +283,7 @@ export class ApiClient {
   async listKnownModels(): Promise<{
     models: Record<string, KnownModelInfo>;
     imageModels: Record<string, KnownImageModelInfo>;
+    tierDefaults: Record<string, ProviderTierDefaults>;
   }> {
     return this.get("/manage/models");
   }

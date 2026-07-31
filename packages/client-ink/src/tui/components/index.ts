@@ -14,3 +14,7 @@ export { FullScreenFrame } from "./FullScreenFrame.js";
 export type { FullScreenFrameProps } from "./FullScreenFrame.js";
 export { useStarfield, StarfieldRows, resetStarfieldCache } from "./Starfield.js";
 export type { StarfieldConfig, StarfieldCell } from "./Starfield.js";
+export { buildMenuLines, menuPalette, hintBar } from "./MenuList.js";
+export type { MenuRow, MenuPalette } from "./MenuList.js";
+export { getScrollWindow } from "./scroll-window.js";
+export type { ScrollWindow } from "./scroll-window.js";

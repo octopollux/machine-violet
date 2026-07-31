@@ -587,7 +587,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const registry = loadModelRegistry(server.configDir);
-    return { models: registry.models, imageModels: registry.imageModels };
+    return { models: registry.models, imageModels: registry.imageModels, tierDefaults: registry.tierDefaults };
   });
 
   // -----------------------------------------------------------------------

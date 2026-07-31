@@ -95,7 +95,7 @@ surfaces must pass an explicit policy for each advertised tool through
 4. Add tier defaults under the provider's connection-type key in `packages/engine/src/config/known-models.json`
 5. If the provider's connection-type maps to an existing model family (e.g. both `openai-apikey` and `openai-chatgpt` reach the `openai` family), update `modelFamilyFor` in `packages/engine/src/config/model-registry.ts`
 6. Add the provider id to the `AddConnectionRequest` literal union in `packages/shared/src/protocol/rest.ts` and to `VALID_PROVIDERS` in `packages/engine/src/server/routes/management.ts`
-7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
+7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/connections/providers.ts` — display name, picker description, key source, and `auth: "key" | "oauth"` all live there (OAuth providers are picker rows too; their flow branches inside `ConnectWizard`)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
 ### Changing the tape format (Tier-2 record/replay)

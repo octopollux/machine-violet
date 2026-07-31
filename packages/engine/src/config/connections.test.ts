@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  removeConnection, setImageAssignment, setTierAssignment, upsertChatGptConnection,
+  addConnection, removeConnection, setImageAssignment, setTierAssignment, upsertChatGptConnection,
 } from "./connections.js";
 import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
@@ -406,6 +406,32 @@ describe("image assignment operations", () => {
       connectionId: "xai-1",
       modelId: "grok-imagine-image",
     }).imageAssignment).toBeNull();
+  });
+});
+
+describe("addConnection default labels", () => {
+  const emptyStore = (): ConnectionStore => ({
+    connections: [],
+    tierAssignments: { large: null, medium: null, small: null },
+    imageAssignment: null,
+  });
+
+  it("defaults the label to the provider display name, not the raw id", () => {
+    const store = addConnection(emptyStore(), "openai-apikey", "sk-x", "");
+    expect(store.connections[0].label).toBe("OpenAI");
+  });
+
+  it("disambiguates a colliding default label with a counter", () => {
+    let store = addConnection(emptyStore(), "openai-apikey", "sk-1", "");
+    store = addConnection(store, "openai-apikey", "sk-2", "");
+    store = addConnection(store, "openai-apikey", "sk-3", "");
+    expect(store.connections.map((c) => c.label)).toEqual(["OpenAI", "OpenAI (2)", "OpenAI (3)"]);
+  });
+
+  it("keeps an explicit label verbatim, even when it collides", () => {
+    let store = addConnection(emptyStore(), "anthropic", "sk-1", "Work key");
+    store = addConnection(store, "anthropic", "sk-2", "Work key");
+    expect(store.connections.map((c) => c.label)).toEqual(["Work key", "Work key"]);
   });
 });
 

@@ -279,6 +279,13 @@ export const SetTiersRequest = Type.Object({
 export const ModelsResponse = Type.Object({
   models: Type.Unknown(),
   imageModels: Type.Unknown(),
+  /**
+   * Per-provider default model ids for each tier
+   * (`{ [provider]: { large?, medium?, small? } }`). The client's model
+   * assignment screen uses these to render "Auto (<model>)" and to apply a
+   * provider's default set when the player selects a connection.
+   */
+  tierDefaults: Type.Unknown(),
 });
 
 export const ArchiveResponse = Type.Object({
