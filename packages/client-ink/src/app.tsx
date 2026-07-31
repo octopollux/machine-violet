@@ -475,6 +475,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     applyConnectionsResponse(resp);
   }, [applyConnectionsResponse]);
 
+  const updateConnectionKeyAsync = useCallback(async (id: string, apiKey: string): Promise<void> => {
+    const resp = await apiClientRef.current.updateConnectionKey(id, apiKey);
+    applyConnectionsResponse(resp);
+  }, [applyConnectionsResponse]);
+
   const setTiersAsync = useCallback(async (body: SetTiersBody): Promise<void> => {
     const resp = await apiClientRef.current.setTierAssignments(body);
     setTierAssignments(resp.tierAssignments);
@@ -586,6 +591,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           knownImageModels={knownImageModels}
           tierDefaults={tierDefaults}
           onAddConnection={addConnectionAsync}
+          onUpdateConnectionKey={updateConnectionKeyAsync}
           onRemoveConnection={removeConnectionAsync}
           onCheckHealth={checkConnectionAsync}
           onSetTiers={setTiersAsync}

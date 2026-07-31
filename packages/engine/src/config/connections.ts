@@ -489,6 +489,27 @@ export function setImageAssignment(
   return { ...store, imageAssignment: assignment };
 }
 
+/**
+ * Replace a connection's API key in place (the Fix flow for a failed key).
+ * Preserves the connection id, so tier assignments and any live provider
+ * bindings survive the credential swap. Env-derived and OAuth connections
+ * are not eligible (env keys live in the environment; ChatGPT connections
+ * are fixed by signing in again) — callers enforce that, this op is a
+ * plain map.
+ */
+export function updateConnectionKey(
+  store: ConnectionStore,
+  connectionId: string,
+  apiKey: string,
+): ConnectionStore {
+  return {
+    ...store,
+    connections: store.connections.map((c) =>
+      c.id === connectionId ? { ...c, apiKey } : c,
+    ),
+  };
+}
+
 export function updateConnectionModels(
   store: ConnectionStore,
   connectionId: string,

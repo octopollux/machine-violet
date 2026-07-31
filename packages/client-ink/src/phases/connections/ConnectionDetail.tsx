@@ -30,6 +30,8 @@ export interface ConnectionDetailProps {
   tierAssignments: TierAssignmentsResponse;
   onApply: () => Promise<void>;
   onCheck: () => Promise<ConnectionHealthResponse>;
+  /** Open the Fix flow (re-enter key, or re-sign-in for ChatGPT). */
+  onFix: () => void;
   onRemove: () => Promise<void>;
   onBack: () => void;
 }
@@ -39,7 +41,7 @@ type Busy = null | "applying" | "checking" | "deleting";
 export function ConnectionDetail({
   theme, columns, rows,
   connection: conn, health, usage, isActive, knownModels, tierAssignments,
-  onApply, onCheck, onRemove, onBack,
+  onApply, onCheck, onFix, onRemove, onBack,
 }: ConnectionDetailProps) {
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState<Busy>(null);
@@ -49,7 +51,23 @@ export function ConnectionDetail({
   const isEnv = conn.source === "env";
   const pal = menuPalette(theme);
 
+  // A failed check gets a first-class remedy, not just a red glyph.
+  const broken = health?.status === "invalid" || health?.status === "error";
+
   const actions: MenuRow[] = [];
+  if (broken) {
+    actions.push(
+      isEnv
+        ? {
+            key: "fix", label: "Fix connection", disabled: true,
+            description: "update the environment variable, then check again",
+          }
+        : {
+            key: "fix", label: "Fix connection", emphasis: true,
+            description: conn.provider === "openai-chatgpt" ? "sign in again" : "re-enter your API key",
+          },
+    );
+  }
   actions.push(
     isActive
       ? { key: "use", label: "Use this connection", description: "already in use", disabled: true }
@@ -81,7 +99,9 @@ export function ConnectionDetail({
     const action = actions[index];
     if (action.disabled) return;
     setError(null);
-    if (action.key === "use") {
+    if (action.key === "fix") {
+      onFix();
+    } else if (action.key === "use") {
       setBusy("applying");
       void onApply()
         .catch((err) => setError(err instanceof Error ? err.message : String(err)))

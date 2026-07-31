@@ -47,6 +47,7 @@ function defaultProps(overrides?: Partial<ConnectionsAreaProps>): ConnectionsAre
     knownImageModels: {},
     tierDefaults: {},
     onAddConnection: vi.fn(async () => conn()),
+    onUpdateConnectionKey: vi.fn(async () => undefined),
     onRemoveConnection: vi.fn(async () => undefined),
     onCheckHealth: vi.fn(async (id: string) => ({ id, status: "valid" as const, message: "Valid" })),
     onSetTiers: vi.fn(async () => undefined),
@@ -334,6 +335,67 @@ describe("ConnectionDetail", () => {
     });
   });
 
+  it("offers Fix connection when the check failed, and re-enters the key in place", async () => {
+    const onUpdateConnectionKey = vi.fn(async () => undefined);
+    const onCheckHealth = vi.fn(async (id: string) => ({ id, status: "valid" as const, message: "Valid" }));
+    const rendered = await openDetail({
+      healthResults: { "conn-1": { id: "conn-1", status: "invalid", message: "Invalid API key" } },
+      onUpdateConnectionKey,
+      onCheckHealth,
+    });
+    const frame = () => rendered.lastFrame() ?? "";
+    expect(frame()).toContain("Fix connection");
+    expect(frame()).toContain("re-enter your API key");
+
+    await press(rendered, ENTER); // Fix leads the actions when broken
+    await vi.waitFor(() => {
+      expect(frame()).toContain("Paste a new Anthropic API key");
+      expect(frame()).toContain("model choices are kept");
+    });
+    for (const ch of "sk-fixed-key") rendered.stdin.write(ch);
+    await new Promise((r) => setTimeout(r, 20));
+    await press(rendered, ENTER);
+    await vi.waitFor(() => {
+      expect(onUpdateConnectionKey).toHaveBeenCalledWith("conn-1", "sk-fixed-key");
+      expect(onCheckHealth).toHaveBeenCalledWith("conn-1");
+      // Verified — back on the detail screen.
+      expect(frame()).toContain("Provider");
+    });
+  });
+
+  it("keeps the player on the fix screen with the provider's error when the new key is invalid", async () => {
+    const onCheckHealth = vi.fn(async (id: string) => ({ id, status: "invalid" as const, message: "Invalid API key" }));
+    const rendered = await openDetail({
+      healthResults: { "conn-1": { id: "conn-1", status: "invalid", message: "Invalid API key" } },
+      onCheckHealth,
+    });
+    await press(rendered, ENTER); // Fix
+    await vi.waitFor(() => expect(rendered.lastFrame()).toContain("Paste a new Anthropic API key"));
+    for (const ch of "sk-still-bad") rendered.stdin.write(ch);
+    await new Promise((r) => setTimeout(r, 20));
+    await press(rendered, ENTER);
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Invalid API key");
+      expect(frame).toContain("Paste a new Anthropic API key");
+    });
+  });
+
+  it("fixes a broken ChatGPT connection by re-running the sign-in flow", async () => {
+    const rendered = await openDetail({
+      connections: [conn({ id: "cg-1", provider: "openai-chatgpt", label: "ChatGPT (q@example.com)" })],
+      healthResults: { "cg-1": { id: "cg-1", status: "invalid", message: "Not signed in" } },
+    });
+    const frame = () => rendered.lastFrame() ?? "";
+    expect(frame()).toContain("Fix connection");
+    expect(frame()).toContain("sign in again");
+    await press(rendered, ENTER);
+    await vi.waitFor(() => {
+      // The ChatGPT OAuth screen took over (pending on the mocked start/poll).
+      expect(frame()).toMatch(/Starting the sign-in flow|Sign in by opening this URL/);
+    });
+  });
+
   it("explains why env connections cannot be deleted instead of silently refusing", async () => {
     const onRemoveConnection = vi.fn(async () => undefined);
     const rendered = await openDetail({
@@ -345,6 +407,13 @@ describe("ConnectionDetail", () => {
     await press(rendered, DOWN);
     await press(rendered, ENTER);
     expect(onRemoveConnection).not.toHaveBeenCalled();
+  });
+
+  it("offers no Fix action while the connection is healthy", async () => {
+    const rendered = await openDetail({
+      healthResults: { "conn-1": { id: "conn-1", status: "valid", message: "Valid" } },
+    });
+    expect(rendered.lastFrame()).not.toContain("Fix connection");
   });
 
   it("applies the provider's default models when Use this connection is chosen", async () => {

@@ -13,19 +13,18 @@
  * no label step — connections are auto-named server-side from the provider's
  * display name.
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useInput, Text } from "ink";
 import type { ResolvedTheme } from "../../tui/themes/types.js";
 import { FullScreenFrame, buildMenuLines, hintBar, menuPalette } from "../../tui/components/index.js";
 import type { MenuRow } from "../../tui/components/index.js";
 import { useTextInput } from "../../tui/hooks/useTextInput.js";
-import { openPath } from "../../commands/open-path.js";
-import { copyToClipboard } from "../../utils/clipboard.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, KnownModelInfo,
   ConnectionHealthResponse, ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
 } from "../../api-client.js";
 import { VISIBLE_PROVIDER_OPTIONS, type ProviderOption } from "./providers.js";
+import { ChatGptSignIn } from "./ChatGptSignIn.js";
 
 type Step =
   | { kind: "provider" }
@@ -87,60 +86,20 @@ export function ConnectWizard({
   const { handleKey: handleKeyInput } = useTextInput({ value: keyInput, onChange: setKeyInput });
   const { handleKey: handleUrlInput } = useTextInput({ value: urlInput, onChange: setUrlInput });
 
-  // ChatGPT OAuth state
-  const [loginInfo, setLoginInfo] = useState<{ loginId: string; authUrl: string } | null>(null);
-  const [loginStatus, setLoginStatus] = useState<ChatGptLoginStatusResponse | null>(null);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
-
   const pal = menuPalette(theme);
 
   const activeId = tierAssignments.large?.connectionId ?? null;
   const activeConn = activeId ? connections.find((c) => c.id === activeId) : undefined;
 
-  // Poll the OAuth login while on the chatgpt step.
-  useEffect(() => {
-    if (step.kind !== "chatgpt" || !loginInfo) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const status = await onPollChatGptLogin(loginInfo.loginId);
-        if (cancelled) return;
-        setLoginStatus(status);
-        if (status.status === "success") {
-          onRefreshConnections();
-          const suffix = `${status.email ? ` as ${status.email}` : ""}${status.planType ? ` (${status.planType})` : ""}`;
-          setStep({
-            kind: "result",
-            headline: `✔ Signed in${suffix}`,
-            headlineColor: "#88cc88",
-            connectionId: status.connectionId,
-          });
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setLoginError(err instanceof Error ? err.message : String(err));
-      }
-    };
-    void poll();
-    const timer = setInterval(() => void poll(), 2000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [step.kind, loginInfo, onPollChatGptLogin, onRefreshConnections]);
-
-  const startChatGptLogin = () => {
-    setLoginInfo(null);
-    setLoginStatus(null);
-    setLoginError(null);
-    setCopyStatus("idle");
-    setStep({ kind: "chatgpt" });
-    void (async () => {
-      try {
-        const start = await onStartChatGptLogin();
-        setLoginInfo({ loginId: start.loginId, authUrl: start.authUrl });
-      } catch (err) {
-        setLoginError(err instanceof Error ? err.message : String(err));
-      }
-    })();
+  const handleSignInSuccess = (status: ChatGptLoginStatusResponse) => {
+    onRefreshConnections();
+    const suffix = `${status.email ? ` as ${status.email}` : ""}${status.planType ? ` (${status.planType})` : ""}`;
+    setStep({
+      kind: "result",
+      headline: `✔ Signed in${suffix}`,
+      headlineColor: "#88cc88",
+      connectionId: status.connectionId,
+    });
   };
 
   /** Add + verify a key-based connection; bounce back to the key screen on a bad key. */
@@ -208,7 +167,7 @@ export function ConnectWizard({
         const provider = VISIBLE_PROVIDER_OPTIONS[providerIndex];
         setInputError(null);
         if (provider.auth === "oauth") {
-          startChatGptLogin();
+          setStep({ kind: "chatgpt" });
         } else {
           setKeyInput("");
           setUrlInput("");
@@ -250,24 +209,7 @@ export function ConnectWizard({
     }
 
     if (step.kind === "chatgpt") {
-      if (key.escape) {
-        if (loginInfo && (loginStatus?.status ?? "pending") === "pending") {
-          void onCancelChatGptLogin(loginInfo.loginId).catch(() => { /* best-effort */ });
-        }
-        setStep({ kind: "provider" });
-        return;
-      }
-      if (key.return && loginStatus && loginStatus.status !== "pending" && loginStatus.status !== "success") {
-        setStep({ kind: "provider" });
-        return;
-      }
-      if (loginInfo && (loginStatus?.status ?? "pending") === "pending") {
-        if (input === "o" || input === "O") { openPath(loginInfo.authUrl); return; }
-        if (input === "c" || input === "C") {
-          void copyToClipboard(loginInfo.authUrl).then((ok) => setCopyStatus(ok ? "copied" : "failed"));
-          return;
-        }
-      }
+      // ChatGptSignIn owns input while mounted.
       return;
     }
 
@@ -362,36 +304,18 @@ export function ConnectWizard({
   }
 
   if (step.kind === "chatgpt") {
-    const status = loginStatus?.status ?? "pending";
-    const lines: React.ReactNode[] = [];
-    if (loginError) {
-      lines.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
-      lines.push(<Text key="err-gap"> </Text>);
-      lines.push(<Text key="err-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
-    } else if (!loginInfo) {
-      lines.push(<Text key="starting" color={pal.fg}>Starting the sign-in flow…</Text>);
-      lines.push(<Text key="s-gap"> </Text>);
-      lines.push(<Text key="s-hint" color={pal.dim}>{hintBar("Esc cancel")}</Text>);
-    } else if (status === "pending") {
-      lines.push(<Text key="open" color={pal.fg}>Sign in by opening this URL in your browser:</Text>);
-      lines.push(<Text key="o-gap"> </Text>);
-      lines.push(<Text key="url" color="#88ccff">{loginInfo.authUrl}</Text>);
-      lines.push(<Text key="u-gap"> </Text>);
-      lines.push(<Text key="waiting" color={pal.dim}>Waiting for browser authentication…</Text>);
-      if (copyStatus === "copied") lines.push(<Text key="copied" color="#88cc88">URL copied to clipboard.</Text>);
-      else if (copyStatus === "failed") lines.push(<Text key="copyfail" color="#cc4444">Clipboard unavailable.</Text>);
-      lines.push(<Text key="hint-gap"> </Text>);
-      lines.push(
-        <Text key="hints" color={pal.dim}>{hintBar("o open in browser", "c copy URL", "Esc cancel")}</Text>,
-      );
-    } else if (status === "cancelled") {
-      lines.push(<Text key="cancelled" color={pal.dim}>Sign-in cancelled.</Text>);
-      lines.push(<Text key="c-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
-    } else {
-      lines.push(<Text key="failed" color="#cc4444">Sign-in failed: {loginStatus?.error ?? "unknown error"}</Text>);
-      lines.push(<Text key="f-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
-    }
-    return frame(lines);
+    return (
+      <ChatGptSignIn
+        theme={theme}
+        columns={columns}
+        rows={rows}
+        onStart={onStartChatGptLogin}
+        onPoll={onPollChatGptLogin}
+        onCancel={onCancelChatGptLogin}
+        onSuccess={handleSignInSuccess}
+        onExit={() => setStep({ kind: "provider" })}
+      />
+    );
   }
 
   // step.kind === "result"

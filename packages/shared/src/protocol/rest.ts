@@ -264,6 +264,11 @@ export const UpdateModelsRequest = Type.Object({
   models: Type.Array(ConnectionModel),
 });
 
+/** Body for PATCH /manage/connections/:id — in-place API-key replacement (Fix flow). */
+export const UpdateConnectionKeyRequest = Type.Object({
+  apiKey: Type.String(),
+});
+
 export const TiersResponse = Type.Object({
   tierAssignments: Type.Unknown(),
   imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
@@ -356,6 +361,7 @@ export type ChatGptLoginStatusResponse = Static<typeof ChatGptLoginStatusRespons
 export type AddConnectionRequest = Static<typeof AddConnectionRequest>;
 export type HealthCheckResponse = Static<typeof HealthCheckResponse>;
 export type UpdateModelsRequest = Static<typeof UpdateModelsRequest>;
+export type UpdateConnectionKeyRequest = Static<typeof UpdateConnectionKeyRequest>;
 export type TiersResponse = Static<typeof TiersResponse>;
 export type SetTiersRequest = Static<typeof SetTiersRequest>;
 export type ModelsResponse = Static<typeof ModelsResponse>;

@@ -27,12 +27,18 @@ import { ConnectionsList } from "./ConnectionsList.js";
 import { ConnectionDetail } from "./ConnectionDetail.js";
 import { ModelAssignments } from "./ModelAssignments.js";
 import { ConnectWizard } from "./ConnectWizard.js";
+import { FixConnection } from "./FixConnection.js";
+import { ChatGptSignIn } from "./ChatGptSignIn.js";
 
 export type AreaScreen =
   | { kind: "list" }
   | { kind: "detail"; connectionId: string }
   | { kind: "models" }
-  | { kind: "wizard" };
+  | { kind: "wizard" }
+  /** Re-enter a failed key in place (key-based providers). */
+  | { kind: "fix"; connectionId: string }
+  /** Re-run the ChatGPT OAuth flow (upserts the connection in place). */
+  | { kind: "signin"; connectionId: string };
 
 export interface SetTiersBody {
   large?: TierAssignmentEntry;
@@ -54,6 +60,8 @@ export interface ConnectionsAreaProps {
   tierDefaults: Record<string, ProviderTierDefaults>;
   /** Add a connection; resolves with the new connection, rejects with the server's message. */
   onAddConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<ConnectionInfo>;
+  /** Replace a connection's API key in place (Fix flow). */
+  onUpdateConnectionKey: (id: string, apiKey: string) => Promise<void>;
   onRemoveConnection: (id: string) => Promise<void>;
   /** Health-check a connection; resolves with the result (also recorded in `healthResults`). */
   onCheckHealth: (id: string) => Promise<ConnectionHealthResponse>;
@@ -174,8 +182,42 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
     );
   }
 
-  if (screen.kind === "detail") {
+  if (screen.kind === "fix" || screen.kind === "signin" || screen.kind === "detail") {
     const conn = props.connections.find((c) => c.id === screen.connectionId);
+    if (conn && screen.kind === "fix") {
+      return (
+        <FixConnection
+          theme={props.theme}
+          columns={cols}
+          rows={termRows}
+          connection={conn}
+          onUpdateKey={(apiKey) => props.onUpdateConnectionKey(conn.id, apiKey)}
+          onCheck={() => props.onCheckHealth(conn.id)}
+          onDone={pop}
+          onBack={pop}
+        />
+      );
+    }
+    if (conn && screen.kind === "signin") {
+      return (
+        <ChatGptSignIn
+          theme={props.theme}
+          columns={cols}
+          rows={termRows}
+          onStart={props.onStartChatGptLogin}
+          onPoll={props.onPollChatGptLogin}
+          onCancel={props.onCancelChatGptLogin}
+          onSuccess={() => {
+            // The OAuth upsert refreshed the credential in place — reload the
+            // list and re-verify so the detail screen shows the fresh state.
+            props.onRefreshConnections();
+            void props.onCheckHealth(conn.id).catch(() => { /* recorded as error state */ });
+            pop();
+          }}
+          onExit={pop}
+        />
+      );
+    }
     if (!conn) {
       // Connection disappeared under us (deleted elsewhere) — fall back.
       return (
@@ -207,6 +249,11 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
         tierAssignments={props.tierAssignments}
         onApply={() => applyConnection(conn)}
         onCheck={() => props.onCheckHealth(conn.id)}
+        onFix={() => push(
+          conn.provider === "openai-chatgpt"
+            ? { kind: "signin", connectionId: conn.id }
+            : { kind: "fix", connectionId: conn.id },
+        )}
         onRemove={async () => {
           await props.onRemoveConnection(conn.id);
           pop();

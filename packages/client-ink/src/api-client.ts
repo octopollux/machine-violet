@@ -238,6 +238,11 @@ export class ApiClient {
     return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
+  /** Replace a connection's API key in place (Fix flow); preserves the id. */
+  async updateConnectionKey(id: string, apiKey: string): Promise<ConnectionsResponse> {
+    return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "PATCH", body: { apiKey } });
+  }
+
   async checkConnection(id: string): Promise<ConnectionHealthResponse> {
     return this.post(`/manage/connections/${encodeURIComponent(id)}/check`);
   }
