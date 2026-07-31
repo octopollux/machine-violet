@@ -238,7 +238,9 @@ export function ConnectWizard({
       return;
     }
     if (needsSwitch && (input === "k" || input === "K")) { onDone(); return; }
-    if (key.escape) { onDone(); return; }
+    // No Esc handling here: the result hints advertise Enter (and K on the
+    // switch offer) only — an unadvertised Esc that silently picks an
+    // outcome would contradict the displayed controls.
   });
 
   // --- Render ---

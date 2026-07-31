@@ -396,6 +396,31 @@ describe("ConnectionDetail", () => {
     });
   });
 
+  it("keeps the caret in bounds when the Fix row disappears after a passing re-check", async () => {
+    // Broken health shows 4 actions (Fix/Use/Check/Delete). Park the caret on
+    // the last row, then flip the connection healthy — the list shrinks to 3
+    // and Enter must act on a real row, not read past the end.
+    const props = defaultProps({
+      connections: [conn()],
+      healthResults: { "conn-1": { id: "conn-1", status: "invalid", message: "Invalid API key" } },
+    });
+    const rendered = render(<ConnectionsArea {...props} />);
+    await press(rendered, ENTER); // open detail
+    await vi.waitFor(() => expect(rendered.lastFrame()).toContain("Fix connection"));
+    await press(rendered, DOWN);
+    await press(rendered, DOWN);
+    await press(rendered, DOWN); // Delete (index 3)
+    rendered.rerender(<ConnectionsArea {...defaultProps({
+      connections: [conn()],
+      healthResults: { "conn-1": { id: "conn-1", status: "valid", message: "Valid" } },
+    })} />);
+    await vi.waitFor(() => expect(rendered.lastFrame()).not.toContain("Fix connection"));
+    await press(rendered, ENTER); // clamped onto Delete — asks to confirm, no crash
+    await vi.waitFor(() => {
+      expect(rendered.lastFrame()).toContain("press Enter again to confirm");
+    });
+  });
+
   it("explains why env connections cannot be deleted instead of silently refusing", async () => {
     const onRemoveConnection = vi.fn(async () => undefined);
     const rendered = await openDetail({

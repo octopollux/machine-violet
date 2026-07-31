@@ -85,6 +85,11 @@ export function ConnectionDetail({
         : { key: "delete", label: "Delete connection" },
   );
 
+  // The actions list can shrink under the caret — e.g. a re-check flips
+  // broken → healthy and the leading "Fix connection" row disappears. Clamp
+  // at use so a stale index can never dereference past the end.
+  const selectedIndex = Math.min(index, actions.length - 1);
+
   useInput((_input, key) => {
     if (busy) return;
     if (key.escape) {
@@ -92,12 +97,12 @@ export function ConnectionDetail({
       onBack();
       return;
     }
-    if (key.upArrow) { setIndex((i) => Math.max(0, i - 1)); setConfirmDelete(false); return; }
-    if (key.downArrow) { setIndex((i) => Math.min(actions.length - 1, i + 1)); setConfirmDelete(false); return; }
+    if (key.upArrow) { setIndex(Math.max(0, selectedIndex - 1)); setConfirmDelete(false); return; }
+    if (key.downArrow) { setIndex(Math.min(actions.length - 1, selectedIndex + 1)); setConfirmDelete(false); return; }
     if (!key.return) return;
 
-    const action = actions[index];
-    if (action.disabled) return;
+    const action = actions[selectedIndex];
+    if (!action || action.disabled) return;
     setError(null);
     if (action.key === "fix") {
       onFix();
@@ -185,7 +190,7 @@ export function ConnectionDetail({
   }
 
   lines.push(<Text key="gap"> </Text>);
-  lines.push(...buildMenuLines(actions, index, pal));
+  lines.push(...buildMenuLines(actions, selectedIndex, pal));
 
   if (error) {
     lines.push(<Text key="err-gap"> </Text>);

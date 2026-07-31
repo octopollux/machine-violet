@@ -487,7 +487,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   }, []);
 
   const checkConnectionAsync = useCallback(async (connId: string): Promise<ConnectionHealthResponse> => {
-    setConnHealthResults((prev) => ({ ...prev, [connId]: { id: connId, status: "valid", message: "Checking..." } }));
+    // While the check is in flight, keep the previous status (an optimistic
+    // "valid" would flash a misleading ✔ and hide the Fix action mid-check);
+    // only the message flips to "Checking...". Unchecked connections stay
+    // unset — the list renders "?" and the detail screen has its own busy text.
+    setConnHealthResults((prev) => {
+      const existing = prev[connId];
+      return existing ? { ...prev, [connId]: { ...existing, message: "Checking..." } } : prev;
+    });
     try {
       const resp = await apiClientRef.current.checkConnection(connId);
       setConnHealthResults((prev) => ({ ...prev, [connId]: resp }));
