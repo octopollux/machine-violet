@@ -367,7 +367,7 @@ export function ConnectWizard({
     if (loginError) {
       lines.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
       lines.push(<Text key="err-gap"> </Text>);
-      lines.push(<Text key="err-hint" color={pal.dim}>Press Esc to go back.</Text>);
+      lines.push(<Text key="err-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
     } else if (!loginInfo) {
       lines.push(<Text key="starting" color={pal.fg}>Starting the sign-in flow…</Text>);
       lines.push(<Text key="s-gap"> </Text>);
@@ -386,10 +386,10 @@ export function ConnectWizard({
       );
     } else if (status === "cancelled") {
       lines.push(<Text key="cancelled" color={pal.dim}>Sign-in cancelled.</Text>);
-      lines.push(<Text key="c-hint" color={pal.dim}>Press Enter or Esc to go back.</Text>);
+      lines.push(<Text key="c-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
     } else {
       lines.push(<Text key="failed" color="#cc4444">Sign-in failed: {loginStatus?.error ?? "unknown error"}</Text>);
-      lines.push(<Text key="f-hint" color={pal.dim}>Press Enter or Esc to go back.</Text>);
+      lines.push(<Text key="f-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
     }
     return frame(lines);
   }

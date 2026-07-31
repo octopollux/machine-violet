@@ -223,6 +223,65 @@ describe("ConnectWizard validate-on-submit", () => {
   });
 });
 
+describe("ConnectWizard ChatGPT sign-in hints", () => {
+  async function openChatGpt(props?: Partial<ConnectionsAreaProps>) {
+    const rendered = render(<ConnectionsArea {...defaultProps({ initialScreen: "wizard", ...props })} />);
+    await press(rendered, ENTER); // ChatGPT is the pre-selected first row
+    return rendered;
+  }
+
+  it("offers Esc (and never Enter) while the sign-in is pending", async () => {
+    const rendered = await openChatGpt();
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Waiting for browser authentication");
+      expect(frame).toContain("Esc cancel");
+      expect(frame).not.toContain("Enter");
+    });
+  });
+
+  it("offers Esc only when the sign-in was cancelled", async () => {
+    const rendered = await openChatGpt({
+      onPollChatGptLogin: vi.fn(async () => ({ status: "cancelled" as const })),
+    });
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Sign-in cancelled.");
+      expect(frame).toContain("Esc back");
+      expect(frame).not.toContain("Enter");
+    });
+  });
+
+  it("offers Esc only when the sign-in failed", async () => {
+    const rendered = await openChatGpt({
+      onPollChatGptLogin: vi.fn(async () => ({ status: "error" as const, error: "boom" })),
+    });
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("Sign-in failed: boom");
+      expect(frame).toContain("Esc back");
+      expect(frame).not.toContain("Enter");
+    });
+  });
+
+  it("offers Enter only (no Esc) after a verified successful sign-in", async () => {
+    const rendered = await openChatGpt({
+      onPollChatGptLogin: vi.fn(async () => ({
+        status: "success" as const,
+        connectionId: "cg-1",
+        email: "q@example.com",
+        planType: "plus",
+      })),
+    });
+    await vi.waitFor(() => {
+      const frame = rendered.lastFrame() ?? "";
+      expect(frame).toContain("✔ Signed in as q@example.com (plus)");
+      expect(frame).toContain("Enter continue");
+      expect(frame).not.toContain("Esc");
+    });
+  });
+});
+
 describe("ConnectionsList", () => {
   it("renders connections with display names, an in-use marker, and the add/advanced rows", () => {
     const rendered = render(<ConnectionsArea {...defaultProps({
