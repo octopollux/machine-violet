@@ -719,6 +719,12 @@ export async function runScribe(
     maxTokens: getMaxOutput(model),
     tools: SCRIBE_TOOLS,
     toolHandler,
+    toolInputPolicies: {
+      list_entities: { criticality: "advisory" },
+      read_entity: { criticality: "advisory" },
+      write_entity: { criticality: "durable" },
+      rename_entity: { criticality: "durable" },
+    },
     cacheTools: true,
     maxToolRounds: 8,
   }, userMessage);

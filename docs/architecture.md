@@ -182,7 +182,18 @@ Full catalog: [subagents-catalog.md](subagents-catalog.md)
 
 ## Tool System
 
-Tools are registered in `src/agents/tool-registry.ts` with JSON Schema input definitions. The DM calls tools by name; the registry dispatches to handler functions.
+Tools are registered in `src/agents/tool-registry.ts`. New and migrated tools
+define one TypeBox contract that supplies the provider-facing JSON Schema, the
+Ajv runtime validator, and the handler's inferred input type. Existing raw JSON
+Schema definitions are also executed by Ajv while migration proceeds.
+
+Both surfaced and provider-owned in-band calls pass through
+`src/agents/tool-contract.ts` in this order: contract-local repair → structural
+validation → semantic refinement → handler. A rejection returns an actionable
+error tool result and cannot reach persistence or success callbacks. Setup
+tools have a separate dispatch loop, so `subagents/setup-conversation.ts`
+applies the same validator at that boundary. Provider `strict` flags are an
+optimization, not an engine invariant.
 
 Tool handlers receive `(state: GameState, input: T)` and return `ToolResult`:
 - `ok(data)` — success with content string
@@ -193,7 +204,9 @@ Tool handlers receive `(state: GameState, input: T)` and return `ToolResult`:
 
 Tools are organized by domain in `src/tools/`: dice, cards, clocks, combat, maps, filesystem, git, validation.
 
-Full catalog: [tools-catalog.md](tools-catalog.md)
+Full catalog: [tools-catalog.md](tools-catalog.md). Contract authoring,
+criticality, repair policy, logs, and required tests:
+[tool-input-contracts.md](tool-input-contracts.md).
 
 ## TUI Rendering
 

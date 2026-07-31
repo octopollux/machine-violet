@@ -1,8 +1,8 @@
 import type { SubagentResult } from "../subagent.js";
 import type { SetupResult } from "../setup-agent.js";
 import { generateThemeColor } from "../setup-agent.js";
-import { buildNameInspiration } from "../name-inspiration.js";
-import { CAMPAIGN_SCOPES, type CampaignScope, type MechanicsMode } from "@machine-violet/shared/types/config.js";
+import { buildSetupNameInspiration } from "../name-inspiration.js";
+import { CAMPAIGN_SCOPES, type CampaignScope } from "@machine-violet/shared/types/config.js";
 import { loadAllPersonalities, getPersonality } from "../../config/personality-loader.js";
 import { loadAllWorlds, worldSummaries, loadWorldBySlug } from "../../config/world-loader.js";
 import { normalizeForks, assembleCampaignDetail } from "../../config/world-forks.js";
@@ -33,6 +33,17 @@ import { campaignPaths } from "../../tools/filesystem/index.js";
 import { norm } from "../../utils/paths.js";
 import { slugify } from "../../utils/slug.js";
 import { logEvent } from "../../context/engine-log.js";
+import { Type, type Static } from "@sinclair/typebox";
+import {
+  defineToolContract,
+  describeToolInputValue,
+  rejectToolInput,
+  validateToolInput,
+  type ToolInputIssue,
+  type ToolInputPolicy,
+  type ToolInputRepair,
+} from "../tool-contract.js";
+import type { ToolExecutionContext } from "../../providers/types.js";
 
 // --- Types ---
 
@@ -87,85 +98,227 @@ interface ToolDispatchOutcome {
 
 // --- Tool definitions ---
 
-// These fields form the minimum safe setup→DM handoff. opening_scene was
-// introduced later and remains optional at runtime for replay compatibility
-// and the explicit DM-handled opening path. handoff_note is not optional: it
-// carries the player's own character/tone language into the first DM turn.
-// Never scaffold from a call missing one of these fields: model providers do
-// occasionally emit a schema-prefix object, and accepting it creates either
-// the visible fallback identity Player/Adventurer/The Unknown or an unprimed
-// DM instead of giving the model a chance to repair its call.
-const CORE_FINALIZE_FIELDS = [
+function stringEnum<const T extends readonly string[]>(
+  values: T,
+  options: Record<string, unknown>,
+) {
+  return Type.Unsafe<T[number]>({
+    type: "string",
+    enum: [...values],
+    ...options,
+  });
+}
+
+function optionalNullableString(description: string) {
+  return Type.Optional(Type.Union(
+    [Type.String(), Type.Null()],
+    { description },
+  ));
+}
+
+const FINALIZE_SETUP_SCHEMA = Type.Object({
+  genre: Type.String({
+    minLength: 1,
+    description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')",
+  }),
+  system: optionalNullableString(
+    "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.",
+  ),
+  campaign_name: Type.String({
+    minLength: 1,
+    description: "Short evocative campaign title. When the player picked a player-facing fork option from a seeded world, you may suffix with that option's name: `<World Name> - <Option Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without player forks.",
+  }),
+  campaign_premise: Type.String({
+    minLength: 1,
+    description: "One-paragraph campaign hook",
+  }),
+  mood: Type.String({
+    minLength: 1,
+    description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')",
+  }),
+  difficulty: Type.String({
+    minLength: 1,
+    description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')",
+  }),
+  campaign_scope: Type.Optional(stringEnum(CAMPAIGN_SCOPES, {
+    description: "Intended scope of the campaign. 'one-shot' = single session (~few hours). 'few-sessions' = a small arc, 2-4 sessions. 'grand-campaign' = long-form, many sessions, slow burn welcome. 'open-ended' = no fixed destination, living-world style. Default to 'few-sessions' if not discussed.",
+  })),
+  dm_personality: Type.String({
+    minLength: 1,
+    description: "DM personality name from the available list, or a custom name if the player described their own",
+  }),
+  dm_personality_prompt: Type.Optional(Type.String({
+    minLength: 1,
+    description: "For custom personalities only: a 2-3 sentence prompt fragment describing the DM's narrative voice and style (e.g. 'You are The Captain. You narrate with dry naval authority...'). Omit when using a personality from the available list.",
+  })),
+  player_name: Type.String({
+    minLength: 1,
+    description: "Player's real name, or 'Player'",
+  }),
+  character_name: Type.String({
+    minLength: 1,
+    description: "Player character's name",
+  }),
+  character_description: Type.String({
+    minLength: 1,
+    description: "One-sentence character concept",
+  }),
+  character_details: optionalNullableString(
+    "Mechanical character details gathered during setup. Omit or null for pure narrative.",
+  ),
+  campaign_detail: optionalNullableString(
+    "DM-only detail. For a FULLY CUSTOM campaign (no seeded world) this is the entire DM detail. For a seeded world, the seed's own detail is assembled in code from your fork_selections; anything you pass here is APPENDED to it — use this only to record a specific setup-time DM directive you were asked to add (e.g. a chosen visual-style include). Omit if there is nothing to add.",
+  ),
+  world_slug: optionalNullableString(
+    "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.",
+  ),
+  fork_selections: Type.Optional(Type.Unsafe<Record<string, string> | null>({
+    anyOf: [
+      { type: "object", additionalProperties: { type: "string" } },
+      { type: "null" },
+    ],
+    description: "How you resolved the chosen world's forks (from load_world), as a map of forkId → optionId. Include an entry for EVERY fork the world declared: player forks (the option the player picked) and agent forks (the option you rolled or chose). Use the exact ids shown by load_world. Omit for fully custom campaigns or worlds with no forks.",
+  })),
+  age_group: stringEnum(
+    ["child", "teenager", "adult"] as const,
+    { description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
+  ),
+  content_preferences: optionalNullableString(
+    "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.",
+  ),
+  image_generation: Type.Optional(Type.Union([
+    stringEnum(["on", "off"] as const, {
+      description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
+    }),
+    Type.Null(),
+  ])),
+  mechanics_mode: Type.Optional(Type.Union([
+    stringEnum(["dm-managed", "player-facing"] as const, {
+      description: "Player's answer to the mechanics-handling question. 'dm-managed' if they want you to run the rules silently behind the scenes; 'player-facing' if they want to engage the mechanics directly. ONLY include this field if you actually asked the question, which only happens when the chosen system is light or ultra-light (see the System selection section of your prompt). Omit for crunchy systems and pure-narrative campaigns.",
+    }),
+    Type.Null(),
+  ])),
+  handoff_note: Type.String({
+    minLength: 1,
+    description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field.",
+  }),
+  opening_scene: Type.String({
+    minLength: 1,
+    description: "ONE sentence telling the DM where and how to OPEN the very first turn — the concrete situation the player character is in when the curtain rises. Bias hard toward a character-grounded entry beat (waking somewhere, a quiet moment, mid-journey, a conversation, an ordinary task) rather than dropping the player straight onto the campaign's main objective or a crisis — a story should start with the PC, then let plot ensue. Ground it in this specific PC and premise; if the seed's setup-only guidance suggests an opening, honor it. Written as a direct instruction to the DM, not as narration (e.g. \"Open with the PC asleep in a warm bed, woken by frantic hammering at the door\" or \"Begin mid-flight on the back of their pet dragon, the city shrinking below\"). Always include this field.",
+  }),
+}, { additionalProperties: false });
+
+export type FinalizeSetupInput = Static<typeof FINALIZE_SETUP_SCHEMA>;
+
+const FINALIZE_STRING_FIELDS = [
   "genre",
+  "system",
   "campaign_name",
   "campaign_premise",
   "mood",
   "difficulty",
+  "campaign_scope",
   "dm_personality",
+  "dm_personality_prompt",
   "player_name",
   "character_name",
   "character_description",
+  "character_details",
+  "campaign_detail",
+  "world_slug",
+  "age_group",
+  "content_preferences",
+  "image_generation",
+  "mechanics_mode",
   "handoff_note",
+  "opening_scene",
 ] as const;
 
-const FINALIZE_TOOL: NormalizedTool = {
+function repairFinalizeSetup(raw: unknown): {
+  input: unknown;
+  repairs: ToolInputRepair[];
+} {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { input: raw, repairs: [] };
+  }
+  const input = { ...(raw as Record<string, unknown>) };
+  const repairs: ToolInputRepair[] = [];
+  for (const field of FINALIZE_STRING_FIELDS) {
+    const value = input[field];
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (field === "system" && /^(?:null|none)$/i.test(trimmed)) {
+      repairs.push({
+        path: "/system",
+        code: "nullish_system_string",
+        from: describeToolInputValue(value),
+        to: "null",
+        message: "Converted the model's null-like system string to JSON null.",
+      });
+      input[field] = null;
+    } else if (trimmed !== value) {
+      repairs.push({
+        path: `/${field}`,
+        code: "trim_string",
+        from: describeToolInputValue(value),
+        to: describeToolInputValue(trimmed),
+        message: `Trimmed surrounding whitespace from ${field}.`,
+      });
+      input[field] = trimmed;
+    }
+  }
+  return { input, repairs };
+}
+
+function baseFinalizeIssues(input: FinalizeSetupInput): ToolInputIssue[] {
+  const issues: ToolInputIssue[] = [];
+  const hasInvisibleControl = (value: string) =>
+    [...value].some((character) => {
+      const codePoint = character.codePointAt(0) ?? -1;
+      return (
+        (codePoint >= 0 && codePoint <= 8)
+        || codePoint === 11
+        || codePoint === 12
+        || (codePoint >= 14 && codePoint <= 31)
+        || codePoint === 127
+        || /\p{Cf}/u.test(character)
+      );
+    });
+  for (const [field, value] of Object.entries(input)) {
+    if (typeof value === "string" && hasInvisibleControl(value)) {
+      issues.push({
+        path: `/${field}`,
+        code: "invisible_control_character",
+        expected: "text without invisible control or format characters",
+        actual: describeToolInputValue(value),
+        message: `/${field}: contains invisible control or format characters`,
+      });
+    }
+  }
+  if (/(?:prompt[_\s-]*fragment|prompt\s+intermediate)/i.test(input.dm_personality)) {
+    issues.push({
+      path: "/dm_personality",
+      code: "embedded_schema_fragment",
+      expected: "a DM personality display name",
+      actual: describeToolInputValue(input.dm_personality),
+      message: "/dm_personality: appears to contain an embedded schema/property fragment",
+    });
+  }
+  return issues;
+}
+
+const FINALIZE_SETUP_CONTRACT = defineToolContract({
   name: "finalize_setup",
   description:
     "Call this when you have gathered enough information to create the campaign. " +
-    "All fields are required. Infer reasonable defaults for anything the player didn't specify.",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      genre: { type: "string", description: "Genre (e.g. 'Classic fantasy', 'Sci-fi', 'Modern supernatural')" },
-      system: { type: "string", description: "Game system slug from the available systems list (e.g. 'dnd-5e', 'fate-accelerated'), or null for pure narrative. Use the slug, not the display name.", nullable: true },
-      campaign_name: { type: "string", description: "Short evocative campaign title. When the player picked a player-facing fork option from a seeded world, you may suffix with that option's name: `<World Name> - <Option Name>` (e.g. 'Palimpsest - The Dreaming Souk'). Skip the suffix for fully custom campaigns or seeds without player forks." },
-      campaign_premise: { type: "string", description: "One-paragraph campaign hook" },
-      mood: { type: "string", description: "Mood (e.g. 'Heroic', 'Grimdark', 'Whimsical', 'Tense')" },
-      difficulty: { type: "string", description: "Difficulty ('Gentle', 'Balanced', 'Unforgiving')" },
-      campaign_scope: {
-        type: "string",
-        enum: ["one-shot", "few-sessions", "grand-campaign", "open-ended"],
-        description: "Intended scope of the campaign. 'one-shot' = single session (~few hours). 'few-sessions' = a small arc, 2-4 sessions. 'grand-campaign' = long-form, many sessions, slow burn welcome. 'open-ended' = no fixed destination, living-world style. Default to 'few-sessions' if not discussed.",
-      },
-      dm_personality: { type: "string", description: "DM personality name from the available list, or a custom name if the player described their own" },
-      dm_personality_prompt: { type: "string", description: "For custom personalities only: a 2-3 sentence prompt fragment describing the DM's narrative voice and style (e.g. 'You are The Captain. You narrate with dry naval authority...'). Omit when using a personality from the available list." },
-      player_name: { type: "string", description: "Player's real name, or 'Player'" },
-      character_name: { type: "string", description: "Player character's name" },
-      character_description: { type: "string", description: "One-sentence character concept" },
-      character_details: { type: "string", description: "Mechanical character details gathered during setup (class, skills, approaches, etc). Free-form text. Omit or null for pure narrative.", nullable: true },
-      campaign_detail: { type: "string", description: "DM-only detail. For a FULLY CUSTOM campaign (no seeded world) this is the entire DM detail. For a seeded world, the seed's own detail is assembled in code from your fork_selections; anything you pass here is APPENDED to it — use this only to record a specific setup-time DM directive you were asked to add (e.g. a chosen visual-style include). Omit if there is nothing to add.", nullable: true },
-      world_slug: { type: "string", description: "Slug of the world file used (from load_world). Required when the campaign is built from a seeded world — it's how the engine re-loads the world to assemble DM detail and materialize content. Omit only for fully custom campaigns.", nullable: true },
-      fork_selections: {
-        type: "object",
-        description: "How you resolved the chosen world's forks (from load_world), as a map of forkId → optionId. Include an entry for EVERY fork the world declared: player forks (the option the player picked) and agent forks (the option you rolled or chose). Use the exact ids shown by load_world. Omit for fully custom campaigns or worlds with no forks.",
-        additionalProperties: { type: "string" },
-        nullable: true,
-      },
-      age_group: { type: "string", enum: ["child", "teenager", "adult"], description: "Player's age group. Set to 'child' or 'teenager' if the player clearly indicates so. Otherwise — including when age is not discussed or the player declines — set to 'adult'. Always include this field." },
-      content_preferences: { type: "string", description: "Any content preferences or sensitivities the player mentioned during setup (one per line). Only include if the player volunteered them — never prompt for these.", nullable: true },
-      image_generation: {
-        type: "string",
-        enum: ["on", "off"],
-        description: "Player's answer to the image-generation consent question. 'on' if they said yes, 'off' if they said no. Only include this field if you actually asked the consent question (which only happens when the active provider/model supports image generation — see the Image generation section of your prompt). Omit when not asked.",
-        nullable: true,
-      },
-      mechanics_mode: {
-        type: "string",
-        enum: ["dm-managed", "player-facing"],
-        description: "Player's answer to the mechanics-handling question. 'dm-managed' if they want you to run the rules silently behind the scenes; 'player-facing' if they want to engage the mechanics directly. ONLY include this field if you actually asked the question, which only happens when the chosen system is light or ultra-light (see the System selection section of your prompt). Omit for crunchy systems and pure-narrative campaigns.",
-        nullable: true,
-      },
-      handoff_note: { type: "string", description: "Handoff postcard for the DM's first turn. Free-form prose — the DM sees this once as priming for the opening scene. Include: what the player said about their character IN THEIR OWN WORDS (quote or paraphrase closely, don't sanitize), any freeform remarks they made about the world / tone / things they want or don't want, and anything you (the setup agent) want to pass along to the DM — hooks you promised, tone cues the structured fields don't capture, unresolved ambiguities. Write it as a direct note to the DM, not as narration. A paragraph or two is usually right. Always include this field." },
-      opening_scene: { type: "string", description: "ONE sentence telling the DM where and how to OPEN the very first turn — the concrete situation the player character is in when the curtain rises. Bias hard toward a character-grounded entry beat (waking somewhere, a quiet moment, mid-journey, a conversation, an ordinary task) rather than dropping the player straight onto the campaign's main objective or a crisis — a story should start with the PC, then let plot ensue. Ground it in this specific PC and premise; if the seed's setup-only guidance suggests an opening, honor it. Written as a direct instruction to the DM, not as narration (e.g. \"Open with the PC asleep in a warm bed, woken by frantic hammering at the door\" or \"Begin mid-flight on the back of their pet dragon, the city shrinking below\"). Always include this field." },
-    },
-    required: [
-      "genre", "campaign_name", "campaign_premise", "mood",
-      "difficulty", "dm_personality", "player_name",
-      "character_name", "character_description", "handoff_note",
-      "opening_scene",
-    ],
-  },
-};
+    "Required identity and handoff fields must be supplied; only fields documented with defaults may be omitted.",
+  schema: FINALIZE_SETUP_SCHEMA,
+  criticality: "commit",
+  repair: repairFinalizeSetup,
+  refine: baseFinalizeIssues,
+});
+
+const FINALIZE_TOOL = FINALIZE_SETUP_CONTRACT.definition;
 
 const PRESENT_CHOICES_TOOL: NormalizedTool = {
   name: "present_choices",
@@ -184,7 +337,7 @@ const PRESENT_CHOICES_TOOL: NormalizedTool = {
         type: "array",
         items: { type: "string" },
         description: "2-10 short option labels for the player to choose from",
-        minItems: 1,
+        minItems: 2,
         maxItems: 10,
       },
       descriptions: {
@@ -574,7 +727,7 @@ function buildSystemPrompt(
 
   blocks.push({
     text: "\n\n## Available campaign worlds\n\nUse these when presenting Quick Start options or campaign ideas. Pick worlds that match the player's genre if known. When presenting worlds as choices, use the name as the choice label and the summary (or description if available) as the choice description. For worlds marked [has detail], call `load_world` with the slug to get the full DM detail and any suboptions to present to the player.\n\n" + seedList +
-      "\n\n## Available DM personalities\n\nWhen presenting personality choices, use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList,
+      "\n\n## Available DM personalities\n\nWhen presenting personality choices, the first option is always The Chronicler. Use the name as the choice label and the description as the choice description. You can also invent new personalities beyond this list — if a campaign calls for a voice that isn't here, or the player asks for something custom, craft a name and prompt fragment in the same style as the examples below.\n\n" + personalityList,
   });
 
   // Name inspiration — same entropy injection the DM gets (see
@@ -586,7 +739,7 @@ function buildSystemPrompt(
   // random content stays out of the cache-stamped Tier 1/2 prefix, which is
   // meant to stay byte-stable across sessions — putting it there would churn
   // that shared cached prefix for no benefit.
-  blocks.push({ text: "\n\n## Name Inspiration\n" + buildNameInspiration() });
+  blocks.push({ text: "\n\n## Name Inspiration\n" + buildSetupNameInspiration() });
 
   return blocks;
 }
@@ -726,6 +879,55 @@ export function createSetupConversation(
   const TOOLS: NormalizedTool[] = portraitLoopActive
     ? [...BASE_TOOLS, ...IMAGE_GEN_TOOLS]
     : BASE_TOOLS;
+  const finalizePolicy: ToolInputPolicy<FinalizeSetupInput> = {
+    ...FINALIZE_SETUP_CONTRACT.policy,
+    refine: (input) => {
+      const issues = baseFinalizeIssues(input);
+      const preset = getPersonality(input.dm_personality, userPersonalitiesDir);
+      if (!preset && !input.dm_personality_prompt?.trim()) {
+        issues.push({
+          path: "/dm_personality_prompt",
+          code: "custom_personality_prompt_required",
+          expected: "a non-empty prompt for a custom DM personality",
+          actual: describeToolInputValue(input.dm_personality_prompt),
+          message:
+            "/dm_personality_prompt: required when dm_personality is not a known preset",
+        });
+      }
+      return issues;
+    },
+  };
+  const toolInputPolicies: Record<string, ToolInputPolicy> = {
+    finalize_setup: finalizePolicy as ToolInputPolicy,
+    present_choices: {
+      criticality: "reversible",
+      refine: (raw) => {
+        const input = raw as {
+          choices?: string[];
+          descriptions?: string[];
+        };
+        if (
+          input.descriptions
+          && input.choices
+          && input.descriptions.length !== input.choices.length
+        ) {
+          return [{
+            path: "/descriptions",
+            code: "parallel_array_length",
+            expected: `array length ${input.choices.length}`,
+            actual: describeToolInputValue(input.descriptions),
+            message:
+              "/descriptions: must have exactly one description per choice",
+          }];
+        }
+        return [];
+      },
+    },
+    load_world: { criticality: "advisory" },
+    roll_dice: { criticality: "advisory" },
+    generate_image: { criticality: "expensive" },
+    set_portrait: { criticality: "durable" },
+  };
   // A partial finalize repair may cross a runTurn boundary (for example when
   // the provider emits a text-only response after receiving the validation
   // error). Keep both the accepted payload and narrowed tool schema at
@@ -797,12 +999,12 @@ export function createSetupConversation(
     try {
       // Chargen has exactly one canonical render config — a standard-effort,
       // landscape multi-angle reference sheet — so we pin both here rather than
-      // read them from the model. Tool args aren't enforced server-side (see
-      // image-coerce), and a stray `aspect: "portrait"` would collapse the
+      // read them from the model. A stray `aspect: "portrait"` would collapse the
       // sheet back to a single front pose (defeating the whole point); pinning
       // `effort: "standard"` keeps the card off the apikey path's slow `high`
       // tier (it's a no-op on the codex path — see types.ts ImageEffort).
-      // That's why the tool no longer exposes either knob.
+      // The tool contract still validates the exposed prompt before this
+      // dispatcher pins the hidden render settings.
       const result = await provider.generateImage({
         prompt: styledPrompt,
         ...(imageModel ? { imageModel } : {}),
@@ -883,36 +1085,43 @@ export function createSetupConversation(
     }
   }
 
-  function handleFinalize(input: Record<string, unknown>): void {
-    const personalityName = typeof input.dm_personality === "string"
-      ? input.dm_personality.trim()
-      : "The Unknown";
-    const customPrompt = input.dm_personality_prompt as string | undefined;
-    const personality = getPersonality(personalityName, userPersonalitiesDir)
-      ?? { name: personalityName, prompt_fragment: customPrompt || `You are ${personalityName}.` };
+  function handleFinalize(input: FinalizeSetupInput): void {
+    const personalityName = input.dm_personality;
+    const customPrompt = input.dm_personality_prompt;
+    let personality = getPersonality(
+      personalityName,
+      userPersonalitiesDir,
+    );
+    if (!personality) {
+      if (!customPrompt) {
+        throw new Error(
+          "Validated custom personality is missing dm_personality_prompt.",
+        );
+      }
+      personality = {
+        name: personalityName,
+        prompt_fragment: customPrompt,
+      };
+    }
 
-    const characterName = (input.character_name as string) || "Adventurer";
+    const characterName = input.character_name;
 
     // Resolve system to a known slug — the agent should pass a slug, but
     // if it passes a display name (e.g. "D&D 5e") we map it to the slug.
     // Guard against the LLM returning the literal string "null" / "none",
     // possibly with whitespace padding.
-    const rawSystem = typeof input.system === "string" ? input.system.trim() : "";
-    const normalized = rawSystem.toLowerCase();
-    const isNullish = !rawSystem || normalized === "null" || normalized === "none";
-    const resolvedSystem = isNullish ? null : resolveSystemSlug(rawSystem);
+    const rawSystem = typeof input.system === "string" ? input.system : "";
+    const resolvedSystem = rawSystem ? resolveSystemSlug(rawSystem) : null;
 
     // Resolve campaign detail: prefer the agent's passthrough, fall back to world file lookup.
     // Only fall back when the field is truly absent (undefined/null) — an explicit
     // empty string means the agent intentionally omitted it.
-    const campaignName = (input.campaign_name as string) || "A New Story";
+    const campaignName = input.campaign_name;
 
     // The explicit seed slug the agent passed (came from load_world — reliable).
-    // Sanitized to a clean slug to prevent path traversal. Empty when the
-    // campaign is fully custom (no world chosen). This is the *only* slug used
-    // to materialize a seed's inline content — we never fall back to a
-    // campaign-name-derived slug for materialization, which could pull in an
-    // unrelated bundled world that happens to share the name.
+    // Sanitized to a clean slug to prevent path traversal. This is the preferred
+    // seed identity; when absent, the back-compat path below may derive a slug
+    // from campaign_name only if the agent also supplied no campaign detail.
     const rawWorldSlug = typeof input.world_slug === "string" ? input.world_slug.trim().toLowerCase() : "";
     const worldSlug = rawWorldSlug.replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
 
@@ -922,7 +1131,7 @@ export function createSetupConversation(
     let reportedSelections: Record<string, string> | undefined;
     if (rawForkSel && typeof rawForkSel === "object" && !Array.isArray(rawForkSel)) {
       const fs: Record<string, string> = {};
-      for (const [k, v] of Object.entries(rawForkSel as Record<string, unknown>)) {
+      for (const [k, v] of Object.entries(rawForkSel)) {
         if (typeof v === "string" && v.trim()) fs[k] = v.trim();
       }
       if (Object.keys(fs).length) reportedSelections = fs;
@@ -982,63 +1191,41 @@ export function createSetupConversation(
       }
     }
 
-    // The setup prompt + tool description document `few-sessions` as the
-    // default when the player declines to choose. Apply that default here
-    // too so the stored config matches the documented behavior even if the
-    // model omits the field or emits an unknown value.
-    const rawScope = typeof input.campaign_scope === "string" ? input.campaign_scope.trim() : "";
-    const campaignScope: CampaignScope = (CAMPAIGN_SCOPES as readonly string[]).includes(rawScope)
-      ? (rawScope as CampaignScope)
-      : "few-sessions";
+    // Omission is a documented domain default. An explicitly unknown value is
+    // rejected by the contract rather than silently rewritten.
+    const campaignScope: CampaignScope = input.campaign_scope ?? "few-sessions";
 
     finalized = {
-      genre: (input.genre as string) || "Classic fantasy",
+      genre: input.genre,
       system: resolvedSystem,
       campaignName,
-      campaignPremise: (input.campaign_premise as string) || "An adventure awaits.",
+      campaignPremise: input.campaign_premise,
       campaignDetail,
-      mood: (input.mood as string) || "Balanced",
-      difficulty: (input.difficulty as string) || "Balanced",
+      mood: input.mood,
+      difficulty: input.difficulty,
       campaignScope,
       personality,
-      playerName: (input.player_name as string) || "Player",
+      playerName: input.player_name,
       characterName,
-      characterDescription: (input.character_description as string) || "",
-      characterDetails: (input.character_details as string) || null,
+      characterDescription: input.character_description,
+      characterDetails: input.character_details ?? null,
       themeColor: generateThemeColor(characterName),
-      ageGroup: (input.age_group as "child" | "teenager" | "adult" | undefined) ?? undefined,
-      contentPreferences: (input.content_preferences as string) || undefined,
+      ageGroup: input.age_group,
+      contentPreferences: input.content_preferences ?? undefined,
       imageGeneration: input.image_generation === "on" || input.image_generation === "off"
-        ? (input.image_generation as "on" | "off")
+        ? input.image_generation
         : undefined,
       // Only honored for light/ultra-light systems (the only case the agent is
       // told to ask). Recorded verbatim when the agent reports it; the DM prefix
       // applies MECHANICS_MODE_DEFAULT when a light system runs without a choice.
       mechanicsMode: input.mechanics_mode === "dm-managed" || input.mechanics_mode === "player-facing"
-        ? (input.mechanics_mode as MechanicsMode)
+        ? input.mechanics_mode
         : undefined,
-      handoffNote: (typeof input.handoff_note === "string" && input.handoff_note.trim())
-        ? input.handoff_note.trim() : undefined,
-      openingScene: (typeof input.opening_scene === "string" && input.opening_scene.trim())
-        ? input.opening_scene.trim() : undefined,
+      handoffNote: input.handoff_note,
+      openingScene: input.opening_scene,
       worldSlug: worldSlug || undefined,
       forkSelections,
     };
-  }
-
-  function missingCoreFinalizeFields(input: Record<string, unknown>): string[] {
-    return CORE_FINALIZE_FIELDS.filter((field) => (
-      typeof input[field] !== "string"
-      || !(input[field] as string).trim()
-      || (field === "dm_personality" && !isSafePersonalityName(input[field] as string))
-    ));
-  }
-
-  function isSafePersonalityName(value: string): boolean {
-    const name = value.trim();
-    return name.length <= 80
-      && !/[\p{Cc}\p{Cf}]/u.test(name)
-      && !/(?:prompt|name)[\s_-]*placeholder|remove[\s_-]*me/i.test(name);
   }
 
   /**
@@ -1083,20 +1270,26 @@ export function createSetupConversation(
      */
     function setFinalizeRepairSchema(missingFields: string[]): void {
       const allProperties = FINALIZE_TOOL.inputSchema.properties as Record<string, unknown>;
+      // Issues can point at fields outside the contract (e.g. an
+      // additionalProperties rejection names the unknown field). Those can't
+      // be advertised in a repair schema — keep the full tool in that case.
+      const fields = missingFields.filter((field) => Object.hasOwn(allProperties, field));
+      if (fields.length === 0) {
+        activeTools = TOOLS;
+        return;
+      }
       const properties = Object.fromEntries(
-        missingFields
-          .filter((field) => Object.hasOwn(allProperties, field))
-          .map((field) => [field, allProperties[field]]),
+        fields.map((field) => [field, allProperties[field]]),
       );
       const repairTool: NormalizedTool = {
         ...FINALIZE_TOOL,
         description:
           "Repair the prior finalize_setup call. Already accepted fields are retained. "
-          + `Call this with only these missing fields: ${missingFields.join(", ")}.`,
+          + `Call this with only these missing fields: ${fields.join(", ")}.`,
         inputSchema: {
           type: "object",
           properties,
-          required: missingFields,
+          required: fields,
         },
       };
       activeTools = TOOLS.map((tool) => tool.name === FINALIZE_TOOL.name ? repairTool : tool);
@@ -1126,19 +1319,93 @@ export function createSetupConversation(
      * lands, `pendingChoices` is captured when present_choices lands, etc.
      */
     async function runToolDispatch(call: { id: string; name: string; input: Record<string, unknown> }): Promise<ToolDispatchOutcome> {
+      const definition = TOOLS.find((tool) => tool.name === call.name);
+      if (!definition) {
+        return { content: `Unknown tool: ${call.name}`, isError: true };
+      }
+      const context: ToolExecutionContext = {
+        agent: "setup",
+        provider: provider.providerId,
+        model,
+        callId: call.id,
+      };
+      const policy = toolInputPolicies[call.name] ?? {
+        criticality: "advisory" as const,
+      };
+      if (call.input._parse_error) {
+        const rejected = rejectToolInput(
+          definition,
+          policy.criticality,
+          [{
+            path: "/",
+            code: "json_parse",
+            expected: "valid JSON tool arguments",
+            actual: "malformed JSON arguments",
+            message: "/: tool arguments were not valid JSON",
+          }],
+          context,
+        );
+        return { content: rejected.content, isError: true };
+      }
+      // A finalize repair may arrive as a partial call — the narrowed repair
+      // schema (setFinalizeRepairSchema) advertises only the missing fields —
+      // so merge it over the retained payload before validating: the full
+      // contract judges the combined call.
+      const effectiveInput = call.name === "finalize_setup" && pendingFinalizeInput
+        ? { ...pendingFinalizeInput, ...call.input }
+        : call.input;
+      const validation = validateToolInput<Record<string, unknown>>(
+        definition,
+        effectiveInput,
+        policy,
+        context,
+      );
+      if (!validation.ok) {
+        if (call.name === "finalize_setup") {
+          // Retain the accepted fields and narrow the advertised schema to
+          // the failing ones. Grok otherwise tends to regenerate the very
+          // large fields while repeatedly omitting a short late field such
+          // as handoff_note — and a partial repair may cross a runTurn
+          // boundary when the provider answers the error with text only
+          // (pendingFinalizeInput/activeTools live at conversation scope
+          // for exactly that reason).
+          pendingFinalizeInput = effectiveInput;
+          const repairFields = [...new Set(
+            validation.issues
+              .map((issue) => issue.path.split("/")[1])
+              .filter((field): field is string => Boolean(field)),
+          )];
+          setFinalizeRepairSchema(repairFields);
+          logEvent("setup:finalize_rejected", {
+            model,
+            providerId: provider.providerId,
+            missingFields: repairFields,
+          });
+          return {
+            content: `${validation.content}\n`
+              + "Fields already supplied are retained. Call finalize_setup again with only "
+              + "the listed fields corrected; do not end setup.",
+            isError: true,
+          };
+        }
+        return { content: validation.content, isError: true };
+      }
+      const input = validation.value;
+
       if (call.name === "generate_image") {
-        return dispatchGenerateImage(call.id, call.input);
+        return dispatchGenerateImage(call.id, input);
       }
       if (call.name === "set_portrait") {
-        return dispatchSetPortrait(call.input);
+        return dispatchSetPortrait(input);
       }
       if (call.name === "present_choices") {
-        const input = call.input as { prompt?: string; choices?: unknown; descriptions?: unknown };
-        const rawChoices = Array.isArray(input.choices) ? input.choices : [];
-        const choices = rawChoices.map((c: unknown) => typeof c === "string" ? c : String(c));
-        const rawDescs = Array.isArray(input.descriptions) ? input.descriptions : [];
-        const descriptions = rawDescs.length > 0
-          ? rawDescs.map((d: unknown) => typeof d === "string" ? d : String(d))
+        const choiceInput = input as {
+          prompt: string;
+          choices: string[];
+          descriptions?: string[];
+        };
+        const descriptions = choiceInput.descriptions?.length
+          ? choiceInput.descriptions
           : undefined;
         pendingToolUseId = call.id;
         // present_choices suspends the turn — signal that via pendingChoices so
@@ -1149,11 +1416,15 @@ export function createSetupConversation(
         return {
           content: "Choices have been presented to the player. End your turn now; you will be re-invoked once they select.",
           isError: false,
-          pendingChoices: { prompt: input.prompt ?? "Choose:", choices, descriptions },
+          pendingChoices: {
+            prompt: choiceInput.prompt,
+            choices: choiceInput.choices,
+            descriptions,
+          },
         };
       }
       if (call.name === "load_world") {
-        const slug = (call.input as { slug?: string }).slug ?? "";
+        const slug = input.slug as string;
         const world = loadWorldBySlug(slug, userWorldsDir);
         // Remember the seed so the chargen portrait can adopt its visual style.
         if (world) lastLoadedWorld = world;
@@ -1161,35 +1432,29 @@ export function createSetupConversation(
         return { content, isError: false };
       }
       if (call.name === "roll_dice") {
-        return renderRollDice(call.input);
+        return renderRollDice(input);
       }
       if (call.name === "finalize_setup") {
-        if (call.input._parse_error) {
-          return { content: String(call.input._parse_error), isError: true };
-        }
-        const mergedInput = pendingFinalizeInput
-          ? { ...pendingFinalizeInput, ...call.input }
-          : call.input;
-        const missingFields = missingCoreFinalizeFields(mergedInput);
-        if (missingFields.length > 0) {
-          pendingFinalizeInput = mergedInput;
-          setFinalizeRepairSchema(missingFields);
-          logEvent("setup:finalize_rejected", {
-            model,
-            providerId: provider.providerId,
-            missingFields,
-          });
-          return {
-            content:
-              `finalize_setup rejected: missing or invalid required fields: ${missingFields.join(", ")}. `
-              + "The fields already supplied are retained. Call finalize_setup again with only "
-              + "the listed missing fields populated; do not end setup.",
-            isError: true,
-          };
+        if (finalized) {
+          finalized = undefined;
+          const rejected = rejectToolInput(
+            definition,
+            "commit",
+            [{
+              path: "/",
+              code: "duplicate_call",
+              expected: "exactly one finalize_setup call",
+              actual: "multiple finalize_setup calls",
+              message:
+                "/: multiple competing finalize_setup calls were emitted; resend one authoritative call",
+            }],
+            context,
+          );
+          return { content: rejected.content, isError: true };
         }
         pendingFinalizeInput = undefined;
         activeTools = TOOLS;
-        handleFinalize(mergedInput);
+        handleFinalize(input as FinalizeSetupInput);
         return {
           content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
           isError: false,

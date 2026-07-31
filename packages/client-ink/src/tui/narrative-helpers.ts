@@ -16,7 +16,7 @@ import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
  * their own `intent` field that the streaming path has no way to
  * supply.
  */
-type StreamableKind = Exclude<NarrativeLine["kind"], "image">;
+type StreamableKind = Exclude<NarrativeLine["kind"], "image" | "metadata">;
 
 export function appendDelta(
   prev: NarrativeLine[],

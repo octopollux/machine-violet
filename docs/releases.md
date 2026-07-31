@@ -118,4 +118,23 @@ The release UI is kept lean so humans can scan it:
 
 ## Homebrew
 
-The Homebrew tap (`octopollux/homebrew-mv-tap`) currently tracks **nightly** only — the formula is overwritten on each nightly build by [nightly.yml](../.github/workflows/nightly.yml). A stable formula split is planned post-1.0; until then, `brew install octopollux/mv-tap/machine-violet` gets nightlies despite the stable release body advertising it.
+The Homebrew tap (`octopollux/homebrew-mv-tap`) has separate formulas for the
+stable and nightly channels:
+
+| Channel | Formula | Updated by |
+|---|---|---|
+| Stable | `machine-violet` | [release.yml](../.github/workflows/release.yml), after each stable release is published |
+| Nightly | `machine-violet-nightly` | [nightly.yml](../.github/workflows/nightly.yml), after each nightly release is published |
+
+Both workflows render their formula through
+[`scripts/ci/render-homebrew-formula.sh`](../scripts/ci/render-homebrew-formula.sh)
+so their install behavior stays identical. Versions, immutable stable asset
+URLs, rolling nightly URLs, and checksums come from the release being
+published—no application version is hard-coded in the automation.
+
+Both formulas expose the `machine-violet` executable and therefore conflict;
+switching channels requires uninstalling one formula before installing the
+other. The stable formula carries `version_scheme 1` because the unsplit
+formula previously used nightly version strings. This one-time scheme change
+lets existing `machine-violet` installations move onto the stable version
+sequence with a normal `brew upgrade`.

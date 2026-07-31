@@ -12,10 +12,15 @@ import type {
   LLMProvider, ChatParams, ChatResult, DispatchToolFn,
   NormalizedMessage, NormalizedTool,
   ContentPart, NormalizedUsage, SystemBlock, ThinkingConfig,
-  CacheHint,
+  CacheHint, ToolExecutionContext,
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
+import {
+  rejectToolInput,
+  validateToolInput,
+  type ToolInputPolicy,
+} from "../agents/tool-contract.js";
 import {
   extractStatus, RETRYABLE_STATUS, retryDelay, sleep,
 } from "../utils/retry.js";
@@ -61,6 +66,7 @@ import { getKnownModel } from "../config/model-registry.js";
 export type ToolHandler = (
   name: string,
   input: Record<string, unknown>,
+  context: ToolExecutionContext,
 ) => ToolResult | Promise<ToolResult>;
 
 export interface ProviderLoopConfig {
@@ -72,6 +78,8 @@ export interface ProviderLoopConfig {
   stream?: boolean;
   tools?: NormalizedTool[];
   toolHandler?: ToolHandler;
+  /** Per-tool repair/refinement policy. Structural schema validation is always on. */
+  toolInputPolicies?: Readonly<Record<string, ToolInputPolicy>>;
   cacheHints?: CacheHint[];
   tuiToolNames?: Set<string>;
   /** Called immediately when a non-deferred TUI command is extracted. */
@@ -147,6 +155,7 @@ interface DispatchedToolCall {
 async function dispatchToolCall(
   tc: { id: string; name: string; input: Record<string, unknown> },
   config: ProviderLoopConfig,
+  providerId: string,
   tuiToolNames: Set<string>,
   onTui: (cmd: TuiCommand) => void,
   toolRoundTextWithheld = false,
@@ -162,11 +171,38 @@ async function dispatchToolCall(
     async () => {
       config.onToolStart?.(tc.name);
 
+      const context: ToolExecutionContext = {
+        agent: config.name,
+        provider: providerId,
+        model: config.model,
+        callId: tc.id,
+      };
+      const definition = config.tools?.find((tool) => tool.name === tc.name);
+      const policy = config.toolInputPolicies?.[tc.name] ?? {
+        criticality: "advisory" as const,
+      };
+
       // Strict JSON parse error from the provider — surface as an error result
       // without ever calling the handler.
       if (tc.input._parse_error) {
+        const rejected = rejectToolInput(
+          definition ?? {
+            name: tc.name,
+            description: "",
+            inputSchema: {},
+          },
+          policy.criticality,
+          [{
+            path: "/",
+            code: "json_parse",
+            expected: "valid JSON tool arguments",
+            actual: "malformed JSON arguments",
+            message: "/: tool arguments were not valid JSON",
+          }],
+          context,
+        );
         const parseResult: ToolResult = {
-          content: String(tc.input._parse_error),
+          content: rejected.content,
           is_error: true,
         };
         config.onToolEnd?.(tc.name, parseResult);
@@ -174,10 +210,29 @@ async function dispatchToolCall(
         return { content: parseResult.content, isError: true };
       }
 
+      let validatedInput = tc.input;
+      if (definition) {
+        const validation = validateToolInput<Record<string, unknown>>(
+          definition,
+          tc.input,
+          policy,
+          context,
+        );
+        if (!validation.ok) {
+          const validationResult: ToolResult = {
+            content: validation.content,
+            is_error: true,
+          };
+          config.onToolEnd?.(tc.name, validationResult);
+          return { content: validation.content, isError: true };
+        }
+        validatedInput = validation.value;
+      }
+
       let toolResult: ToolResult;
       try {
         if (config.toolHandler) {
-          toolResult = await config.toolHandler(tc.name, tc.input);
+          toolResult = await config.toolHandler(tc.name, validatedInput, context);
         } else {
           toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
         }
@@ -199,8 +254,8 @@ async function dispatchToolCall(
       // Record a few cheap, useful attributes for the timeline tooltip.
       if (toolResult.is_error) setSpanAttrs({ failed: true });
       if (tc.name === "generate_image") {
-        const effort = tc.input.effort;
-        const aspect = tc.input.aspect;
+        const effort = validatedInput.effort;
+        const aspect = validatedInput.aspect;
         setSpanAttrs({
           ...(typeof effort === "string" ? { effort } : {}),
           ...(typeof aspect === "string" ? { aspect } : {}),
@@ -319,6 +374,7 @@ export async function runProviderLoop(
       const dispatched = await dispatchToolCall(
         { id: call.id, name: call.name, input: call.input },
         config,
+        provider.providerId,
         tuiToolNames,
         (cmd) => {
           if (DEFERRED_TUI_TYPES.has(cmd.type)) {
@@ -606,6 +662,7 @@ export async function runProviderLoop(
         const dispatched = await dispatchToolCall(
           tc,
           config,
+          provider.providerId,
           tuiToolNames,
           (cmd) => {
             if (DEFERRED_TUI_TYPES.has(cmd.type)) {

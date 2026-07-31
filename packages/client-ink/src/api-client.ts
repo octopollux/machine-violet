@@ -146,6 +146,7 @@ export class ApiClient {
        *  option (vs. typing free-form). Used by setup to distinguish a
        *  selection from a dismissal+free-form response. */
       fromChoice?: boolean;
+      choiceResponse?: ContributeRequest["choiceResponse"];
     },
   ): Promise<{ turnId: string; contributionId: string }> {
     const body: ContributeRequest = {
@@ -154,6 +155,7 @@ export class ApiClient {
       campaignId: opts?.campaignId,
       turnSeq: opts?.turnSeq,
       fromChoice: opts?.fromChoice,
+      choiceResponse: opts?.choiceResponse,
     };
     return this.post(`/session/turn/contribute?player=${encodeURIComponent(this.playerId)}`, body);
   }
@@ -192,7 +194,7 @@ export class ApiClient {
   }
 
   async diagnostics(): Promise<{ ok: boolean; path: string }> {
-    return this.fetch("/session/diagnostics", { method: "PUT" });
+    return this.fetch("/manage/diagnostics", { method: "PUT" });
   }
 
   async getSettings(): Promise<{ config: unknown }> {

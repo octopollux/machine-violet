@@ -72,6 +72,44 @@ const TIER_LABELS: Record<string, string> = {
 const TIERS = ["large", "medium", "small"] as const;
 const ASSIGNMENT_ROWS = TIERS.length + 1;
 
+interface ScrollWindow {
+  start: number;
+  end: number;
+  canScrollUp: boolean;
+  canScrollDown: boolean;
+}
+
+/**
+ * Keep a selected one-row item inside a stable viewport. The window only
+ * moves when the selection crosses an edge, matching the choice list in the
+ * PlayingPhase player pane.
+ */
+function getScrollWindow(
+  selectedIndex: number,
+  itemCount: number,
+  visibleRows: number,
+  previousStart: number,
+): ScrollWindow {
+  const rowCount = Math.max(2, visibleRows);
+  const maxStart = Math.max(0, itemCount - rowCount);
+  let start = Math.min(Math.max(0, previousStart), maxStart);
+
+  if (selectedIndex < start) {
+    start = selectedIndex;
+  } else if (selectedIndex >= start + rowCount) {
+    start = selectedIndex - rowCount + 1;
+  }
+  start = Math.min(Math.max(0, start), maxStart);
+
+  const end = Math.min(itemCount, start + rowCount);
+  return {
+    start,
+    end,
+    canScrollUp: start > 0,
+    canScrollDown: end < itemCount,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Usage segment rendering
 // ---------------------------------------------------------------------------
@@ -183,6 +221,8 @@ export function ConnectionsPhase({
   const [tierIndex, setTierIndex] = useState(0);
   const [tierModelIndex, setTierModelIndex] = useState(0);
   const [imageModelIndex, setImageModelIndex] = useState(0);
+  const tierModelScrollStartRef = useRef(0);
+  const imageModelScrollStartRef = useRef(0);
   const [addProviderIndex, setAddProviderIndex] = useState(0);
   const [addProvider, setAddProvider] = useState("");
   const [keyInput, setKeyInput] = useState("");
@@ -400,10 +440,12 @@ export function ConnectionsPhase({
       if (key.return) {
         if (tierIndex < TIERS.length && allModels.length > 0) {
           setTierModelIndex(0);
+          tierModelScrollStartRef.current = 0;
           setScreen("tier-pick");
         } else if (tierIndex === TIERS.length && largeConnection) {
           const currentIndex = imageModels.findIndex((m) => m.modelId === imageAssignment?.modelId);
           setImageModelIndex(Math.max(0, currentIndex));
+          imageModelScrollStartRef.current = 0;
           setScreen("image-pick");
         }
       }
@@ -682,12 +724,30 @@ export function ConnectionsPhase({
     const lines: React.ReactNode[] = [];
     lines.push(<Text key="header" color={dim}>Select model for {TIER_LABELS[tier]}:</Text>);
     lines.push(<Text key="sep"> </Text>);
-    for (let i = 0; i < allModels.length; i++) {
+    const visibleModelRows = termRows - theme.asset.height * 2 - lines.length;
+    const scrollWindow = getScrollWindow(
+      tierModelIndex,
+      allModels.length,
+      visibleModelRows,
+      tierModelScrollStartRef.current,
+    );
+    tierModelScrollStartRef.current = scrollWindow.start;
+    for (let i = scrollWindow.start; i < scrollWindow.end; i++) {
       const m = allModels[i];
       const selected = i === tierModelIndex;
+      const visibleIndex = i - scrollWindow.start;
+      const arrow = visibleIndex === 0 ? "\u25B2" : visibleIndex === 1 ? "\u25BC" : " ";
+      const arrowAvailable = visibleIndex === 0
+        ? scrollWindow.canScrollUp
+        : scrollWindow.canScrollDown;
       lines.push(
         <Text key={`${m.connectionId}-${m.modelId}`} color={selected ? accent : fg}>
-          {selected ? "\u25C6 " : "  "}{m.label}
+          {visibleIndex < 2
+            ? arrowAvailable
+              ? <Text color="#aaff00">{arrow}</Text>
+              : <Text dimColor>{arrow}</Text>
+            : arrow}
+          {" "}{selected ? "\u25C6 " : "  "}{m.label}
         </Text>,
       );
     }
@@ -702,12 +762,30 @@ export function ConnectionsPhase({
     const lines: React.ReactNode[] = [];
     lines.push(<Text key="header" color={dim}>Select image model for {largeConnection?.label}:</Text>);
     lines.push(<Text key="sep"> </Text>);
-    for (let i = 0; i < imageModels.length; i++) {
+    const visibleModelRows = termRows - theme.asset.height * 2 - lines.length;
+    const scrollWindow = getScrollWindow(
+      imageModelIndex,
+      imageModels.length,
+      visibleModelRows,
+      imageModelScrollStartRef.current,
+    );
+    imageModelScrollStartRef.current = scrollWindow.start;
+    for (let i = scrollWindow.start; i < scrollWindow.end; i++) {
       const m = imageModels[i];
       const selected = i === imageModelIndex;
+      const visibleIndex = i - scrollWindow.start;
+      const arrow = visibleIndex === 0 ? "\u25B2" : visibleIndex === 1 ? "\u25BC" : " ";
+      const arrowAvailable = visibleIndex === 0
+        ? scrollWindow.canScrollUp
+        : scrollWindow.canScrollDown;
       lines.push(
         <Text key={m.modelId ?? "provider-default"} color={selected ? accent : fg}>
-          {selected ? "\u25C6 " : "  "}{m.label}
+          {visibleIndex < 2
+            ? arrowAvailable
+              ? <Text color="#aaff00">{arrow}</Text>
+              : <Text dimColor>{arrow}</Text>
+            : arrow}
+          {" "}{selected ? "\u25C6 " : "  "}{m.label}
         </Text>,
       );
     }

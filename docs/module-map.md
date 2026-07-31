@@ -25,6 +25,7 @@ The game loop, state management, and AI session handling.
 | `deferred-work.ts` | `DeferredWork` registry — detached background lanes (scribe, scene-tracker) flushed at consistency barriers via `settle()`; blocked settles emit `barrier_wait` spans |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
+| `tool-contract.ts` | Shared TypeBox/Ajv tool-input boundary: allowlisted repair, structural + semantic validation, criticality, retryable failures, and structured diagnostics |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
 | `dm-prompt.ts` | `DMSessionState`, system prompt builder, active state formatting |
 | `setup-agent.ts` | Campaign initialization wizard (delegates to setup-conversation subagent) |

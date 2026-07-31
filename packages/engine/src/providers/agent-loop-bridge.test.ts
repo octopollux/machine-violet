@@ -551,7 +551,16 @@ describe("runProviderLoop tool-call precedence", () => {
     });
 
     expect(toolHandler).toHaveBeenCalledOnce();
-    expect(toolHandler).toHaveBeenCalledWith("roll_dice", {});
+    expect(toolHandler).toHaveBeenCalledWith(
+      "roll_dice",
+      {},
+      expect.objectContaining({
+        agent: "test",
+        model: "test-model",
+        provider: "test-end-with-tools",
+        callId: "toolu_1",
+      }),
+    );
     expect(provider.chat).toHaveBeenCalledTimes(2);
     const secondRoundMessages = vi.mocked(provider.chat).mock.calls[1][0].messages;
     expect(secondRoundMessages.at(-2)).toEqual({
@@ -563,6 +572,78 @@ describe("runProviderLoop tool-call precedence", () => {
         is_error: false,
       }],
     });
+    expect(result.text).toBe("You rolled a 17.");
+  });
+
+  it("returns a validation error for malformed input, then executes one corrected retry", async () => {
+    const toolHandler = vi.fn(() => ({ content: "17" }));
+    const toolDefinition = {
+      name: "roll_dice",
+      description: "Roll dice.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          expression: { type: "string" },
+        },
+        required: ["expression"],
+        additionalProperties: false,
+      },
+    };
+    const toolRound = (
+      id: string,
+      input: Record<string, unknown>,
+    ): ChatResult => ({
+      text: "",
+      toolCalls: [{ id, name: "roll_dice", input }],
+      usage: mockUsage(),
+      stopReason: "tool_use",
+      assistantContent: [{
+        type: "tool_use",
+        id,
+        name: "roll_dice",
+        input,
+      }],
+    });
+    const provider: LLMProvider = {
+      providerId: "weak-tool-caller",
+      chat: vi.fn()
+        .mockResolvedValueOnce(toolRound("bad-call", { expression: 20 }))
+        .mockResolvedValueOnce(toolRound("fixed-call", { expression: "1d20" }))
+        .mockResolvedValueOnce(textResult("You rolled a 17.")),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "Roll" },
+    ], {
+      name: "dm",
+      model: "small-model",
+      maxTokens: 100,
+      stream: false,
+      tools: [toolDefinition],
+      toolInputPolicies: {
+        roll_dice: { criticality: "advisory" },
+      },
+      toolHandler,
+    });
+
+    expect(toolHandler).toHaveBeenCalledOnce();
+    expect(toolHandler).toHaveBeenCalledWith(
+      "roll_dice",
+      { expression: "1d20" },
+      expect.objectContaining({ callId: "fixed-call" }),
+    );
+    expect(provider.chat).toHaveBeenCalledTimes(3);
+    const retryMessages = vi.mocked(provider.chat).mock.calls[1][0].messages;
+    const serializedRetryMessages = JSON.stringify(retryMessages);
+    expect(serializedRetryMessages).toContain('"tool_use_id":"bad-call"');
+    expect(serializedRetryMessages).toContain(
+      'Invalid input for tool \\"roll_dice\\"',
+    );
+    expect(serializedRetryMessages).toContain(
+      "No side effects were applied",
+    );
     expect(result.text).toBe("You rolled a 17.");
   });
 

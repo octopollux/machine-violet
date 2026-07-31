@@ -1,9 +1,10 @@
 /**
  * Build an HTML transcript from the live narrative lines.
  *
- * Renders FormattingNode trees into inline-styled HTML that visually
- * matches the TUI output. The HTML is self-contained (inlined CSS,
- * no external dependencies) and opens cleanly in any browser.
+ * Renders FormattingNode trees into inline-styled HTML that preserves the
+ * exporting terminal's column width on roomy viewports and reflows when space
+ * is constrained. The HTML is self-contained (inlined CSS, no external
+ * dependencies) and opens cleanly in any browser.
  */
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
@@ -85,6 +86,9 @@ function lineToHtml(
     (line.nodes.length === 1 && line.nodes[0] === "");
 
   switch (line.kind) {
+    case "metadata":
+      return ""; // preserved separately in the invisible JSON metadata block
+
     case "spacer":
       return `<div class="spacer">&nbsp;</div>`;
 
@@ -222,13 +226,98 @@ export function buildTranscriptHtml(opts: TranscriptOptions): string {
     themeAsset, separatorColor, playerColor, quoteColor, imageBytes,
   } = opts;
 
-  const processed = processNarrativeLines(narrativeLines, width, quoteColor);
-  const separatorText = composeTurnSeparator(themeAsset, width);
+  // Width 0 keeps the formatting/healing pipeline but disables terminal-row
+  // wrapping. The browser can then reflow each semantic line when its viewport
+  // is narrower than the exporting terminal, while `max-width` below preserves
+  // the original terminal-width column on roomy screens.
+  const processed = processNarrativeLines(narrativeLines, 0, quoteColor);
+  // Keep composeTurnSeparator's terminal-width truncation, but strip the space
+  // padding it adds for physical-row centering. HTML centers the motif with CSS,
+  // so padding would only create overflow in narrow viewports.
+  const separatorText = composeTurnSeparator(themeAsset, width).trim();
 
   const bodyLines = processed
     .map((line) => lineToHtml(line, { separatorText, separatorColor, playerColor, imageBytes }))
     .filter(Boolean)
     .join("\n");
+
+  let exportedEntryIndex = 0;
+  const checkpoints: {
+    afterEntry: number;
+    state: Extract<
+      Extract<NarrativeLine, { kind: "metadata" }>["event"],
+      { type: "state_checkpoint" }
+    >["state"];
+  }[] = [];
+  const choices = new Map<string, {
+    id: string;
+    source: "present_choices" | "suggestion_generator";
+    presentedAfterEntry: number;
+    prompt: string;
+    options: { index: number; text: string; description?: string }[];
+    resolution: null | {
+      kind: "option" | "custom";
+      playerId: string;
+      contributionText: string;
+      resolvedAfterEntry: number;
+      optionIndex?: number;
+      optionText?: string;
+    };
+  }>();
+  for (const line of narrativeLines) {
+    if (line.kind === "metadata") {
+      switch (line.event.type) {
+        case "state_checkpoint":
+          checkpoints.push({ afterEntry: exportedEntryIndex, state: line.event.state });
+          break;
+        case "choices_presented": {
+          const { presentation } = line.event;
+          choices.set(presentation.id, {
+            id: presentation.id,
+            source: presentation.source,
+            presentedAfterEntry: exportedEntryIndex,
+            prompt: presentation.prompt,
+            options: presentation.choices.map((text, index) => ({
+              index,
+              text,
+              ...(presentation.descriptions?.[index] !== undefined
+                ? { description: presentation.descriptions[index] }
+                : {}),
+            })),
+            resolution: null,
+          });
+          break;
+        }
+        case "choice_resolved": {
+          const { resolution } = line.event;
+          const choice = choices.get(resolution.presentationId);
+          if (!choice) break;
+          choice.resolution = {
+            kind: resolution.kind,
+            playerId: resolution.playerId,
+            contributionText: resolution.contributionText,
+            resolvedAfterEntry: exportedEntryIndex,
+            ...(resolution.kind === "option"
+              ? {
+                  optionIndex: resolution.optionIndex,
+                  optionText: choice.options[resolution.optionIndex]?.text,
+                }
+              : {}),
+          };
+          break;
+        }
+      }
+    } else if (line.kind !== "dev") {
+      exportedEntryIndex += 1;
+    }
+  }
+  // Escape '<' so formatted choices/modelines cannot terminate the script element.
+  const metadataJson = JSON.stringify({
+    format: "machine-violet-transcript-metadata",
+    version: 1,
+    checkpoints,
+    choices: [...choices.values()],
+  }).replace(/</g, "\\u003c");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -236,18 +325,39 @@ export function buildTranscriptHtml(opts: TranscriptOptions): string {
 <meta charset="utf-8">
 <title>${esc(campaignName)} — Transcript</title>
 <style>
+html {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+html:hover {
+  scrollbar-color: ${esc(separatorColor)} transparent;
+}
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 5px;
+}
+html:hover::-webkit-scrollbar-thumb {
+  background: ${esc(separatorColor)};
+}
 body {
   background: #000;
   color: #e0e0e0;
   font-family: 'Cascadia Mono', 'Cascadia Code', Consolas, Menlo, Monaco, 'Courier New', monospace;
   max-width: ${width}ch;
   margin: 2em auto;
-  padding: 0 1em;
+  padding: 0 clamp(2px, 2vw, 1em);
   line-height: 1.4;
 }
 div {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
   min-height: 1.4em;
 }
 .spacer { min-height: 1.4em; }
@@ -259,7 +369,7 @@ i { font-style: italic; }
 u { text-decoration: underline; }
 .dm-quote {
   white-space: pre-wrap;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
   border-left: 2px solid #666;
   margin: 0;
   padding-left: 1ch;
@@ -267,7 +377,7 @@ u { text-decoration: underline; }
   font-style: italic;
   min-height: 1.4em;
 }
-.list-item { white-space: pre-wrap; word-wrap: break-word; }
+.list-item { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Image shadowbox: clicking a narrative image fills the viewport on black. */
 #shadowbox {
   display: none;
@@ -293,6 +403,7 @@ u { text-decoration: underline; }
 </head>
 <body>
 ${bodyLines}
+<script id="machine-violet-transcript-metadata" type="application/json">${metadataJson}</script>
 <div id="shadowbox"><img alt=""></div>
 <script>
 (function () {

@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import { narrativeLinesToMarkdown, markdownToNarrativeLines, tailLines, iterDisplayLogReplay } from "./display-log.js";
 import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
 
+const checkpoint = {
+  version: 1 as const,
+  modelines: { Aldric: "Bruised, beneath the gate" },
+  displayResources: { Aldric: ["HP", "Air"] },
+  resourceValues: { Aldric: { HP: "18/30", Air: "4/6" } },
+};
+
 describe("narrativeLinesToMarkdown", () => {
   it("converts dm lines as-is", () => {
     const lines: NarrativeLine[] = [{ kind: "dm", text: "The tavern is warm." }];
@@ -42,6 +49,18 @@ describe("narrativeLinesToMarkdown", () => {
       "> [Aldric] What do you see?\nThe room is dark.\n\n",
     );
   });
+
+  it("writes checkpoints as invisible versioned comment markers", () => {
+    const markdown = narrativeLinesToMarkdown([
+      {
+        kind: "metadata",
+        text: "",
+        event: { type: "state_checkpoint", state: checkpoint },
+      },
+    ]);
+    expect(markdown).toMatch(/^<!--mv-transcript-meta:v1:[A-Za-z0-9+/=]+-->\n$/);
+    expect(markdown).not.toContain("Bruised");
+  });
 });
 
 describe("markdownToNarrativeLines", () => {
@@ -78,6 +97,62 @@ describe("markdownToNarrativeLines", () => {
     const md = narrativeLinesToMarkdown(original);
     const parsed = markdownToNarrativeLines(md.split("\n").slice(0, -1)); // trim trailing empty from split
     expect(parsed).toEqual(original);
+  });
+
+  it("round-trips modeline and resource checkpoints", () => {
+    const original: NarrativeLine[] = [
+      { kind: "dm", text: "The gate falls." },
+      {
+        kind: "metadata",
+        text: "",
+        event: { type: "state_checkpoint", state: checkpoint },
+      },
+    ];
+    const markdown = narrativeLinesToMarkdown(original);
+    const parsed = markdownToNarrativeLines(markdown.split("\n").slice(0, -1));
+    expect(parsed).toEqual(original);
+  });
+
+  it("round-trips formatted choice presentation and resolution metadata", () => {
+    const original: NarrativeLine[] = [
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choices_presented",
+          presentation: {
+            id: "choice-1",
+            source: "suggestion_generator",
+            prompt: "<i>What now?</i>",
+            choices: ["◆ <b>Open</b> the door", "◆ Wait"],
+            descriptions: ["Commit.", "Listen."],
+          },
+        },
+      },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choice_resolved",
+          resolution: {
+            presentationId: "choice-1",
+            kind: "option",
+            optionIndex: 0,
+            playerId: "Aldric",
+            contributionText: "Open the door",
+          },
+        },
+      },
+    ];
+    const markdown = narrativeLinesToMarkdown(original);
+    expect(markdown).not.toContain("<b>Open</b>");
+    expect(markdownToNarrativeLines(markdown.split("\n").slice(0, -1))).toEqual(original);
+  });
+
+  it("swallows malformed reserved checkpoint markers instead of showing them", () => {
+    expect(markdownToNarrativeLines([
+      "<!--mv-transcript-meta:v1:not-valid-base64!-->",
+    ])).toEqual([]);
   });
 
   it("round-trips turn separators before player and DM", () => {
@@ -257,6 +332,26 @@ describe("iterDisplayLogReplay", () => {
       type: "narrative:chunk",
       data: { text: "Inside, lamplight.", kind: "dm" },
     });
+  });
+
+  it("flushes prose before replaying an invisible checkpoint", () => {
+    const events = [...iterDisplayLogReplay([
+      { kind: "dm", text: "The gate falls." },
+      {
+        kind: "metadata",
+        text: "",
+        event: { type: "state_checkpoint", state: checkpoint },
+      },
+      { kind: "dm", text: "Dust settles." },
+    ])];
+    expect(events).toEqual([
+      { type: "narrative:chunk", data: { text: "The gate falls.", kind: "dm" } },
+      {
+        type: "transcript:metadata",
+        data: { type: "state_checkpoint", state: checkpoint },
+      },
+      { type: "narrative:chunk", data: { text: "Dust settles.", kind: "dm" } },
+    ]);
   });
 
   it("preserves all three intent values in display_image events", () => {

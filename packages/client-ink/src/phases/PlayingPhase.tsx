@@ -23,18 +23,21 @@ import { Layout } from "../tui/layout.js";
 import { OcclusionProvider } from "../tui/image/occlusion.js";
 import {
   ChoiceOverlay, DESCRIPTION_ROWS, GameMenu, ApiErrorModal,
+  type ChoiceOverlaySelection,
   CharacterSheetModal, CompendiumModal, PlayerNotesModal, SwatchModal,
   SessionRecapModal, CenteredModal, CharacterPane, CampaignSettingsModal,
   RollbackSummaryModal, RollbackPickerModal, RollbackConfirmModal,
 } from "../tui/modals/index.js";
 import type { MenuGroup, MenuItem } from "../tui/modals/index.js";
 import type { CampaignConfig, ChoiceFrequency } from "@machine-violet/shared/types/config.js";
+import type { TranscriptStateCheckpoint } from "@machine-violet/shared";
 import type { CenteredModalHandle } from "../tui/modals/index.js";
 import { useGameContext } from "../tui/game-context.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { buildTranscriptHtml, loadImageBytes } from "../commands/transcript.js";
 import { openPath, revealInExplorer } from "../commands/open-path.js";
 import { routePlayingPhaseKey } from "./playing-input.js";
+import { formatResources } from "../tui/resources.js";
 
 export function PlayingPhase() {
   const {
@@ -73,6 +76,7 @@ export function PlayingPhase() {
   const [tokenSummary, setTokenSummary] = useState("");
   const [characterPaneOpen, setCharacterPaneOpen] = useState(false);
   const [characterSheetCache, setCharacterSheetCache] = useState<string | null>(null);
+  const [historicalState, setHistoricalState] = useState<TranscriptStateCheckpoint | null>(null);
   const characterSheetCacheCharRef = useRef<string>("");
   const characterSheetCacheEpochRef = useRef<number>(0);
   // attemptId the user last dismissed the API-error modal at. The modal hides
@@ -132,6 +136,14 @@ export function PlayingPhase() {
     isAI: p.type === "ai",
   })) ?? [{ name: "Player", isAI: false }];
   const activeChar = players[activePlayerIndex]?.name ?? "Player";
+  const displayedModelines = historicalState?.modelines ?? modelines;
+  const displayedResources = historicalState
+    ? formatResources(historicalState.displayResources, historicalState.resourceValues)
+    : resources;
+  const handleTranscriptStateChange = useCallback(
+    (state: TranscriptStateCheckpoint | null) => setHistoricalState(state),
+    [],
+  );
 
   // Layout math — used in render below and in the viewport-reporting
   // effect. Computed up here so the report still fires even when the
@@ -260,7 +272,10 @@ export function PlayingPhase() {
   }, [apiClient, activeChar, currentTurn, setNarrativeLines, clearInput, restoreInput, saveTranscript]);
 
   // --- Choice selection ---
-  const handleChoiceSelect = useCallback(async (choice: string) => {
+  const handleChoiceSelect = useCallback(async (selection: ChoiceOverlaySelection) => {
+    const presentation = activeChoices;
+    if (!presentation) return;
+    const choice = selection.text;
     setActiveChoices(null);
 
     // Optimistic echo. The server also rebroadcasts the contribution via
@@ -282,11 +297,21 @@ export function PlayingPhase() {
         campaignId: currentTurn?.campaignId,
         turnSeq: currentTurn?.seq,
         fromChoice: true,
+        choiceResponse: selection.kind === "option"
+          ? {
+              presentationId: presentation.id,
+              kind: "option",
+              optionIndex: selection.optionIndex,
+            }
+          : {
+              presentationId: presentation.id,
+              kind: "custom",
+            },
       });
     } catch {
       setNarrativeLines((prev) => prev.filter((l) => l.tag !== tag));
     }
-  }, [apiClient, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
+  }, [apiClient, activeChoices, setActiveChoices, activeChar, currentTurn, setNarrativeLines]);
 
   const handleNarrativeScroll = useCallback((direction: number) => {
     const step = scrollAmount(rows);
@@ -496,7 +521,7 @@ export function PlayingPhase() {
         dimensions={{ columns: cols, rows }}
         theme={theme}
         narrativeLines={narrativeLines}
-        modelineText={modelines[activeChar] ?? campaignName}
+        modelineText={displayedModelines[activeChar] ?? campaignName}
         activeCharacterName={activeChar}
         inputIsDisabled={textInputDisabled}
         inputDefaultValue={pendingInput}
@@ -505,7 +530,7 @@ export function PlayingPhase() {
         players={players}
         activePlayerIndex={activePlayerIndex}
         campaignName={campaignName}
-        resources={resources}
+        resources={displayedResources}
         turnHolder={engineState === "waiting_input" ? activeChar : "DM"}
         engineState={engineState}
         engineStateSince={engineStateSince}
@@ -515,6 +540,7 @@ export function PlayingPhase() {
         playerFrameColor={engineState === "waiting_input" ? stateSnapshot?.players?.[activePlayerIndex]?.color : "#808080"}
         showVerbose={showVerbose}
         narrativeRef={narrativeRef}
+        onTranscriptStateChange={handleTranscriptStateChange}
         conversationPaneTop={conversationPaneTop}
         mouseScrollOverrideRef={modalScrollRef}
         hideInputLine={!!activeChoices}

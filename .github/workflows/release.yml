@@ -562,3 +562,41 @@ jobs:
             -H "Content-Type: application/json" \
             -d @discord-payload.json \
             "$DISCORD_WEBHOOK"
+
+  update-homebrew-stable:
+    needs: [prep, release]
+    if: needs.prep.outputs.channel == 'stable'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prep.outputs.tag }}
+
+      - name: Update Homebrew formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ needs.prep.outputs.tag }}
+          VERSION: ${{ needs.prep.outputs.version }}
+        run: |
+          DARWIN_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-darwin-arm64.tar.gz"
+          LINUX_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/machine-violet-${VERSION}-linux-x64.tar.gz"
+
+          DARWIN_SHA=$(curl -fsSL "$DARWIN_URL" | sha256sum | cut -d' ' -f1)
+          LINUX_SHA=$(curl -fsSL "$LINUX_URL" | sha256sum | cut -d' ' -f1)
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/octopollux/homebrew-mv-tap.git" tap
+
+          bash scripts/ci/render-homebrew-formula.sh \
+            stable \
+            "$VERSION" \
+            "$DARWIN_URL" \
+            "$DARWIN_SHA" \
+            "$LINUX_URL" \
+            "$LINUX_SHA" \
+            tap/Formula/machine-violet.rb
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/machine-violet.rb
+          git diff --cached --quiet && echo "No changes" || (git commit -m "Update machine-violet stable (${VERSION})" && git push)

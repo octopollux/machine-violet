@@ -6,6 +6,93 @@
  */
 import { Type, type Static } from "@sinclair/typebox";
 
+/**
+ * Versioned UI/resource state captured at a durable transcript boundary.
+ *
+ * Checkpoints are full snapshots rather than deltas so any individual entry is
+ * independently useful to scrollback and transcript-export consumers.
+ */
+export const TranscriptStateCheckpoint = Type.Object({
+  version: Type.Literal(1),
+  modelines: Type.Record(Type.String(), Type.String()),
+  displayResources: Type.Record(Type.String(), Type.Array(Type.String())),
+  resourceValues: Type.Record(Type.String(), Type.Record(Type.String(), Type.String())),
+});
+
+export type TranscriptStateCheckpoint = Static<typeof TranscriptStateCheckpoint>;
+
+/** Origin of a choice presentation shown during gameplay. */
+export const TranscriptChoiceSource = Type.Union([
+  Type.Literal("present_choices"),
+  Type.Literal("suggestion_generator"),
+]);
+
+export type TranscriptChoiceSource = Static<typeof TranscriptChoiceSource>;
+
+/**
+ * The exact choice payload shown to the player. Prompt, choices, and
+ * descriptions are preserved verbatim, including Machine Violet formatting
+ * tags; the stable ID links the later response without comparing display text.
+ */
+export const TranscriptChoicePresentation = Type.Object({
+  id: Type.String(),
+  source: TranscriptChoiceSource,
+  prompt: Type.String(),
+  choices: Type.Array(Type.String()),
+  descriptions: Type.Optional(Type.Array(Type.String())),
+});
+
+export type TranscriptChoicePresentation = Static<typeof TranscriptChoicePresentation>;
+
+/** Structured provenance sent back when the player responds to a choice UI. */
+export const TranscriptChoiceResponse = Type.Union([
+  Type.Object({
+    presentationId: Type.String(),
+    kind: Type.Literal("option"),
+    /** Zero-based index into the presentation's ordered `choices` array. */
+    optionIndex: Type.Integer({ minimum: 0 }),
+  }),
+  Type.Object({
+    presentationId: Type.String(),
+    kind: Type.Literal("custom"),
+  }),
+]);
+
+export type TranscriptChoiceResponse = Static<typeof TranscriptChoiceResponse>;
+
+/** Accepted player response to a previously presented choice set. */
+export const TranscriptChoiceResolution = Type.Intersect([
+  TranscriptChoiceResponse,
+  Type.Object({
+    playerId: Type.String(),
+    /** Plain contribution text recorded in the visible transcript. */
+    contributionText: Type.String(),
+  }),
+]);
+
+export type TranscriptChoiceResolution = Static<typeof TranscriptChoiceResolution>;
+
+/**
+ * Append-only, invisible metadata interleaved with the visible transcript.
+ * More event kinds can be added without inventing another display-log marker.
+ */
+export const TranscriptMetadataEvent = Type.Union([
+  Type.Object({
+    type: Type.Literal("state_checkpoint"),
+    state: TranscriptStateCheckpoint,
+  }),
+  Type.Object({
+    type: Type.Literal("choices_presented"),
+    presentation: TranscriptChoicePresentation,
+  }),
+  Type.Object({
+    type: Type.Literal("choice_resolved"),
+    resolution: TranscriptChoiceResolution,
+  }),
+]);
+
+export type TranscriptMetadataEvent = Static<typeof TranscriptMetadataEvent>;
+
 export const StateSnapshot = Type.Object({
   /** Campaign identity */
   campaignId: Type.String(),
@@ -27,6 +114,9 @@ export const StateSnapshot = Type.Object({
 
   /** Modeline statuses (character → status text) */
   modelines: Type.Record(Type.String(), Type.String()),
+
+  /** Choice modal currently awaiting a response, if any. */
+  activeChoices: Type.Optional(TranscriptChoicePresentation),
 
   /** Theme / visual state */
   themeName: Type.Optional(Type.String()),
@@ -72,16 +162,16 @@ export const StateSnapshot = Type.Object({
    * about to be re-issued). It is intentionally omitted from per-turn
    * snapshots so live-streamed deltas aren't clobbered.
    *
-   * Only `dm` and `player` kinds cross the wire; turn separators are
-   * re-derived by the client from kind transitions so post-replace
-   * rendering matches live streaming, while system/dev lines and any
-   * spacers from a prior live stream are dropped on replace (they're
+   * Only `dm`, `player`, and invisible `metadata` kinds cross the wire;
+   * turn separators are re-derived by the client from kind transitions so
+   * post-replace rendering matches live streaming, while system/dev lines
+   * and any spacers from a prior live stream are dropped on replace (they're
    * presentation-only and not worth round-tripping).
    *
-   * Each entry is one rendered line — multi-paragraph DM/player text is
+   * Each text entry is one rendered line — multi-paragraph DM/player text is
    * split on `\n` server-side so the shape matches what `appendDelta`
-   * produces during live streaming. Empty entries represent paragraph
-   * boundaries.
+   * produces during live streaming. Empty text entries represent paragraph
+   * boundaries; metadata entries consume zero rows.
    */
   narrativeLines: Type.Optional(Type.Array(Type.Union([
     Type.Object({
@@ -91,6 +181,11 @@ export const StateSnapshot = Type.Object({
     Type.Object({
       kind: Type.Literal("player"),
       text: Type.String(),
+    }),
+    Type.Object({
+      kind: Type.Literal("metadata"),
+      text: Type.Literal(""),
+      event: TranscriptMetadataEvent,
     }),
   ]))),
 });

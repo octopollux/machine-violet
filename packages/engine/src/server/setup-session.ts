@@ -281,6 +281,7 @@ export class SetupSession {
         type: "choices:presented",
         data: {
           id: "setup-choice",
+          source: "present_choices",
           prompt: result.pendingChoices.prompt,
           choices: result.pendingChoices.choices,
           descriptions: result.pendingChoices.descriptions,
