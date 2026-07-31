@@ -88,6 +88,13 @@ export interface KnownImageModelInfo {
   displayName: string;
 }
 
+/** Per-provider default model ids for each tier, from the model registry. */
+export interface ProviderTierDefaults {
+  large?: string;
+  medium?: string;
+  small?: string;
+}
+
 export class ApiClient {
   private baseUrl: string;
   private playerId: string;
@@ -231,6 +238,11 @@ export class ApiClient {
     return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
+  /** Replace a connection's API key in place (Fix flow); preserves the id. */
+  async updateConnectionKey(id: string, apiKey: string): Promise<ConnectionsResponse> {
+    return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "PATCH", body: { apiKey } });
+  }
+
   async checkConnection(id: string): Promise<ConnectionHealthResponse> {
     return this.post(`/manage/connections/${encodeURIComponent(id)}/check`);
   }
@@ -276,6 +288,7 @@ export class ApiClient {
   async listKnownModels(): Promise<{
     models: Record<string, KnownModelInfo>;
     imageModels: Record<string, KnownImageModelInfo>;
+    tierDefaults: Record<string, ProviderTierDefaults>;
   }> {
     return this.get("/manage/models");
   }

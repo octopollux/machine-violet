@@ -28,6 +28,20 @@ import {
 
 export type ProviderType = "anthropic" | "gemini" | "openai-apikey" | "openai-chatgpt" | "openrouter" | "xai" | "custom";
 
+/**
+ * Human-readable provider names, used wherever a provider id would otherwise
+ * leak into user-facing copy (default connection labels, UI titles).
+ */
+export const PROVIDER_DISPLAY_NAMES: Record<ProviderType, string> = {
+  anthropic: "Anthropic",
+  gemini: "Google Gemini",
+  "openai-apikey": "OpenAI",
+  "openai-chatgpt": "ChatGPT",
+  openrouter: "OpenRouter",
+  xai: "xAI",
+  custom: "Custom endpoint",
+};
+
 export interface DiscoveredModel {
   id: string;
   displayName: string;
@@ -379,10 +393,21 @@ export function addConnection(
   label: string,
   baseUrl?: string,
 ): ConnectionStore {
+  // Default the label to the provider's display name ("OpenAI"), never the
+  // raw provider id ("openai-apikey key"). Disambiguate with a counter only
+  // on collision, so a second key for the same provider reads "OpenAI (2)".
+  let effectiveLabel = label || PROVIDER_DISPLAY_NAMES[provider] || provider;
+  if (!label) {
+    const taken = new Set(store.connections.map((c) => c.label));
+    const base = effectiveLabel;
+    for (let n = 2; taken.has(effectiveLabel); n++) {
+      effectiveLabel = `${base} (${n})`;
+    }
+  }
   const connection: AIConnection = {
     id: generateId(),
     provider,
-    label: label || `${provider} key`,
+    label: effectiveLabel,
     apiKey,
     baseUrl,
     models: [],
@@ -462,6 +487,27 @@ export function setImageAssignment(
     }
   }
   return { ...store, imageAssignment: assignment };
+}
+
+/**
+ * Replace a connection's API key in place (the Fix flow for a failed key).
+ * Preserves the connection id, so tier assignments and any live provider
+ * bindings survive the credential swap. Env-derived and OAuth connections
+ * are not eligible (env keys live in the environment; ChatGPT connections
+ * are fixed by signing in again) — callers enforce that, this op is a
+ * plain map.
+ */
+export function updateConnectionKey(
+  store: ConnectionStore,
+  connectionId: string,
+  apiKey: string,
+): ConnectionStore {
+  return {
+    ...store,
+    connections: store.connections.map((c) =>
+      c.id === connectionId ? { ...c, apiKey } : c,
+    ),
+  };
 }
 
 export function updateConnectionModels(

@@ -635,11 +635,11 @@ export function PlayingPhase() {
           height={narRows}
           config={am.config as CampaignConfig}
           onDismiss={() => {
-            // Settings is launched from the ESC menu, so closing it (via ESC or
-            // after Enter-to-save) returns to the menu rather than all the way
-            // to gameplay. One more ESC then drops back to play.
+            // Closing settings (via ESC or after Enter-to-save) returns to
+            // play, matching every other modal — Esc means "back to the
+            // game" everywhere, even though this one was opened from the
+            // ESC menu.
             setActiveModal(null);
-            setMenuOpen(true);
           }}
           onChoicesFrequencyChange={async (value: ChoiceFrequency) => {
             const cfg = am.config as CampaignConfig;

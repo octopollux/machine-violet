@@ -13,12 +13,12 @@ import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
   addConnection, removeConnection, setImageAssignment, setTierAssignment, updateConnectionModels,
-  maskKey, upsertChatGptConnection,
+  updateConnectionKey, maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
 import { e2eActive, e2eConnectionStore, E2E_HEALTH } from "../../config/e2e.js";
 import { createProviderFromConnection } from "../../providers/index.js";
-import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
+import { loadModelRegistry, getModelsForProvider, getTierDefaults, modelFamilyFor } from "../../config/model-registry.js";
 import {
   CodexRpcClient, startChatGptThirdPartyOAuth, pushChatGptAuthTokens, getAccount,
   listModels, getCodexClientInfo, allocateCodexHome, sweepStaleCodexHomesOnce,
@@ -37,7 +37,7 @@ import {
   IdParams, NameParams, LoginIdParams,
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
-  ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
+  ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest, UpdateConnectionKeyRequest,
   DiscordSettings, MachineSettingsResponse, DeleteInfoResponse, ErrorResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
   UsageResponse, DiagnosticsResponse,
@@ -191,6 +191,42 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     };
   });
 
+  /**
+   * Replace a connection's API key in place (the client's "Fix connection"
+   * flow). Preserves the connection id so tier assignments survive the swap.
+   */
+  server.patch("/connections/:id", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      body: UpdateConnectionKeyRequest,
+      response: { 200: ConnectionsListResponse, 400: ErrorResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const apiKey = ((request.body as { apiKey?: string })?.apiKey ?? "").trim();
+    if (!apiKey) {
+      return reply.status(400).send({ error: "Missing apiKey." });
+    }
+    const store = getConnections();
+    const conn = store.connections.find((c) => c.id === id);
+    if (!conn) {
+      return reply.status(404).send({ error: "Connection not found." });
+    }
+    if (conn.source === "env") {
+      return reply.status(400).send({ error: "Environment connections take their key from the environment variable." });
+    }
+    if (conn.provider === "openai-chatgpt") {
+      return reply.status(400).send({ error: "ChatGPT connections are fixed by signing in again." });
+    }
+    const effective = persistAndReturn(updateConnectionKey(store, id, apiKey));
+    return {
+      connections: effective.connections.map(serializeConnection),
+      tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
+    };
+  });
+
   /** Health-check a connection. */
   server.post("/connections/:id/check", {
     schema: {
@@ -219,8 +255,18 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     // via ensureStarted, and without teardown repeated health checks
     // accumulate subprocesses.
     const provider = createProviderFromConnection(conn, { configDir: server.configDir });
+    // Probe with a model this connection actually serves: the provider's
+    // small-tier registry default (cheapest known-good), else the first
+    // discovered model. Without an explicit model, providers sharing the
+    // OpenAI-compatible client (xai, openrouter, custom) fall back to an
+    // api.openai.com model id and 400 with "Model not found" even though
+    // the key is perfectly valid.
+    const smallDefault = getTierDefaults(conn.provider, server.configDir)?.small;
+    const probeModel = smallDefault && conn.models.some((m) => m.id === smallDefault)
+      ? smallDefault
+      : conn.models[0]?.id;
     try {
-      const result = await provider.healthCheck();
+      const result = await provider.healthCheck(probeModel);
       return { id: conn.id, ...result };
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
@@ -587,7 +633,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const registry = loadModelRegistry(server.configDir);
-    return { models: registry.models, imageModels: registry.imageModels };
+    return { models: registry.models, imageModels: registry.imageModels, tierDefaults: registry.tierDefaults };
   });
 
   // -----------------------------------------------------------------------

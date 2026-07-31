@@ -264,6 +264,11 @@ export const UpdateModelsRequest = Type.Object({
   models: Type.Array(ConnectionModel),
 });
 
+/** Body for PATCH /manage/connections/:id — in-place API-key replacement (Fix flow). */
+export const UpdateConnectionKeyRequest = Type.Object({
+  apiKey: Type.String(),
+});
+
 export const TiersResponse = Type.Object({
   tierAssignments: Type.Unknown(),
   imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
@@ -279,6 +284,13 @@ export const SetTiersRequest = Type.Object({
 export const ModelsResponse = Type.Object({
   models: Type.Unknown(),
   imageModels: Type.Unknown(),
+  /**
+   * Per-provider default model ids for each tier
+   * (`{ [provider]: { large?, medium?, small? } }`). The client's model
+   * assignment screen uses these to render "Auto (<model>)" and to apply a
+   * provider's default set when the player selects a connection.
+   */
+  tierDefaults: Type.Unknown(),
 });
 
 export const ArchiveResponse = Type.Object({
@@ -349,6 +361,7 @@ export type ChatGptLoginStatusResponse = Static<typeof ChatGptLoginStatusRespons
 export type AddConnectionRequest = Static<typeof AddConnectionRequest>;
 export type HealthCheckResponse = Static<typeof HealthCheckResponse>;
 export type UpdateModelsRequest = Static<typeof UpdateModelsRequest>;
+export type UpdateConnectionKeyRequest = Static<typeof UpdateConnectionKeyRequest>;
 export type TiersResponse = Static<typeof TiersResponse>;
 export type SetTiersRequest = Static<typeof SetTiersRequest>;
 export type ModelsResponse = Static<typeof ModelsResponse>;

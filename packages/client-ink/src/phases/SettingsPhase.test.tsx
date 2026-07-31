@@ -18,7 +18,7 @@ function makeTheme() {
 function defaultProps(overrides?: Partial<SettingsPhaseProps>): SettingsPhaseProps {
   return {
     theme: makeTheme(),
-    onApiKeys: vi.fn(),
+    onConnections: vi.fn(),
     onDiscord: vi.fn(),
     onArchivedCampaigns: vi.fn(),
     onExportDiagnostics: vi.fn(async () => "/home/diagnostics/machine-violet.mvdiag"),
@@ -40,9 +40,9 @@ describe("SettingsPhase", () => {
     expect(lastFrame()).toContain("Settings");
   });
 
-  it("renders API Keys menu item", () => {
+  it("renders the Connect to AI menu item", () => {
     const { lastFrame } = render(<SettingsPhase {...defaultProps()} />);
-    expect(lastFrame()).toContain("API Keys");
+    expect(lastFrame()).toContain("Connect to AI");
   });
 
   it("renders an Export Diagnostics menu item", () => {
@@ -59,19 +59,16 @@ describe("SettingsPhase", () => {
     });
   });
 
-  it("calls onApiKeys when API Keys selected", () => {
-    const onApiKeys = vi.fn();
-    const { stdin } = render(<SettingsPhase {...defaultProps({ onApiKeys })} />);
+  it("calls onConnections when Connect to AI is selected", () => {
+    const onConnections = vi.fn();
+    const { stdin } = render(<SettingsPhase {...defaultProps({ onConnections })} />);
     stdin.write("\r"); // Enter on the first item
-    expect(onApiKeys).toHaveBeenCalled();
+    expect(onConnections).toHaveBeenCalled();
   });
 
-  it("deep-links to API Keys when initialView is set", async () => {
-    const onApiKeys = vi.fn();
-    render(<SettingsPhase {...defaultProps({ onApiKeys, initialView: "api_keys" })} />);
-    // setTimeout(0) is used for the deep-link, so wait a tick
-    await new Promise((r) => setTimeout(r, 10));
-    expect(onApiKeys).toHaveBeenCalled();
+  it("renders the standard key-hint footer", () => {
+    const { lastFrame } = render(<SettingsPhase {...defaultProps()} />);
+    expect(lastFrame()).toContain("↑↓ select · Enter open · Esc back");
   });
 
   it("exports diagnostics and displays the saved path", async () => {

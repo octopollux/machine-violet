@@ -23,18 +23,27 @@ const {
   unarchiveCampaignMock,
   pendingRestore,
   collectDiagnosticsMock,
+  healthCheckMock,
+  createProviderMock,
 } = vi.hoisted(() => {
   const pending: ((v: ArchiveResult) => void)[] = [];
   const archiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pending.push(res); }));
   const pendingRestore: ((v: ArchiveResult) => void)[] = [];
   const unarchiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pendingRestore.push(res); }));
   const collectDiagnosticsMock = vi.fn();
+  const healthCheckMock = vi.fn();
+  const createProviderMock = vi.fn(() => ({
+    healthCheck: healthCheckMock,
+    dispose: vi.fn(async () => undefined),
+  }));
   return {
     archiveCampaignMock,
     pending,
     unarchiveCampaignMock,
     pendingRestore,
     collectDiagnosticsMock,
+    healthCheckMock,
+    createProviderMock,
   };
 });
 
@@ -53,6 +62,13 @@ vi.mock("../../config/campaign-archive.js", async (importActual) => {
 vi.mock("../diagnostics.js", () => ({
   collectDiagnostics: collectDiagnosticsMock,
 }));
+
+// Real provider construction would make live network calls from healthCheck;
+// replace only the factory and capture what the check route probes with.
+vi.mock("../../providers/index.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../providers/index.js")>();
+  return { ...actual, createProviderFromConnection: createProviderMock };
+});
 
 import { managementRoutes } from "./management.js";
 
@@ -230,6 +246,108 @@ describe("POST /connections — provider visibility gate", () => {
       connectionId: "xai-1",
       modelId: "grok-imagine-image",
     });
+  });
+});
+
+describe("connection routes — health probe + in-place key fix", () => {
+  let app: FastifyInstance;
+  const tempDirs: string[] = [];
+
+  /** Real file-backed store in a temp config dir (same pattern as the gate tests above). */
+  function seedStore(connections: Parameters<typeof saveConnectionStore>[1]["connections"]): string {
+    const configDir = mkdtempSync(join(tmpdir(), "mv-conn-fix-"));
+    tempDirs.push(configDir);
+    saveConnectionStore(configDir, {
+      connections,
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    return configDir;
+  }
+
+  const openrouterConn = {
+    id: "or-1",
+    provider: "openrouter" as const,
+    label: "OpenRouter",
+    apiKey: "sk-or-original-key-000000000000",
+    models: [],
+    source: "manual" as const,
+    addedAt: "2026-01-01T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    healthCheckMock.mockReset();
+    healthCheckMock.mockResolvedValue({ status: "valid", message: "Valid" });
+    createProviderMock.mockClear();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("probes the health check with a model the connection actually serves (xAI/OpenRouter gpt-4o-mini regression)", async () => {
+    // Regression: with no explicit model, providers sharing the
+    // OpenAI-compatible client fell back to an api.openai.com model id and
+    // e.g. xAI answered 400 "Model not found: gpt-4o-mini" for a valid key.
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({ method: "POST", url: "/connections/or-1/check" });
+
+    expect(res.statusCode).toBe(200);
+    expect(healthCheckMock).toHaveBeenCalledTimes(1);
+    const probed = healthCheckMock.mock.calls[0][0] as string | undefined;
+    // buildEffectiveConnections fills OpenRouter models from the shipped
+    // registry; the probe is its small-tier default — never an OpenAI id,
+    // never undefined.
+    expect(probed).toBe("moonshotai/kimi-k3");
+  });
+
+  it("PATCH /connections/:id replaces the key in place, preserving id and label", async () => {
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/connections/or-1",
+      body: { apiKey: "sk-or-replacement-key-111111111111" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const conn = (res.json().connections as { id: string; label: string; masked: string }[])
+      .find((c) => c.id === "or-1");
+    expect(conn).toBeDefined();
+    expect(conn!.label).toBe("OpenRouter");
+    expect(conn!.masked).toContain("sk-or-repl");
+    // Persisted, not just echoed.
+    const saved = loadConnectionStore(configDir).connections.find((c) => c.id === "or-1");
+    expect(saved?.apiKey).toBe("sk-or-replacement-key-111111111111");
+  });
+
+  it("PATCH rejects an unknown connection with 404 and an empty key with 400", async () => {
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const missing = await app.inject({
+      method: "PATCH", url: "/connections/nope", body: { apiKey: "k" },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const empty = await app.inject({
+      method: "PATCH", url: "/connections/or-1", body: { apiKey: "   " },
+    });
+    expect(empty.statusCode).toBe(400);
+  });
+
+  it("PATCH refuses ChatGPT connections — those are fixed by signing in again", async () => {
+    const configDir = seedStore([{
+      id: "cg-1", provider: "openai-chatgpt", label: "ChatGPT", apiKey: "",
+      models: [], source: "oauth", addedAt: "",
+    }]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({
+      method: "PATCH", url: "/connections/cg-1", body: { apiKey: "k" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/signing in again/i);
   });
 });
 
