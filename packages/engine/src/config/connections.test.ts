@@ -171,20 +171,31 @@ describe("buildEffectiveConnections", () => {
     expect(env?.apiKey).toBe("sk-test-env");
   });
 
-  it("auto-creates an env connection for XAI_API_KEY with current Grok models", () => {
+  it("does not surface an env connection for XAI_API_KEY while xAI is gated (#749)", () => {
     process.env.XAI_API_KEY = "xai-test-env";
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
       imageAssignment: null,
     });
-    const env = effective.connections.find((c) => c.source === "env" && c.provider === "xai");
-    expect(env?.apiKey).toBe("xai-test-env");
-    expect(env?.models.map((m) => m.id)).toContain("grok-4.5");
-    expect(effective.tierAssignments.large).toEqual({
-      connectionId: "env-xai",
-      modelId: "grok-4.5",
+    expect(effective.connections.some((c) => c.provider === "xai")).toBe(false);
+    expect(effective.tierAssignments.large).toBeNull();
+  });
+
+  it("does not surface a saved xAI connection or retain its tier assignments (#749)", () => {
+    const assignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
+        models: [{ id: "grok-4.5", displayName: "Grok 4.5", available: true }],
+        source: "manual", addedAt: "2026-07-24",
+      }],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image" },
     });
+    expect(effective.connections.some((c) => c.provider === "xai")).toBe(false);
+    expect(effective.tierAssignments).toEqual({ large: null, medium: null, small: null });
+    expect(effective.imageAssignment).toBeNull();
   });
 
   it("auto-creates an ephemeral OpenRouter connection from OPENROUTER_API_KEY", () => {
@@ -312,19 +323,19 @@ describe("buildEffectiveConnections", () => {
 
   it("keeps an explicit image model only on the exact Large-tier connection", () => {
     const connection: AIConnection = {
-      id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
-      models: [{ id: "grok-4.5", displayName: "Grok 4.5", available: true }],
+      id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "openai-test",
+      models: [{ id: "gpt-5.5", displayName: "GPT-5.5", available: true }],
       source: "manual", addedAt: "2026-07-24",
     };
-    const assignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    const assignment = { connectionId: "openai-1", modelId: "gpt-5.5" };
     const effective = buildEffectiveConnections({
       connections: [connection],
       tierAssignments: { large: assignment, medium: assignment, small: assignment },
-      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image-quality" },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
     });
     expect(effective.imageAssignment).toEqual({
-      connectionId: "xai-1",
-      modelId: "grok-imagine-image-quality",
+      connectionId: "openai-1",
+      modelId: "gpt-image-2",
     });
   });
 

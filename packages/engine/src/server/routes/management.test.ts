@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 import { norm } from "../../utils/paths.js";
+import { loadConnectionStore, saveConnectionStore } from "../../config/connections.js";
 
 // The archive route's concurrency guard is the unit under test: a second
 // archive of the SAME campaign while the first is in flight must be rejected
@@ -60,11 +64,12 @@ const ARCHIVE_URL = "/campaigns/test-campaign/archive";
 
 async function buildApp(opts: {
   isBusy?: boolean;
+  configDir?: string;
   gameState?: { campaignRoot: string; homeDir: string } | null;
   campaignsDir?: string;
 } = {}): Promise<FastifyInstance> {
   const app = Fastify();
-  app.decorate("configDir", "/tmp/config");
+  app.decorate("configDir", opts.configDir ?? "/tmp/config");
   app.decorate("sessionManager", {
     isBusy: opts.isBusy ?? false,
     getCampaignsDir: () => opts.campaignsDir ?? "/tmp/campaigns",
@@ -145,6 +150,86 @@ describe("PUT /diagnostics — pre-session export", () => {
 
     expect(res.statusCode).toBe(500);
     expect(res.json().error).toBe("Nothing to collect");
+  });
+});
+
+describe("POST /connections — provider visibility gate", () => {
+  let app: FastifyInstance;
+  const tempDirs: string[] = [];
+
+  afterEach(async () => {
+    await app?.close();
+    for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("rejects xAI while the provider is hidden pending its 4.6 retest (#749)", async () => {
+    app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/connections",
+      payload: { provider: "xai", apiKey: "xai-test" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("preserves dormant xAI credentials and untouched assignments across settings writes (#749)", async () => {
+    const configDir = mkdtempSync(join(tmpdir(), "mv-xai-gate-"));
+    tempDirs.push(configDir);
+    const xaiAssignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    saveConnectionStore(configDir, {
+      connections: [
+        {
+          id: "anthropic-1",
+          provider: "anthropic",
+          label: "Anthropic",
+          apiKey: "ant-test",
+          models: [],
+          source: "manual",
+          addedAt: "2026-07-24",
+        },
+        {
+          id: "xai-1",
+          provider: "xai",
+          label: "xAI",
+          apiKey: "xai-test",
+          models: [],
+          source: "manual",
+          addedAt: "2026-07-24",
+        },
+      ],
+      tierAssignments: {
+        large: xaiAssignment,
+        medium: xaiAssignment,
+        small: xaiAssignment,
+      },
+      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image" },
+    });
+
+    app = await buildApp({ configDir });
+    const update = await app.inject({
+      method: "PUT",
+      url: "/connections/anthropic-1/models",
+      payload: { models: [{ id: "claude-opus-5", displayName: "Claude Opus 5", available: true }] },
+    });
+    expect(update.statusCode).toBe(200);
+
+    const visible = await app.inject({ method: "GET", url: "/connections" });
+    expect(visible.statusCode).toBe(200);
+    expect(visible.json().connections.some((connection: { provider: string }) => connection.provider === "xai"))
+      .toBe(false);
+
+    const persisted = loadConnectionStore(configDir);
+    expect(persisted.connections.find((connection) => connection.id === "xai-1")?.apiKey)
+      .toBe("xai-test");
+    expect(persisted.tierAssignments).toEqual({
+      large: xaiAssignment,
+      medium: xaiAssignment,
+      small: xaiAssignment,
+    });
+    expect(persisted.imageAssignment).toEqual({
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image",
+    });
   });
 });
 

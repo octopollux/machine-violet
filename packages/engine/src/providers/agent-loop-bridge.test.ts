@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage, ContentPart } from "./types.js";
 import { runProviderLoop } from "./agent-loop-bridge.js";
+import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
 
 function mockUsage(): NormalizedUsage {
   return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -523,6 +524,8 @@ describe("runProviderLoop with internal-dispatch providers", () => {
 });
 
 describe("runProviderLoop tool-call precedence", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
   it("dispatches surfaced tool calls and follows up even when stopReason is end", async () => {
     const toolHandler = vi.fn(() => ({ content: "17" }));
     const provider: LLMProvider = {
@@ -642,6 +645,310 @@ describe("runProviderLoop tool-call precedence", () => {
       "No side effects were applied",
     );
     expect(result.text).toBe("You rolled a 17.");
+  });
+
+  it("suppresses xAI pre-tool output and releases only final narration", async () => {
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          const r = textPlusToolResult(
+            "Opening on the storm — setting the scene first.",
+            "generate_image",
+          );
+          onDelta(r.text);
+          return r;
+        }
+        const r = textResult("Rain needles the observatory glass.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+    const deltas: string[] = [];
+
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: true,
+      tools: [{
+        name: "generate_image",
+        description: "",
+        inputSchema: { type: "object", properties: {} },
+      }],
+      toolHandler: () => ({ content: "image queued" }),
+      onTextDelta: (delta) => deltas.push(delta),
+    });
+
+    expect(result.text).toBe("Rain needles the observatory glass.");
+    expect(deltas).toEqual(["Rain needles the observatory glass."]);
+    const secondRoundMessages = vi.mocked(provider.stream).mock.calls[1][0].messages;
+    expect(JSON.stringify(secondRoundMessages)).toContain(
+      "ordinary text emitted before this tool call was withheld",
+    );
+    expect(result.turnMessages[0]).toEqual({
+      role: "assistant",
+      content: [{
+        type: "tool_use",
+        id: "toolu_1",
+        name: "generate_image",
+        input: {},
+      }],
+    });
+  });
+
+  it("does not leak or roll back a failed buffered xAI attempt", async () => {
+    vi.useFakeTimers();
+    let callCount = 0;
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(),
+      stream: vi.fn(async (_params, onDelta) => {
+        callCount++;
+        if (callCount === 1) {
+          onDelta("Planning the response...");
+          throw apiError(503, "retry");
+        }
+        const r = textResult("The final scene.");
+        onDelta(r.text);
+        return r;
+      }),
+      healthCheck: vi.fn(),
+    };
+    const onTextDelta = vi.fn();
+    const onRollback = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: true,
+      maxRetries: 1,
+      onTextDelta,
+      onRollback,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result.text).toBe("The final scene.");
+    expect(onTextDelta).toHaveBeenCalledOnce();
+    expect(onTextDelta).toHaveBeenCalledWith("The final scene.");
+    expect(onRollback).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("retries a reasoning-only xAI completion instead of accepting an empty turn", async () => {
+    vi.useFakeTimers();
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(),
+      stream: vi.fn()
+        .mockResolvedValueOnce({
+          text: "",
+          toolCalls: [],
+          usage: { ...mockUsage(), outputTokens: 106, reasoningTokens: 106 },
+          stopReason: "end" as const,
+          assistantContent: [{
+            type: "reasoning" as const,
+            id: "rs_1",
+            encryptedContent: "opaque",
+            summary: ["Preparing the opening"],
+          }],
+        })
+        .mockImplementationOnce(async (_params, onDelta) => {
+          const r = textResult("The observatory doors open.");
+          onDelta(r.text);
+          return r;
+        }),
+      healthCheck: vi.fn(),
+    };
+    const onTextDelta = vi.fn();
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta,
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(provider.stream).toHaveBeenCalledTimes(2);
+    expect(result.text).toBe("The observatory doors open.");
+    expect(result.usage).toMatchObject({
+      inputTokens: 100,
+      outputTokens: 126,
+      reasoningTokens: 106,
+    });
+    expect(onTextDelta).toHaveBeenCalledOnce();
+    expect(onTextDelta).toHaveBeenCalledWith("The observatory doors open.");
+    vi.useRealTimers();
+  });
+
+  it("bounds repeated reasoning-only xAI completions", async () => {
+    vi.useFakeTimers();
+    const emptyResult: ChatResult = {
+      text: "",
+      toolCalls: [],
+      usage: { ...mockUsage(), outputTokens: 30, reasoningTokens: 30 },
+      stopReason: "end",
+      assistantContent: [{
+        type: "reasoning",
+        id: "rs_empty",
+        encryptedContent: "opaque",
+        summary: [],
+      }],
+    };
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(),
+      stream: vi.fn(async () => emptyResult),
+      healthCheck: vi.fn(),
+    };
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: true,
+      onTextDelta: vi.fn(),
+    });
+    let caught: Error | undefined;
+    promise.catch((error: Error) => { caught = error; });
+
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.runAllTimersAsync();
+
+    expect(caught?.message).toContain(
+      "xAI returned reasoning without final output after 3 attempts",
+    );
+    expect((caught as Error & { usage?: NormalizedUsage }).usage).toMatchObject({
+      inputTokens: 150,
+      outputTokens: 90,
+      reasoningTokens: 90,
+    });
+    expect(provider.stream).toHaveBeenCalledTimes(3);
+    vi.useRealTimers();
+  });
+
+  it("keeps xAI empty-final retries independent from transport retries", async () => {
+    vi.useFakeTimers();
+    const emptyResult: ChatResult = {
+      text: "",
+      toolCalls: [],
+      usage: { ...mockUsage(), outputTokens: 12, reasoningTokens: 12 },
+      stopReason: "end",
+      assistantContent: [],
+    };
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(),
+      stream: vi.fn()
+        .mockRejectedValueOnce(apiError(503, "transport"))
+        .mockResolvedValueOnce(emptyResult)
+        .mockResolvedValueOnce(emptyResult)
+        .mockImplementationOnce(async (_params, onDelta) => {
+          const r = textResult("Recovered.");
+          onDelta(r.text);
+          return r;
+        }),
+      healthCheck: vi.fn(),
+    };
+    const promise = runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: true,
+      maxRetries: 1,
+      onTextDelta: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(4000);
+    const result = await promise;
+
+    expect(provider.stream).toHaveBeenCalledTimes(4);
+    expect(result.text).toBe("Recovered.");
+  });
+
+  it("does not turn an empty xAI refusal into an empty-final retry", async () => {
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn(async () => ({
+        text: "",
+        toolCalls: [],
+        usage: mockUsage(),
+        stopReason: "refusal" as const,
+        assistantContent: [],
+      })),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+
+    await expect(runProviderLoop(provider, "system", [
+      { role: "user", content: "Begin." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: false,
+    })).rejects.toBeInstanceOf(ContentRefusalError);
+    expect(provider.chat).toHaveBeenCalledOnce();
+  });
+
+  it("applies the same xAI tool-round policy without streaming", async () => {
+    const provider: LLMProvider = {
+      providerId: "xai",
+      chat: vi.fn()
+        // This sentence is legitimate prose, but xAI gives it the same
+        // structure as leaked operational self-talk. The deterministic policy
+        // drops all tool-round text and asks the final round to restate it.
+        .mockResolvedValueOnce(textPlusToolResult(
+          "Blandine answers before the question finishes.",
+          "roll_dice",
+        ))
+        .mockResolvedValueOnce(textResult(
+          "Blandine answers before the question finishes.\n\nThe die rings against stone.",
+        )),
+      stream: vi.fn(),
+      healthCheck: vi.fn(),
+    };
+    const onTextDelta = vi.fn();
+
+    const result = await runProviderLoop(provider, "system", [
+      { role: "user", content: "Ask Blandine." },
+    ], {
+      name: "dm",
+      model: "grok-4.5",
+      maxTokens: 100,
+      stream: false,
+      tools: [{
+        name: "roll_dice",
+        description: "",
+        inputSchema: { type: "object", properties: {} },
+      }],
+      toolHandler: () => ({ content: "17" }),
+      onTextDelta,
+    });
+
+    expect(result.text).toBe(
+      "Blandine answers before the question finishes.\n\nThe die rings against stone.",
+    );
+    expect(onTextDelta).toHaveBeenCalledOnce();
+    expect(onTextDelta).toHaveBeenCalledWith(result.text);
   });
 });
 

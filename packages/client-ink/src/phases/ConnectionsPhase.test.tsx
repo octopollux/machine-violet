@@ -58,13 +58,13 @@ async function openProviderPicker(props?: Partial<ConnectionsPhaseProps>) {
 }
 
 describe("ConnectionsPhase provider picker", () => {
-  it("offers the validated providers, including Gemini, xAI, and OpenRouter", async () => {
+  it("offers validated providers while hiding xAI pending its 4.6 retest (#749)", async () => {
     const { lastFrame } = await openProviderPicker();
     const frame = lastFrame() ?? "";
     expect(frame).toContain("Anthropic");
     expect(frame).toContain("Google Gemini");
     expect(frame).toContain("OpenAI (API key)");
-    expect(frame).toContain("xAI");
+    expect(frame).not.toContain("xAI");
     expect(frame).toContain("OpenRouter (Kimi K3)");
   });
 

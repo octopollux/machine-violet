@@ -6,8 +6,11 @@
  *
  * Connections are persisted to `connections.json` in the app config dir.
  * Environment keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY /
- * GEMINI_API_KEY, OPENROUTER_API_KEY, XAI_API_KEY) auto-create
+ * GEMINI_API_KEY, OPENROUTER_API_KEY) auto-create
  * connections at runtime via buildEffectiveConnections().
+ *
+ * xAI remains implemented for the Grok 4.6 retest tracked in #749, but is
+ * deliberately absent from effective/user-visible connections until then.
  */
 import { readFileSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -110,7 +113,6 @@ const STORE_FILENAME = "connections.json";
 const ENV_ANTHROPIC_ID = "env-anthropic";
 const ENV_GEMINI_ID = "env-gemini";
 const ENV_OPENAI_ID = "env-openai";
-const ENV_XAI_ID = "env-xai";
 const ENV_OPENROUTER_ID = "env-openrouter";
 
 function generateId(): string {
@@ -253,23 +255,6 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     });
   }
 
-  // Environment: xAI
-  const xaiKey = process.env.XAI_API_KEY;
-  if (xaiKey) {
-    const knownModels = getModelsForProvider("xai", configDir);
-    connections.push({
-      id: ENV_XAI_ID,
-      provider: "xai",
-      label: "xAI (env)",
-      apiKey: xaiKey,
-      models: Object.entries(knownModels).map(([id, m]) => ({
-        id, displayName: m.displayName, available: true,
-      })),
-      source: "env",
-      addedAt: "",
-    });
-  }
-
   // Environment: OpenRouter
   const openrouterKey = process.env.OPENROUTER_API_KEY;
   if (openrouterKey) {
@@ -324,7 +309,7 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
   // a live `model/list` call against the codex subprocess at session
   // startup, so whatever lands here gets replaced before the model picker
   // ever consults it.
-  for (const conn of stored.connections.filter((c) => c.source !== "env")) {
+  for (const conn of stored.connections.filter((c) => c.source !== "env" && c.provider !== "xai")) {
     if (!conn.models) conn.models = [];
     const knownModels = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
     const knownIds = Object.keys(knownModels);
@@ -416,7 +401,6 @@ export function removeConnection(store: ConnectionStore, connectionId: string): 
     || connectionId === ENV_GEMINI_ID
     || connectionId === ENV_OPENAI_ID
     || connectionId === ENV_OPENROUTER_ID
-    || connectionId === ENV_XAI_ID
   ) return store;
   const connections = store.connections.filter((c) => c.id !== connectionId);
   // Clear tier assignments that referenced this connection

@@ -928,6 +928,13 @@ export function createSetupConversation(
     generate_image: { criticality: "expensive" },
     set_portrait: { criticality: "durable" },
   };
+  // A partial finalize repair may cross a runTurn boundary (for example when
+  // the provider emits a text-only response after receiving the validation
+  // error). Keep both the accepted payload and narrowed tool schema at
+  // conversation scope so the next player/setup turn can finish the repair
+  // without regenerating the large fields.
+  let activeTools = TOOLS;
+  let pendingFinalizeInput: Record<string, unknown> | undefined;
 
   // Breadcrumb so the harness can confirm setup-agent actually believes it
   // should be doing portraits. If this is false in a live image-gen smoke
@@ -1255,6 +1262,39 @@ export function createSetupConversation(
     const MAX_ROUNDS = 4;
     let text = "";
 
+    /**
+     * Once a provider has supplied most of finalize_setup, retain the accepted
+     * fields and narrow the next round's schema to only what was missing.
+     * Grok otherwise tends to regenerate the very large campaign_detail while
+     * repeatedly omitting a short late field such as handoff_note.
+     */
+    function setFinalizeRepairSchema(missingFields: string[]): void {
+      const allProperties = FINALIZE_TOOL.inputSchema.properties as Record<string, unknown>;
+      // Issues can point at fields outside the contract (e.g. an
+      // additionalProperties rejection names the unknown field). Those can't
+      // be advertised in a repair schema — keep the full tool in that case.
+      const fields = missingFields.filter((field) => Object.hasOwn(allProperties, field));
+      if (fields.length === 0) {
+        activeTools = TOOLS;
+        return;
+      }
+      const properties = Object.fromEntries(
+        fields.map((field) => [field, allProperties[field]]),
+      );
+      const repairTool: NormalizedTool = {
+        ...FINALIZE_TOOL,
+        description:
+          "Repair the prior finalize_setup call. Already accepted fields are retained. "
+          + `Call this with only these missing fields: ${fields.join(", ")}.`,
+        inputSchema: {
+          type: "object",
+          properties,
+          required: fields,
+        },
+      };
+      activeTools = TOOLS.map((tool) => tool.name === FINALIZE_TOOL.name ? repairTool : tool);
+    }
+
     // Per-turn state set by `dispatchTool` for providers that own tool
     // dispatch internally (openai-chatgpt — codex's `item/tool/call` server
     // requests must be answered synchronously, so we can't wait for the
@@ -1307,13 +1347,52 @@ export function createSetupConversation(
         );
         return { content: rejected.content, isError: true };
       }
+      // A finalize repair may arrive as a partial call — the narrowed repair
+      // schema (setFinalizeRepairSchema) advertises only the missing fields —
+      // so merge it over the retained payload before validating: the full
+      // contract judges the combined call.
+      const effectiveInput = call.name === "finalize_setup" && pendingFinalizeInput
+        ? { ...pendingFinalizeInput, ...call.input }
+        : call.input;
       const validation = validateToolInput<Record<string, unknown>>(
         definition,
-        call.input,
+        effectiveInput,
         policy,
         context,
       );
       if (!validation.ok) {
+        if (call.name === "finalize_setup") {
+          // Retain the accepted fields and narrow the advertised schema to
+          // the failing ones. Grok otherwise tends to regenerate the very
+          // large fields while repeatedly omitting a short late field such
+          // as handoff_note — and a partial repair may cross a runTurn
+          // boundary when the provider answers the error with text only
+          // (pendingFinalizeInput/activeTools live at conversation scope
+          // for exactly that reason). Retain only schema-known properties:
+          // an unknown-field rejection would otherwise be reintroduced by
+          // the merge on every retry, making the repair impossible.
+          const knownProperties = FINALIZE_TOOL.inputSchema.properties as Record<string, unknown>;
+          pendingFinalizeInput = Object.fromEntries(
+            Object.entries(effectiveInput).filter(([key]) => Object.hasOwn(knownProperties, key)),
+          );
+          const repairFields = [...new Set(
+            validation.issues
+              .map((issue) => issue.path.split("/")[1])
+              .filter((field): field is string => Boolean(field)),
+          )];
+          setFinalizeRepairSchema(repairFields);
+          logEvent("setup:finalize_rejected", {
+            model,
+            providerId: provider.providerId,
+            missingFields: repairFields,
+          });
+          return {
+            content: `${validation.content}\n`
+              + "Fields already supplied are retained. Call finalize_setup again with only "
+              + "the listed fields corrected; do not end setup.",
+            isError: true,
+          };
+        }
         return { content: validation.content, isError: true };
       }
       const input = validation.value;
@@ -1378,6 +1457,8 @@ export function createSetupConversation(
           );
           return { content: rejected.content, isError: true };
         }
+        pendingFinalizeInput = undefined;
+        activeTools = TOOLS;
         handleFinalize(input as FinalizeSetupInput);
         return {
           content: "Setup finalized. Say a brief farewell (don't narrate on behalf of the DM!) and finish with a separator: `---`",
@@ -1396,7 +1477,7 @@ export function createSetupConversation(
         maxTokens: getMaxOutput(model),
         systemPrompt,
         messages,
-        tools: TOOLS,
+        tools: activeTools,
         thinking,
         cacheHints,
         // Per-call dispatch for providers that own the tool loop internally
@@ -1428,7 +1509,27 @@ export function createSetupConversation(
         },
       };
 
-      const result = await streamWithRetry(provider, params, onDelta, onRetry);
+      // Grok sometimes emits operational self-talk as ordinary output_text
+      // alongside finalize_setup ("I'll send the complete payload now").
+      // xAI's real reasoning stream is already separated by the provider, so
+      // buffer its setup text until we know whether this is a finalize round.
+      // Finalize-round text is never useful player dialogue: rejected calls
+      // need a silent retry, while accepted calls get a dedicated farewell
+      // round from the tool result below.
+      let bufferedXaiText = "";
+      const result = await streamWithRetry(
+        provider,
+        params,
+        provider.providerId === "xai"
+          ? (delta) => { bufferedXaiText += delta; }
+          : onDelta,
+        onRetry,
+      );
+      const suppressXaiFinalizeText = provider.providerId === "xai"
+        && result.toolCalls.some((call) => call.name === "finalize_setup");
+      if (provider.providerId === "xai" && !suppressXaiFinalizeText && bufferedXaiText) {
+        onDelta(bufferedXaiText);
+      }
       // Portrait drafts are now persisted directly inside dispatchGenerateImage
       // when the model calls the generate_image function tool — no post-hoc
       // assistantContent scrape needed.
@@ -1497,7 +1598,7 @@ export function createSetupConversation(
       totalUsage.cacheCreationTokens += result.usage.cacheCreationTokens;
       totalUsage.reasoningTokens += result.usage.reasoningTokens;
 
-      text += result.text;
+      if (!suppressXaiFinalizeText) text += result.text;
       if (result.thinkingText) dumpThinking("setup", round, result.thinkingText);
 
       // Append assistant message (thinking already stripped by provider)

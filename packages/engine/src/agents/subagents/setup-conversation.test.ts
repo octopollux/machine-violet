@@ -404,6 +404,112 @@ describe("createSetupConversation", () => {
     expect(retry).toContain("one authoritative call");
   });
 
+  it("rejects a partial finalize_setup and narrows the repair schema to the missing fields", async () => {
+    // Real xAI regression: the model returned the schema-prefix campaign
+    // fields through campaign_scope but omitted the identity fields. The old
+    // fallback path scaffolded Player/Adventurer/The Unknown permanently.
+    const partial = {
+      genre: "Cinematic science-fantasy mystery",
+      system: "fate-accelerated",
+      campaign_name: "The Orrery of Storms",
+      campaign_premise: "A storm-battered observatory hangs above a gas giant.",
+      mood: "Tense but hopeful",
+      difficulty: "Balanced",
+      campaign_scope: "one-shot",
+    };
+    const repaired = {
+      dm_personality: "The Chronicler",
+      player_name: "Alex",
+      character_name: "Mara Voss",
+      character_description: "A disgraced cartographer summoned by a map that knows her name.",
+      age_group: "adult",
+      handoff_note: "Alex wants Mara's cartographic competence and distrust of institutions preserved.",
+      opening_scene: "Open with Mara tracing an uncharted contour that is not on her own map.",
+    };
+    const provider = mockProvider([
+      finalizeResponse(partial),
+      finalizeResponse(repaired),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(provider.stream).toHaveBeenCalledTimes(3);
+    expect(result.finalized).toMatchObject({
+      playerName: "Alex",
+      characterName: "Mara Voss",
+      personality: { name: "The Chronicler" },
+    });
+
+    const repairCall = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const serialized = JSON.stringify(repairCall.messages);
+    expect(serialized).toContain("Fields already supplied are retained");
+    expect(serialized).toContain('"is_error":true');
+    const repairTool = repairCall.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(Object.keys(repairTool.inputSchema.properties).sort()).toEqual([
+      "age_group",
+      "character_description",
+      "character_name",
+      "dm_personality",
+      "handoff_note",
+      "opening_scene",
+      "player_name",
+    ]);
+  });
+
+  it("retains a partial finalize payload across setup turns", async () => {
+    const withoutHandoff = Object.fromEntries(
+      Object.entries(FINALIZE_INPUT).filter(([key]) => key !== "handoff_note"),
+    );
+    const provider = mockProvider([
+      finalizeResponse(withoutHandoff),
+      textResponse("I still need to seal the handoff."),
+      finalizeResponse({ handoff_note: FINALIZE_INPUT.handoff_note }),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+
+    const first = await conv.start(noop);
+    expect(first.finalized).toBeUndefined();
+
+    const second = await conv.send("Continue.", noop);
+    expect(second.finalized).toMatchObject({
+      campaignName: FINALIZE_INPUT.campaign_name,
+      playerName: FINALIZE_INPUT.player_name,
+      characterName: FINALIZE_INPUT.character_name,
+      handoffNote: FINALIZE_INPUT.handoff_note,
+    });
+
+    const crossTurnRepair = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[2][0];
+    const repairTool = crossTurnRepair.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(repairTool.inputSchema.required).toEqual(["handoff_note"]);
+    expect(Object.keys(repairTool.inputSchema.properties)).toEqual(["handoff_note"]);
+  });
+
+  it("does not reintroduce a rejected unknown field on the finalize retry", async () => {
+    // The retained payload must hold schema-known properties only — otherwise
+    // an additionalProperties rejection is merged back in on every retry and
+    // the repair can never complete.
+    const provider = mockProvider([
+      finalizeResponse({ ...FINALIZE_INPUT, bogus_field: "surprise" }),
+      finalizeResponse({}),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(result.finalized).toMatchObject({
+      campaignName: FINALIZE_INPUT.campaign_name,
+      characterName: FINALIZE_INPUT.character_name,
+    });
+    const rejection = JSON.stringify(vi.mocked(provider.stream).mock.calls[1]?.[0]);
+    expect(rejection).toContain("/bogus_field");
+  });
+
   it("finalize_setup passes through handoff_note", async () => {
     const note = "Player leans noir-burnout. Wants ensemble scenes, not solo monologues.";
     const input = { ...FINALIZE_INPUT, handoff_note: note };
@@ -445,6 +551,74 @@ describe("createSetupConversation", () => {
     expect(result.finalized).toBeUndefined();
     expect(JSON.stringify(vi.mocked(provider.stream).mock.calls[1]?.[0]))
       .toContain("/handoff_note");
+  });
+
+  it("repairs a malformed custom DM personality name without replacing its prompt", async () => {
+    const malformedName = 'prompt\u200b_\u200bplaceholder\u200b_\u200bremove\u200b_\u200bme": "skip';
+    const customPrompt = "You are the Dreamweaver. Narrate with hopeful gothic intimacy.";
+    const provider = mockProvider([
+      finalizeResponse({
+        ...FINALIZE_INPUT,
+        dm_personality: malformedName,
+        dm_personality_prompt: customPrompt,
+      }),
+      finalizeResponse({ dm_personality: "Dreamweaver" }),
+      textResponse("The handoff is ready.\n\n---"),
+    ]);
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start(noop);
+
+    expect(result.finalized?.personality).toEqual({
+      name: "Dreamweaver",
+      prompt_fragment: customPrompt,
+    });
+    const repairCall = (provider.stream as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    const repairTool = repairCall.tools.find(
+      (tool: { name: string }) => tool.name === "finalize_setup",
+    );
+    expect(repairTool.inputSchema.required).toEqual(["dm_personality"]);
+    expect(Object.keys(repairTool.inputSchema.properties)).toEqual(["dm_personality"]);
+  });
+
+  it("suppresses xAI finalize planning text while retrying an incomplete handoff", async () => {
+    const partial = {
+      genre: "Science fantasy",
+      campaign_name: "Meridian Spire",
+      campaign_premise: "An observatory hangs above a gas giant.",
+      mood: "Tense but hopeful",
+      difficulty: "Balanced",
+      dm_personality: "The Chronicler",
+      player_name: "Lyra Quill",
+      age_group: "adult",
+      character_name: "Captain Lyra Quill",
+      character_description: "A defiant orbital archivist.",
+      opening_scene: "Open with Lyra suspended in the observatory survey chair.",
+    };
+    const responses = [
+      { ...finalizeResponse(partial), text: "I will send the complete payload now." },
+      {
+        ...finalizeResponse({
+          handoff_note: "Lyra wants grounded competence and wonder.",
+        }),
+        text: "Right. Full payload:",
+      },
+      textResponse("Everything is ready.\n\n---"),
+    ];
+    let callIdx = 0;
+    const provider = mockProvider([]);
+    provider.providerId = "xai";
+    provider.stream = vi.fn(async (_params, onDelta) => {
+      const response = responses[callIdx++];
+      if (response.text) onDelta(response.text);
+      return response;
+    });
+    const deltas: string[] = [];
+    const conv = createSetupConversation(provider, "grok-4.5");
+    const result = await conv.start((delta) => deltas.push(delta));
+
+    expect(result.finalized?.characterName).toBe("Captain Lyra Quill");
+    expect(result.text).toBe("Everything is ready.\n\n---");
+    expect(deltas.join("")).toBe("Everything is ready.\n\n---");
   });
 
   it("finalize_setup passes through opening_scene", async () => {
