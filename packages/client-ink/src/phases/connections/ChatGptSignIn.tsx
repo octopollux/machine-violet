@@ -9,12 +9,14 @@
  * component never renders a success screen of its own.
  */
 import React, { useState, useEffect, useRef } from "react";
-import { useInput, Text } from "ink";
+import { useInput, Box } from "ink";
 import type { ResolvedTheme } from "../../tui/themes/types.js";
 import { FullScreenFrame, hintBar, menuPalette } from "../../tui/components/index.js";
+import { CenteredModal } from "../../tui/modals/CenteredModal.js";
 import { openPath } from "../../commands/open-path.js";
 import { copyToClipboard } from "../../utils/clipboard.js";
 import type { ChatGptLoginStartResponse, ChatGptLoginStatusResponse } from "../../api-client.js";
+import type { FormattingNode } from "@machine-violet/shared";
 
 export interface ChatGptSignInProps {
   theme: ResolvedTheme;
@@ -96,41 +98,65 @@ export function ChatGptSignIn({
 
   const pal = menuPalette(theme);
   const status = loginStatus?.status ?? "pending";
-  const lines: React.ReactNode[] = [];
+
+  // Modal-style body: styled lines rendered by CenteredModal, which wraps
+  // long rows (the OAuth URL) to the modal's inner width and pads every row
+  // opaque. Hints live in the modal footer, keeping the Esc-until-success
+  // grammar.
+  const colored = (text: string, color: string): FormattingNode[] =>
+    [{ type: "color" as const, color, content: [text] }];
+
+  const styled: FormattingNode[][] = [];
+  let footer = ` ${hintBar("Esc cancel")} `;
 
   if (loginError) {
-    lines.push(<Text key="err" color="#cc4444">Error: {loginError}</Text>);
-    lines.push(<Text key="err-gap"> </Text>);
-    lines.push(<Text key="err-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
+    styled.push(colored(`Error: ${loginError}`, "#cc4444"));
+    footer = ` ${hintBar("Esc back")} `;
   } else if (!loginInfo) {
-    lines.push(<Text key="starting" color={pal.fg}>Starting the sign-in flow…</Text>);
-    lines.push(<Text key="s-gap"> </Text>);
-    lines.push(<Text key="s-hint" color={pal.dim}>{hintBar("Esc cancel")}</Text>);
+    styled.push(colored("Starting the sign-in flow…", pal.fg));
   } else if (status === "pending" || status === "success") {
     // Success unmounts via onSuccess in the same tick; render the pending
     // layout until the parent swaps screens so there is no flash.
-    lines.push(<Text key="open" color={pal.fg}>Sign in by opening this URL in your browser:</Text>);
-    lines.push(<Text key="o-gap"> </Text>);
-    lines.push(<Text key="url" color="#88ccff">{loginInfo.authUrl}</Text>);
-    lines.push(<Text key="u-gap"> </Text>);
-    lines.push(<Text key="waiting" color={pal.dim}>Waiting for browser authentication…</Text>);
-    if (copyStatus === "copied") lines.push(<Text key="copied" color="#88cc88">URL copied to clipboard.</Text>);
-    else if (copyStatus === "failed") lines.push(<Text key="copyfail" color="#cc4444">Clipboard unavailable.</Text>);
-    lines.push(<Text key="hint-gap"> </Text>);
-    lines.push(
-      <Text key="hints" color={pal.dim}>{hintBar("o open in browser", "c copy URL", "Esc cancel")}</Text>,
-    );
+    styled.push(colored("Sign in by opening this URL in your browser:", pal.fg));
+    styled.push([]);
+    styled.push(colored(loginInfo.authUrl, "#88ccff"));
+    styled.push([]);
+    styled.push(colored("Waiting for browser authentication…", pal.dim));
+    if (copyStatus === "copied") styled.push(colored("URL copied to clipboard.", "#88cc88"));
+    else if (copyStatus === "failed") styled.push(colored("Clipboard unavailable.", "#cc4444"));
+    footer = ` ${hintBar("o open in browser", "c copy URL", "Esc cancel")} `;
   } else if (status === "cancelled") {
-    lines.push(<Text key="cancelled" color={pal.dim}>Sign-in cancelled.</Text>);
-    lines.push(<Text key="c-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
+    styled.push(colored("Sign-in cancelled.", pal.dim));
+    footer = ` ${hintBar("Esc back")} `;
   } else {
-    lines.push(<Text key="failed" color="#cc4444">Sign-in failed: {loginStatus?.error ?? "unknown error"}</Text>);
-    lines.push(<Text key="f-hint" color={pal.dim}>{hintBar("Esc back")}</Text>);
+    styled.push(colored(`Sign-in failed: ${loginStatus?.error ?? "unknown error"}`, "#cc4444"));
+    footer = ` ${hintBar("Esc back")} `;
+  }
+
+  // Pad to ~60% of terminal height with empty lines so the modal body is
+  // fully opaque over the backdrop frame (CenteredModal pads each line to
+  // innerWidth, so empty rows render as blank opaque rows).
+  const targetRows = Math.max(styled.length, Math.floor(rows * 0.6) - 4);
+  while (styled.length < targetRows) {
+    styled.push([]);
   }
 
   return (
-    <FullScreenFrame theme={theme} columns={columns} rows={rows} title="Connect to AI" contentRows={lines.length}>
-      {lines}
-    </FullScreenFrame>
+    <Box flexDirection="column" width={columns} height={rows}>
+      <FullScreenFrame theme={theme} columns={columns} rows={rows} title="Connect to AI" contentRows={0}>
+        {[]}
+      </FullScreenFrame>
+      <CenteredModal
+        theme={theme}
+        width={columns}
+        height={rows}
+        title="Sign in with ChatGPT"
+        widthFraction={0.6}
+        minWidth={50}
+        maxWidth={Math.max(50, Math.floor(columns * 0.6))}
+        styledLines={styled}
+        footer={footer}
+      />
+    </Box>
   );
 }
