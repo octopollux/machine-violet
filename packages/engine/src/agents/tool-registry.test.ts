@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { createTestRegistry } from "./tool-registry.js";
+import { describe, it, expect, vi } from "vitest";
+import {
+  createTestRegistry,
+  TOOL_CRITICALITY,
+} from "./tool-registry.js";
+import { validateToolInput } from "./tool-contract.js";
 import type { GameState } from "./game-state.js";
 import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState, createDefaultConfig } from "../tools/combat/index.js";
@@ -50,6 +54,31 @@ describe("ToolRegistry", () => {
     for (const def of defs) {
       expect(def.name).toBeTruthy();
       expect(def.inputSchema.type).toBe("object");
+    }
+  });
+
+  it("requires an explicit criticality for every registered tool", () => {
+    const reg = createTestRegistry();
+    expect(Object.keys(TOOL_CRITICALITY).sort()).toEqual(
+      reg.getDefinitions().map((definition) => definition.name).sort(),
+    );
+  });
+
+  it("keeps every registered JSON Schema executable", () => {
+    const reg = createTestRegistry();
+    const policies = reg.getInputPolicies();
+    for (const definition of reg.getDefinitions()) {
+      const result = validateToolInput(
+        definition,
+        {},
+        policies[definition.name],
+      );
+      if (!result.ok) {
+        expect(
+          result.issues.some((issue) => issue.code === "invalid_contract_schema"),
+          `${definition.name} has an invalid contract schema`,
+        ).toBe(false);
+      }
     }
   });
 
@@ -319,7 +348,8 @@ describe("ToolRegistry", () => {
     const state = mockState();
     const result = reg.dispatch(state, "dm_notes", { action: "delete" });
     expect(result.is_error).toBe(true);
-    expect(result.content).toContain("Invalid action");
+    expect(result.content).toContain("/action");
+    expect(result.content).toContain("one of");
   });
 
   it("getDefinitionsFor returns only requested tools, skips unknown", () => {
@@ -386,6 +416,26 @@ describe("ToolRegistry", () => {
       resources: "HP, Spell Slots",
     });
     expect(state.displayResources["Aldric"]).toEqual(["HP", "Spell Slots"]);
+  });
+
+  it("set_display_resources rejects ambiguous input before any side effect", () => {
+    const reg = createTestRegistry();
+    const state = mockState();
+    state.displayResources["Aldric"] = ["HP"];
+    reg.persist = vi.fn();
+    reg.onToolSuccess = vi.fn();
+
+    const result = reg.dispatch(state, "set_display_resources", {
+      character: "Aldric",
+      resources: [42],
+    });
+
+    expect(result.is_error).toBe(true);
+    expect(result.content).toContain("/resources/0");
+    expect(result.content).toContain("No side effects were applied");
+    expect(state.displayResources["Aldric"]).toEqual(["HP"]);
+    expect(reg.persist).not.toHaveBeenCalled();
+    expect(reg.onToolSuccess).not.toHaveBeenCalled();
   });
 
   it("set_resource_values stores and merges values on state", () => {

@@ -3,6 +3,7 @@ import { Text, Box } from "ink";
 import { ScrollView } from "ink-scroll-view";
 import type { ScrollViewRef } from "ink-scroll-view";
 import { InlineImage } from "../image/InlineImage.js";
+import type { TranscriptStateCheckpoint } from "@machine-violet/shared";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines } from "../formatting.js";
 import { QUOTE_RULE } from "../narrative/layout.js";
@@ -72,6 +73,9 @@ function tailFingerprint(lines: NarrativeLine[]): string {
     fp += l.kind;
     fp += ":";
     fp += l.text;
+    if (l.kind === "metadata") {
+      fp += JSON.stringify(l.event);
+    }
     fp += "\n";
   }
   return fp;
@@ -182,6 +186,11 @@ interface NarrativeAreaProps {
   /** When true, dev/debug lines are shown in the narrative. */
   showVerbose?: boolean;
   /**
+   * Reports the historical checkpoint selected by scrollback. Null means the
+   * viewport is at the live bottom (or has no checkpoint history).
+   */
+  onTranscriptStateChange?: (state: TranscriptStateCheckpoint | null) => void;
+  /**
    * Absolute top row of the narrative viewport (where the ScrollView clips).
    * Passed to InlineImage so it can crop the out-of-band graphics to the
    * viewport. Equals PlayingPhase's `conversationPaneTop`.
@@ -197,16 +206,52 @@ export function scrollAmount(viewportRows: number): number {
 }
 
 /**
+ * Checkpoints sit after the turn whose resulting state they capture. For a
+ * viewport row, choose the next checkpoint at or below that row so prose from
+ * the visible turn is paired with that turn's final state.
+ */
+export function checkpointForScrollOffset(
+  lines: readonly ProcessedLine[],
+  offset: number,
+  getItemPosition: (index: number) => { top: number; height: number } | null,
+): TranscriptStateCheckpoint | null {
+  let lastMeasured: TranscriptStateCheckpoint | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const metadata = lines[i].metadata;
+    if (metadata?.type !== "state_checkpoint") continue;
+    const checkpoint = metadata.state;
+    const position = getItemPosition(i);
+    if (!position) continue;
+    lastMeasured = checkpoint;
+    if (position.top >= offset) return checkpoint;
+  }
+  return lastMeasured;
+}
+
+/**
  * Scrolling narrative area using ink-scroll-view.
  * Auto-scrolls to bottom when new content arrives (unless user scrolled up).
  * Exposes scrollBy via ref for keyboard scrolling.
  */
 export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>(
-  function NarrativeArea({ lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor, mouseScrollOverrideRef, showVerbose, viewportTop }, ref) {
+  function NarrativeArea({
+    lines, maxRows, quoteColor, playerColor, width, themeAsset, separatorColor,
+    mouseScrollOverrideRef, showVerbose, viewportTop, onTranscriptStateChange,
+  }, ref) {
   const scrollRef = useRef<ScrollViewRef>(null);
   const localHandleRef = useRef<ScrollHandle>(null);
   const [linesBelow, setLinesBelow] = useState(0);
   const atBottomRef = useRef(true);
+
+  // Filter out dev lines when verbose display is disabled.
+  const visibleLines = useMemo(
+    () => showVerbose ? lines : lines.filter((l) => l.kind !== "dev"),
+    [lines, showVerbose],
+  );
+
+  // Incremental pipeline: frozen prefix cached, only tail reprocessed.
+  // Checkpoints survive this pipeline as zero-height processed rows.
+  const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
   // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
@@ -239,7 +284,12 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     const below = Math.max(0, bottom - offset);
     setLinesBelow(below);
     atBottomRef.current = below <= 0;
-  }, []);
+    onTranscriptStateChange?.(
+      below <= 0
+        ? null
+        : checkpointForScrollOffset(processedLines, offset, (index) => sv.getItemPosition(index)),
+    );
+  }, [onTranscriptStateChange, processedLines]);
 
   const handleScroll = useCallback((_offset: number) => {
     updateScrollState();
@@ -270,15 +320,6 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
     return () => { process.stdout.off("resize", onResize); };
   }, [updateScrollState]);
 
-  // Filter out dev lines when verbose display is disabled.
-  const visibleLines = useMemo(
-    () => showVerbose ? lines : lines.filter((l) => l.kind !== "dev"),
-    [lines, showVerbose],
-  );
-
-  // Incremental pipeline: frozen prefix cached, only tail reprocessed
-  const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
-
   // Graphics capabilities for inline images (null → render nothing inline).
   const graphicsCaps = gameCtx?.graphicsCaps ?? null;
 
@@ -290,7 +331,12 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   const usageStatus = gameCtx?.usageStatus ?? null;
   return (
     <Box height={maxRows} flexDirection="column">
-      <ScrollView ref={scrollRef} onScroll={handleScroll}>
+      <ScrollView
+        ref={scrollRef}
+        onScroll={handleScroll}
+        onContentHeightChange={updateScrollState}
+        onItemHeightChange={updateScrollState}
+      >
         {processedLines.map((line, i) => (
           <NarrativeLineComponent
             key={i}
@@ -336,6 +382,12 @@ interface NarrativeLineProps {
 const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
   line, playerColor, width, themeAsset, separatorColor, viewportTop, viewportRows, graphicsCaps,
 }: NarrativeLineProps) {
+  // Transcript metadata participates in ScrollView measurement/order but
+  // consume no terminal rows and render no user-visible content.
+  if (line.kind === "metadata") {
+    return <Box height={0} />;
+  }
+
   // Spacer lines render as visual blank lines (paragraph spacing)
   // but are invisible to the formatting/healing pipeline.
   if (line.kind === "spacer") {

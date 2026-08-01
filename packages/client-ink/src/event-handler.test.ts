@@ -6,6 +6,13 @@ import {
 } from "./event-handler.js";
 import type { ServerEvent } from "@machine-violet/shared";
 
+const checkpoint = {
+  version: 1 as const,
+  modelines: { Aldric: "Bruised" },
+  displayResources: { Aldric: ["HP"] },
+  resourceValues: { Aldric: { HP: "18/30" } },
+};
+
 function makeHarness() {
   let state = initialClientState();
   const update: StateUpdater = (fn) => {
@@ -95,6 +102,24 @@ describe("event-handler", () => {
 
       const kinds = h.state.narrativeLines.map((l) => l.kind);
       expect(kinds).toEqual(["dm"]);
+    });
+
+    it("appends invisible transcript checkpoints in event order", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "narrative:chunk", data: { text: "The gate falls.", kind: "dm" } });
+      h.dispatch({
+        type: "transcript:metadata",
+        data: { type: "state_checkpoint", state: checkpoint },
+      });
+
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "dm", text: "The gate falls." },
+        {
+          kind: "metadata",
+          text: "",
+          event: { type: "state_checkpoint", state: checkpoint },
+        },
+      ]);
     });
   });
 
@@ -190,7 +215,12 @@ describe("event-handler", () => {
       const h = makeHarness();
       h.dispatch({
         type: "choices:presented",
-        data: { id: "c1", prompt: "Pick one", choices: ["A", "B"] },
+        data: {
+          id: "c1",
+          source: "present_choices",
+          prompt: "Pick one",
+          choices: ["A", "B"],
+        },
       });
 
       expect(h.state.activeChoices).not.toBeNull();
@@ -201,7 +231,12 @@ describe("event-handler", () => {
       const h = makeHarness();
       h.dispatch({
         type: "choices:presented",
-        data: { id: "c1", prompt: "Pick", choices: ["A"] },
+        data: {
+          id: "c1",
+          source: "present_choices",
+          prompt: "Pick",
+          choices: ["A"],
+        },
       });
       h.dispatch({ type: "choices:cleared", data: {} });
 
@@ -361,6 +396,26 @@ describe("event-handler", () => {
       expect(h.state.stateSnapshot!.campaignId).toBe("c1");
     });
 
+    it("restores the active choice presentation on gameplay reconnect", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          activeChoices: {
+            id: "choice-1",
+            source: "suggestion_generator",
+            prompt: "",
+            choices: ["◆ <b>Open</b> the door"],
+          },
+        },
+      });
+      expect(h.state.activeChoices?.id).toBe("choice-1");
+      expect(h.state.activeChoices?.choices[0]).toBe("◆ <b>Open</b> the door");
+    });
+
     // Issue #431: snapshots that include narrativeLines act as authoritative
     // resets — the server uses this on retry rollback to discard a partial
     // DM stream that's about to be re-issued, and on connect to give
@@ -442,6 +497,40 @@ describe("event-handler", () => {
         { kind: "dm", text: "The door swings open." },
         { kind: "dm", text: "" },
         { kind: "dm", text: "A bell chimes." },
+      ]);
+    });
+
+    it("preserves checkpoints across authoritative retry replacement", () => {
+      const h = makeHarness();
+      h.dispatch({
+        type: "state:snapshot",
+        data: {
+          campaignId: "c1", campaignName: "Test", players: [],
+          activePlayerIndex: 0, displayResources: {}, resourceValues: {},
+          modelines: {}, mode: "play",
+          narrativeLines: [
+            { kind: "dm", text: "The gate falls." },
+            {
+              kind: "metadata",
+              text: "",
+              event: { type: "state_checkpoint", state: checkpoint },
+            },
+            { kind: "player", text: "[Aldric] crawl free" },
+            { kind: "dm", text: "You emerge into daylight." },
+          ],
+        },
+      });
+
+      expect(h.state.narrativeLines).toEqual([
+        { kind: "dm", text: "The gate falls." },
+        {
+          kind: "metadata",
+          text: "",
+          event: { type: "state_checkpoint", state: checkpoint },
+        },
+        { kind: "player", text: "[Aldric] crawl free" },
+        { kind: "separator", text: "---" },
+        { kind: "dm", text: "You emerge into daylight." },
       ]);
     });
 
@@ -766,7 +855,12 @@ describe("event-handler", () => {
 
       h.dispatch({
         type: "choices:presented",
-        data: { id: "x", prompt: "", choices: ["a", "b"] },
+        data: {
+          id: "x",
+          source: "suggestion_generator",
+          prompt: "",
+          choices: ["a", "b"],
+        },
       });
       expect(h.state.lastError).toBeNull();
     });

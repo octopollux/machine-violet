@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  upsertChatGptConnection,
+  addConnection, removeConnection, setImageAssignment, setTierAssignment, upsertChatGptConnection,
 } from "./connections.js";
 import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
@@ -19,6 +19,15 @@ afterEach(() => {
 });
 
 describe("loadConnectionStore migration", () => {
+  it("migrates pre-image-selection stores to a null provider default", () => {
+    const legacy = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+    };
+    writeFileSync(join(tempDir, "connections.json"), JSON.stringify(legacy));
+    expect(loadConnectionStore(tempDir).imageAssignment).toBeNull();
+  });
+
   it("rewrites legacy provider 'openai' to 'openai-apikey'", () => {
     const legacy = {
       connections: [
@@ -77,6 +86,7 @@ describe("saveConnectionStore", () => {
     saveConnectionStore(tempDir, {
       connections: [conn],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const loaded = loadConnectionStore(tempDir);
     expect(loaded.connections).toHaveLength(1);
@@ -84,7 +94,11 @@ describe("saveConnectionStore", () => {
   });
 
   it("writes atomically — no temp file is left behind (#696 parallel-safe)", () => {
-    const empty: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    const empty: ConnectionStore = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
     saveConnectionStore(tempDir, empty);
     // The atomic write stages a `.connections.json.<pid>.<rand>.tmp` then renames
     // it over the target; on success nothing temp should remain in the dir.
@@ -93,8 +107,42 @@ describe("saveConnectionStore", () => {
     expect(readdirSync(tempDir)).toContain("connections.json");
   });
 
+  it("creates the config dir when it does not exist yet (#768 fresh install)", () => {
+    // On a fresh install the first connection save is the first write into the
+    // config dir — nothing has created it. Before #768 the staged temp write
+    // threw ENOENT and the completed OAuth sign-in was lost.
+    const freshDir = join(tempDir, "MachineViolet");
+    expect(existsSync(freshDir)).toBe(false);
+    const conn: AIConnection = {
+      id: "fresh", provider: "openai-chatgpt", label: "ChatGPT",
+      apiKey: "", chatgptAccount: { id: "acct-1", email: "u@example.com" },
+      models: [], source: "oauth", addedAt: "2026-07-31T00:00:00.000Z",
+    };
+    expect(() => saveConnectionStore(freshDir, {
+      connections: [conn],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    })).not.toThrow();
+    expect(loadConnectionStore(freshDir).connections).toHaveLength(1);
+    expect(loadConnectionStore(freshDir).connections[0]).toMatchObject(conn);
+  });
+
+  it("creates missing intermediate dirs (config root itself absent)", () => {
+    const nested = join(tempDir, "a", "b", "MachineViolet");
+    saveConnectionStore(nested, {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    expect(readdirSync(nested)).toContain("connections.json");
+  });
+
   it("stays valid JSON across many back-to-back saves (crash/interleave surrogate)", () => {
-    const store: ConnectionStore = { connections: [], tierAssignments: { large: null, medium: null, small: null } };
+    const store: ConnectionStore = {
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    };
     for (let i = 0; i < 20; i++) saveConnectionStore(tempDir, store);
     // Every intermediate state was a complete file (rename is atomic), so the
     // final read must parse cleanly — never a half-written truncation.
@@ -105,20 +153,40 @@ describe("saveConnectionStore", () => {
 
 describe("buildEffectiveConnections", () => {
   let savedAnthropic: string | undefined;
+  let savedGoogle: string | undefined;
+  let savedGemini: string | undefined;
   let savedOpenai: string | undefined;
+  let savedXai: string | undefined;
+  let savedOpenrouter: string | undefined;
 
   beforeEach(() => {
     savedAnthropic = process.env.ANTHROPIC_API_KEY;
+    savedGoogle = process.env.GOOGLE_API_KEY;
+    savedGemini = process.env.GEMINI_API_KEY;
     savedOpenai = process.env.OPENAI_API_KEY;
+    savedXai = process.env.XAI_API_KEY;
+    savedOpenrouter = process.env.OPENROUTER_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.XAI_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
   });
 
   afterEach(() => {
     if (savedAnthropic === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = savedAnthropic;
+    if (savedGoogle === undefined) delete process.env.GOOGLE_API_KEY;
+    else process.env.GOOGLE_API_KEY = savedGoogle;
+    if (savedGemini === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = savedGemini;
     if (savedOpenai === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedOpenai;
+    if (savedXai === undefined) delete process.env.XAI_API_KEY;
+    else process.env.XAI_API_KEY = savedXai;
+    if (savedOpenrouter === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = savedOpenrouter;
   });
 
   it("auto-creates an env connection for OPENAI_API_KEY with provider 'openai-apikey'", () => {
@@ -126,10 +194,94 @@ describe("buildEffectiveConnections", () => {
     const effective = buildEffectiveConnections({
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const env = effective.connections.find((c) => c.source === "env" && c.provider === "openai-apikey");
     expect(env).toBeDefined();
     expect(env?.apiKey).toBe("sk-test-env");
+  });
+
+  it("does not surface an env connection for XAI_API_KEY while xAI is gated (#749)", () => {
+    process.env.XAI_API_KEY = "xai-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    expect(effective.connections.some((c) => c.provider === "xai")).toBe(false);
+    expect(effective.tierAssignments.large).toBeNull();
+  });
+
+  it("does not surface a saved xAI connection or retain its tier assignments (#749)", () => {
+    const assignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
+        models: [{ id: "grok-4.5", displayName: "Grok 4.5", available: true }],
+        source: "manual", addedAt: "2026-07-24",
+      }],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image" },
+    });
+    expect(effective.connections.some((c) => c.provider === "xai")).toBe(false);
+    expect(effective.tierAssignments).toEqual({ large: null, medium: null, small: null });
+    expect(effective.imageAssignment).toBeNull();
+  });
+
+  it("auto-creates an ephemeral OpenRouter connection from OPENROUTER_API_KEY", () => {
+    process.env.OPENROUTER_API_KEY = "sk-or-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    const env = effective.connections.find((c) => c.id === "env-openrouter");
+    expect(env).toMatchObject({
+      provider: "openrouter",
+      label: "OpenRouter (env)",
+      apiKey: "sk-or-test-env",
+      source: "env",
+    });
+    expect(env?.models).toEqual([{
+      id: "moonshotai/kimi-k3",
+      displayName: "MoonshotAI: Kimi K3",
+      available: true,
+    }]);
+    expect(effective.tierAssignments.large).toEqual({
+      connectionId: "env-openrouter",
+      modelId: "moonshotai/kimi-k3",
+    });
+  });
+
+  it("auto-creates a Gemini env connection from GOOGLE_API_KEY", () => {
+    process.env.GOOGLE_API_KEY = "google-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    const env = effective.connections.find((c) => c.id === "env-gemini");
+    expect(env).toMatchObject({
+      provider: "gemini",
+      label: "Gemini (env)",
+      apiKey: "google-test-env",
+      source: "env",
+    });
+    expect(env?.models.map((model) => model.id)).toEqual(expect.arrayContaining([
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
+    ]));
+  });
+
+  it("accepts GEMINI_API_KEY as the official quickstart alias", () => {
+    process.env.GEMINI_API_KEY = "gemini-test-env";
+    const effective = buildEffectiveConnections({
+      connections: [],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    expect(effective.connections.find((c) => c.id === "env-gemini")?.apiKey).toBe("gemini-test-env");
   });
 
   it("refreshes a manual openai-apikey connection's models against the current registry", () => {
@@ -147,6 +299,7 @@ describe("buildEffectiveConnections", () => {
         source: "manual", addedAt: "2026-01-01",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const conn = effective.connections.find((c) => c.id === "stale-openai");
     expect(conn).toBeDefined();
@@ -154,6 +307,30 @@ describe("buildEffectiveConnections", () => {
     expect(ids).toContain("gpt-5.5");
     // Sanity check: other shipped models are also present.
     expect(ids).toContain("gpt-4o-mini");
+  });
+
+  it("refreshes OpenRouter with the shipped Kimi K3 model and assigns every tier", () => {
+    const effective = buildEffectiveConnections({
+      connections: [{
+        id: "openrouter-1", provider: "openrouter", label: "OpenRouter",
+        apiKey: "sk-or-test", models: [],
+        source: "manual", addedAt: "2026-07-24",
+      }],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    const conn = effective.connections.find((c) => c.id === "openrouter-1");
+    expect(conn?.models).toEqual([{
+      id: "moonshotai/kimi-k3",
+      displayName: "MoonshotAI: Kimi K3",
+      available: true,
+    }]);
+    for (const tier of ["large", "medium", "small"] as const) {
+      expect(effective.tierAssignments[tier]).toEqual({
+        connectionId: "openrouter-1",
+        modelId: "moonshotai/kimi-k3",
+      });
+    }
   });
 
   it("leaves a manual custom-provider connection's models alone (no registry entries to refresh against)", () => {
@@ -168,9 +345,146 @@ describe("buildEffectiveConnections", () => {
         source: "manual", addedAt: "2026-01-01",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     });
     const conn = effective.connections.find((c) => c.id === "custom-1");
     expect(conn?.models).toEqual([{ id: "llama-3-70b", displayName: "Llama 3 70B", available: true }]);
+  });
+
+  it("keeps an explicit image model only on the exact Large-tier connection", () => {
+    const connection: AIConnection = {
+      id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "openai-test",
+      models: [{ id: "gpt-5.5", displayName: "GPT-5.5", available: true }],
+      source: "manual", addedAt: "2026-07-24",
+    };
+    const assignment = { connectionId: "openai-1", modelId: "gpt-5.5" };
+    const effective = buildEffectiveConnections({
+      connections: [connection],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    });
+    expect(effective.imageAssignment).toEqual({
+      connectionId: "openai-1",
+      modelId: "gpt-image-2",
+    });
+  });
+
+  it("clears cross-provider, stale, or unregistered image assignments", () => {
+    const connection: AIConnection = {
+      id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test",
+      models: [{ id: "gpt-5.6-sol", displayName: "GPT-5.6 Sol", available: true }],
+      source: "manual", addedAt: "2026-07-24",
+    };
+    const assignment = { connectionId: "openai-1", modelId: "gpt-5.6-sol" };
+    const effective = buildEffectiveConnections({
+      connections: [connection],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment },
+      imageAssignment: { connectionId: "openai-1", modelId: "grok-imagine-image" },
+    });
+    expect(effective.imageAssignment).toBeNull();
+  });
+});
+
+describe("image assignment operations", () => {
+  const openai: AIConnection = {
+    id: "openai-1", provider: "openai-apikey", label: "OpenAI", apiKey: "sk-test",
+    models: [], source: "manual", addedAt: "",
+  };
+  const xai: AIConnection = {
+    id: "xai-1", provider: "xai", label: "xAI", apiKey: "xai-test",
+    models: [], source: "manual", addedAt: "",
+  };
+
+  it("preserves the image model when Large changes model on the same connection", () => {
+    const store: ConnectionStore = {
+      connections: [openai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.5" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    };
+    expect(setTierAssignment(store, "large", "openai-1", "gpt-5.6-sol").imageAssignment)
+      .toEqual({ connectionId: "openai-1", modelId: "gpt-image-2" });
+  });
+
+  it("clears the image model when Large moves to another connection", () => {
+    const store: ConnectionStore = {
+      connections: [openai, xai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.6-sol" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: { connectionId: "openai-1", modelId: "gpt-image-2" },
+    };
+    expect(setTierAssignment(store, "large", "xai-1", "grok-4.5").imageAssignment).toBeNull();
+  });
+
+  it("rejects an image assignment from any connection other than Large", () => {
+    const store: ConnectionStore = {
+      connections: [openai, xai],
+      tierAssignments: {
+        large: { connectionId: "openai-1", modelId: "gpt-5.6-sol" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: null,
+    };
+    expect(setImageAssignment(store, {
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image",
+    }).imageAssignment).toBeNull();
+  });
+});
+
+describe("addConnection default labels", () => {
+  const emptyStore = (): ConnectionStore => ({
+    connections: [],
+    tierAssignments: { large: null, medium: null, small: null },
+    imageAssignment: null,
+  });
+
+  it("defaults the label to the provider display name, not the raw id", () => {
+    const store = addConnection(emptyStore(), "openai-apikey", "sk-x", "");
+    expect(store.connections[0].label).toBe("OpenAI");
+  });
+
+  it("disambiguates a colliding default label with a counter", () => {
+    let store = addConnection(emptyStore(), "openai-apikey", "sk-1", "");
+    store = addConnection(store, "openai-apikey", "sk-2", "");
+    store = addConnection(store, "openai-apikey", "sk-3", "");
+    expect(store.connections.map((c) => c.label)).toEqual(["OpenAI", "OpenAI (2)", "OpenAI (3)"]);
+  });
+
+  it("keeps an explicit label verbatim, even when it collides", () => {
+    let store = addConnection(emptyStore(), "anthropic", "sk-1", "Work key");
+    store = addConnection(store, "anthropic", "sk-2", "Work key");
+    expect(store.connections.map((c) => c.label)).toEqual(["Work key", "Work key"]);
+  });
+});
+
+describe("removeConnection", () => {
+  it("does not remove the environment-derived OpenRouter connection", () => {
+    const store: ConnectionStore = {
+      connections: [{
+        id: "env-openrouter", provider: "openrouter", label: "OpenRouter (env)",
+        apiKey: "sk-or-test-env", models: [{
+          id: "moonshotai/kimi-k3",
+          displayName: "MoonshotAI: Kimi K3",
+          available: true,
+        }],
+        source: "env", addedAt: "",
+      }],
+      tierAssignments: {
+        large: { connectionId: "env-openrouter", modelId: "moonshotai/kimi-k3" },
+        medium: null,
+        small: null,
+      },
+      imageAssignment: null,
+    };
+    expect(removeConnection(store, "env-openrouter")).toBe(store);
   });
 });
 
@@ -192,6 +506,7 @@ describe("upsertChatGptConnection", () => {
     const store: ConnectionStore = {
       connections: [],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount(), [
       { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
@@ -228,6 +543,7 @@ describe("upsertChatGptConnection", () => {
         medium: null,
         small: null,
       },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "a@example.com" }), []);
     expect(result.replacedInPlace).toBe(true);
@@ -262,6 +578,7 @@ describe("upsertChatGptConnection", () => {
         addedAt: "",
       }],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     upsertChatGptConnection(store, freshAccount({ id: "acct-A", email: "renamed@example.com" }), []);
     expect(store.connections[0].label).toBe("ChatGPT (renamed@example.com)");
@@ -300,6 +617,7 @@ describe("upsertChatGptConnection", () => {
         medium: { connectionId: "anth-conn", modelId: "claude" },
         small: { connectionId: "old-conn", modelId: "gpt-deprecated" },
       },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-B", email: "b@example.com" }), [
       { id: "gpt-5.5", displayName: "GPT-5.5", available: true },
@@ -335,6 +653,7 @@ describe("upsertChatGptConnection", () => {
         },
       ],
       tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
     };
     const result = upsertChatGptConnection(store, freshAccount({ id: "acct-A" }), []);
     expect(result.replacedInPlace).toBe(true);

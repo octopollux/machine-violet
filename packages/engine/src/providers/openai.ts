@@ -4,6 +4,7 @@
  * Wraps the official OpenAI SDK. Works with:
  * - OpenAI API (api.openai.com, key-based) — uses Responses API
  * - OpenRouter (openrouter.ai/api) — uses Responses API
+ * - xAI (api.x.ai/v1) — uses Responses API plus Grok Imagine
  * - Any OpenAI-compatible endpoint (Ollama, vLLM, llama.cpp, etc.) — uses Chat Completions API
  *
  * NOT used for ChatGPT-account auth. That goes through the
@@ -28,7 +29,7 @@ import type {
 } from "./types.js";
 import { patchOrphanedToolUses } from "./orphan-patch.js";
 import { buildReferenceDirective } from "./image-reference-directive.js";
-import { supportsImageGeneration } from "../config/model-registry.js";
+import { getKnownModel, supportsImageGeneration } from "../config/model-registry.js";
 import { logEvent } from "../context/engine-log.js";
 
 // ---------------------------------------------------------------------------
@@ -36,10 +37,78 @@ import { logEvent } from "../context/engine-log.js";
 // ---------------------------------------------------------------------------
 
 /** Provider IDs that use the Responses API instead of Chat Completions. */
-const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter"]);
+const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter", "xai"]);
 
 function useResponsesAPI(providerId: string): boolean {
   return RESPONSES_API_PROVIDERS.has(providerId);
+}
+
+/**
+ * Grok 4.5 follows a tool schema's property order unusually strongly. In live
+ * setup calls, optional properties interleaved ahead of required identity
+ * fields caused it to stop after the optional prefix while still reporting a
+ * completed function call. Put required properties first for xAI so the
+ * constrained decoder reaches the full handoff before optional enrichment.
+ *
+ * This is order-only: the schema's required set and every property definition
+ * remain unchanged.
+ */
+function requiredPropertiesFirst(schema: Record<string, unknown>): Record<string, unknown> {
+  const properties = schema.properties;
+  const required = schema.required;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties)
+      || !Array.isArray(required)) {
+    return schema;
+  }
+
+  const source = properties as Record<string, unknown>;
+  const ordered: Record<string, unknown> = {};
+  for (const name of required) {
+    if (typeof name === "string" && Object.hasOwn(source, name)) {
+      ordered[name] = source[name];
+    }
+  }
+  for (const [name, definition] of Object.entries(source)) {
+    if (!Object.hasOwn(ordered, name)) ordered[name] = definition;
+  }
+  return { ...schema, properties: ordered };
+}
+
+const XAI_OUTPUT_DISCIPLINE =
+  "Every normal-text token is delivered as final output to the caller. "
+  + "Keep planning in reasoning. Never emit meta-commentary about tools, configuration, "
+  + "payloads, retries, or what you are about to do as normal text. In a tool-call response, "
+  + "normal text must be final prose appropriate to your assigned role or empty.";
+
+/**
+ * Map Machine Violet's provider-neutral effort scale onto OpenAI's. GPT-5.6
+ * is the first shipped family where `max` is a distinct API level; older
+ * models and OpenAI-compatible providers continue to receive `xhigh`.
+ */
+function mapReasoningEffort(
+  providerId: string,
+  model: string,
+  effort: NonNullable<ChatParams["thinking"]>["effort"],
+): ReasoningEffort {
+  if (effort === "max") {
+    if (providerId === "openai-apikey" && model.startsWith("gpt-5.6")) return "max";
+    // Grok 4.5 supports low/medium/high only. The multi-agent model retains
+    // xhigh, while the rest of xAI's shipped family is clamped to its ceiling.
+    if (providerId === "xai" && model !== "grok-4.20-multi-agent-0309") return "high";
+    return "xhigh";
+  }
+  return effort ?? "medium";
+}
+
+/**
+ * Only the direct OpenAI connection owns the OpenAI Images API contract.
+ * OpenRouter also exposes a Responses-compatible endpoint, but its selected
+ * chat model may be served by any vendor and image generation is a separate
+ * model/API capability. Never route a non-OpenAI model to the pinned
+ * `gpt-image-2` implementation below.
+ */
+function useOpenAIImagesAPI(providerId: string): boolean {
+  return providerId === "openai-apikey";
 }
 
 // ---------------------------------------------------------------------------
@@ -83,10 +152,9 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
   return {
     providerId,
     getCapabilities: (model) => ({
-      // Only the Responses API path supports inline image generation. The
-      // Chat Completions fallback (custom OpenAI-compatible endpoints) has
-      // no `image_generation` tool, regardless of model.
-      imageGeneration: useResponsesAPI(providerId) && supportsImageGeneration(model),
+      imageGeneration:
+        (useOpenAIImagesAPI(providerId) || providerId === "xai")
+        && supportsImageGeneration(model),
     }),
     chat: (params) => openaiChat(client, providerId, params, false, undefined, rateLimitState),
     stream: (params, onDelta) => openaiChat(client, providerId, params, true, onDelta, rateLimitState),
@@ -95,10 +163,14 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
       rateLimitState.limits
         ? rateLimitsToUsageStatus(rateLimitState.limits, rateLimitState.capturedAt)
         : null,
-    // Only the Responses API path supports image generation; the Chat
-    // Completions fallback (custom OpenAI-compatible endpoints) has no
-    // Images API equivalent, so leave generateImage undefined there.
-    ...(useResponsesAPI(providerId) ? { generateImage: (req) => openaiGenerateImage(client, req) } : {}),
+    // Image generation is vendor-paired. OpenRouter's selected Kimi K3 model
+    // is text-output-only, and custom endpoints have no guaranteed Images API.
+    ...(useOpenAIImagesAPI(providerId) || providerId === "xai"
+      ? {
+          generateImage: (req: GenerateImageRequest) =>
+            providerId === "xai" ? xaiGenerateImage(client, req) : openaiGenerateImage(client, req),
+        }
+      : {}),
   };
 }
 
@@ -135,18 +207,170 @@ const ASPECT_TO_SIZE: Record<ImageAspect, "1024x1024" | "1024x1536" | "1536x1024
  */
 const MAX_IMAGE_ATTEMPTS = 3;
 
+/**
+ * Current xAI image models. Exported so configuration/UI layers can offer a
+ * dedicated image-model assignment without duplicating provider slugs.
+ */
+export const XAI_IMAGE_MODELS = {
+  standard: "grok-imagine-image",
+  quality: "grok-imagine-image-quality",
+} as const;
+
+const XAI_EFFORT_TO_MODEL: Record<ImageEffort, string> = {
+  draft: XAI_IMAGE_MODELS.standard,
+  standard: XAI_IMAGE_MODELS.standard,
+  quality: XAI_IMAGE_MODELS.quality,
+  showcase: XAI_IMAGE_MODELS.quality,
+};
+
+const XAI_EFFORT_TO_RESOLUTION: Record<ImageEffort, "1k" | "2k"> = {
+  draft: "1k",
+  standard: "1k",
+  quality: "1k",
+  showcase: "2k",
+};
+
+const XAI_ASPECT_TO_RATIO: Record<ImageAspect, "1:1" | "2:3" | "3:2"> = {
+  square: "1:1",
+  portrait: "2:3",
+  landscape: "3:2",
+};
+
+interface XAIImageResponse {
+  data?: {
+    b64_json?: string;
+    mime_type?: string;
+    revised_prompt?: string;
+  }[];
+}
+
+/**
+ * Grok Imagine generation/editing.
+ *
+ * xAI documents the OpenAI SDK for text-to-image, but explicitly does not
+ * support its multipart `images.edit()` method: edits require JSON. Use the
+ * SDK's authenticated/retrying low-level request for both endpoints so the two
+ * paths share one response shape and reference images can ride as data URIs.
+ */
+async function xaiGenerateImage(
+  client: OpenAI,
+  req: GenerateImageRequest,
+): Promise<GenerateImageResult> {
+  const effort = req.effort ?? "standard";
+  const aspect = req.aspect ?? "square";
+  const model = req.imageModel ?? XAI_EFFORT_TO_MODEL[effort];
+  const resolution = XAI_EFFORT_TO_RESOLUTION[effort];
+  const aspectRatio = XAI_ASPECT_TO_RATIO[aspect];
+  const references = req.referenceImages ?? [];
+  const labels = references.map((r) => r.label).filter((l): l is string => !!l);
+  const prompt = req.prompt + buildReferenceDirective(labels);
+
+  logEvent("image_gen:request", {
+    provider: "xai",
+    model,
+    effort,
+    aspect,
+    resolution,
+    aspectRatio,
+    intent: req.intent ?? "player_request",
+    ...(references.length > 0 ? { referenceCount: references.length } : {}),
+    promptPreview: req.prompt.slice(0, 120),
+  });
+
+  const imageInputs = references.map((r) => ({
+    type: "image_url" as const,
+    url: `data:${r.mimeType};base64,${r.base64}`,
+  }));
+  const endpoint = references.length > 0 ? "/images/edits" : "/images/generations";
+
+  for (let attempt = 1; ; attempt++) {
+    let response: XAIImageResponse;
+    try {
+      const body: Record<string, unknown> = {
+        model,
+        prompt,
+        response_format: "b64_json",
+        resolution,
+        n: 1,
+      };
+      if (references.length === 0) {
+        body.aspect_ratio = aspectRatio;
+      } else if (references.length === 1) {
+        // xAI follows a single source image's aspect ratio for edits. Its API
+        // ignores an explicit aspect_ratio in this case, so omit the misleading
+        // field. Multi-image edits do honor it.
+        body.image = imageInputs[0];
+      } else {
+        body.images = imageInputs;
+        body.aspect_ratio = aspectRatio;
+      }
+      response = await client.post<XAIImageResponse>(endpoint, { body });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const status = (e as { status?: number } | null)?.status;
+      logEvent("image_gen:error", {
+        provider: "xai",
+        model,
+        effort,
+        aspect,
+        message: message.slice(0, 400),
+        ...(typeof status === "number" ? { status } : {}),
+      });
+      throw e;
+    }
+
+    const item = response.data?.[0];
+    if (item?.b64_json) {
+      const mimeType =
+        item.mime_type === "image/png" || item.mime_type === "image/webp"
+          ? item.mime_type
+          : "image/jpeg";
+      logEvent("image_gen:response", {
+        provider: "xai",
+        model,
+        effort,
+        aspect,
+        base64Length: item.b64_json.length,
+        ...(item.revised_prompt ? { revisedPromptPreview: item.revised_prompt.slice(0, 120) } : {}),
+      });
+      return {
+        base64: item.b64_json,
+        mimeType,
+        ...(item.revised_prompt ? { revisedPrompt: item.revised_prompt } : {}),
+        effortUsed: effort,
+        aspectUsed: aspect,
+      };
+    }
+
+    logEvent("image_gen:no_data", { provider: "xai", model, effort, aspect, attempt });
+    if (attempt >= MAX_IMAGE_ATTEMPTS) {
+      throw new Error("xAI images returned no image data");
+    }
+    logEvent("image_gen:retry", {
+      provider: "xai",
+      model,
+      effort,
+      aspect,
+      attempt,
+      maxAttempts: MAX_IMAGE_ATTEMPTS,
+    });
+  }
+}
+
 async function openaiGenerateImage(
   client: OpenAI,
   req: GenerateImageRequest,
 ): Promise<GenerateImageResult> {
   const effort = req.effort ?? "standard";
   const aspect = req.aspect ?? "square";
+  const model = req.imageModel ?? "gpt-image-2";
   const quality = EFFORT_TO_QUALITY[effort];
   const size = ASPECT_TO_SIZE[aspect];
   const references = req.referenceImages ?? [];
 
   // Diagnostic breadcrumb. The harness asserts on these.
   logEvent("image_gen:request", {
+    model,
     effort,
     aspect,
     quality,
@@ -180,17 +404,17 @@ async function openaiGenerateImage(
   // kicks in for the older dall-e-2/3 path, which doesn't accept low/medium/high
   // quality).
   //
-  // We pin to `gpt-image-2`. It's a direct upgrade over gpt-image-1 / 1.5 at
-  // the same quality tiers — same call surface, sharper output, better prompt
-  // adherence. Launched 2026-04-21; SDK support added in openai@6.37. Rolling
-  // pointer rather than the dated snapshot (`gpt-image-2-2026-04-21`) so we ride
-  // future quality bumps without a code change.
+  // The provider default is `gpt-image-2`. It's a direct upgrade over
+  // gpt-image-1 / 1.5 at the same quality tiers — same call surface, sharper
+  // output, better prompt adherence. An explicit Large-paired image assignment
+  // overrides it; otherwise the rolling pointer lets us ride future quality
+  // bumps without a code change.
   for (let attempt = 1; ; attempt++) {
     let response: Awaited<ReturnType<typeof client.images.generate>>;
     try {
       response = referenceFiles
         ? await client.images.edit({
-            model: "gpt-image-2",
+            model,
             image: referenceFiles,
             prompt,
             quality,
@@ -199,7 +423,7 @@ async function openaiGenerateImage(
             n: 1,
           })
         : await client.images.generate({
-            model: "gpt-image-2",
+            model,
             prompt,
             quality,
             size,
@@ -264,7 +488,7 @@ async function openaiChat(
   rateLimitState?: RateLimitState,
 ): Promise<ChatResult> {
   if (useResponsesAPI(providerId)) {
-    return responsesChat(client, params, streaming, onDelta, rateLimitState);
+    return responsesChat(client, providerId, params, streaming, onDelta, rateLimitState);
   }
   return completionsChat(client, params, streaming, onDelta, rateLimitState);
 }
@@ -279,14 +503,16 @@ async function openaiChat(
 
 async function responsesChat(
   client: OpenAI,
+  providerId: string,
   params: ChatParams,
   streaming: boolean,
   onDelta?: (text: string) => void,
   rateLimitState?: RateLimitState,
 ): Promise<ChatResult> {
-  const apiParams = toResponsesParams(params);
+  const apiParams = toResponsesParams(params, providerId);
 
-  if (streaming && onDelta) {
+  const modelSupportsStreaming = getKnownModel(params.model)?.capabilities.streaming !== false;
+  if (streaming && onDelta && modelSupportsStreaming) {
     return responsesStream(client, apiParams, onDelta);
   }
 
@@ -295,7 +521,12 @@ async function responsesChat(
     rateLimitState,
   );
 
-  return fromResponsesResponse(response);
+  const result = fromResponsesResponse(response);
+  // A small number of selectable Responses API models (currently GPT-5.5
+  // Pro) do not support SSE. Preserve the provider's stream contract by
+  // issuing a non-streaming request and emitting the completed text once.
+  if (streaming && onDelta && result.text) onDelta(result.text);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,9 +615,11 @@ interface ResponsesParams {
   /** Optional `include` selectors — currently we only use this to opt into
    * `reasoning.encrypted_content` when a reasoning effort is requested. */
   include?: OpenAI.Responses.ResponseIncludable[];
+  /** xAI conversation-affinity key for reliable prompt cache hits. */
+  prompt_cache_key?: string;
 }
 
-function toResponsesParams(params: ChatParams): ResponsesParams {
+function toResponsesParams(params: ChatParams, providerId: string): ResponsesParams {
   // System prompt → instructions
   let instructions: string | undefined;
   if (typeof params.systemPrompt === "string") {
@@ -419,8 +652,15 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
       type: "function" as const,
       name: t.name,
       description: t.description ?? undefined,
-      parameters: t.inputSchema as Record<string, unknown>,
-      strict: false,
+      parameters: (
+        providerId === "xai"
+          ? requiredPropertiesFirst(t.inputSchema as Record<string, unknown>)
+          : t.inputSchema
+      ) as Record<string, unknown>,
+      // xAI documents function schemas as implicitly strict. Be explicit so
+      // the request matches that contract; local validation remains the final
+      // safety net for providers that still return incomplete arguments.
+      strict: providerId === "xai",
     }));
     if (functionTools.length > 0) tools = functionTools;
   }
@@ -434,14 +674,8 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
   let reasoning: Reasoning | undefined;
   let include: OpenAI.Responses.ResponseIncludable[] | undefined;
   if (params.thinking?.effort) {
-    const effortMap: Record<string, ReasoningEffort> = {
-      low: "low",
-      medium: "medium",
-      high: "high",
-      max: "xhigh",
-    };
     reasoning = {
-      effort: effortMap[params.thinking.effort] ?? "medium",
+      effort: mapReasoningEffort(providerId, params.model, params.thinking.effort),
       summary: "concise",
     };
     include = ["reasoning.encrypted_content"];
@@ -450,11 +684,16 @@ function toResponsesParams(params: ChatParams): ResponsesParams {
   return {
     model: params.model,
     input,
-    instructions,
+    instructions: providerId === "xai"
+      ? [instructions, XAI_OUTPUT_DISCIPLINE].filter(Boolean).join("\n\n")
+      : instructions,
     ...(tools ? { tools } : {}),
     max_output_tokens: params.maxTokens,
     ...(reasoning ? { reasoning } : {}),
     ...(include ? { include } : {}),
+    ...(providerId === "xai" && params.conversationId
+      ? { prompt_cache_key: params.conversationId }
+      : {}),
     store: false,
   };
 }
@@ -902,13 +1141,7 @@ function toOpenAIParams(params: ChatParams): OpenAIChatParams {
   // not an object. Map from our normalized effort levels.
   let reasoningEffort: ReasoningEffort | undefined;
   if (params.thinking?.effort) {
-    const effortMap: Record<string, ReasoningEffort> = {
-      low: "low",
-      medium: "medium",
-      high: "high",
-      max: "xhigh",
-    };
-    reasoningEffort = effortMap[params.thinking.effort] ?? "medium";
+    reasoningEffort = mapReasoningEffort("custom", params.model, params.thinking.effort);
   }
 
   return {

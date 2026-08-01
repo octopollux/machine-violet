@@ -109,7 +109,7 @@ export function ArchivedCampaignsPhase({
     <Text key="spacer">{" "}</Text>,
   );
   menuLines.push(
-    <Text key="hint" color={dimColor}>{"  Enter to restore  ·  Esc to go back"}</Text>,
+    <Text key="hint" color={dimColor}>{"↑↓ select · Enter restore · Esc back"}</Text>,
   );
 
   return (

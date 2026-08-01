@@ -17,7 +17,18 @@ export type MessageRole = "user" | "assistant";
 /** A single content part within a message. */
 export type ContentPart =
   | { type: "text"; text: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | {
+      type: "tool_use";
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+      /**
+       * Opaque Gemini Interactions thought signature attached to function-call
+       * steps by Gemini 3.x. Must round-trip unchanged in stateless mode.
+       * Other providers ignore it.
+       */
+      geminiSignature?: string;
+    }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
   /**
    * Anthropic-shape thinking block. Persisted with the assistant turn and
@@ -40,7 +51,7 @@ export type ContentPart =
   /**
    * Encrypted reasoning blob produced by an OpenAI reasoning model on the
    * Responses API (with `include: ["reasoning.encrypted_content"]`) — i.e. the
-   * `openai-apikey` / `openrouter` providers. Persisted with the assistant turn
+   * `openai-apikey` / `openrouter` / `xai` providers. Persisted with the assistant turn
    * and replayed on subsequent turns so the model keeps its chain-of-thought
    * across calls without us setting `store: true`. The `encryptedContent`
    * payload is opaque; `summary` mirrors the human-readable reasoning summary we
@@ -51,6 +62,25 @@ export type ContentPart =
    * ChatGPT-account path, so its #533 replay was removed as a no-op (#607).
    */
   | { type: "reasoning"; id: string; encryptedContent: string; summary: string[] }
+  /**
+   * Gemini Interactions API thought step. Stateless Interactions requests must
+   * replay model-generated thought steps exactly, including the opaque
+   * signature, so keep the provider-native shape distinct from Anthropic's
+   * `thinking` block (the signatures are not interchangeable).
+   */
+  | {
+      type: "gemini_thought";
+      summary: (
+        | { type: "text"; text: string }
+        | {
+            type: "image";
+            data?: string;
+            mimeType?: string;
+            uri?: string;
+          }
+      )[];
+      signature?: string;
+    }
   /**
    * Image produced during a turn by dispatching the `generate_image`
    * function tool to {@link LLMProvider.generateImage}. Persisted with
@@ -159,6 +189,14 @@ export type ImageAspect = "portrait" | "landscape" | "square";
 /** Args accepted by {@link LLMProvider.generateImage}. */
 export interface GenerateImageRequest {
   prompt: string;
+  /**
+   * Optional provider-native image model override. Callers normally omit this
+   * and let the active provider choose its shipped default (for example,
+   * Gemini uses Nano Banana 2, `gemini-3.1-flash-image`). This seam keeps
+   * image-model assignment separate from the chat model without forcing every
+   * provider to honor foreign model IDs.
+   */
+  imageModel?: string;
   /** Default: `"standard"`. */
   effort?: ImageEffort;
   /** Default: `"square"`. */
@@ -234,6 +272,19 @@ export interface NormalizedToolCall {
   id: string;
   name: string;
   input: Record<string, unknown>;
+}
+
+/**
+ * Diagnostic context for one executable tool call. Provider loops fill this
+ * at the dispatch boundary so validation logs can identify which agent/model
+ * produced a malformed call without putting user-authored argument values in
+ * the log.
+ */
+export interface ToolExecutionContext {
+  agent: string;
+  provider: string;
+  model: string;
+  callId: string;
 }
 
 // ---------------------------------------------------------------------------

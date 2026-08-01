@@ -82,8 +82,10 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       : turn.activePlayers[0] ?? "player";
 
     try {
+      server.sessionManager.validateChoiceResponse(body.choiceResponse);
       const contribution = tm.contribute(playerId, text, "client", {
         fromChoice: body.fromChoice === true,
+        choiceResponse: body.choiceResponse,
       });
       return { turnId: turn.id, contributionId: contribution.id };
     } catch (err) {

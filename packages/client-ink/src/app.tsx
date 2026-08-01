@@ -8,7 +8,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { useBatchedNarrativeLines } from "./tui/hooks/useBatchedNarrativeLines.js";
-import { coerceResourceKeys } from "@machine-violet/shared";
 import type { ChoicesData } from "@machine-violet/shared";
 import type { ActiveModal } from "@machine-violet/shared/types/tui.js";
 import { ApiClient } from "./api-client.js";
@@ -24,47 +23,24 @@ import { PlayingPhase } from "./phases/PlayingPhase.js";
 import { MainMenuPhase } from "./phases/MainMenuPhase.js";
 import type { CampaignEntry } from "./phases/MainMenuPhase.js";
 import { SettingsPhase } from "./phases/SettingsPhase.js";
-import { ConnectionsPhase } from "./phases/ConnectionsPhase.js";
+import { ConnectionsArea } from "./phases/connections/index.js";
+import type { SetTiersBody } from "./phases/connections/index.js";
 import { ArchivedCampaignsPhase } from "./phases/ArchivedCampaignsPhase.js";
 import { DiscordSettingsPhase } from "./phases/DiscordSettingsPhase.js";
 import type {
   ConnectionInfo, TierAssignmentsResponse, ConnectionHealthResponse,
-  KnownModelInfo,
+  KnownImageModelInfo, KnownModelInfo, TierAssignmentEntry, ProviderTierDefaults,
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import { setAgentClientState } from "./agent-state-ref.js";
 import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
+import { revealInExplorer } from "./commands/open-path.js";
 import {
   loadThemeDefinition,
   resolveTheme,
 } from "./tui/themes/index.js";
 import type { ResolvedTheme, StyleVariant, ThemeDefinition } from "./tui/themes/index.js";
-
-/** Format display resources into "Key Value" strings for the top frame.
- *
- *  Keys go through `coerceResourceKeys` rather than being iterated directly:
- *  a snapshot hydrated from a campaign saved before the tool boundary coerced
- *  (or any other path that slips a bare string in) would otherwise iterate the
- *  string's characters and render `S | t | r | e | s | s` for `"Stress"`.
- *
- *  The param is typed `string[] | string` deliberately. Nothing on the wire
- *  guarantees the array — that unenforced assumption is what broke the line in
- *  the first place — so the signature admits what can actually arrive rather
- *  than restating the claim this function exists to defend against. */
-function formatResources(
-  displayResources: Record<string, string[] | string>,
-  resourceValues: Record<string, Record<string, string>>,
-): string[] {
-  const result: string[] = [];
-  for (const [char, keys] of Object.entries(displayResources)) {
-    const vals = resourceValues[char] ?? {};
-    for (const key of coerceResourceKeys(keys)) {
-      const val = vals[key];
-      result.push(val ? `${key} ${val}` : key);
-    }
-  }
-  return result;
-}
+import { formatResources } from "./tui/resources.js";
 
 export interface AppProps {
   serverUrl: string;
@@ -78,9 +54,15 @@ export interface AppProps {
   graphicsCaps?: import("./tui/image/capabilities.js").GraphicsCapabilities | null;
 }
 
-type AppPhase =
-  | "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error"
-  | "settings" | "settings_apikeys" | "api_keys" | "archived_campaigns" | "discord_settings";
+type AppPhase = "connecting" | "menu" | "starting" | "playing" | "disconnected" | "error";
+
+/**
+ * Out-of-game screens stack on top of the main menu: Esc always pops one
+ * level, and an empty stack means the main menu itself. `connections_wizard`
+ * is the main-menu "Connect to AI" CTA deep link — same area as
+ * `connections`, entered at the wizard instead of the list.
+ */
+type MenuScreen = "settings" | "connections" | "connections_wizard" | "archived_campaigns" | "discord_settings";
 
 /** Error screen with keyboard input — press Enter to return to menu or q to quit. */
 function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToMenu: () => void }) {
@@ -104,6 +86,8 @@ function ErrorScreen({ message, onReturnToMenu }: { message: string; onReturnToM
 
 export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFilterChain, graphicsCaps }: AppProps) {
   const [phase, setPhase] = useState<AppPhase>("connecting");
+  // Stack of out-of-game screens above the main menu (empty = main menu).
+  const [menuStack, setMenuStack] = useState<MenuScreen[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
@@ -116,8 +100,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Settings / management state
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
   const [tierAssignments, setTierAssignments] = useState<TierAssignmentsResponse>({ large: null, medium: null, small: null });
+  const [imageAssignment, setImageAssignment] = useState<TierAssignmentEntry | null>(null);
   const [connHealthResults, setConnHealthResults] = useState<Record<string, ConnectionHealthResponse>>({});
   const [knownModels, setKnownModels] = useState<Record<string, KnownModelInfo>>({});
+  const [knownImageModels, setKnownImageModels] = useState<Record<string, KnownImageModelInfo>>({});
+  const [tierDefaults, setTierDefaults] = useState<Record<string, ProviderTierDefaults>>({});
   const [apiKeyValid, setApiKeyValid] = useState(true);
   const [apiKeyStatus, setApiKeyStatus] = useState<string | undefined>(undefined);
   const [archivedCampaigns, setArchivedCampaigns] = useState<ArchivedCampaignEntry[]>([]);
@@ -262,10 +249,11 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       // server has already torn down — the call no-ops but the idle poll
       // resolves quickly, so we don't need a separate cleanup path.
       returnToMenu();
-    } else if (phase !== "menu") {
-      // Settings / connections / etc — just bounce to the menu so the
-      // player sees the banner.
+    } else {
+      // Settings / connections / etc — bounce to the main menu (clearing
+      // any stacked screens) so the player sees the banner.
       setPhase("menu");
+      setMenuStack([]);
     }
     // Clear the error from clientState so a subsequent session start
     // doesn't re-fire this effect from stale state.
@@ -328,6 +316,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     api.listConnections().then((resp) => {
       setConnections(resp.connections);
       setTierAssignments(resp.tierAssignments);
+      setImageAssignment(resp.imageAssignment);
       if (resp.connections.length > 0) {
         setApiKeyValid(true);
         // Check health of first connection
@@ -374,6 +363,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     setKeyColor("#8888aa");
     setThemeDef(loadThemeDefinition("gothic"));
     setPhase("menu");
+    setMenuStack([]);
     // Refresh campaign list and menu status indicators
     apiClientRef.current.listCampaigns().then((resp) => {
       setCampaigns(resp.campaigns.map((c) => ({ id: c.id ?? c.name, name: c.name, path: c.path ?? "" })));
@@ -443,28 +433,79 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   }, [discordEnabled]);
 
   // --- Management helpers ---
+  //
+  // Connection mutations are promise-returning: the Connect to AI screens
+  // await them and surface failures inline (the wizard's validate step, the
+  // detail screen's status line). Nothing here swallows an error silently.
+
+  const applyConnectionsResponse = useCallback((resp: {
+    connections: ConnectionInfo[];
+    tierAssignments: TierAssignmentsResponse;
+    imageAssignment: TierAssignmentEntry | null;
+  }) => {
+    setConnections(resp.connections);
+    setTierAssignments(resp.tierAssignments);
+    setImageAssignment(resp.imageAssignment);
+  }, []);
 
   const refreshConnections = useCallback(() => {
     const api = apiClientRef.current;
-    api.listConnections().then((resp) => {
-      setConnections(resp.connections);
-      setTierAssignments(resp.tierAssignments);
-    }).catch(() => { /* ignore */ });
+    api.listConnections().then(applyConnectionsResponse).catch(() => { /* transient — next refresh wins */ });
     api.listKnownModels().then((resp) => {
       setKnownModels(resp.models);
-    }).catch(() => { /* ignore */ });
+      setKnownImageModels(resp.imageModels);
+      setTierDefaults(resp.tierDefaults ?? {});
+    }).catch(() => { /* transient — next refresh wins */ });
+  }, [applyConnectionsResponse]);
+
+  const addConnectionAsync = useCallback(async (provider: string, apiKey: string, baseUrl?: string): Promise<ConnectionInfo> => {
+    // No label: the server derives one from the provider display name.
+    const resp = await apiClientRef.current.addConnection(provider, apiKey, "", baseUrl);
+    applyConnectionsResponse(resp);
+    // Env connections come first in the effective list; the new manual
+    // connection is always appended last (same invariant the server route
+    // relies on when discovering models for it).
+    const fresh = resp.connections[resp.connections.length - 1];
+    if (!fresh) throw new Error("The connection was not added.");
+    return fresh;
+  }, [applyConnectionsResponse]);
+
+  const removeConnectionAsync = useCallback(async (id: string): Promise<void> => {
+    const resp = await apiClientRef.current.removeConnection(id);
+    applyConnectionsResponse(resp);
+  }, [applyConnectionsResponse]);
+
+  const updateConnectionKeyAsync = useCallback(async (id: string, apiKey: string): Promise<void> => {
+    const resp = await apiClientRef.current.updateConnectionKey(id, apiKey);
+    applyConnectionsResponse(resp);
+  }, [applyConnectionsResponse]);
+
+  const setTiersAsync = useCallback(async (body: SetTiersBody): Promise<void> => {
+    const resp = await apiClientRef.current.setTierAssignments(body);
+    setTierAssignments(resp.tierAssignments);
+    setImageAssignment(resp.imageAssignment);
   }, []);
 
-  const handleCheckConnection = useCallback((connId: string) => {
-    setConnHealthResults((prev) => ({ ...prev, [connId]: { id: connId, status: "valid", message: "Checking..." } }));
-    apiClientRef.current.checkConnection(connId).then((resp) => {
+  const checkConnectionAsync = useCallback(async (connId: string): Promise<ConnectionHealthResponse> => {
+    // While the check is in flight, keep the previous status (an optimistic
+    // "valid" would flash a misleading ✔ and hide the Fix action mid-check);
+    // only the message flips to "Checking...". Unchecked connections stay
+    // unset — the list renders "?" and the detail screen has its own busy text.
+    setConnHealthResults((prev) => {
+      const existing = prev[connId];
+      return existing ? { ...prev, [connId]: { ...existing, message: "Checking..." } } : prev;
+    });
+    try {
+      const resp = await apiClientRef.current.checkConnection(connId);
       setConnHealthResults((prev) => ({ ...prev, [connId]: resp }));
-    }).catch(() => {
+      return resp;
+    } catch (err) {
       setConnHealthResults((prev) => ({
         ...prev,
         [connId]: { id: connId, status: "error", message: "Health check failed" },
       }));
-    });
+      throw err instanceof Error ? err : new Error(String(err));
+    }
   }, []);
 
   const refreshCampaigns = useCallback(() => {
@@ -508,6 +549,122 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   }
 
   if (phase === "menu") {
+    const menuScreen = menuStack[menuStack.length - 1];
+    const pushMenu = (s: MenuScreen) => setMenuStack((prev) => [...prev, s]);
+    const popMenu = () => setMenuStack((prev) => prev.slice(0, -1));
+
+    if (menuScreen === "settings") {
+      return (
+        <SettingsPhase
+          theme={theme}
+          devModeEnabled={devModeEnabled}
+          onToggleDevMode={() => {
+            const next = !devModeEnabled;
+            setDevModeEnabled(next);
+            apiClientRef.current.setMachineSettings({ devModeEnabled: next }).catch(() => { /* best-effort */ });
+          }}
+          showVerbose={showVerbose}
+          onToggleVerbose={() => setShowVerbose((v) => !v)}
+          onConnections={() => { refreshConnections(); pushMenu("connections"); }}
+          onDiscord={() => {
+            apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
+            pushMenu("discord_settings");
+          }}
+          onArchivedCampaigns={() => {
+            apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
+            pushMenu("archived_campaigns");
+          }}
+          onExportDiagnostics={async () => {
+            const { path } = await apiClientRef.current.diagnostics();
+            revealInExplorer(path);
+            return path;
+          }}
+          onBack={popMenu}
+        />
+      );
+    }
+
+    if (menuScreen === "connections" || menuScreen === "connections_wizard") {
+      return (
+        <ConnectionsArea
+          key={menuScreen}
+          theme={theme}
+          initialScreen={menuScreen === "connections_wizard" ? "wizard" : "list"}
+          connections={connections}
+          tierAssignments={tierAssignments}
+          imageAssignment={imageAssignment}
+          healthResults={connHealthResults}
+          knownModels={knownModels}
+          knownImageModels={knownImageModels}
+          tierDefaults={tierDefaults}
+          onAddConnection={addConnectionAsync}
+          onUpdateConnectionKey={updateConnectionKeyAsync}
+          onRemoveConnection={removeConnectionAsync}
+          onCheckHealth={checkConnectionAsync}
+          onSetTiers={setTiersAsync}
+          onStartChatGptLogin={() => apiClientRef.current.startChatGptLogin()}
+          onPollChatGptLogin={(loginId) => apiClientRef.current.getChatGptLoginStatus(loginId)}
+          onCancelChatGptLogin={(loginId) => apiClientRef.current.cancelChatGptLogin(loginId)}
+          onRefreshConnections={refreshConnections}
+          onFetchUsage={(id) => apiClientRef.current.getConnectionUsage(id)}
+          onBack={() => {
+            // Returning from the connections area refreshes the main-menu
+            // gate so a freshly-added connection unlocks play immediately.
+            refreshMenuStatus();
+            popMenu();
+          }}
+        />
+      );
+    }
+
+    if (menuScreen === "archived_campaigns") {
+      return (
+        <ArchivedCampaignsPhase
+          theme={theme}
+          archives={archivedCampaigns}
+          statusMessage={archiveStatus}
+          restoringPaths={restoringPaths}
+          onUnarchive={(entry) => {
+            // Synchronous guard off the ref — a mashed Enter can't fire a second
+            // restore of the same archive before the state commits.
+            if (restoringPathsRef.current.has(entry.zipPath)) return;
+            restoringPathsRef.current.add(entry.zipPath);
+            setRestoringPaths(new Set(restoringPathsRef.current));
+            apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
+              setArchiveStatus(`Restored "${entry.name}"`);
+              refreshCampaigns();
+              // Refresh archive list too
+              apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
+            }).catch((err) => {
+              setErrorMessage(err instanceof Error ? err.message : String(err));
+            }).finally(() => {
+              restoringPathsRef.current.delete(entry.zipPath);
+              setRestoringPaths(new Set(restoringPathsRef.current));
+            });
+          }}
+          onBack={() => { setArchiveStatus(""); popMenu(); }}
+        />
+      );
+    }
+
+    if (menuScreen === "discord_settings") {
+      return (
+        <DiscordSettingsPhase
+          theme={theme}
+          currentSetting={discordEnabled}
+          onSave={(enabled) => {
+            apiClientRef.current.setDiscordSettings(enabled).then(() => {
+              setDiscordEnabled(enabled);
+              popMenu();
+            }).catch(() => {
+              popMenu();
+            });
+          }}
+          onBack={popMenu}
+        />
+      );
+    }
+
     return (
       <MainMenuPhase
         theme={theme}
@@ -515,6 +672,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         errorMsg={errorMessage || null}
         apiKeyValid={apiKeyValid}
         apiKeyStatus={apiKeyStatus}
+        hasConnections={connections.length > 0}
         devModeEnabled={devModeEnabled}
         onNewCampaign={() => {
           setSessionKey((k) => k + 1);
@@ -571,125 +729,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         }}
         onCancelDelete={() => { setDeleteModal(null); setPendingDeleteId(null); }}
         onAddContent={() => { /* not yet migrated */ }}
-        onSettings={() => setPhase("settings")}
-        onSettingsApiKeys={() => { refreshConnections(); setPhase("settings_apikeys"); }}
+        onSettings={() => pushMenu("settings")}
+        onConnectToAI={() => { refreshConnections(); pushMenu("connections_wizard"); }}
         onQuit={() => process.exit(0)}
-      />
-    );
-  }
-
-  if (phase === "settings" || phase === "settings_apikeys") {
-    return (
-      <SettingsPhase
-        theme={theme}
-        initialView={phase === "settings_apikeys" ? "api_keys" : undefined}
-        devModeEnabled={devModeEnabled}
-        onToggleDevMode={() => {
-          const next = !devModeEnabled;
-          setDevModeEnabled(next);
-          apiClientRef.current.setMachineSettings({ devModeEnabled: next }).catch(() => { /* best-effort */ });
-        }}
-        showVerbose={showVerbose}
-        onToggleVerbose={() => setShowVerbose((v) => !v)}
-        onApiKeys={() => { refreshConnections(); setPhase("api_keys"); }}
-        onDiscord={() => {
-          apiClientRef.current.getDiscordSettings().then((s) => setDiscordEnabled(s.enabled)).catch(() => { /* ignore */ });
-          setPhase("discord_settings");
-        }}
-        onArchivedCampaigns={() => {
-          apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
-          setPhase("archived_campaigns");
-        }}
-        onBack={() => setPhase("menu")}
-      />
-    );
-  }
-
-  if (phase === "api_keys") {
-    return (
-      <ConnectionsPhase
-        theme={theme}
-        connections={connections}
-        tierAssignments={tierAssignments}
-        healthResults={connHealthResults}
-        knownModels={knownModels}
-        onAddConnection={(provider, apiKey, label, baseUrl) => {
-          apiClientRef.current.addConnection(provider, apiKey, label, baseUrl).then((resp) => {
-            setConnections(resp.connections);
-            setTierAssignments(resp.tierAssignments);
-          }).catch(() => { /* ignore */ });
-        }}
-        onRemoveConnection={(id) => {
-          apiClientRef.current.removeConnection(id).then((resp) => {
-            setConnections(resp.connections);
-            setTierAssignments(resp.tierAssignments);
-          }).catch(() => { /* ignore */ });
-        }}
-        onCheckHealth={handleCheckConnection}
-        onSetTier={(tier, assignment) => {
-          apiClientRef.current.setTierAssignments({ [tier]: assignment }).then((resp) => {
-            setTierAssignments(resp.tierAssignments);
-          }).catch(() => { /* ignore */ });
-        }}
-        onStartChatGptLogin={() => apiClientRef.current.startChatGptLogin()}
-        onPollChatGptLogin={(loginId) => apiClientRef.current.getChatGptLoginStatus(loginId)}
-        onCancelChatGptLogin={(loginId) => apiClientRef.current.cancelChatGptLogin(loginId)}
-        onRefreshConnections={() => {
-          apiClientRef.current.listConnections().then((resp) => {
-            setConnections(resp.connections);
-            setTierAssignments(resp.tierAssignments);
-          }).catch(() => { /* ignore */ });
-        }}
-        onFetchUsage={(id) => apiClientRef.current.getConnectionUsage(id)}
-        onBack={() => setPhase("settings")}
-      />
-    );
-  }
-
-  if (phase === "archived_campaigns") {
-    return (
-      <ArchivedCampaignsPhase
-        theme={theme}
-        archives={archivedCampaigns}
-        statusMessage={archiveStatus}
-        restoringPaths={restoringPaths}
-        onUnarchive={(entry) => {
-          // Synchronous guard off the ref — a mashed Enter can't fire a second
-          // restore of the same archive before the state commits.
-          if (restoringPathsRef.current.has(entry.zipPath)) return;
-          restoringPathsRef.current.add(entry.zipPath);
-          setRestoringPaths(new Set(restoringPathsRef.current));
-          apiClientRef.current.restoreArchivedCampaign(entry.name, entry.zipPath).then(() => {
-            setArchiveStatus(`Restored "${entry.name}"`);
-            refreshCampaigns();
-            // Refresh archive list too
-            apiClientRef.current.listArchivedCampaigns().then((resp) => setArchivedCampaigns(resp.archives)).catch(() => { /* ignore */ });
-          }).catch((err) => {
-            setErrorMessage(err instanceof Error ? err.message : String(err));
-          }).finally(() => {
-            restoringPathsRef.current.delete(entry.zipPath);
-            setRestoringPaths(new Set(restoringPathsRef.current));
-          });
-        }}
-        onBack={() => { setArchiveStatus(""); setPhase("settings"); }}
-      />
-    );
-  }
-
-  if (phase === "discord_settings") {
-    return (
-      <DiscordSettingsPhase
-        theme={theme}
-        currentSetting={discordEnabled}
-        onSave={(enabled) => {
-          apiClientRef.current.setDiscordSettings(enabled).then(() => {
-            setDiscordEnabled(enabled);
-            setPhase("settings");
-          }).catch(() => {
-            setPhase("settings");
-          });
-        }}
-        onBack={() => setPhase("settings")}
       />
     );
   }

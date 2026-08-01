@@ -36,6 +36,11 @@ export function ApiErrorModal({ theme, width, height, overlay }: ApiErrorModalPr
     // visible countdown rather than freezing at 0.
   }, [overlay.status, overlay.delaySec, overlay.attemptId]);
 
+  // Auth failures rarely fix themselves — point at the actual remedy while
+  // the retry loop spins.
+  const authHint = overlay.status === 401 || overlay.status === 403
+    ? ["  If this persists, fix your connection", "  in Settings → Connect to AI.", ""]
+    : [];
   const lines = [
     "",
     `  ${retryLabel(overlay.status)}`,
@@ -43,6 +48,8 @@ export function ApiErrorModal({ theme, width, height, overlay }: ApiErrorModalPr
     `  Retrying in ${remaining}s...`,
     "",
     "  Will auto-resume on reconnect.",
+    ...(authHint.length > 0 ? [""] : []),
+    ...authHint,
     "",
   ];
 

@@ -1,6 +1,10 @@
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { coerceResourceKeys } from "@machine-violet/shared";
+import type {
+  TranscriptChoicePresentation,
+  TranscriptChoiceResolution,
+} from "@machine-violet/shared";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { DM_TURN_LENGTH_PCT_DEFAULT } from "@machine-violet/shared/types/config.js";
 import { agentLoopStreaming } from "./agent-loop.js";
@@ -17,6 +21,15 @@ import type { SceneState, FileIO } from "./scene-manager.js";
 import { InjectionRegistry, BehaviorInjection, ScenePacingInjection, LengthSteeringInjection, HardStatsInjection } from "./injections.js";
 import type { TerminalDims, InjectionContext } from "./injections.js";
 import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
+
+export interface ProcessInputOptions {
+  fromAI?: boolean;
+  skipTranscript?: boolean;
+  choiceContexts?: {
+    presentation: TranscriptChoicePresentation;
+    resolution: TranscriptChoiceResolution;
+  }[];
+}
 
 /** Optional line-counting function for length steering.
  *  Defaults to a simple estimate if the TUI formatting pipeline isn't available. */
@@ -88,6 +101,8 @@ export class GameEngine {
    * via the `tierProvidersForTest` helper.
    */
   private tierProviders: Record<ModelTier, TierProvider>;
+  /** Explicit provider-native image model paired to the DM's Large connection. */
+  private readonly imageModel?: string;
   private registry: ToolRegistry;
   private gameState: GameState;
   private conversation: ConversationManager;
@@ -119,7 +134,11 @@ export class GameEngine {
   private entityToolDispatcher: ((name: string, input: Record<string, unknown>) => Promise<import("./tool-registry.js").ToolResult | null>) | null = null;
 
   /** Tracks the last failed input so the player can press Enter to retry. */
-  private lastFailedInput: { characterName: string; text: string; opts?: { fromAI?: boolean; skipTranscript?: boolean } } | null = null;
+  private lastFailedInput: {
+    characterName: string;
+    text: string;
+    opts?: ProcessInputOptions;
+  } | null = null;
 
   /** Set while the DM turn is running if the DM called `present_choices` itself.
    *  Used to suppress auto-generated choices for that turn. */
@@ -245,11 +264,13 @@ export class GameEngine {
      * synthesize a homogeneous map via `tierProvidersForTest`.
      */
     tierProviders: Record<ModelTier, TierProvider>;
+    imageModel?: string;
     gitIO?: GitIO;
     entityTree?: EntityTree;
   }) {
     this.provider = params.provider;
     this.tierProviders = params.tierProviders;
+    this.imageModel = params.imageModel;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
     this.fileIO = params.fileIO;
@@ -488,6 +509,7 @@ export class GameEngine {
         // all tool calls before any text). Re-broadcast through the same
         // onTuiCommand sink the bridge would have used immediately for a
         // non-deferred command.
+        this.dmProvidedChoicesThisTurn = true;
         this.callbacks.onTuiCommand?.(cmd);
       }
     }
@@ -568,7 +590,10 @@ export class GameEngine {
     const characterName = match[1];
     const text = match[2];
     // skipTranscript: true — the original transcript entry is already written
-    this.processInput(characterName, text, { skipTranscript: true });
+    this.processInput(characterName, text, {
+      skipTranscript: true,
+      choiceContexts: popped.choiceContexts,
+    });
     return true;
   }
 
@@ -591,7 +616,7 @@ export class GameEngine {
    * Process player input: send to DM, stream response, handle tools.
    * This is the main game loop entry point.
    */
-  async processInput(characterName: string, text: string, opts?: { fromAI?: boolean; skipTranscript?: boolean }): Promise<void> {
+  async processInput(characterName: string, text: string, opts?: ProcessInputOptions): Promise<void> {
     if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
     }
@@ -695,6 +720,17 @@ export class GameEngine {
     if (volatileContext) {
       preambleParts.push(volatileContext);
     }
+
+    const choiceHints = opts?.choiceContexts?.flatMap(({ presentation, resolution }) => {
+      if (
+        resolution.kind !== "option"
+        || presentation.source !== "suggestion_generator"
+      ) return [];
+      return [
+        "[choice] Selected from generated suggestions; treat as intent, not a voice shift; don't mention the UI.",
+      ];
+    }) ?? [];
+    preambleParts.push(...choiceHints);
 
     // Registered injections (behavior, scene-pacing, length steering,
     // hard-stats, etc.)
@@ -811,7 +847,12 @@ export class GameEngine {
         ? turn[turn.length - 1]
         : { role: "assistant", content: result.text };
       const toolMessages = turn.slice(0, -1);
-      const dropped = this.conversation.addExchange(storedUserMessage, assistantMessage, toolMessages);
+      const dropped = this.conversation.addExchange(
+        storedUserMessage,
+        assistantMessage,
+        toolMessages,
+        opts?.choiceContexts,
+      );
 
       // Drain any background `generate_image` renders that finished since the
       // last turn. They're divorced from turn order (the DM fired them earlier
@@ -834,6 +875,13 @@ export class GameEngine {
             // the client injects during live play).
             logLines.push({ kind: "separator", text: "---" });
             logLines.push({ kind: "player", text: `[${characterName}] ${text}` });
+            for (const { resolution } of opts?.choiceContexts ?? []) {
+              logLines.push({
+                kind: "metadata",
+                text: "",
+                event: { type: "choice_resolved", resolution },
+              });
+            }
           }
           if (result.text) {
             // Turn separator before DM narration (matches the client-side
@@ -1040,6 +1088,7 @@ export class GameEngine {
     opts?: { fromAI?: boolean; skipTranscript?: boolean },
   ): Promise<void> {
     if (opts?.skipTranscript) return;
+    if (this.modeSession) return;
     if (!narration || narration.length < 40) return;
 
     const choicesConfig = this.gameState.config.choices;
@@ -1081,6 +1130,7 @@ export class GameEngine {
 
       this.callbacks.onTuiCommand({
         type: "present_choices",
+        source: "suggestion_generator",
         prompt: "",
         choices: generated.choices,
       });
@@ -1594,6 +1644,7 @@ export class GameEngine {
         : [];
       const result = await generateImage({
         prompt: promptText,
+        ...(this.imageModel ? { imageModel: this.imageModel } : {}),
         effort,
         aspect,
         intent,
@@ -1742,6 +1793,7 @@ export class GameEngine {
       try {
         const result = await generateImage({
           prompt: buildPortraitRevisionPrompt(name, change),
+          ...(this.imageModel ? { imageModel: this.imageModel } : {}),
           effort: "standard",
           // The canonical portrait is the multi-angle landscape reference
           // sheet from setup; re-render in landscape so the revision keeps

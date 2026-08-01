@@ -66,6 +66,17 @@ Signals the end of a DM response. Sent after all `narrative:chunk` events for th
 | `text`         | string  | The complete DM response text. |
 | `playerAction` | string? | The player action that triggered this response. |
 
+#### `transcript:metadata`
+
+Invisible append-only transcript metadata. Clients preserve each event at its
+current transcript position without rendering a row.
+
+| `data.type`         | Payload | Description |
+|---------------------|---------|-------------|
+| `state_checkpoint`  | `state` | Full versioned modeline/resource snapshot. The reference client uses the nearest checkpoint to rewind those displays during scrollback. |
+| `choices_presented` | `presentation` | Stable ID, source, prompt, exact formatted choices, and optional descriptions shown to the player. |
+| `choice_resolved`   | `resolution` | Presentation ID, player, contribution text, and either a zero-based selected option index or `custom`. |
+
 ---
 
 ### Turn Lifecycle
@@ -147,11 +158,19 @@ The DM or setup agent is offering the player a set of choices.
 | Field          | Type     | Description |
 |----------------|----------|-------------|
 | `id`           | string   | Choice set identifier. |
+| `source`       | string   | `present_choices` or `suggestion_generator`. |
 | `prompt`       | string   | Question or prompt text. |
 | `choices`      | string[] | Available options. |
 | `descriptions` | string[]?| Optional per-choice descriptions. |
 
-The player responds by sending the selected text as a turn contribution (`POST /session/turn/contribute`) with `fromChoice: true` so the setup agent can distinguish a real selection from a dismissal+free-form reply. The wire path is identical for setup and gameplay.
+The player responds by sending the selected text as a turn contribution
+(`POST /session/turn/contribute`) with `fromChoice: true`. Gameplay clients
+also send `choiceResponse`: either
+`{ presentationId, kind: "option", optionIndex }` or
+`{ presentationId, kind: "custom" }`. The stable ID/index preserves formatted
+and duplicate options without matching submitted plain text. A generated
+option selection adds one terse, API-only provenance hint to the next DM call;
+it is not stored in visible narration.
 
 #### `choices:cleared`
 
@@ -203,6 +222,7 @@ Full game state. Sent on initial connect, after every DM turn completes, after s
 | `displayResources` | object   | `{ [character]: string[] }` — resource names to display. |
 | `resourceValues`   | object   | `{ [character]: { [resource]: string } }` — current values. |
 | `modelines`        | object   | `{ [character]: string }` — status text per character. |
+| `activeChoices`    | object?  | Choice presentation currently awaiting a response. Included so reconnecting clients retain its stable ID. |
 | `themeName`        | string?  | Active theme name. |
 | `variant`          | string?  | Style variant (e.g. scene mood). |
 | `keyColor`         | string?  | Theme key color override. |
@@ -212,7 +232,7 @@ Full game state. Sent on initial connect, after every DM turn completes, after s
 | `sceneNumber`      | number?  | Current scene number. |
 | `scenePrecis`      | string?  | One-line scene summary. |
 | `sessionRecap`     | object?  | `{ id, lines }` — present only in the first snapshot after a clean session-end. Client renders the "Previously on..." modal; server clears the pending flag as it emits. Omitted on mid-session reconnects and fresh campaigns. |
-| `narrativeLines`   | array?   | Authoritative committed transcript (`{ kind: "dm" \| "player", text }`). When present, the client REPLACES its accumulated narrative log; when omitted, the existing log is preserved. Sent on connect (so reconnecting clients see history) and on retry rollback (so a partial DM stream that's about to be re-issued doesn't accumulate twice on the client). Per-turn snapshots intentionally omit it to avoid clobbering in-flight stream deltas. |
+| `narrativeLines`   | array?   | Authoritative committed transcript (`dm`, `player`, and invisible `metadata` entries). When present, the client REPLACES its accumulated narrative log; when omitted, the existing log is preserved. Sent on connect (so reconnecting clients see history) and on retry rollback (so a partial DM stream that's about to be re-issued doesn't accumulate twice on the client). Per-turn snapshots intentionally omit it to avoid clobbering in-flight stream deltas. |
 
 **Player** (nested in `players` array):
 

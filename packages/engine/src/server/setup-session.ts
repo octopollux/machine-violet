@@ -40,6 +40,8 @@ export class SetupSession {
   private conversation: SetupConversation | null = null;
   private provider: LLMProvider;
   private model: string;
+  /** Explicit provider-native image model paired to the Large connection. */
+  private imageModel?: string;
   /**
    * Per-tier resolved {provider, model} pairs. Setup runs on `large` for the
    * main conversation, but subagents invoked during setup (e.g.
@@ -81,6 +83,7 @@ export class SetupSession {
       // Full-stack replay (E2E): tiers served from the tape, no connection/key.
       this.tierProviders = replayTiers;
       this.providersByConnectionId = new Map();
+      this.imageModel = undefined;
     } else {
       const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
       // configDir must be forwarded so openai-chatgpt connections get a
@@ -94,6 +97,7 @@ export class SetupSession {
       // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
       this.tierProviders = wrapForRecording(resolution.tiers);
       this.providersByConnectionId = resolution.byConnectionId;
+      this.imageModel = resolution.imageModel;
     }
     this.provider = this.tierProviders.large.provider;
     this.model = this.tierProviders.large.model;
@@ -178,7 +182,7 @@ export class SetupSession {
           category: "retryable",
         },
       });
-    }, paths.worldsDir, paths.personalitiesDir, this.fileIO, setupRoot);
+    }, paths.worldsDir, paths.personalitiesDir, this.fileIO, setupRoot, this.imageModel);
     this.started = true;
 
     this.emitThinking();
@@ -277,6 +281,7 @@ export class SetupSession {
         type: "choices:presented",
         data: {
           id: "setup-choice",
+          source: "present_choices",
           prompt: result.pendingChoices.prompt,
           choices: result.pendingChoices.choices,
           descriptions: result.pendingChoices.descriptions,

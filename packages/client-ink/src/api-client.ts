@@ -52,6 +52,7 @@ export interface ConnectionInfo {
 export interface ConnectionsResponse {
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
+  imageAssignment: TierAssignmentEntry | null;
 }
 
 export interface ConnectionHealthResponse {
@@ -80,6 +81,18 @@ export interface KnownModelInfo {
   defaultTier: string;
   pricing: { input: number; output: number; cacheWrite: number; cacheRead: number };
   capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean };
+}
+
+export interface KnownImageModelInfo {
+  provider: string;
+  displayName: string;
+}
+
+/** Per-provider default model ids for each tier, from the model registry. */
+export interface ProviderTierDefaults {
+  large?: string;
+  medium?: string;
+  small?: string;
 }
 
 export class ApiClient {
@@ -140,6 +153,7 @@ export class ApiClient {
        *  option (vs. typing free-form). Used by setup to distinguish a
        *  selection from a dismissal+free-form response. */
       fromChoice?: boolean;
+      choiceResponse?: ContributeRequest["choiceResponse"];
     },
   ): Promise<{ turnId: string; contributionId: string }> {
     const body: ContributeRequest = {
@@ -148,6 +162,7 @@ export class ApiClient {
       campaignId: opts?.campaignId,
       turnSeq: opts?.turnSeq,
       fromChoice: opts?.fromChoice,
+      choiceResponse: opts?.choiceResponse,
     };
     return this.post(`/session/turn/contribute?player=${encodeURIComponent(this.playerId)}`, body);
   }
@@ -186,7 +201,7 @@ export class ApiClient {
   }
 
   async diagnostics(): Promise<{ ok: boolean; path: string }> {
-    return this.fetch("/session/diagnostics", { method: "PUT" });
+    return this.fetch("/manage/diagnostics", { method: "PUT" });
   }
 
   async getSettings(): Promise<{ config: unknown }> {
@@ -223,6 +238,11 @@ export class ApiClient {
     return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
+  /** Replace a connection's API key in place (Fix flow); preserves the id. */
+  async updateConnectionKey(id: string, apiKey: string): Promise<ConnectionsResponse> {
+    return this.fetch(`/manage/connections/${encodeURIComponent(id)}`, { method: "PATCH", body: { apiKey } });
+  }
+
   async checkConnection(id: string): Promise<ConnectionHealthResponse> {
     return this.post(`/manage/connections/${encodeURIComponent(id)}/check`);
   }
@@ -247,15 +267,29 @@ export class ApiClient {
     return this.get(`/manage/connections/${encodeURIComponent(id)}/usage`);
   }
 
-  async getTierAssignments(): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+  async getTierAssignments(): Promise<{
+    tierAssignments: TierAssignmentsResponse;
+    imageAssignment: TierAssignmentEntry | null;
+  }> {
     return this.get("/manage/tiers");
   }
 
-  async setTierAssignments(assignments: Partial<TierAssignmentsResponse>): Promise<{ tierAssignments: TierAssignmentsResponse }> {
+  async setTierAssignments(
+    assignments: Partial<TierAssignmentsResponse> & {
+      imageAssignment?: TierAssignmentEntry | null;
+    },
+  ): Promise<{
+    tierAssignments: TierAssignmentsResponse;
+    imageAssignment: TierAssignmentEntry | null;
+  }> {
     return this.fetch("/manage/tiers", { method: "PUT", body: assignments });
   }
 
-  async listKnownModels(): Promise<{ models: Record<string, KnownModelInfo> }> {
+  async listKnownModels(): Promise<{
+    models: Record<string, KnownModelInfo>;
+    imageModels: Record<string, KnownImageModelInfo>;
+    tierDefaults: Record<string, ProviderTierDefaults>;
+  }> {
     return this.get("/manage/models");
   }
 

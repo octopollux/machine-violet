@@ -21,6 +21,7 @@ function estimateContentTokens(content: NormalizedMessage["content"]): number {
       total += estimateTokens(block.text);
     } else if (block.type === "tool_use") {
       total += estimateTokens(block.name) + estimateTokens(JSON.stringify(block.input));
+      total += estimateTokens(block.geminiSignature ?? "");
     } else if (block.type === "tool_result") {
       total += estimateTokens(block.content);
     } else if (block.type === "reasoning") {
@@ -42,6 +43,14 @@ function estimateContentTokens(content: NormalizedMessage["content"]): number {
       total += estimateTokens(block.text) + estimateTokens(block.signature);
     } else if (block.type === "redacted_thinking") {
       total += estimateTokens(block.data);
+    } else if (block.type === "gemini_thought") {
+      // Interactions stateless mode requires thought summaries + signatures
+      // to round-trip exactly, so both contribute to retained context.
+      total += estimateTokens(block.signature ?? "");
+      for (const item of block.summary) {
+        if (item.type === "text") total += estimateTokens(item.text);
+        else total += estimateTokens(item.data ?? "") + estimateTokens(item.uri ?? "");
+      }
     }
   }
   return total;

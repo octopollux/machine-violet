@@ -613,11 +613,12 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
 
 ```
 <appDir>/
-├── .env                      API keys (ANTHROPIC_API_KEY, etc.). Loaded at startup via first-launch.ts.
+├── .env                      API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, etc.; XAI_API_KEY is dormant under #749).
+│                              Loaded at startup; each active-provider key becomes an ephemeral, non-persisted connection.
 ├── config.json               App-level config (home directory path, defaults).
 ├── api-keys.json             Manually added API keys (treated as secret, like .env).
-├── connections.json           AI provider connections: Anthropic, OpenAI (API key), OpenAI (ChatGPT), OpenRouter, custom.
-│                              Each connection: id, provider (anthropic | openai-apikey | openai-chatgpt | openrouter | custom), label,
+├── connections.json           AI provider connections, text-tier assignments, and optional Large-paired image assignment.
+│                              Each connection: id, provider (anthropic | gemini | openai-apikey | openai-chatgpt | openrouter | xai | custom), label,
 │                              apiKey (empty for openai-chatgpt — Codex owns its own token store at ~/.codex/auth.json),
 │                              optional baseUrl, optional chatgptAccount, discovered models,
 │                              source (env/manual/oauth). Tier assignments (large/medium/small → connectionId + modelId).
@@ -639,9 +640,9 @@ In addition to campaign-scoped state, Machine Violet maintains machine-scoped co
                                Per-model: pricing, capabilities, context window, tier defaults.
 ```
 
-Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments are stripped before JSON parsing. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI.
+Additionally, `dev-config.jsonc` (read from the process working directory, not the app config directory) provides optional dev-only overrides for `effort` (per-agent reasoning level) and `pricing` (per-model cost calculations). `//` and `/* */` comments and trailing commas are stripped before JSON parsing. A genuinely-absent file falls back to defaults silently; a file that is *present but unparseable* logs a one-time warning (rather than silently defaulting) so a typo'd override doesn't go unnoticed. Per-tier provider/model assignment is *not* configured here — that lives in `connections.json`, managed via the Connections UI. The same store's nullable `imageAssignment` selects a provider-native image model on the exact Large connection; null keeps the bundled/provider-managed default.
 
-**Tier resolution:** at session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads `connections.json` and emits a `Record<ModelTier, TierProvider>` — three `{provider, model}` pairs, one per tier. The map threads through `GameEngine`, `SceneManager`, and `ResolveSession` so every subagent call routes through the connection assigned to its tier. Heterogeneous setups (e.g. Large=OpenAI, Medium=Anthropic) just work; subagents accept `model` as a required parameter and never fall back to `getModel(tier)` silently.
+**Tier resolution:** at session start, `buildTierProviders` (`src/config/tier-resolver.ts`) reads `connections.json` and emits a `Record<ModelTier, TierProvider>` — three `{provider, model}` pairs, one per tier — plus the optional explicit `imageModel`. The tier map threads through `GameEngine`, `SceneManager`, and `ResolveSession`; the image model threads through setup portraits and every gameplay render. Heterogeneous setups (e.g. Large=OpenAI, Medium=Anthropic) just work; subagents accept `model` as a required parameter and never fall back to `getModel(tier)` silently.
 
 **Code:** `packages/engine/src/config/connections.ts`, `packages/engine/src/config/tier-resolver.ts`, `packages/engine/src/config/discord.ts`, `packages/engine/src/config/machine-settings.ts`, `packages/engine/src/config/model-registry.ts`, `packages/engine/src/config/first-launch.ts`
 
@@ -657,6 +658,9 @@ The engine writes a structured, append-only JSONL event log to `../.debug/engine
 - **Turn lifecycle:** turn open, turn commit, turn resolve
 - **API calls:** model, tier, token counts, latency
 - **Subagent lifecycle:** spawn, complete, usage
+- **Tool input contracts:** allowlisted repairs and rejected calls, with
+  criticality, call correlation, stable issue codes, and shape-only
+  diagnostics (`tool_input:repaired`, `tool_input:rejected`)
 - **Errors:** unhandled exceptions, API failures
 
 The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an external reader — the campaign-explorer, a diagnostics bundle — sees each line the instant it lands; the per-event cost is microseconds and writes never throw. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.

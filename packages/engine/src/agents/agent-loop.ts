@@ -1,7 +1,13 @@
 import type { ToolRegistry, ToolResult } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
-import type { LLMProvider, NormalizedMessage, NormalizedTool, SystemBlock } from "../providers/types.js";
+import type {
+  LLMProvider,
+  NormalizedMessage,
+  NormalizedTool,
+  SystemBlock,
+  ToolExecutionContext,
+} from "../providers/types.js";
 import { GENERATE_IMAGE_TOOL_NAME, UPDATE_PORTRAIT_TOOL_NAME } from "../providers/types.js";
 
 // --- TUI tools ---
@@ -155,8 +161,17 @@ async function runAgentLoopInternal(
 ): Promise<AgentLoopResult> {
   const asyncHandler = config.asyncToolHandler;
   const toolHandler = asyncHandler
-    ? async (name: string, input: Record<string, unknown>) => (await asyncHandler(name, input)) ?? registry.dispatch(gameState, name, input)
-    : (name: string, input: Record<string, unknown>) => registry.dispatch(gameState, name, input);
+    ? async (
+        name: string,
+        input: Record<string, unknown>,
+        context: ToolExecutionContext,
+      ) => (await asyncHandler(name, input))
+        ?? registry.dispatch(gameState, name, input, context)
+    : (
+        name: string,
+        input: Record<string, unknown>,
+        context: ToolExecutionContext,
+      ) => registry.dispatch(gameState, name, input, context);
 
   // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
   // `generate_image` function tool when image generation is gated on.
@@ -250,6 +265,15 @@ async function runAgentLoopInternal(
       },
     });
   }
+  const toolInputPolicies = {
+    ...registry.getInputPolicies(DM_EXCLUDED_TOOLS),
+    ...(config.imageGenEnabled
+      ? {
+          [GENERATE_IMAGE_TOOL_NAME]: { criticality: "expensive" as const },
+          [UPDATE_PORTRAIT_TOOL_NAME]: { criticality: "expensive" as const },
+        }
+      : {}),
+  };
 
   const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "dm",
@@ -260,6 +284,7 @@ async function runAgentLoopInternal(
     stream,
     tools,
     toolHandler,
+    toolInputPolicies,
     cacheHints: [{ target: "tools", ttl: "1h" }, { target: "messages" }],
     tuiToolNames: TUI_TOOLS,
     onTuiCommand: config.onTuiCommand,

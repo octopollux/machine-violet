@@ -1,7 +1,12 @@
 export { Modal } from "./Modal.js";
 export { CenteredModal } from "./CenteredModal.js";
 export type { CenteredModalHandle } from "./CenteredModal.js";
-export { ChoiceModal, ChoiceOverlay, DESCRIPTION_ROWS } from "./ChoiceModal.js";
+export {
+  ChoiceModal,
+  ChoiceOverlay,
+  DESCRIPTION_ROWS,
+  type ChoiceOverlaySelection,
+} from "./ChoiceModal.js";
 export { GameMenu } from "./GameMenu.js";
 export type { MenuGroup, MenuItem } from "./GameMenu.js";
 export { CharacterSheetModal } from "./CharacterSheetModal.js";

@@ -270,6 +270,11 @@ export async function searchContent(
     maxTokens: getMaxOutput(model),
     tools: SEARCH_TOOLS,
     toolHandler,
+    toolInputPolicies: {
+      list_categories: { criticality: "advisory" },
+      search_facets: { criticality: "advisory" },
+      read_entity: { criticality: "advisory" },
+    },
     cacheTools: true,
     maxToolRounds: 5,
   }, `Search query: ${input.query}`);

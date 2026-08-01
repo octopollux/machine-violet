@@ -42,6 +42,20 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("max-width: 120ch");
   });
 
+  it("leaves prose unwrapped so the browser can reflow it", () => {
+    const lines: NarrativeLine[] = [
+      {
+        kind: "dm",
+        text: "This deliberately long paragraph exceeds a twenty-column terminal but remains one semantic HTML block.",
+      },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines, 20));
+    expect(html.match(/<div class="dm">/g)).toHaveLength(1);
+    expect(html).toContain(
+      "This deliberately long paragraph exceeds a twenty-column terminal but remains one semantic HTML block.",
+    );
+  });
+
   it("renders DM lines with formatting", () => {
     const lines: NarrativeLine[] = [
       { kind: "dm", text: "The door <b>groans</b> open." },
@@ -76,7 +90,25 @@ describe("buildTranscriptHtml", () => {
     ];
     const html = buildTranscriptHtml(buildOpts(lines));
     expect(html).toContain('class="separator"');
-    expect(html).toContain("†");
+    expect(html).toContain('color:#666666">── † ──</div>');
+    expect(html).not.toContain('color:#666666"> ');
+  });
+
+  it("keeps separators within the exporting terminal width", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "separator", text: "---" },
+    ];
+    const opts = buildOpts(lines, 5);
+    opts.themeAsset = {
+      ...stubAsset(),
+      components: {
+        ...stubAsset().components,
+        turn_separator: { rows: ["ABCDEFGHIJ"], width: 10, height: 1 },
+      },
+    };
+    const html = buildTranscriptHtml(opts);
+    expect(html).toContain('color:#666666">ABCDE</div>');
+    expect(html).not.toContain("FGHIJ");
   });
 
   it("renders color tags as styled spans", () => {
@@ -96,6 +128,130 @@ describe("buildTranscriptHtml", () => {
     expect(html).not.toContain("debug info");
   });
 
+  it("embeds transcript checkpoints as invisible machine-readable JSON", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "The gate falls." },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "state_checkpoint",
+          state: {
+            version: 1,
+            modelines: { Aldric: "Bruised" },
+            displayResources: { Aldric: ["HP", "Air"] },
+            resourceValues: { Aldric: { HP: "18/30", Air: "4/6" } },
+          },
+        },
+      },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines));
+    const match = html.match(
+      /<script id="machine-violet-transcript-metadata" type="application\/json">([^<]*)<\/script>/,
+    );
+    expect(match).not.toBeNull();
+    expect(JSON.parse(match![1])).toEqual({
+      format: "machine-violet-transcript-metadata",
+      version: 1,
+      checkpoints: [{
+        afterEntry: 1,
+        state: {
+          version: 1,
+          modelines: { Aldric: "Bruised" },
+          displayResources: { Aldric: ["HP", "Air"] },
+          resourceValues: { Aldric: { HP: "18/30", Air: "4/6" } },
+        },
+      }],
+      choices: [],
+    });
+    expect(html).not.toContain('class="metadata"');
+  });
+
+  it("escapes checkpoint text that could terminate the JSON script element", () => {
+    const lines: NarrativeLine[] = [{
+      kind: "metadata",
+      text: "",
+      event: {
+        type: "state_checkpoint",
+        state: {
+          version: 1,
+          modelines: { Aldric: "</script><script>alert(1)</script>" },
+          displayResources: {},
+          resourceValues: {},
+        },
+      },
+    }];
+    const html = buildTranscriptHtml(buildOpts(lines));
+    expect(html).not.toContain("</script><script>alert(1)</script>");
+    expect(html).toContain("\\u003c/script>");
+  });
+
+  it("joins formatted choice presentations with the accepted resolution", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "The sigils flare." },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choices_presented",
+          presentation: {
+            id: "choice-1",
+            source: "suggestion_generator",
+            prompt: "<i>What now?</i>",
+            choices: [
+              "◆ <b>Open</b> the door",
+              "◆ <color=#cc4444>Break</color> the seal",
+            ],
+            descriptions: ["Carefully.", "Violently."],
+          },
+        },
+      },
+      { kind: "player", text: "[Aldric] Open the door" },
+      {
+        kind: "metadata",
+        text: "",
+        event: {
+          type: "choice_resolved",
+          resolution: {
+            presentationId: "choice-1",
+            kind: "option",
+            optionIndex: 0,
+            playerId: "Aldric",
+            contributionText: "Open the door",
+          },
+        },
+      },
+    ];
+
+    const html = buildTranscriptHtml(buildOpts(lines));
+    const match = html.match(
+      /<script id="machine-violet-transcript-metadata" type="application\/json">([^<]*)<\/script>/,
+    );
+    const metadata = JSON.parse(match![1]);
+    expect(metadata.choices).toEqual([{
+      id: "choice-1",
+      source: "suggestion_generator",
+      presentedAfterEntry: 1,
+      prompt: "<i>What now?</i>",
+      options: [
+        { index: 0, text: "◆ <b>Open</b> the door", description: "Carefully." },
+        {
+          index: 1,
+          text: "◆ <color=#cc4444>Break</color> the seal",
+          description: "Violently.",
+        },
+      ],
+      resolution: {
+        kind: "option",
+        playerId: "Aldric",
+        contributionText: "Open the door",
+        resolvedAfterEntry: 2,
+        optionIndex: 0,
+        optionText: "◆ <b>Open</b> the door",
+      },
+    }]);
+  });
+
   it("renders a <quote> block as a styled blockquote", () => {
     const lines: NarrativeLine[] = [
       { kind: "dm", text: "<quote>Here lies the <i>last honest broker</i>.</quote>" },
@@ -106,6 +262,15 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("<i>last honest broker</i>");
     // The literal tag must not leak.
     expect(html).not.toContain("&lt;quote&gt;");
+  });
+
+  it("preserves explicit line breaks inside responsive blocks", () => {
+    const lines: NarrativeLine[] = [
+      { kind: "dm", text: "<quote>ALERT<br>breach detected</quote>" },
+    ];
+    const html = buildTranscriptHtml(buildOpts(lines, 20));
+    expect(html.match(/<blockquote class="dm-quote">/g)).toHaveLength(1);
+    expect(html).toContain("ALERT<br>breach detected");
   });
 
   it("renders an ordered list with markers and hanging indent", () => {
@@ -146,6 +311,15 @@ describe("buildTranscriptHtml", () => {
     expect(html).toContain("Consolas");
     expect(html).toContain("Menlo");
     expect(html).toContain("monospace");
+  });
+
+  it("bakes responsive padding and subtle scrollbars into the export", () => {
+    const html = buildTranscriptHtml(buildOpts([]));
+    expect(html).toContain("padding: 0 clamp(2px, 2vw, 1em)");
+    expect(html).toContain("scrollbar-width: thin");
+    expect(html).toContain("scrollbar-color: #666666 transparent");
+    expect(html).toContain("html:hover::-webkit-scrollbar-thumb");
+    expect(html).toContain("overflow-wrap: anywhere");
   });
 
   it("inlines image lines as base64 data: URIs when bytes are supplied", () => {

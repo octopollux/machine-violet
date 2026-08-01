@@ -205,6 +205,13 @@ export class ResolveSession {
         stream: false,
         tools: [...SESSION_TOOLS],
         toolHandler,
+        toolInputPolicies: {
+          roll_dice: { criticality: "advisory" },
+          read_character_sheet: { criticality: "advisory" },
+          read_stat_block: { criticality: "advisory" },
+          query_rules: { criticality: "advisory" },
+          search_content: { criticality: "expensive" },
+        },
         cacheHints: [{ target: "tools" }],
         effort: null,
       },

@@ -12,13 +12,13 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  addConnection, removeConnection, setTierAssignment, updateConnectionModels,
-  maskKey, upsertChatGptConnection,
+  addConnection, removeConnection, setImageAssignment, setTierAssignment, updateConnectionModels,
+  updateConnectionKey, maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
 import { e2eActive, e2eConnectionStore, E2E_HEALTH } from "../../config/e2e.js";
 import { createProviderFromConnection } from "../../providers/index.js";
-import { loadModelRegistry, getModelsForProvider, modelFamilyFor } from "../../config/model-registry.js";
+import { loadModelRegistry, getModelsForProvider, getTierDefaults, modelFamilyFor } from "../../config/model-registry.js";
 import {
   CodexRpcClient, startChatGptThirdPartyOAuth, pushChatGptAuthTokens, getAccount,
   listModels, getCodexClientInfo, allocateCodexHome, sweepStaleCodexHomesOnce,
@@ -32,14 +32,15 @@ import { norm } from "../../utils/paths.js";
 import { loadDiscordSettings, saveDiscordSettings } from "../../config/discord.js";
 import { loadMachineSettings, saveMachineSettings } from "../../config/machine-settings.js";
 import { createArchiveFileIO } from "../fileio.js";
+import { collectDiagnostics } from "../diagnostics.js";
 import {
   IdParams, NameParams, LoginIdParams,
   AddConnectionRequest, ConnectionsListResponse, HealthCheckResponse,
   UpdateModelsRequest, OkResponse, TiersResponse, SetTiersRequest,
-  ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest,
+  ModelsResponse, ArchiveResponse, ArchivedListResponse, RestoreRequest, UpdateConnectionKeyRequest,
   DiscordSettings, MachineSettingsResponse, DeleteInfoResponse, ErrorResponse,
   ChatGptLoginStartResponse, ChatGptLoginStatusResponse,
-  UsageResponse,
+  UsageResponse, DiagnosticsResponse,
 } from "@machine-violet/shared";
 
 export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
@@ -57,8 +58,41 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return buildEffectiveConnections(stored, server.configDir);
   }
 
-  function persistAndReturn(store: ConnectionStore): ConnectionStore {
-    saveConnectionStore(server.configDir, store);
+  function persistAndReturn(
+    store: ConnectionStore,
+    changed: { tiers?: ReadonlySet<keyof ConnectionStore["tierAssignments"]>; image?: boolean } = {},
+  ): ConnectionStore {
+    // `getConnections()` intentionally omits dormant xAI records (#749).
+    // Merge them back before an unrelated settings write so hiding the new
+    // provider never destroys a manually saved credential. Preserve untouched
+    // xAI assignments on disk as well; buildEffectiveConnections() still
+    // clears them from the active/user-visible view.
+    const persisted = loadConnectionStore(server.configDir);
+    const dormant = persisted.connections.filter((connection) => connection.provider === "xai");
+    const dormantIds = new Set(dormant.map((connection) => connection.id));
+    const connections = [
+      ...store.connections,
+      ...dormant.filter((connection) => !store.connections.some((candidate) => candidate.id === connection.id)),
+    ];
+    const tierAssignments = { ...store.tierAssignments };
+    for (const tier of ["large", "medium", "small"] as const) {
+      const prior = persisted.tierAssignments[tier];
+      if (!changed.tiers?.has(tier) && prior && dormantIds.has(prior.connectionId)) {
+        tierAssignments[tier] = prior;
+      }
+    }
+    let imageAssignment = store.imageAssignment;
+    const priorImage = persisted.imageAssignment;
+    if (
+      !changed.image
+      && !imageAssignment
+      && priorImage
+      && dormantIds.has(priorImage.connectionId)
+      && tierAssignments.large?.connectionId === priorImage.connectionId
+    ) {
+      imageAssignment = priorImage;
+    }
+    saveConnectionStore(server.configDir, { connections, tierAssignments, imageAssignment });
     return buildEffectiveConnections(loadConnectionStore(server.configDir), server.configDir);
   }
 
@@ -86,11 +120,14 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       connections: store.connections.map(serializeConnection),
       tierAssignments: store.tierAssignments,
+      imageAssignment: store.imageAssignment,
     };
   });
 
   /** Add a connection. `openai-chatgpt` excluded — uses OAuth login flow instead. */
-  const VALID_PROVIDERS = new Set<string>(["anthropic", "openai-apikey", "openrouter", "custom"]);
+  // xAI is intentionally absent while Grok 4.5's native tool-call corruption
+  // is gated (#749). The provider implementation stays available for retesting.
+  const VALID_PROVIDERS = new Set<string>(["anthropic", "gemini", "openai-apikey", "openrouter", "custom"]);
 
   server.post("/connections", {
     schema: {
@@ -126,6 +163,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return reply.status(201).send({
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
     });
   });
 
@@ -149,6 +187,43 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
+    };
+  });
+
+  /**
+   * Replace a connection's API key in place (the client's "Fix connection"
+   * flow). Preserves the connection id so tier assignments survive the swap.
+   */
+  server.patch("/connections/:id", {
+    schema: {
+      tags: ["Management"],
+      params: IdParams,
+      body: UpdateConnectionKeyRequest,
+      response: { 200: ConnectionsListResponse, 400: ErrorResponse, 404: ErrorResponse },
+    },
+  }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const apiKey = ((request.body as { apiKey?: string })?.apiKey ?? "").trim();
+    if (!apiKey) {
+      return reply.status(400).send({ error: "Missing apiKey." });
+    }
+    const store = getConnections();
+    const conn = store.connections.find((c) => c.id === id);
+    if (!conn) {
+      return reply.status(404).send({ error: "Connection not found." });
+    }
+    if (conn.source === "env") {
+      return reply.status(400).send({ error: "Environment connections take their key from the environment variable." });
+    }
+    if (conn.provider === "openai-chatgpt") {
+      return reply.status(400).send({ error: "ChatGPT connections are fixed by signing in again." });
+    }
+    const effective = persistAndReturn(updateConnectionKey(store, id, apiKey));
+    return {
+      connections: effective.connections.map(serializeConnection),
+      tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
     };
   });
 
@@ -180,8 +255,18 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     // via ensureStarted, and without teardown repeated health checks
     // accumulate subprocesses.
     const provider = createProviderFromConnection(conn, { configDir: server.configDir });
+    // Probe with a model this connection actually serves: the provider's
+    // small-tier registry default (cheapest known-good), else the first
+    // discovered model. Without an explicit model, providers sharing the
+    // OpenAI-compatible client (xai, openrouter, custom) fall back to an
+    // api.openai.com model id and 400 with "Model not found" even though
+    // the key is perfectly valid.
+    const smallDefault = getTierDefaults(conn.provider, server.configDir)?.small;
+    const probeModel = smallDefault && conn.models.some((m) => m.id === smallDefault)
+      ? smallDefault
+      : conn.models[0]?.id;
     try {
-      const result = await provider.healthCheck();
+      const result = await provider.healthCheck(probeModel);
       return { id: conn.id, ...result };
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
@@ -497,7 +582,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const store = getConnections();
-    return { tierAssignments: store.tierAssignments };
+    return {
+      tierAssignments: store.tierAssignments,
+      imageAssignment: store.imageAssignment,
+    };
   });
 
   /** Set tier assignments. */
@@ -509,15 +597,32 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async (request) => {
     let store = getConnections();
-    const body = (request.body as { large?: TierAssignment; medium?: TierAssignment; small?: TierAssignment }) ?? {};
+    const body = (request.body as {
+      large?: TierAssignment;
+      medium?: TierAssignment;
+      small?: TierAssignment;
+      imageAssignment?: TierAssignment | null;
+    }) ?? {};
     for (const tier of ["large", "medium", "small"] as const) {
       const assignment = body[tier];
       if (assignment) {
         store = setTierAssignment(store, tier, assignment.connectionId, assignment.modelId);
       }
     }
-    persistAndReturn(store);
-    return { tierAssignments: store.tierAssignments };
+    if ("imageAssignment" in body) {
+      store = setImageAssignment(store, body.imageAssignment ?? null, server.configDir);
+    }
+    const changedTiers = new Set(
+      (["large", "medium", "small"] as const).filter((tier) => body[tier] !== undefined),
+    );
+    const effective = persistAndReturn(store, {
+      tiers: changedTiers,
+      image: "imageAssignment" in body,
+    });
+    return {
+      tierAssignments: effective.tierAssignments,
+      imageAssignment: effective.imageAssignment,
+    };
   });
 
   /** List all known models from the registry. */
@@ -528,7 +633,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     },
   }, async () => {
     const registry = loadModelRegistry(server.configDir);
-    return { models: registry.models };
+    return { models: registry.models, imageModels: registry.imageModels, tierDefaults: registry.tierDefaults };
   });
 
   // -----------------------------------------------------------------------
@@ -536,6 +641,36 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
   // -----------------------------------------------------------------------
 
   const campaignsDir = () => server.sessionManager.getCampaignsDir();
+
+  // -----------------------------------------------------------------------
+  // Diagnostics
+  // -----------------------------------------------------------------------
+
+  /**
+   * Collect diagnostics whether or not a campaign session is active.
+   *
+   * This lives under /manage rather than /session so a player blocked at API
+   * setup or sign-in can still export engine logs. When a session is active,
+   * include that campaign exactly as the gameplay command historically did.
+   */
+  server.put("/diagnostics", {
+    schema: {
+      tags: ["Management"],
+      response: { 200: DiagnosticsResponse, 500: ErrorResponse },
+    },
+  }, async (_request, reply) => {
+    const gs = server.sessionManager.getGameState();
+    // Match SessionManager's canonical derivation exactly. `dirname()` differs
+    // when campaignsDir has a trailing slash or uses a non-standard layout.
+    const homeDir = gs?.homeDir ?? campaignsDir().replace(/[/\\]campaigns\/?$/, "");
+    const io = createArchiveFileIO();
+    const result = await collectDiagnostics(gs?.campaignRoot, homeDir, io);
+
+    if (!result.ok || !result.path) {
+      return reply.status(500).send({ error: result.error ?? "Diagnostics collection failed." });
+    }
+    return { ok: true, path: result.path };
+  });
 
   /** Get info for delete confirmation dialog. */
   server.get("/campaigns/:id/delete-info", {

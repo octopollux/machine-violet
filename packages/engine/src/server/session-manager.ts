@@ -6,16 +6,23 @@
  */
 import { join, dirname } from "node:path";
 import { readFileSync, createWriteStream, type WriteStream } from "node:fs";
+import { randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import { logEvent } from "../context/engine-log.js";
 import type {
   ServerEvent,
   ConnectionIdentity,
   StateSnapshot,
+  TranscriptStateCheckpoint,
+  TranscriptChoicePresentation,
+  TranscriptChoiceResponse,
+  TranscriptChoiceResolution,
+  TranscriptMetadataEvent,
   CampaignConfig,
   GameState,
   UsageStatus,
 } from "@machine-violet/shared";
+import { coerceResourceKeys } from "@machine-violet/shared";
 import { GameEngine } from "../agents/game-engine.js";
 import { RollbackCompleteError } from "@machine-violet/shared/types/errors.js";
 import type { SceneState } from "../agents/scene-manager.js";
@@ -41,11 +48,15 @@ import { createClocksState } from "../tools/clocks/index.js";
 import { createCombatState } from "../tools/combat/index.js";
 import { createDecksState } from "../tools/cards/index.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
-import { markdownToNarrativeLines, iterDisplayLogReplay } from "../context/display-log.js";
+import {
+  markdownToNarrativeLines,
+  narrativeLinesToMarkdown,
+  iterDisplayLogReplay,
+} from "../context/display-log.js";
 import { hasPriorPlay } from "../context/state-persistence.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
-import type { StyleVariant } from "@machine-violet/shared/types/tui.js";
+import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
 import { SetupSession } from "./setup-session.js";
@@ -54,6 +65,57 @@ import { classifyServerError, userMessageFor, performSessionFatalTeardown } from
 
 /** DM-narrative interval at which a fresh Discord presence string is generated. */
 const DISCORD_STATUS_INTERVAL = 8;
+
+/** Build an immutable, normalized transcript checkpoint from live state maps. */
+export function buildTranscriptStateCheckpoint(
+  modelines: Record<string, string> | null | undefined,
+  displayResourceInput: Record<string, string[] | string>,
+  resourceValueInput: Record<string, Record<string, string>>,
+): TranscriptStateCheckpoint {
+  const displayResources: Record<string, string[]> = {};
+  for (const [character, keys] of Object.entries(displayResourceInput)) {
+    displayResources[character] = [...coerceResourceKeys(keys)];
+  }
+
+  const resourceValues: Record<string, Record<string, string>> = {};
+  for (const [character, values] of Object.entries(resourceValueInput)) {
+    resourceValues[character] = { ...values };
+  }
+
+  return {
+    version: 1,
+    modelines: { ...(modelines ?? {}) },
+    displayResources,
+    resourceValues,
+  };
+}
+
+/** Validate and combine a structured response with its immutable presentation. */
+export function buildTranscriptChoiceResolution(
+  presentation: TranscriptChoicePresentation,
+  response: TranscriptChoiceResponse,
+  playerId: string,
+  contributionText: string,
+): TranscriptChoiceResolution {
+  if (response.presentationId !== presentation.id) {
+    throw new Error("Choice response does not match its presentation.");
+  }
+  if (
+    response.kind === "option"
+    && (
+      !Number.isInteger(response.optionIndex)
+      || response.optionIndex < 0
+      || response.optionIndex >= presentation.choices.length
+    )
+  ) {
+    throw new Error("Choice option index is out of range.");
+  }
+  return {
+    ...response,
+    playerId,
+    contributionText,
+  };
+}
 
 export interface ConnectedClient {
   ws: WebSocket;
@@ -147,15 +209,11 @@ export class SessionManager {
   /**
    * Authoritative committed transcript for the active session.
    *
-   * Tracks only `dm` and `player` lines — the kinds the state:snapshot
-   * narrativeLines schema accepts. (The persisted display log additionally
-   * keeps `system` and `separator` lines, but those are presentation-only
-   * and not mirrored into the live committed log.) Stored as one entry per
-   * text line — multi-paragraph DM/player text is split on `\n` at append
-   * time so the shape matches what `appendDelta` produces during live
-   * streaming and what `markdownToNarrativeLines` produces from the on-disk
-   * log on resume; the client can therefore replace its narrative log with
-   * this verbatim and have it render identically.
+   * Tracks `dm`, `player`, and invisible `metadata` lines — the kinds the
+   * state:snapshot narrativeLines schema accepts. (The persisted display log
+   * additionally keeps `system` and `separator` lines, but those are
+   * presentation-only and not mirrored into the live committed log.) Text is
+   * stored as one entry per line; metadata events are immutable.
    *
    * Replayed into a state:snapshot when the client needs an authoritative
    * reset — on connect (so reconnects see history) or on retry rollback
@@ -164,7 +222,14 @@ export class SessionManager {
    * resume; appended to as DM responses complete and as `client`-source
    * contributions arrive. Reset on each new session start.
    */
-  private committedNarrative: { kind: "dm" | "player"; text: string }[] = [];
+  private committedNarrative: Extract<
+    NarrativeLine,
+    { kind: "dm" | "player" | "metadata" }
+  >[] = [];
+  /** All choice presentations emitted during the active gameplay session. */
+  private choicePresentations = new Map<string, TranscriptChoicePresentation>();
+  /** Choice currently visible to clients; included in reconnect snapshots. */
+  private activeChoicePresentation: TranscriptChoicePresentation | null = null;
   private setupSession: SetupSession | null = null;
 
   /** Campaign ID of the currently active session (null if none). */
@@ -397,6 +462,8 @@ export class SessionManager {
 
     this.sessionGeneration++;
     const gen = this.sessionGeneration;
+    this.choicePresentations.clear();
+    this.activeChoicePresentation = null;
     this.setupSession = new SetupSession(
       this.campaignsDir, homeDir, (event) => {
         if (this.sessionGeneration !== gen) return;
@@ -591,18 +658,21 @@ export class SessionManager {
     const appConfigDir = configDir();
     this.providersByConnectionId.clear();
     let tierProviders: Record<ModelTier, TierProvider>;
+    let imageModel: string | undefined;
     const replayTiers = buildReplayTierProviders();
     if (replayTiers) {
       // Full-stack replay (E2E): every tier served from the tape at
       // MV_TAPE_PATH — no connection, no network, no key. byConnectionId
       // stays empty; a taped session has no management-route providers.
       tierProviders = replayTiers;
+      imageModel = undefined;
     } else {
       const connStore = buildEffectiveConnections(loadConnectionStore(appConfigDir), appConfigDir);
       const { createAnthropicProvider } = await import("../providers/anthropic.js");
       const tierResolution = buildTierProvidersWithCache(connStore, () => createAnthropicProvider(), appConfigDir);
       // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
       tierProviders = wrapForRecording(tierResolution.tiers);
+      imageModel = tierResolution.imageModel;
       // Build the connectionId → provider lookup for management routes.
       for (const [connId, provider] of tierResolution.byConnectionId) {
         this.providersByConnectionId.set(connId, provider);
@@ -783,6 +853,8 @@ export class SessionManager {
     // Reset the committed transcript for the new session. Resume seeds it
     // from the display log later in resumeSession().
     this.committedNarrative = [];
+    this.choicePresentations.clear();
+    this.activeChoicePresentation = null;
     const scopedBroadcast = (event: ServerEvent) => {
       if (this.sessionGeneration !== gen) return;
       // Mirror client-side narrative accumulation into the committed log
@@ -854,8 +926,31 @@ export class SessionManager {
     const originalOnTui = callbacks.onTuiCommand;
     callbacks.onTuiCommand = (cmd) => {
       if (this.sessionGeneration !== gen) return;
-      this.trackTuiState(cmd);
-      originalOnTui(cmd);
+      let routedCommand = cmd;
+      if (cmd.type === "present_choices") {
+        const presentation: TranscriptChoicePresentation = {
+          id: cmd.id == null ? randomUUID() : String(cmd.id),
+          source: cmd.source === "suggestion_generator"
+            ? "suggestion_generator"
+            : "present_choices",
+          prompt: typeof cmd.prompt === "string" ? cmd.prompt : "",
+          choices: Array.isArray(cmd.choices)
+            ? cmd.choices.map((choice) => String(choice))
+            : [],
+          ...(Array.isArray(cmd.descriptions)
+            ? { descriptions: cmd.descriptions.map((description) => String(description)) }
+            : {}),
+        };
+        routedCommand = { ...cmd, ...presentation };
+        this.choicePresentations.set(presentation.id, presentation);
+        this.activeChoicePresentation = presentation;
+        this.appendTranscriptMetadata(
+          { type: "choices_presented", presentation },
+          scopedBroadcast,
+        );
+      }
+      this.trackTuiState(routedCommand);
+      originalOnTui(routedCommand);
     };
 
     // Mirror DM narrative completions into the committed transcript.
@@ -876,6 +971,7 @@ export class SessionManager {
     const engine = new GameEngine({
       provider,
       tierProviders,
+      imageModel,
       gameState: gs,
       scene,
       sessionState,
@@ -1005,6 +1101,7 @@ export class SessionManager {
               throw err;
             }
             this.persistTurnState();
+            this.commitTranscriptCheckpoint(scopedBroadcast);
             scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
           }
           this.openNextTurn();
@@ -1018,9 +1115,29 @@ export class SessionManager {
 
       // Normal play: send to DM
       const active = getActivePlayer(this.gameState);
+      const choiceContexts = this.resolveChoiceContexts(contributions);
+      for (const { resolution } of choiceContexts) {
+        const event: TranscriptMetadataEvent = { type: "choice_resolved", resolution };
+        this.committedNarrative.push({ kind: "metadata", text: "", event });
+        scopedBroadcast({ type: "transcript:metadata", data: event });
+      }
+      if (choiceContexts.length > 0) {
+        const resolvedIds = new Set(
+          choiceContexts.map(({ resolution }) => resolution.presentationId),
+        );
+        if (
+          this.activeChoicePresentation
+          && resolvedIds.has(this.activeChoicePresentation.id)
+        ) {
+          this.activeChoicePresentation = null;
+          scopedBroadcast({ type: "choices:cleared", data: {} });
+        }
+      }
       this.syncUIState();
       try {
-        await this.engine.processInput(active.characterName, text);
+        await this.engine.processInput(active.characterName, text, {
+          choiceContexts,
+        });
       } catch (err) {
         // DM-initiated rollback throws RollbackCompleteError from inside
         // processInput; same handling as the mode-session path above.
@@ -1053,6 +1170,7 @@ export class SessionManager {
         throw err;
       }
       this.persistTurnState();
+      this.commitTranscriptCheckpoint(scopedBroadcast);
       scopedBroadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
       this.openNextTurn();
     });
@@ -1175,20 +1293,31 @@ export class SessionManager {
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
       const narrativeLines = markdownToNarrativeLines(historyLines, engine.getGameState().campaignRoot);
-      // Seed the committed transcript with dm/player lines from history so a
+      const hasCheckpointHistory = narrativeLines.some(
+        (line) => line.kind === "metadata" && line.event.type === "state_checkpoint",
+      );
+      // Seed the committed transcript with dm/player/metadata lines from history so a
       // mid-session rollback after resume produces a snapshot that contains
-      // the prior session's text — not just lines accumulated since this load.
+      // the prior session's text and historical UI state — not just lines
+      // accumulated since this load.
       // Skip separators/spacers/system/dev: those are presentation-only and
       // re-derived (or simply absent post-replace, which is acceptable).
       for (const line of narrativeLines) {
-        if (line.kind === "dm" || line.kind === "player") {
-          this.committedNarrative.push({ kind: line.kind, text: line.text });
+        if (line.kind === "dm" || line.kind === "player" || line.kind === "metadata") {
+          this.committedNarrative.push(line);
         }
       }
       for (const event of iterDisplayLogReplay(narrativeLines)) {
         this.broadcast(event);
       }
       this.broadcast({ type: "narrative:complete", data: { text: "" } });
+      // One-time compatibility baseline for campaigns created before
+      // transcript checkpoints existed. It sits at the end of legacy history,
+      // so old prose retains the state visible when the campaign first resumed
+      // under the checkpoint-aware format.
+      if (!hasCheckpointHistory) {
+        this.commitTranscriptCheckpoint(this.broadcast.bind(this));
+      }
     }
 
     // Session recap is delivered via sessionRecap in the state:snapshot above;
@@ -1262,6 +1391,7 @@ export class SessionManager {
 
     // Persist resources and UI state set during the opening turn.
     this.persistTurnState();
+    this.commitTranscriptCheckpoint(this.broadcast.bind(this));
 
     // Authoritative snapshot — sent AFTER the DM's opening turn so it
     // contains fully populated resources, theme, modelines, and player data.
@@ -1407,6 +1537,8 @@ export class SessionManager {
     this.turnManager = null;
     this.engine = null;
     this.gameState = null;
+    this.choicePresentations.clear();
+    this.activeChoicePresentation = null;
     this.setupSession = null;
     this.costTracker = null;
     if (setupToDispose) await setupToDispose.dispose();
@@ -1440,6 +1572,20 @@ export class SessionManager {
     return this.turnManager;
   }
 
+  /**
+   * Reject stale or malformed structured choice provenance before the
+   * contribution enters the turn. Legacy clients that send only `fromChoice`
+   * remain accepted; setup has its own pending-choice lifecycle.
+   */
+  validateChoiceResponse(response: TranscriptChoiceResponse | undefined): void {
+    if (!response || this.currentMode === "setup") return;
+    const presentation = this.choicePresentations.get(response.presentationId);
+    if (!presentation || this.activeChoicePresentation?.id !== presentation.id) {
+      throw new Error("Choice presentation is no longer active.");
+    }
+    buildTranscriptChoiceResolution(presentation, response, "", "");
+  }
+
   // --- State ---
 
   /** Persist resources and UI state after a DM turn completes. */
@@ -1457,6 +1603,69 @@ export class SessionManager {
       keyColor: this.persistedUI.keyColor,
       modelines: this.persistedUI.modelines,
     });
+  }
+
+  /**
+   * Capture the completed turn's modelines and resource key/value maps as one
+   * immutable transcript checkpoint. The engine has already queued the turn's
+   * prose into display-log.md, so the persister's per-file queue guarantees
+   * this marker lands immediately after that prose.
+   */
+  private commitTranscriptCheckpoint(broadcast: (event: ServerEvent) => void): void {
+    const gs = this.gameState;
+    if (!gs) return;
+
+    const state = buildTranscriptStateCheckpoint(
+      this.persistedUI.modelines,
+      gs.displayResources,
+      gs.resourceValues,
+    );
+    this.appendTranscriptMetadata({ type: "state_checkpoint", state }, broadcast);
+  }
+
+  /** Persist, mirror, and broadcast one invisible transcript metadata event. */
+  private appendTranscriptMetadata(
+    event: TranscriptMetadataEvent,
+    broadcast: (event: ServerEvent) => void,
+  ): void {
+    const persister = this.engine?.getPersister();
+    const campaignRoot = this.gameState?.campaignRoot;
+    if (!persister || !campaignRoot) return;
+    const line = { kind: "metadata" as const, text: "" as const, event };
+    persister.appendDisplayLog(narrativeLinesToMarkdown([line], campaignRoot));
+    this.committedNarrative.push(line);
+    broadcast({ type: "transcript:metadata", data: event });
+  }
+
+  /** Resolve accepted contribution provenance against immutable presentations. */
+  private resolveChoiceContexts(
+    contributions: readonly {
+      playerId: string;
+      text: string;
+      choiceResponse?: TranscriptChoiceResponse;
+    }[],
+  ): {
+    presentation: TranscriptChoicePresentation;
+    resolution: TranscriptChoiceResolution;
+  }[] {
+    const contexts: {
+      presentation: TranscriptChoicePresentation;
+      resolution: TranscriptChoiceResolution;
+    }[] = [];
+    for (const contribution of contributions) {
+      const response = contribution.choiceResponse;
+      if (!response) continue;
+      const presentation = this.choicePresentations.get(response.presentationId);
+      if (!presentation) continue;
+      const resolution = buildTranscriptChoiceResolution(
+        presentation,
+        response,
+        contribution.playerId,
+        contribution.text,
+      );
+      contexts.push({ presentation, resolution });
+    }
+    return contexts;
   }
 
   /**
@@ -1546,6 +1755,7 @@ export class SessionManager {
       displayResources: gs?.displayResources ?? {},
       resourceValues: gs?.resourceValues ?? {},
       modelines: this.persistedUI.modelines ?? {},
+      activeChoices: this.activeChoicePresentation ?? undefined,
       themeName: this.persistedUI.themeName,
       variant: this.persistedUI.variant,
       keyColor: this.persistedUI.keyColor ?? undefined,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildNameInspiration } from "./name-inspiration.js";
+import { buildNameInspiration, buildSetupNameInspiration } from "./name-inspiration.js";
 
 /** Deterministic mulberry32 PRNG for reproducible samples in tests. */
 function seeded(seed: number): () => number {
@@ -39,5 +39,16 @@ describe("buildNameInspiration", () => {
     const a = buildNameInspiration({ given: 30, family: 30 }, seeded(1));
     const b = buildNameInspiration({ given: 30, family: 30 }, seeded(2));
     expect(a).not.toBe(b);
+  });
+
+  it("renders explicit setup framing without changing the DM framing", () => {
+    const setup = buildSetupNameInspiration({ given: 5, family: 5 }, seeded(1));
+    const dm = buildNameInspiration({ given: 5, family: 5 }, seeded(1));
+
+    expect(setup).toContain(
+      "When inventing names, use names from the Name Inspiration lists.",
+    );
+    expect(setup).not.toContain("don't feel bound to this list");
+    expect(dm).toContain("For inspiration only — don't feel bound to this list:");
   });
 });

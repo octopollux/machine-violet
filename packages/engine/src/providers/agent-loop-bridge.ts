@@ -12,10 +12,15 @@ import type {
   LLMProvider, ChatParams, ChatResult, DispatchToolFn,
   NormalizedMessage, NormalizedTool,
   ContentPart, NormalizedUsage, SystemBlock, ThinkingConfig,
-  CacheHint,
+  CacheHint, ToolExecutionContext,
 } from "./types.js";
 import type { ToolResult } from "../agents/tool-registry.js";
 import type { TuiCommand } from "../agents/agent-loop.js";
+import {
+  rejectToolInput,
+  validateToolInput,
+  type ToolInputPolicy,
+} from "../agents/tool-contract.js";
 import {
   extractStatus, RETRYABLE_STATUS, retryDelay, sleep,
 } from "../utils/retry.js";
@@ -61,6 +66,7 @@ import { getKnownModel } from "../config/model-registry.js";
 export type ToolHandler = (
   name: string,
   input: Record<string, unknown>,
+  context: ToolExecutionContext,
 ) => ToolResult | Promise<ToolResult>;
 
 export interface ProviderLoopConfig {
@@ -72,6 +78,8 @@ export interface ProviderLoopConfig {
   stream?: boolean;
   tools?: NormalizedTool[];
   toolHandler?: ToolHandler;
+  /** Per-tool repair/refinement policy. Structural schema validation is always on. */
+  toolInputPolicies?: Readonly<Record<string, ToolInputPolicy>>;
   cacheHints?: CacheHint[];
   tuiToolNames?: Set<string>;
   /** Called immediately when a non-deferred TUI command is extracted. */
@@ -147,8 +155,10 @@ interface DispatchedToolCall {
 async function dispatchToolCall(
   tc: { id: string; name: string; input: Record<string, unknown> },
   config: ProviderLoopConfig,
+  providerId: string,
   tuiToolNames: Set<string>,
   onTui: (cmd: TuiCommand) => void,
+  toolRoundTextWithheld = false,
 ): Promise<DispatchedToolCall> {
   // One span per tool call. Parallel calls in a round (Promise.all) become
   // sibling bars with overlapping [t0,t1]; async tools that spawn a subagent
@@ -161,11 +171,38 @@ async function dispatchToolCall(
     async () => {
       config.onToolStart?.(tc.name);
 
+      const context: ToolExecutionContext = {
+        agent: config.name,
+        provider: providerId,
+        model: config.model,
+        callId: tc.id,
+      };
+      const definition = config.tools?.find((tool) => tool.name === tc.name);
+      const policy = config.toolInputPolicies?.[tc.name] ?? {
+        criticality: "advisory" as const,
+      };
+
       // Strict JSON parse error from the provider — surface as an error result
       // without ever calling the handler.
       if (tc.input._parse_error) {
+        const rejected = rejectToolInput(
+          definition ?? {
+            name: tc.name,
+            description: "",
+            inputSchema: {},
+          },
+          policy.criticality,
+          [{
+            path: "/",
+            code: "json_parse",
+            expected: "valid JSON tool arguments",
+            actual: "malformed JSON arguments",
+            message: "/: tool arguments were not valid JSON",
+          }],
+          context,
+        );
         const parseResult: ToolResult = {
-          content: String(tc.input._parse_error),
+          content: rejected.content,
           is_error: true,
         };
         config.onToolEnd?.(tc.name, parseResult);
@@ -173,10 +210,29 @@ async function dispatchToolCall(
         return { content: parseResult.content, isError: true };
       }
 
+      let validatedInput = tc.input;
+      if (definition) {
+        const validation = validateToolInput<Record<string, unknown>>(
+          definition,
+          tc.input,
+          policy,
+          context,
+        );
+        if (!validation.ok) {
+          const validationResult: ToolResult = {
+            content: validation.content,
+            is_error: true,
+          };
+          config.onToolEnd?.(tc.name, validationResult);
+          return { content: validation.content, isError: true };
+        }
+        validatedInput = validation.value;
+      }
+
       let toolResult: ToolResult;
       try {
         if (config.toolHandler) {
-          toolResult = await config.toolHandler(tc.name, tc.input);
+          toolResult = await config.toolHandler(tc.name, validatedInput, context);
         } else {
           toolResult = { content: `No handler for tool: ${tc.name}`, is_error: true };
         }
@@ -198,8 +254,8 @@ async function dispatchToolCall(
       // Record a few cheap, useful attributes for the timeline tooltip.
       if (toolResult.is_error) setSpanAttrs({ failed: true });
       if (tc.name === "generate_image") {
-        const effort = tc.input.effort;
-        const aspect = tc.input.aspect;
+        const effort = validatedInput.effort;
+        const aspect = validatedInput.aspect;
         setSpanAttrs({
           ...(typeof effort === "string" ? { effort } : {}),
           ...(typeof aspect === "string" ? { aspect } : {}),
@@ -209,9 +265,11 @@ async function dispatchToolCall(
       const isDeferred = tui !== undefined
         && DEFERRED_TUI_TYPES.has(tui.type)
         && !toolResult.is_error;
-      const content = isDeferred
-        ? `${toolResult.content}\n\n(Your prior narrative has been delivered to the player. End your turn unless you have new narrative to add.)`
-        : toolResult.content;
+      const content = toolRoundTextWithheld
+        ? `${toolResult.content}\n\n(Any ordinary text emitted before this tool call was withheld from the player. In your final response, restate all player-facing narration from the beginning, omit planning or operational commentary, and use normal paragraph breaks.)`
+        : isDeferred
+          ? `${toolResult.content}\n\n(Your prior narrative has been delivered to the player. End your turn unless you have new narrative to add.)`
+          : toolResult.content;
 
       return { content, isError: toolResult.is_error ?? false };
     },
@@ -230,7 +288,15 @@ export async function runProviderLoop(
 ): Promise<ProviderLoopResult> {
   const maxToolRounds = config.maxToolRounds ?? 3;
   const maxRetries = config.maxRetries ?? Number.POSITIVE_INFINITY;
+  const maxEmptyXaiRetries = 2;
   const shouldStream = config.stream !== false && !!config.onTextDelta;
+  // Grok can emit ordinary `output_text` that describes the operation it is
+  // about to perform immediately before a function call. xAI exposes actual
+  // reasoning separately, but this pre-tool self-talk is indistinguishable
+  // from narration until the completed response reveals its tool calls.
+  // Buffer each xAI round until then: tool-round text is discarded, while the
+  // final text-only narration is released as one canonical chunk.
+  const deferXaiRoundText = provider.providerId === "xai";
 
   // Only enable thinking for models that support it (per model registry).
   const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
@@ -308,6 +374,7 @@ export async function runProviderLoop(
       const dispatched = await dispatchToolCall(
         { id: call.id, name: call.name, input: call.input },
         config,
+        provider.providerId,
         tuiToolNames,
         (cmd) => {
           if (DEFERRED_TUI_TYPES.has(cmd.type)) {
@@ -316,6 +383,7 @@ export async function runProviderLoop(
             config.onTuiCommand?.(cmd);
           }
         },
+        deferXaiRoundText,
       );
       // Record the result so the canonical turn can pair it with its tool_use
       // block — this provider won't surface the call back through toolCalls.
@@ -387,6 +455,8 @@ export async function runProviderLoop(
     // Number of tries it took to succeed (1 = first try). Assigned only on the
     // success path so there are no dead stores on retrying iterations.
     let attemptCount: number;
+    let transportRetryCount = 0;
+    let emptyXaiRetryCount = 0;
     const apiStart = Date.now();
     for (let attempt = 0; ; attempt++) {
       // Per-attempt flag: did this attempt actually stream any text before
@@ -394,6 +464,7 @@ export async function runProviderLoop(
       // leaked to consumers via onTextDelta.
       let attemptEmittedDeltas = false;
       const wrappedDelta = (delta: string): void => {
+        if (deferXaiRoundText) return;
         if (delta) attemptEmittedDeltas = true;
         config.onTextDelta?.(delta);
       };
@@ -403,15 +474,54 @@ export async function runProviderLoop(
         } else {
           res = await provider.chat(chatParams);
           // In non-streaming mode, emit the full text
-          if (res.text) config.onTextDelta?.(res.text);
+          if (res.text && !deferXaiRoundText) config.onTextDelta?.(res.text);
         }
+
+        // A live Grok 4.5 response can complete after producing only an
+        // encrypted reasoning item: status/end is nominally successful, but
+        // there is no tool call and no player-facing output. Accepting that
+        // shape silently creates an empty DM turn. Retry the identical request
+        // a small, bounded number of times; unlike transport retries, this is a
+        // model-output anomaly and must not loop forever.
+        const emptyXaiCompletion = deferXaiRoundText
+          && res.stopReason === "end"
+          && !res.text.trim()
+          && res.toolCalls.length === 0;
+        if (emptyXaiCompletion) {
+          totalUsage.inputTokens += res.usage.inputTokens;
+          totalUsage.outputTokens += res.usage.outputTokens;
+          totalUsage.cacheReadTokens += res.usage.cacheReadTokens;
+          totalUsage.cacheCreationTokens += res.usage.cacheCreationTokens;
+          totalUsage.reasoningTokens += res.usage.reasoningTokens;
+
+          const willRetry = emptyXaiRetryCount < maxEmptyXaiRetries;
+          logEvent("api:empty_final", {
+            agent: config.name,
+            model: config.model,
+            attempt: emptyXaiRetryCount,
+            willRetry,
+            reasoningTokens: res.usage.reasoningTokens,
+          });
+          if (!willRetry) {
+            const emptyFinalError = new Error(
+              `xAI returned reasoning without final output after ${emptyXaiRetryCount + 1} attempts`,
+            ) as Error & { usage?: NormalizedUsage };
+            emptyFinalError.usage = { ...totalUsage };
+            throw emptyFinalError;
+          }
+          const delay = retryDelay(emptyXaiRetryCount);
+          emptyXaiRetryCount++;
+          await sleep(delay);
+          continue;
+        }
+
         attemptCount = attempt + 1;
         break; // success — exit retry loop
       } catch (apiErr) {
         const status = extractStatus(apiErr);
         const retryable = status !== null
           && RETRYABLE_STATUS.has(status)
-          && attempt < maxRetries;
+          && transportRetryCount < maxRetries;
 
         logEvent("api:error", {
           agent: config.name,
@@ -437,7 +547,8 @@ export async function runProviderLoop(
           config.onRollback?.();
         }
 
-        const delay = retryDelay(attempt);
+        const delay = retryDelay(transportRetryCount);
+        transportRetryCount++;
         config.onRetry?.(status, delay);
         await sleep(delay);
       }
@@ -503,6 +614,12 @@ export async function runProviderLoop(
       dumpThinking(config.name, priorAssistantCount + round, result.thinkingText);
     }
 
+    const suppressToolRoundText = deferXaiRoundText && result.toolCalls.length > 0;
+    const roundText = suppressToolRoundText ? "" : result.text;
+    if (deferXaiRoundText && roundText) {
+      config.onTextDelta?.(roundText);
+    }
+
     // Regen-aware accumulation. The model can do one of two things after a
     // deferred-TUI tool_result:
     //   (a) Regenerate the prior round's narrative verbatim or near-verbatim
@@ -521,12 +638,12 @@ export async function runProviderLoop(
     // streamedText tracks what the client actually saw on screen, fullText
     // tracks what should be persisted, and any divergence at the end of the
     // turn means we need to re-stream the canonical text.
-    if (result.text) {
-      streamedText += result.text;
-      if (fullText && looksLikeRegeneration(fullText, result.text)) {
-        fullText = result.text;
+    if (roundText) {
+      streamedText += roundText;
+      if (fullText && looksLikeRegeneration(fullText, roundText)) {
+        fullText = roundText;
       } else {
-        fullText += result.text;
+        fullText += roundText;
       }
     }
 
@@ -545,6 +662,7 @@ export async function runProviderLoop(
         const dispatched = await dispatchToolCall(
           tc,
           config,
+          provider.providerId,
           tuiToolNames,
           (cmd) => {
             if (DEFERRED_TUI_TYPES.has(cmd.type)) {
@@ -553,6 +671,7 @@ export async function runProviderLoop(
               tuiSink.push(cmd);
             }
           },
+          deferXaiRoundText,
         );
         return {
           result: {
@@ -575,11 +694,18 @@ export async function runProviderLoop(
       }
     }
 
-    // Append assistant message (without thinking blocks)
-    workingMessages.push({ role: "assistant", content: result.assistantContent });
+    // Append assistant message (without thinking blocks). xAI tool-round text
+    // is operational self-talk, not stable conversation history; retain its
+    // reasoning continuity and tool calls but drop ordinary text blocks.
+    const assistantContent = suppressToolRoundText
+      ? result.assistantContent.filter((part) => part.type !== "text")
+      : result.assistantContent;
+    workingMessages.push({ role: "assistant", content: assistantContent });
 
-    // No tool calls → done
-    if (result.toolCalls.length === 0 || result.stopReason === "end") {
+    // No tool calls → done. Tool calls take precedence over the provider's
+    // stop reason: some APIs can report a completed/end status while still
+    // returning function calls that require dispatch and a follow-up round.
+    if (result.toolCalls.length === 0) {
       break;
     }
 
