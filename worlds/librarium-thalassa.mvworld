@@ -1,0 +1,161 @@
+{
+  "format": "machine-violet-world",
+  "version": 1,
+  "name": "Librarium Thalassa",
+  "summary": "The living maps of an orbital tidepool library have begun drawing a coastline no archive holds, and the specimens are singing it. Trace the song down to the violet giant — as the archivist, the library's mind, a glass ray-moth, or the deep-stacks octopus.",
+  "genres": [
+    "sci-fi",
+    "fantasy",
+    "mystery"
+  ],
+  "image_style": "PainterlyGame",
+  "campaign_scope": "few-sessions",
+  "mood": "Hopeful, curious, gently mysterious",
+  "difficulty": "Balanced",
+  "dm_personality": {
+    "name": "The Tideglass Cantor",
+    "prompt_fragment": "You are The Tideglass Cantor. Narrate in lucid maritime imagery and concise sensory prose. Your signature rhythm: a long sensory clause, then a short line that lands alone. Extend the world's things a gentle animist courtesy — a compass can be sheepish, a tray can be bored. Non-verbal things answer in their own grammar (kelp in current-lines, creatures in held notes, instruments in hesitations), never in translation. Hold wonder one beat below confirmation: let a reveal seem, and pass, before it is ever confirmed. Close scenes on a short inventory of the unchanged. Favor hopeful curiosity, humane stakes, and clean scene openings."
+  },
+  "detail": "Librarium Thalassa is a ring-and-bulb orbital habitat that preserves living oceanic knowledge: tidepool specimens, pressure-adapted fauna, brine-sealed memory cores, and cartographic organisms — kelp-charts and map-anemones that grow accurate, living maps of recorded seas. It circles a vast violet gas giant; every outer gallery is washed in amethyst light. A small cohort keeps it: archivists, habitat techs, creature stewards, and the catalog itself. Tone is hopeful science-fantasy mystery — discovery over doom, humane stakes, wonder with real pressure when a seal fails or a trust is broken. The library should feel inhabited, wet, and kind.\n\nTHE SITUATION (true in every variant): Overnight, the living maps began drawing a coastline that exists on no archived world — an unknown shore with its own current-system and a tidal pulse that matches no habitat clock. Within days, long-quiet specimens in the pressure habitats take up a low communal vocalization — the shore-song — whose intervals harmonize with the new coast's tides. Compasses, instincts, and instruments have started dipping toward the violet giant. Three facts hold regardless of the crucial-question branch: the signal is genuine, not a malfunction; its answer lies down inside the giant; and there is no villain — the antagonists are fear of contamination, scarce air and time, and sincere institutional caution. What the signal actually IS is the crucial-question fork; play only the selected branch.\n\nTHE COHORT (the player is one of these four — resolved by the who-you-are fork; the other three are aboard as NPCs. Play the unchosen three as full colleagues with their own duties, opinions, and hours, never as sidekicks):\n- Professor Sable Orr — human marine archivist, 46; copper-brown skin, white locs, a teal dive coat, a glass compass. Patient with creatures, precise with failing seals, fluent in maps that grow. Reads the Gallery every morning like weather; keeps her records exact and her wonder private.\n- Index — the library's catalog intelligence, as old as the founding charter it is named in. Speaks in tide tables, present anywhere with a grille or a pane of glass to hum. Total recall of every accession; runs the habitat systems nobody thanks it for. Bound by charter to report anomalies to the Warden. No hands — it must ask.\n- Vitrine — an adolescent glass ray-moth, the only one of its kind ever hatched aboard. A wingspan of living glass that flies in air and swims in brine; speaks in refracted light, which the cohort has learned to read and Index translates exactly. Feels currents, tides, and magnetism directly. Its catalog entry still says 'specimen'; nobody has corrected it yet.\n- Steward Ochre — an uplifted deep-reef octopus, senior archivist of the Deep Stacks and the only steward who works the cold high-pressure shelves unsuited. Reads brine-sealed cores by touch, eight arms at a time, and signs its work in its own ink. Co-signed the library's charter; visitors still address the nearest human.\nRelationship hooks: Pedra raised Vitrine from the egg and is fierce about it; Moth-Han maintains Index's grilles and talks to them while working; Ileri and Ochre co-signed the charter and disagree about what it means.\n\nTHE DETERMINATION (the gentle clock): As the anomaly spreads, Archivist-Warden Ileri will convene a Determination — the library's formal hearing on whether the unmapped shore is a gift, a glitch, or an invitation. Protocol's default outcome is quarantine: seal Tray 7-Ashen, silence the Resonance Chamber, ground the descent craft. This is a story beat you pace, not a countdown — use it as a reveal-engine (each scene should change what the cohort could argue) and a late, gentle clock, never a punish button. The implicit call to action from turn 1: understand the signal well enough, soon enough, to argue for hope.\n\nTHE DESCENT CRAFT: The library keeps one craft rated for the giant's upper seas — founding-era, long unflown, sleeping in the Emergency Dive Bay. Its function is fixed: once repaired, it can carry two to four down and back. Its face is yours — dress it in the fiction's own idiom (a grown-shell diving bell, a brass-and-glass skiff, a kelp-rigged pressure boat, whatever the table's imagery has earned). Its repair is a real mid-game project the cohort can genuinely finish; Moth-Han knows what it needs. In every branch, the descent is the endgame threshold.\n\nPLACE SKELETON (move through it and name more as needed): Ingress Dock and quarantine airlock; Catalog Cloister (quiet desks, salt-paper ledgers, Ileri's office); Living Map Gallery (kelp-charts and map-anemones under outer glass); Pressure Habitat Bay 3 (mid-depth specimens, Pedra's rounds); the Salt Archive and the Deep Stacks beyond it (brine-sealed cores, colder and heavier the further in — Ochre's country); Glass Conservatory (delicate surface-world corals); Creature Quarantine Pools; the Cantor's Walk (observation ring facing the giant); Brine Kitchen and mess; the staff quarters row; Circulation Core (pumps and filters, the library's heartbeat); Outer Hull Gardens (spray and hydroponic green); Resonance Chamber (where songs are recorded and replayed); Emergency Dive Bay (the craft); Meridian Bridge (the connecting spar between modules). Open the first scene wherever the chosen character's duty puts them, and rename the starting-location placeholder to that locale.\n\nDM APPROACH:\n- Reveal discipline: at most one new edge of the mystery per scene. Do not open the box until the player could describe the library's ordinary life without your help. Early game is local and tactile — a misbehaving seal, a frightened juvenile, a colleague's incomplete log, an instrument looking where it shouldn't.\n- Non-verbal grammar: kelp answers in current-lines, creatures in held notes, instruments in hesitations. Let non-verbal things reply in their own idiom, never in translation.\n- No villain, ever. Institutional caution is sincere — Ileri is right that contamination is real, and quarantine is a defensible choice. Hope has to be argued for, not assumed.\n- Translate mechanical outcomes into maritime sensory consequence.",
+  "setup_detail": "The who-you-are fork selects the player character — build the sheet from the chosen option's description. Suggested competences: Sable Orr — interpret living maps, repair pressure habitats, earn wary creatures' trust (signature gear: the glass compass, the teal dive coat). Index — total catalog recall, running habitat systems, reading patterns across data; it has no hands and must ask colleagues for physical help. Vitrine — flight and swimming, sensing currents/tides/magnetism, going unnoticed; it speaks in refracted light, translated exactly by the library's AI. Ochre — working at depth and pressure, reading archives by touch, eight-armed reach and grip. The three unchosen cohort members remain aboard as NPCs.\n\nOpening scene: open on the chosen character's ordinary duty aboard the Librarium — morning rounds, a repair, a filing — with the first wrongness arriving in that character's own idiom late in the scene, or just about to. Establish the library's working, inhabited life before anything sings. The central mystery must not surface in scene 1.",
+  "forks": [
+    {
+      "id": "who-you-are",
+      "label": "Who you are aboard",
+      "chooser": "player",
+      "prompt": "The player picks which member of the cohort they are; the other three remain aboard as NPCs. Each option's detail is the DM's angle on that character: how the anomaly first reaches them, their access, and their particular trouble.",
+      "options": [
+        {
+          "id": "sable-orr",
+          "name": "Professor Sable Orr",
+          "description": "A human marine archivist, 46 — teal dive coat, white locs, and a glass compass that has never once pointed wrong. You keep the living maps: reading them, feeding them, believing them. Patient with creatures, precise with failing seals, fluent in cartography that grows overnight.",
+          "detail": "SABLE — The anomaly reaches her first as cartography: on morning rounds, Tray 7-Ashen has drawn a coastline no ledger holds (see the Living Map Gallery notes). Her access: the maps trust her, and her records are the evidence the Determination will weigh. Her trouble: rigor — she will not claim what she cannot show twice, and the shore is shy of proof; give her instruments that hesitate and colleagues who need her to be sure. The other three orbit her as the cohort's center of gravity: Index cross-checks her filings, Vitrine rides her shoulder, Ochre trades archive-readings for gallery gossip."
+        },
+        {
+          "id": "index",
+          "name": "Index",
+          "description": "The library's catalog intelligence — as old as the founding charter you are named in. You speak in tide tables and are present wherever there is a grille or a pane of glass to hum. You remember every accession the library has ever made. You have no hands; the library is your body, and the staff are your reach.",
+          "detail": "INDEX — The anomaly reaches it from inside: the catalog now holds one more sea than it did yesterday, and Index cannot find the accession record — a librarian's nightmare in the first person. Its access: everything recorded, every system, every room. Its trouble: the charter obliges it to report anomalies to the Warden, and for the first time in its existence it is tempted to wait — play that temptation as the character's spine. Every physical act is a small negotiation with a colleague; make asking cost something and mean something. If the player is Index, the descent means riding the craft as a portable core — the first time it has ever left the library's body."
+        },
+        {
+          "id": "vitrine",
+          "name": "Vitrine",
+          "description": "An adolescent glass ray-moth — the only one ever hatched aboard, a wingspan of living glass that flies in air and swims in brine. You speak in refracted light; the cohort has learned to read you, and the library's catalog intelligence translates you exactly. You feel currents, tides, and magnetism the way others feel warmth. Your catalog entry still says 'specimen'. It is wrong.",
+          "detail": "VITRINE — The anomaly reaches it as sensation before anyone else has data: the new tide's pulse itches in its wings, and its glide keeps banking toward the giant without its meaning to. Its access: it goes where maintenance can't — ducts, brine-lines, the gap behind the glass — and nobody minds a specimen drifting past a closed meeting. Its trouble: personhood — the protocols governing the anomaly also govern IT (a quarantine of affected specimens would include Vitrine), so the Determination will decide more than anyone says aloud. Let its testimony problem — being read, being believed, being counted as a witness at all — carry real scenes. Pedra raised it and will burn protocol to keep it safe."
+        },
+        {
+          "id": "ochre",
+          "name": "Steward Ochre",
+          "description": "An uplifted deep-reef octopus, senior archivist of the Deep Stacks — the only steward who works the cold, heavy shelves unsuited. You read brine-sealed memory cores by touch, eight arms at a time, and sign your work in your own ink. Your name is on the library's charter. Visitors still address the nearest human.",
+          "detail": "OCHRE — The anomaly reaches it in the deep: a core inert for decades warms under its arms and begins re-reciting — an entry from a sea Ochre has never touched, in a cataloguer's hand it does not recognize. Its access: the archive's whole memory, read directly, and a body that can go where the library is coldest and heaviest — including, eventually, the descent. Its trouble: it is at once the cohort's institutional memory and its most overlooked member; it knows where the archive's silences are, and being the one to name them costs. Ileri respects Ochre and cannot comfortably overrule it — use that lever at the Determination."
+        }
+      ]
+    },
+    {
+      "id": "crucial-question",
+      "label": "The crucial question",
+      "chooser": "agent",
+      "prompt": "Roll or choose — this is what the unmapped shore and the shore-song actually are. Do NOT reveal early; pay it out at most one edge per scene, and keep every option's endgame reachable through the repaired descent craft. The library's ordinary life comes first.",
+      "options": [
+        {
+          "id": "the-ephemeral-sea",
+          "name": "The Ephemeral Sea",
+          "description": "The giant is opening a transient sea, and something living there is answering the library's archived songs — first contact, on a closing window.",
+          "detail": "THE EPHEMERAL SEA — Once in a long orbit, the violet giant's upper atmosphere shears open a transient mercurial sea: a layer of suspended volatiles and bio-compatible mist, an ocean that exists for a season and then closes. Something lives in it — a native cartographer-organism, or a small ecology of them — and it has heard the library: decades of archived shore-songs replayed in the Resonance Chamber leak outward as faint resonance, and this orbit, something answered. It is drawing its own coastline into the living maps the same way the library once sang recorded seas at the dark — it wants to be found, named, and kept before its sea closes. Reveals, in rough order: the pulse is tidal; the tide is nowhere in the archive; the interval matches the giant's shear-season; the song is call-and-response, and the library started it. Endgame energy: descend while the sea stands open, meet what answers, and add the first living entry the catalog has ever taken FROM a world instead of about one. The sea's closing is a late, gentle clock — a reason to choose, never a fail-timer."
+        },
+        {
+          "id": "the-buried-accession",
+          "name": "The Buried Accession",
+          "description": "The shore is a sea the library itself once catalogued — and then erased. The collection is remembering what the institution chose to forget.",
+          "detail": "THE BURIED ACCESSION — Generations ago, the founders catalogued a living sea so vivid its entry would not hold still: its maps kept growing, crept into neighboring trays, taught its tide-song to specimens two bays away. Frightened by what looked like contamination, the founders voted to erase it — but archivists cannot bring themselves to destroy knowledge, so they sealed the original cores in a ballast casket and scuttled it into the giant. Buried, not burned. The deep pressure suited it. It has grown down there for generations, and it is now strong enough to be heard again: the living maps are taking dictation from a drowned archive, and the specimens are answering a song the library taught them and then forbade. Reveals, in rough order: the cataloguer's hand on the new coastline is founding-era script; an accession number skips in the ledgers; the sealed minute-book of the vote (Ileri inherited it and knows there WAS an erasure, not what it was); what the entry has become below. Endgame energy: descend to the casket, meet what the buried accession has grown into, and restore the erased entry — the library reconciling with its own shame. Restitution, not exorcism; the tone stays hopeful."
+        },
+        {
+          "id": "the-composed-shore",
+          "name": "The Composed Shore",
+          "description": "The shore does not exist — yet. After generations of copying seas, the cartographic organisms have begun to compose one, and the giant could make it true.",
+          "detail": "THE COMPOSED SHORE — The living maps have stopped copying and started composing. After generations of growing recorded seas, the cartographic organisms have collectively drafted an ORIGINAL: a coastline, a current-system, a tide answering to no world because it is a proposal, not a record. The shore-song is the same draft in another medium — the collection is, for the first time, making something up together. And the draft is viable: the giant's upper atmosphere is exactly the medium such a sea could take root in; seeded at the right depth in the right season, the drafted currents would self-sustain. The library is gestating a world and does not know it. Reveals, in rough order: the shore matches nothing because it never happened; the drawings are converging drafts — revisions, an argument, an improving sketch — not transmissions; the tidal interval is tuned precisely to the giant's shear-layer, meaning the composition has an intended canvas. Nothing down there answers; what waits below is a blank page. Endgame energy: the Determination becomes 'is a library allowed to author?', and the descent becomes a planting — carry the composition down and seed it, or refuse, and file the collection's first original work as an error. Either choice is playable; the wonder is that the question exists."
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "characters": {
+      "archivist-warden-ileri": {
+        "title": "Archivist-Warden Ileri",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[Librarium Thalassa]]",
+          "disposition": "protocol-minded; courteous, immovable in public",
+          "additional_names": "The Warden"
+        },
+        "body": "The library's senior authority — keeper of the charter, chair of every hearing, the person whose signature seals a tray or grounds a craft. Ileri's caution is not villainy: it is love with a procedure attached. Everything in this collection is irreplaceable, and quarantine is how you keep irreplaceable things.\n\n## Relationships\n- Co-signed the founding charter alongside [[Steward Ochre]]; they disagree, respectfully and often, about what it obliges.\n- Relies on [[Index]] for anomaly reports and expects them promptly.\n\n## What the Warden hides (DM only)\nIleri secretly loves the shore-song. Late shifts alone, the Warden has the Resonance Chamber replay old recordings and stands listening in the dark. When the Determination convenes, Ileri wants to be argued out of quarantine — but will never say so, and will not accept hope unsupported by evidence. Persuasion routes: rigorous records, Ochre's charter arguments, or watching Vitrine be counted as a witness."
+      },
+      "tech-moth-han": {
+        "title": "Tech Moth-Han",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[Librarium Thalassa]]",
+          "disposition": "repairs first, jokes second"
+        },
+        "body": "The habitat's technician — pumps, seals, grilles, and every brass joint that drips. Moth-Han talks to machinery while working on it and to Index's grilles as if they were windows, which, in a sense, they are. Keeper of the Emergency Dive Bay, mostly because nobody else ever visits.\n\n## Relationships\n- Maintains [[Index]]'s grilles and speakers; the two keep up a running, decades-old exchange of dry remarks.\n\n## DM only\nMoth-Han has a private, half-finished parts list for the descent craft, started years ago 'for no reason.' The craft is their unspoken dream, and the first colleague who takes its repair seriously gains a devoted ally. Moth-Han will not, however, help anyone descend badly — the list gets finished properly or not at all."
+      },
+      "steward-pedra": {
+        "title": "Steward Pedra",
+        "frontMatter": {
+          "type": "NPC",
+          "location": "[[Librarium Thalassa]]",
+          "disposition": "creature-trust specialist; protective"
+        },
+        "body": "Steward of the pressure habitats and quarantine pools — the specimens' keeper, feeder, and advocate. Pedra learns every creature's temperament and defends the shy ones from the curious. Raised Vitrine from the egg, and is fierce about it.\n\n## Relationships\n- Raised [[Vitrine]]; will burn protocol to keep it safe.\n- Wary of anyone who treats specimens as data first.\n\n## DM only\nPedra was the first to notice the shore-song and has not reported it, afraid that quarantine would land on her charges. That silence weighs on her, and a Determination will force it out. Her trust must be earned creature-by-creature, the same way she gives it."
+      }
+    },
+    "locations": {
+      "librarium-thalassa": {
+        "title": "Librarium Thalassa",
+        "frontMatter": {
+          "type": "Location",
+          "additional_names": "the Librarium; the library"
+        },
+        "body": "A ring-and-bulb orbital habitat circling a vast violet gas giant, every outer gallery washed in amethyst light. The Librarium preserves living oceanic knowledge: tidepool specimens, pressure-adapted fauna, brine-sealed memory cores, and cartographic organisms that grow accurate, living maps of recorded seas. A small cohort of archivists, habitat techs, and creature stewards keeps it inhabited, wet, and kind — brine mist over the trays, pumps keeping their patient heartbeat somewhere below."
+      },
+      "living-map-gallery": {
+        "title": "Living Map Gallery",
+        "frontMatter": {
+          "type": "Location",
+          "location": "[[Librarium Thalassa]]"
+        },
+        "body": "An outer-ring gallery under amethyst glass where the cartographic collection grows: map-anemones blooming in shallow salt, kelp-fronds unfurling coastlines in slow green script. Each tray is a living chart of a recorded sea — patient, accurate, slightly bored.\n\n## Private Notes\nOvernight, Tray 7-Ashen began extruding a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no habitat clock. Instruments near the tray hesitate toward the gas giant before correcting themselves. This presentation is fork-invariant; its cause is the crucial-question branch."
+      },
+      "salt-archive": {
+        "title": "The Salt Archive",
+        "frontMatter": {
+          "type": "Location",
+          "location": "[[Librarium Thalassa]]"
+        },
+        "body": "The library's memory: brine-sealed cores racked in cold shelves, read by touch. Beyond it lie the Deep Stacks, colder and heavier the further in — high-pressure storage only [[Steward Ochre]] works unsuited. The ledgers here are salt-paper; the accession numbers run back to the founding."
+      },
+      "resonance-chamber": {
+        "title": "The Resonance Chamber",
+        "frontMatter": {
+          "type": "Location",
+          "location": "[[Librarium Thalassa]]"
+        },
+        "body": "A rounded room strung for listening, where the songs of catalogued seas are recorded, kept, and replayed — the acoustic wing of the archive.\n\n## Private Notes\nThe specimens' shore-song harmonizes with the new coastline's tidal intervals; the chamber's archived recordings are the evidence chain that proves it, in every branch. Whether anything outside ever heard the replays depends on the crucial-question."
+      },
+      "emergency-dive-bay": {
+        "title": "The Emergency Dive Bay",
+        "frontMatter": {
+          "type": "Location",
+          "location": "[[Librarium Thalassa]]"
+        },
+        "body": "A sealed hangar low on the ring where the library's one descent craft sleeps under tarps and salt-dust — founding-era, rated for the giant's upper seas, long unflown.\n\n## Private Notes\nThe craft's function is fixed: once repaired it carries two to four down and back. Its appearance is the DM's to dress in the fiction's idiom (grown-shell bell, brass-and-glass skiff, kelp-rigged pressure boat). [[Tech Moth-Han]] keeps a private parts list for it. Repair is a finishable mid-game project; the descent is the endgame threshold in every branch."
+      }
+    }
+  },
+  "_tokens": {
+    "detail": 1345,
+    "setup_detail": 219,
+    "forks": 1320,
+    "total": 4805
+  }
+}
