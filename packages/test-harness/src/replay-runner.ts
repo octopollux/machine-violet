@@ -126,6 +126,24 @@ export async function replayGolden(golden: FullStackGolden, opts: ReplayOptions 
   return { scenario: golden.scenario, ok: divergeAt === -1, expected: golden.expectedNarrative, actual, divergeAt };
 }
 
+/**
+ * Re-issue a recorded input sequence against an already-launched harness.
+ *
+ * Exposed for ad-hoc probes that need a *played* campaign as their starting
+ * position (e.g. exercising save/load or exit-to-menu): boot in tape-replay
+ * mode, run the golden's inputs to build the campaign offline, then drive
+ * whatever the probe is actually testing.
+ */
+export async function replayInputs(
+  h: Harness,
+  inputs: RecordedInput[],
+  turnTimeoutMs = Math.max(DEFAULT_TURN_TIMEOUT_MS, 120_000),
+): Promise<void> {
+  for (const input of inputs) {
+    await replayInput(h, input, turnTimeoutMs);
+  }
+}
+
 const dmCount = (s: ClientStateSnapshot): number => s.narrativeLines.filter((l) => l.kind === "dm").length;
 const playerCount = (s: ClientStateSnapshot): number => s.narrativeLines.filter((l) => l.kind === "player").length;
 

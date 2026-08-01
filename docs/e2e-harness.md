@@ -265,12 +265,13 @@ Read-back is over the sidecar's HTTP `/screen` + `/state` (non-blocking — ther
 is no stdin/stdout pipe to block on). The detached launcher's own stdout/stderr
 is tee'd to a log file for crash diagnostics (`mvplay log`).
 
-## The two long-lived probes
+## The long-lived probes
 
 | ID | Live API? | ~Time | What it proves |
 |---|---|---|---|
 | `boot-and-quit` | no | ~10 s | Launcher boots, sidecar reachable, main menu renders, process tears down cleanly. The precondition for everything else. |
 | `smoketest` | **yes** | 7-12 min | New campaign → setup-agent walk → handoff → two in-game player/DM turn cycles. The rare *live* confirmation — the everyday regression gate is Tier-2 golden replay, not this. Hard-killed on exit; Save & Exit is deliberately skipped. |
+| `campaign-identity-probe` | no (tape replay) | ~4 min | Per-campaign UI state doesn't survive exit-to-menu: build a campaign from the quickstart golden, exit, resume it from disk, exit again, then start a New Campaign and assert the setup screen carries no trace of the campaign just left (name, slug, or character). Offline — it reuses the golden's tape, so a probe that needs a *played* campaign as its starting position costs nothing. |
 
 Each probe is a standalone TypeScript file under
 [`packages/test-harness/bin/`](../packages/test-harness/bin/). No registry.
@@ -528,6 +529,13 @@ await runProbe({
 `runProbe` handles argv parsing (`--stdio`, `--keep`, `--binary`), the launch,
 the error dump on failure, and clean shutdown. Every probe gets `--binary` for
 free — no probe-side code needed to target a packaged build.
+
+Pass `launch: { env: { ... } }` to add Harness options — most usefully the
+tape-replay knobs (`MV_E2E`, `MV_TAPE_MODE=replay`, `MV_TAPE_PATH`,
+`MV_CONFIG_DIR`), which make a probe fully offline. Combined with
+`replayInputs(harness, golden.inputs)`, that's how a probe gets a *played*
+campaign to start from without spending a live call — see
+`campaign-identity-probe.ts`.
 
 Conventions:
 - **No naive sleeps.** Reach for `waitForState` family helpers. If you find

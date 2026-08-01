@@ -103,8 +103,14 @@ export async function startAgentSidecar(
   function readScreen(): string {
     const buf = term.buffer.active;
     const lines: string[] = [];
+    // Row indices are absolute over the whole buffer (scrollback included),
+    // so the visible screen starts at `baseY`, not at 0. Ink normally
+    // repaints in place and never scrolls — but anything that writes a stray
+    // line to stdout (a console.log from the in-process engine, a warning)
+    // pushes the frame down, and reading from 0 would then hand back the
+    // top of the scrollback: a frame the player stopped seeing minutes ago.
     for (let i = 0; i < term.rows; i++) {
-      const line = buf.getLine(i);
+      const line = buf.getLine(buf.baseY + i);
       lines.push(line ? line.translateToString(true) : "");
     }
     return lines.join("\n");
