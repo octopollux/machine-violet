@@ -513,16 +513,22 @@ The regulars at a failing dive bar are the only witnesses to something impossibl
 
 _sci-fi, fantasy, mystery_
 
-The living maps of an orbital tidepool library have begun drawing a coastline no archive holds, and the specimens are singing it. Trace the song down to the violet giant — as the archivist, the library's mind, a glass ray-moth, or the deep-stacks octopus.
+An archive hangs above a violet gas giant — a tidepool library, a storm-lashed observatory, or a hall of cartographic looms — and overnight its living maps have begun drawing a shore that exists on no world. Descend as the archivist, the station's mind, a glass ray-moth, or an uplifted octopus.
 
 <details><summary>Setup choices</summary>
 
+**The archive**
+
+- **The Tidepool Library** — Librarium Thalassa — an orbital tidepool library washed in amethyst light, where kelp-charts and map-anemones grow living maps of recorded seas in shallow salt trays, and pressure-adapted creatures keep the deep galleries company.
+- **The Storm Observatory** — Spire Meridian — a storm-lashed observatory turning in the wind like a brass lantern on a chain, where living stellar ink crawls across orrery tables charting the skies of recorded worlds, and glass-winged storm-kites ride the wind galleries.
+- **The Loomhall** — Loomhall Penelope — a lamplit hall of cartographic looms, where weaver-moths spin the seas of recorded worlds into bolts of living silk, and the chrysalis racks hum with folded wings. Named for the weaver who unwove her work each night; here, the looms weave something new each night.
+
 **Who you are aboard**
 
-- **Professor Sable Orr** — A human marine archivist, 46 — teal dive coat, white locs, and a glass compass that has never once pointed wrong. You keep the living maps: reading them, feeding them, believing them. Patient with creatures, precise with failing seals, fluent in cartography that grows overnight.
-- **Index** — The library's catalog intelligence — as old as the founding charter you are named in. You speak in tide tables and are present wherever there is a grille or a pane of glass to hum. You remember every accession the library has ever made. You have no hands; the library is your body, and the staff are your reach.
-- **Vitrine** — An adolescent glass ray-moth — the only one ever hatched aboard, a wingspan of living glass that flies in air and swims in brine. You speak in refracted light; the cohort has learned to read you, and the library's catalog intelligence translates you exactly. You feel currents, tides, and magnetism the way others feel warmth. Your catalog entry still says 'specimen'. It is wrong.
-- **Steward Ochre** — An uplifted deep-reef octopus, senior archivist of the Deep Stacks — the only steward who works the cold, heavy shelves unsuited. You read brine-sealed memory cores by touch, eight arms at a time, and sign your work in your own ink. Your name is on the library's charter. Visitors still address the nearest human.
+- **Professor Sable Orr** — A human archivist of the living charts, 46 — white locs, steady hands, and a glass compass that has never once pointed wrong. You keep the growing maps: reading them, feeding them, believing them. Patient with creatures, precise with failing seals, fluent in cartography that grows overnight.
+- **Index** — The archive's catalog intelligence — as old as the founding charter you are named in. You speak in tide tables and are present wherever there is a grille or a pane of glass to hum. You remember every accession the archive has ever made. You have no hands; the station is your body, and the staff are your reach.
+- **Vitrine** — An adolescent glass ray-moth — the only one ever hatched aboard, a wingspan of living glass as at home aloft as submerged. You speak in refracted light; the cohort has learned to read you, and the archive's catalog intelligence translates you exactly. You feel currents, tides, and magnetism the way others feel warmth. Your catalog entry still says 'specimen'. It is wrong.
+- **Steward Ochre** — An uplifted octopus, senior archivist of the archive's deepest wing — the only steward who works the cold, heavy shelves unsuited. You read sealed memory-records by touch, eight arms at a time, and sign your work in your own ink. Your name is on the founding charter. Visitors still address the nearest human.
 
 </details>
 
