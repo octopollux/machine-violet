@@ -33,6 +33,7 @@ import type {
 } from "./api-client.js";
 import type { ArchivedCampaignEntry, CampaignDeleteInfo } from "./config/campaign-archive.js";
 import { setAgentClientState } from "./agent-state-ref.js";
+import { campaignLabel, NO_CAMPAIGN, type CampaignIdentity } from "./campaign-identity.js";
 import { loadClientSettings, saveClientSettings } from "./config/client-settings.js";
 import { revealInExplorer } from "./commands/open-path.js";
 import {
@@ -91,9 +92,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   const [errorMessage, setErrorMessage] = useState("");
   const [clientState, setClientState] = useState<ClientState>(initialClientState);
   const [campaigns, setCampaigns] = useState<CampaignEntry[]>([]);
-  const [activeCampaignId, setActiveCampaignId] = useState(campaignId ?? "");
-  // Human-readable name set during setup→game transition; cleared when state:snapshot arrives.
-  const [transitionName, setTransitionName] = useState("");
+  // Which campaign the playing phase is rendering — per-campaign state, so
+  // every entry into play sets it and returnToMenu clears it. See
+  // campaign-identity.ts for why both halves matter.
+  const [campaign, setCampaign] = useState<CampaignIdentity>(
+    campaignId ? { id: campaignId, name: "" } : NO_CAMPAIGN,
+  );
   // Session counter forces full PlayingPhase remount on campaign switch
   const [sessionKey, setSessionKey] = useState(0);
 
@@ -270,8 +274,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   useEffect(() => {
     const newId = clientState.transitionCampaignId;
     if (!newId) return;
-    setActiveCampaignId(newId);
-    setTransitionName(clientState.transitionCampaignName ?? "");
+    setCampaign({ id: newId, name: clientState.transitionCampaignName ?? "" });
     setSessionKey((k) => k + 1); // remount PlayingPhase
     // Preserve live UI state through the handoff so the transition is seamless:
     // - narrativeLines: setup conversation stays visible as the DM's opening streams in
@@ -293,7 +296,9 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
 
   // Start a campaign (used by both auto-start and menu selection)
   const startCampaign = useCallback((id: string) => {
-    setActiveCampaignId(id);
+    // Only the id is known here; the server's first snapshot supplies the
+    // human-readable name.
+    setCampaign({ id, name: "" });
     setSessionKey((k) => k + 1);
     setPhase("starting");
     setNarrativeLines([]);
@@ -359,6 +364,10 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     setActiveChoices(null);
     setActiveModal(null);
     setClientState(initialClientState());
+    // Campaign identity is part of that reset: leaving it set is how the
+    // campaign you just left ends up labelling the *next* one's setup
+    // conversation (which never receives a state:snapshot of its own).
+    setCampaign(NO_CAMPAIGN);
     setVariant("exploration");
     setKeyColor("#8888aa");
     setThemeDef(loadThemeDefinition("gothic"));
@@ -675,8 +684,14 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         hasConnections={connections.length > 0}
         devModeEnabled={devModeEnabled}
         onNewCampaign={() => {
+          // Setup runs inside PlayingPhase but belongs to no campaign yet, so
+          // it claims the same clean slate startCampaign does rather than
+          // inheriting whatever the last session left behind.
+          setCampaign(NO_CAMPAIGN);
           setSessionKey((k) => k + 1);
           setPhase("starting");
+          setNarrativeLines([]);
+          setClientState(initialClientState());
           setErrorMessage("");
           apiClientRef.current.createCampaign().then(() => {
             setPhase("playing");
@@ -759,7 +774,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       setTheme,
       keyColor,
       setKeyColor,
-      campaignName: stateSnapshot?.campaignName ?? (transitionName || activeCampaignId),
+      campaignName: campaignLabel(stateSnapshot?.campaignName, campaign),
       activePlayerIndex: stateSnapshot?.activePlayerIndex ?? 0,
       setActivePlayerIndex: () => { /* server manages this */ },
       engineState: clientState.engineState,
@@ -803,7 +818,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
         inline-image renderer in NarrativeArea reads them to pick a protocol
         (kitty / iTerm2 / sixel) or render nothing. No provider needed.
       */}
-      <PlayingPhase key={`${activeCampaignId}-${sessionKey}`} />
+      <PlayingPhase key={`${campaign.id}-${sessionKey}`} />
     </GameProvider>
   );
 }

@@ -29,7 +29,7 @@
  * The body receives a launched Harness and a log() function that writes
  * indented progress lines to stderr.
  */
-import { Harness } from "./harness.js";
+import { Harness, type HarnessOptions } from "./harness.js";
 
 export interface ProbeContext {
   harness: Harness;
@@ -44,6 +44,13 @@ export interface RunProbeOptions {
   title: string;
   /** The actual probe body. Throw to fail; return to pass. */
   body: (ctx: ProbeContext) => Promise<void>;
+  /**
+   * Extra Harness.launch options, merged over the defaults. The usual reason
+   * is `env` — an offline probe needs the tape-replay knobs (`MV_E2E`,
+   * `MV_TAPE_MODE`, `MV_TAPE_PATH`, `MV_CONFIG_DIR`) so no API key or network
+   * is involved. `stdio` and `executable` still come from argv.
+   */
+  launch?: Omit<HarnessOptions, "stdio" | "executable">;
 }
 
 interface ParsedArgs {
@@ -110,6 +117,7 @@ export async function runProbe(opts: RunProbeOptions): Promise<void> {
   process.stderr.write(`▶ ${opts.title}\n  (${opts.name})\n`);
 
   const harness = await Harness.launch({
+    ...opts.launch,
     stdio: args.stdio,
     ...(args.binary ? { executable: { command: args.binary } } : {}),
   });
