@@ -151,7 +151,7 @@
           "type": "Location",
           "location": "[[Librarium Thalassa]]"
         },
-        "body": "An outer-ring gallery under amethyst glass where the cartographic collection grows: map-anemones blooming in shallow salt, kelp-fronds unfurling coastlines in slow green script. Each tray is a living chart of a recorded sea — patient, accurate, slightly bored.\n\n## Private Notes\nOvernight, Tray 7-Ashen began extruding a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock. Instruments near the tray hesitate toward the gas giant before correcting themselves. This presentation is fork-invariant; its cause is the crucial-question branch."
+        "body": "An outer-ring gallery under amethyst glass where the cartographic collection grows: map-anemones blooming in shallow salt, kelp-fronds unfurling coastlines in slow green script. Each tray is a living chart of a recorded sea — patient, accurate, slightly bored.\n\n## Private Notes\nOvernight, Tray 7-Ashen began extruding a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock. Instruments near the tray hesitate toward the gas giant before correcting themselves. This presentation is identical in every crucial-question branch; only the cause differs (play the selected branch)."
       },
       "salt-archive": {
         "title": "The Salt Archive",
@@ -211,7 +211,7 @@
           "type": "Location",
           "location": "[[Spire Meridian]]"
         },
-        "body": "The master orrery's vault: a circular chamber under a cracked dome where living stellar ink moves on black glass like something dreaming — the eldest and most accurate of the Spire's charts, silver light crawling through the constellations of recorded worlds.\n\n## Private Notes\nOvernight, the master orrery began drawing a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock, inked in frost-bright silver. Instruments near the table hesitate toward the gas giant before correcting themselves. This presentation is fork-invariant; its cause is the crucial-question branch."
+        "body": "The master orrery's vault: a circular chamber under a cracked dome where living stellar ink moves on black glass like something dreaming — the eldest and most accurate of the Spire's charts, silver light crawling through the constellations of recorded worlds.\n\n## Private Notes\nOvernight, the master orrery began drawing a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock, inked in frost-bright silver. Instruments near the table hesitate toward the gas giant before correcting themselves. This presentation is identical in every crucial-question branch; only the cause differs (play the selected branch)."
       },
       "loomhall-penelope": {
         "title": "Loomhall Penelope",
@@ -235,7 +235,7 @@
           "type": "Location",
           "location": "[[Loomhall Penelope]]"
         },
-        "body": "The working heart of the hall: rank on rank of living looms where weaver-moths spin the seas and coasts of catalogued worlds into bolts of chart-silk, each bolt still growing on its frame.\n\n## Private Notes\nOvernight, the eldest loom began weaving a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock, worked in thread no one dyed. Instruments near the frame hesitate toward the gas giant before correcting themselves. This presentation is fork-invariant; its cause is the crucial-question branch."
+        "body": "The working heart of the hall: rank on rank of living looms where weaver-moths spin the seas and coasts of catalogued worlds into bolts of chart-silk, each bolt still growing on its frame.\n\n## Private Notes\nOvernight, the eldest loom began weaving a coastline that matches no archived world — an unknown shore with its own current-system and a tidal pulse matching no station clock, worked in thread no one dyed. Instruments near the frame hesitate toward the gas giant before correcting themselves. This presentation is identical in every crucial-question branch; only the cause differs (play the selected branch)."
       }
     }
   },
@@ -243,6 +243,6 @@
     "detail": 1142,
     "setup_detail": 226,
     "forks": 2447,
-    "total": 6409
+    "total": 6424
   }
 }
