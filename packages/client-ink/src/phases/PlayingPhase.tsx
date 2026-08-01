@@ -130,8 +130,13 @@ export function PlayingPhase() {
     !!retryOverlay ||
     menuOpen;
 
-  // Resolve player info from state snapshot
-  const players = stateSnapshot?.players?.map((p) => ({
+  // Resolve player info from state snapshot. A snapshot with an EMPTY player
+  // list is treated as no snapshot at all: a live campaign always has at
+  // least one player, but the teardown snapshot broadcast by the server's
+  // endSession() carries `players: []` and can land after the client has
+  // already reset — leaving the pane with no character name and no selector.
+  const snapshotPlayers = stateSnapshot?.players?.length ? stateSnapshot.players : undefined;
+  const players = snapshotPlayers?.map((p) => ({
     name: p.character,
     isAI: p.type === "ai",
   })) ?? [{ name: "Player", isAI: false }];
