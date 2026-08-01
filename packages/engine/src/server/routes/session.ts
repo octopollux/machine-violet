@@ -44,7 +44,6 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
       },
     },
   }, async (request, reply) => {
-    console.log(`[contribute] text="${(request.body as ContributeRequest)?.text?.slice(0, 50)}"`);
     const tm = server.sessionManager.getTurnManager();
     if (!tm) {
       return reply.status(400).send({ error: "No turn manager." });
