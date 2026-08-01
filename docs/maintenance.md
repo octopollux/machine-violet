@@ -16,8 +16,18 @@ This project maintains a closed loop between code and documentation. When you ch
 ### Adding a new tool
 
 1. Register in `packages/engine/src/agents/tool-registry.ts`
-2. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
-3. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
+2. Define one executable TypeBox contract with `defineToolContract()` and derive both the provider schema and handler input type from it; do not add a separate runtime schema
+3. Classify it in `TOOL_CRITICALITY` (`advisory`, `reversible`, `durable`, `commit`, or `expensive`). The exact-coverage unit test must fail if this is omitted
+4. Declare only deterministic, intent-preserving repairs on that contract. Ambiguous shapes and missing required values must reject before the handler
+5. Add unit coverage for valid input, every repair, structural/semantic rejection, and no side effects on rejection. For a new failure class, add a provider-loop corrected-retry regression too
+6. Add entry to [tools-catalog.md](tools-catalog.md) in the appropriate domain section
+7. If the tool reads/writes state, add to `TOOL_STATE_MAP` in `tool-registry.ts` and update the matrix in [state-atlas.md](state-atlas.md)
+
+The policy, logging contract, and examples live in
+[tool-input-contracts.md](tool-input-contracts.md). Setup-agent tools use the
+same validator at their separate dispatch boundary. Other bespoke subagent
+surfaces must pass an explicit policy for each advertised tool through
+`toolInputPolicies`. All require the same test coverage.
 
 ### Adding a new subagent
 
@@ -85,7 +95,7 @@ This project maintains a closed loop between code and documentation. When you ch
 4. Add tier defaults under the provider's connection-type key in `packages/engine/src/config/known-models.json`
 5. If the provider's connection-type maps to an existing model family (e.g. both `openai-apikey` and `openai-chatgpt` reach the `openai` family), update `modelFamilyFor` in `packages/engine/src/config/model-registry.ts`
 6. Add the provider id to the `AddConnectionRequest` literal union in `packages/shared/src/protocol/rest.ts` and to `VALID_PROVIDERS` in `packages/engine/src/server/routes/management.ts`
-7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/ConnectionsPhase.tsx` (or, for OAuth-style providers, add a dedicated menu entry that doesn't go through the API-key wizard)
+7. Add it to `PROVIDER_OPTIONS` in `packages/client-ink/src/phases/connections/providers.ts` — display name, picker description, key source, and `auth: "key" | "oauth"` all live there (OAuth providers are picker rows too; their flow branches inside `ConnectWizard`)
 8. If the provider implements `getUsageStatus` / `subscribeUsage`, the existing `/manage/connections/:id/usage` endpoint surfaces it automatically
 
 ### Changing the tape format (Tier-2 record/replay)
@@ -149,7 +159,7 @@ materialization — is separate and lives in [format-spec.md §10](format-spec.m
 | REST API (auto-generated) | `/docs` endpoint | OpenAPI spec from TypeBox route schemas |
 | Conventions | [CLAUDE.md](../CLAUDE.md) | Code style, testing, imports |
 | openai-chatgpt provider | [openai-chatgpt-provider.md](openai-chatgpt-provider.md) | Codex app-server integration, OAuth flow, usage tracking |
-| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/custom: Responses-vs-Completions routing, streaming reasoning workaround, encrypted-reasoning replay |
+| openai.ts provider | [openai-provider.md](openai-provider.md) | Direct-API adapter for openai-apikey/openrouter/xai/custom: Responses-vs-Completions routing, streaming reasoning, encrypted-reasoning replay, OpenAI + Grok Imagine |
 | E2E strategy / live harness | [e2e-harness.md](e2e-harness.md) | Three-tier strategy; Tier-3 live harness — probes, mvplay, engine-state gotchas, engine-log breadcrumbs |
 | Release process / pre-cut smoke | [releases.md](releases.md) | Channels, branches, cut commands; the pre-cut install-method smoke test (`/release-smoke`) and what CI's packaged gates can't see |
 | Golden tapes (Tier-2) | [golden-tapes.md](golden-tapes.md) | Record/replay operating model, corpus, record paths, when to re-record |

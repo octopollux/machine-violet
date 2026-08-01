@@ -95,21 +95,48 @@ The `/retry` command retries the last DM turn at any time — useful for recover
 - Otherwise, it pops the last exchange from conversation history and replays the original player input (with `skipTranscript: true`).
 - Both paths log a `dev` narrative line (visible when verbose display is enabled in Settings).
 
-### `/diagnostics` slash command
+### Diagnostics export
 
-The `/diagnostics` command bundles the current campaign folder together with the top-level `.debug/` (engine.jsonl, context dumps) into a single zip and reveals it in the OS file explorer:
+Use **Settings → Export Diagnostics** to create a support bundle at any time,
+including when no API connection is configured or sign-in has failed. During
+gameplay, the `/diagnostics` slash command provides the same export.
 
-- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag` (a zip with a Machine Violet-specific extension — any zip tool can still read it).
-- The bundle includes a `manifest.json` at the root with the collection timestamp, campaign name, platform, and Node version.
+When a campaign is active, the bundle contains the current campaign folder
+together with the top-level `.debug/` (engine.jsonl, context dumps). Before a
+campaign is active, it contains the top-level `.debug/` data only:
+
+- Output path: `<homeDir>/diagnostics/<campaign-name>-<timestamp>.mvdiag`, or `machine-violet-<timestamp>.mvdiag` outside a campaign (a zip with a Machine Violet-specific extension — any zip tool can still read it).
+- The bundle includes a `manifest.json` at the root with the collection timestamp, scope, platform, and Node version, plus campaign name/slug when applicable.
 - Per-campaign `.debug/` is captured as part of the campaign walk; the top-level `.debug/` is added under a `.debug/` prefix in the archive.
 - The top-level `.debug/server.log` (mirrored stdout/stderr) is excluded — it's noisy and rarely useful for triage compared with `engine.jsonl`.
-- Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The system message in the chat always prints the absolute path as a fallback when reveal is unavailable or silently fails.
+- Reveal-in-folder uses platform-specific commands (`explorer /select,` on Windows, `open -R` on macOS, `xdg-open <parent>` on Linux). The UI always prints the absolute path as a fallback when reveal is unavailable or silently fails.
 
 Use this when sending a triage bundle for a bug report.
 
 ### Subagent failures
 
 If a Haiku/Sonnet subagent call fails (during resolution, OOC, chargen, etc.), the engine retries the subagent call. The parent (Opus DM) doesn't see the failure unless retries are exhausted, in which case it receives an error result: "Resolution failed — resolve manually or retry." The DM can narrate around it or ask the player to wait.
+
+### Invalid tool input
+
+Model-generated tool arguments are validated inside the engine before the
+handler runs. The boundary may apply a contract-local, deterministic repair
+when the intended representation is unambiguous; otherwise it returns an error
+tool result with JSON Pointer paths, expected and received shapes, and an
+explicit "No side effects were applied" guarantee. The agent can then correct
+and retry the call without persisting partial state.
+
+Structural JSON Schema validation is followed by semantic/cross-field checks.
+This catches failures a provider's strict schema cannot, such as embedded
+schema fragments in a display-name field, mismatched parallel arrays, or two
+competing `finalize_setup` calls. Required identity and commit fields are not
+silently invented.
+
+Each repair or rejection is logged as `tool_input:repaired` or
+`tool_input:rejected` in `.debug/engine.jsonl`, correlated with the agent,
+provider, model, call ID, and current span. Logs contain shape summaries and
+stable issue codes, not raw campaign prose. See
+[tool-input-contracts.md](tool-input-contracts.md).
 
 ### Malformed history (orphan & block-order patches)
 

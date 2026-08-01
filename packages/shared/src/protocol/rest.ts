@@ -5,6 +5,7 @@
  * and the client (typed fetch wrappers).
  */
 import { Type, type Static } from "@sinclair/typebox";
+import { TranscriptChoiceResponse } from "./state.js";
 
 // --- Campaigns ---
 
@@ -53,6 +54,8 @@ export const ContributeRequest = Type.Object({
    *  choice modal (vs. typing free-form text). Used by setup so the agent
    *  can distinguish selection from dismissal+free-form. */
   fromChoice: Type.Optional(Type.Boolean()),
+  /** Exact presentation + option/custom provenance for choice UI responses. */
+  choiceResponse: Type.Optional(TranscriptChoiceResponse),
 });
 
 export const CommitResponse = Type.Object({
@@ -200,6 +203,7 @@ export const TierAssignmentSchema = Type.Object({
 export const ConnectionsListResponse = Type.Object({
   connections: Type.Array(SerializedConnection),
   tierAssignments: Type.Unknown(),
+  imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
 });
 
 export const AddConnectionRequest = Type.Object({
@@ -208,6 +212,7 @@ export const AddConnectionRequest = Type.Object({
   // not by submitting an API key here.
   provider: Type.Union([
     Type.Literal("anthropic"),
+    Type.Literal("gemini"),
     Type.Literal("openai-apikey"),
     Type.Literal("openrouter"),
     Type.Literal("custom"),
@@ -259,18 +264,33 @@ export const UpdateModelsRequest = Type.Object({
   models: Type.Array(ConnectionModel),
 });
 
+/** Body for PATCH /manage/connections/:id — in-place API-key replacement (Fix flow). */
+export const UpdateConnectionKeyRequest = Type.Object({
+  apiKey: Type.String(),
+});
+
 export const TiersResponse = Type.Object({
   tierAssignments: Type.Unknown(),
+  imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
 });
 
 export const SetTiersRequest = Type.Object({
   large: Type.Optional(TierAssignmentSchema),
   medium: Type.Optional(TierAssignmentSchema),
   small: Type.Optional(TierAssignmentSchema),
+  imageAssignment: Type.Optional(Type.Union([TierAssignmentSchema, Type.Null()])),
 });
 
 export const ModelsResponse = Type.Object({
   models: Type.Unknown(),
+  imageModels: Type.Unknown(),
+  /**
+   * Per-provider default model ids for each tier
+   * (`{ [provider]: { large?, medium?, small? } }`). The client's model
+   * assignment screen uses these to render "Auto (<model>)" and to apply a
+   * provider's default set when the player selects a connection.
+   */
+  tierDefaults: Type.Unknown(),
 });
 
 export const ArchiveResponse = Type.Object({
@@ -341,6 +361,7 @@ export type ChatGptLoginStatusResponse = Static<typeof ChatGptLoginStatusRespons
 export type AddConnectionRequest = Static<typeof AddConnectionRequest>;
 export type HealthCheckResponse = Static<typeof HealthCheckResponse>;
 export type UpdateModelsRequest = Static<typeof UpdateModelsRequest>;
+export type UpdateConnectionKeyRequest = Static<typeof UpdateConnectionKeyRequest>;
 export type TiersResponse = Static<typeof TiersResponse>;
 export type SetTiersRequest = Static<typeof SetTiersRequest>;
 export type ModelsResponse = Static<typeof ModelsResponse>;

@@ -106,16 +106,25 @@ export function migrateConfigFromExeDir(): void {
 /**
  * Load .env from the best available location.
  * Priority: env var already set > config dir > exe directory (legacy) > cwd
- * No-op if ANTHROPIC_API_KEY is already in the environment.
+ *
+ * An ANTHROPIC_API_KEY already in the environment skips the .env *loading*
+ * only — the compiled-mode config migration below still runs, since it is
+ * unrelated to where the key came from (#768).
  */
 export function loadEnv(): void {
+  // Migrate any config files left next to the exe from a prior version. This
+  // runs BEFORE the early return below: migration (and the config-dir mkdir it
+  // does on the way) has nothing to do with whether a key already happens to be
+  // in the environment, and gating it on that left a fresh install with no
+  // config dir at all — the first connection save then died ENOENT (#768).
+  // saveConnectionStore now creates the dir itself; this keeps startup from
+  // silently skipping the migration too.
+  if (isCompiled()) migrateConfigFromExeDir();
+
   if (process.env.ANTHROPIC_API_KEY) return;
 
   // In compiled mode, use the platform config directory
   if (isCompiled()) {
-    // Migrate any config files left next to the exe from a prior version
-    migrateConfigFromExeDir();
-
     const cfgEnv = join(configDir(), ".env");
     if (existsSync(cfgEnv)) {
       dotenvConfig({ path: cfgEnv, quiet: true });

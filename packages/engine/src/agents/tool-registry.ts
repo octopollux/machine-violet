@@ -1,6 +1,16 @@
-import { coerceResourceKeys } from "@machine-violet/shared";
+import { Type, type Static, type TSchema } from "@sinclair/typebox";
 import type { NormalizedTool } from "../providers/types.js";
+import type { ToolExecutionContext } from "../providers/types.js";
 import type { GameState } from "./game-state.js";
+import {
+  defineToolContract,
+  describeToolInputValue,
+  validateToolInput,
+  type ToolContract,
+  type ToolCriticality,
+  type ToolInputPolicy,
+  type ToolInputRepair,
+} from "./tool-contract.js";
 
 // --- Types ---
 
@@ -10,6 +20,7 @@ type Tool = NormalizedTool;
 export interface RegisteredTool {
   definition: Tool;
   handler: (state: GameState, input: Record<string, unknown>) => ToolResult;
+  inputPolicy?: ToolInputPolicy<Record<string, unknown>>;
 }
 
 import type { ToolResult } from "@machine-violet/shared/types/engine.js";
@@ -75,6 +86,93 @@ function requireMap(state: GameState, input: Record<string, unknown>): { map: im
   if (!map) return err(`Map '${mapId}' not found.`);
   return { map };
 }
+
+function contractTool<S extends TSchema>(
+  contract: ToolContract<S>,
+  handler: (state: GameState, input: Static<S>) => ToolResult,
+): RegisteredTool {
+  return {
+    definition: contract.definition,
+    inputPolicy: contract.policy as ToolInputPolicy<Record<string, unknown>>,
+    // The registry validates with this exact contract before invoking the
+    // wrapper. Keep the single cast here rather than repeating casts in every
+    // typed handler.
+    handler: (state, input) => handler(state, input as Static<S>),
+  };
+}
+
+const SET_DISPLAY_RESOURCES_CONTRACT = defineToolContract({
+  name: "set_display_resources",
+  description: "Update which resource keys appear in the top frame for a character.",
+  criticality: "durable",
+  schema: Type.Object({
+    character: Type.String({
+      minLength: 1,
+      description: "Character name",
+    }),
+    resources: Type.Array(Type.String({ minLength: 1 }), {
+      description:
+        "Resource keys as an array of separate strings, e.g. [\"HP\", \"Spell Slots\"] — "
+        + "one key per element, NOT the single comma-separated string used by the "
+        + "`display_resources` sheet front matter.",
+    }),
+  }),
+  repair: (raw): { input: unknown; repairs: ToolInputRepair[] } => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return { input: raw, repairs: [] };
+    }
+    const input = { ...(raw as Record<string, unknown>) };
+    const repairs: ToolInputRepair[] = [];
+    if (typeof input.resources === "string") {
+      const resources = input.resources
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean);
+      repairs.push({
+        path: "/resources",
+        code: "csv_to_string_array",
+        from: describeToolInputValue(input.resources),
+        to: describeToolInputValue(resources),
+        message:
+          "Accepted the sheet-style comma-separated resource list as the tool's string array.",
+      });
+      input.resources = resources;
+    } else if (
+      Array.isArray(input.resources)
+      && input.resources.every((key) => typeof key === "string")
+    ) {
+      const original = input.resources;
+      const resources = original.map((key) => key.trim()).filter(Boolean);
+      if (
+        resources.length !== original.length
+        || resources.some((key, index) => key !== original[index])
+      ) {
+        repairs.push({
+          path: "/resources",
+          code: "trim_string_array",
+          from: describeToolInputValue(original),
+          to: describeToolInputValue(resources),
+          message: "Trimmed resource keys and removed blank entries.",
+        });
+        input.resources = resources;
+      }
+    }
+    if (typeof input.character === "string") {
+      const character = input.character.trim();
+      if (character !== input.character) {
+        repairs.push({
+          path: "/character",
+          code: "trim_string",
+          from: describeToolInputValue(input.character),
+          to: describeToolInputValue(character),
+          message: "Trimmed surrounding whitespace from the character name.",
+        });
+        input.character = character;
+      }
+    }
+    return { input, repairs };
+  },
+});
 
 // --- Tool definitions ---
 
@@ -562,33 +660,11 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(JSON.stringify({ type: "style_scene", ...input }));
     },
   },
-  {
-    definition: {
-      name: "set_display_resources",
-      description: "Update which resource keys appear in the top frame for a character.",
-      inputSchema: {
-        type: "object" as const,
-        properties: {
-          character: { type: "string", description: "Character name" },
-          resources: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              "Resource keys as an array of separate strings, e.g. [\"HP\", \"Spell Slots\"] — "
-              + "one key per element, NOT the single comma-separated string used by the "
-              + "`display_resources` sheet front matter.",
-          },
-        },
-        required: ["character", "resources"],
-      },
-    },
-    handler: (state, input) => {
-      const character = input.character as string;
-      const resources = coerceResourceKeys(input.resources);
+  contractTool(SET_DISPLAY_RESOURCES_CONTRACT, (state, input) => {
+      const { character, resources } = input;
       state.displayResources[character] = resources;
       return ok(JSON.stringify({ type: "set_display_resources", character, resources }));
-    },
-  },
+  }),
   {
     definition: {
       name: "set_resource_values",
@@ -898,7 +974,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "scene_transition",
-      description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms, resets context. Call at natural narrative boundaries.",
+      description: "Transition to a new scene. Finalizes transcript, writes campaign log, updates changelogs, advances calendar, checks alarms; the record carries forward into the new scene. Call at natural narrative boundaries — when the scene's dramatic question is resolved or the story cuts to a new time or place.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -1181,6 +1257,55 @@ const TOOL_STATE_MAP: Record<string, StateSlice[]> = {
 };
 
 /**
+ * Consequence class for every registry tool. The exact-coverage assertion in
+ * tool-registry.test.ts makes adding a tool without choosing a class fail.
+ * Mixed read/write tools use their most consequential operation.
+ */
+export const TOOL_CRITICALITY: Record<string, ToolCriticality> = {
+  roll_dice: "advisory",
+  deck: "durable",
+  map: "durable",
+  map_entity: "durable",
+  map_query: "advisory",
+  alarm: "durable",
+  time: "durable",
+  start_combat: "durable",
+  end_combat: "durable",
+  advance_turn: "durable",
+  modify_initiative: "durable",
+  update_modeline: "reversible",
+  style_scene: "reversible",
+  set_display_resources: "durable",
+  set_resource_values: "durable",
+  present_choices: "reversible",
+  show_character_sheet: "advisory",
+  enter_ooc: "reversible",
+  switch_player: "durable",
+  swap_pc: "commit",
+  howto_swap_pc: "advisory",
+  list_dm_personalities: "advisory",
+  swap_dm_personality: "durable",
+  howto_swap_dm_personality: "advisory",
+  howto_campaign_state: "advisory",
+  scene_transition: "commit",
+  session_end: "commit",
+  rollback: "commit",
+  search_campaign: "expensive",
+  search_content: "expensive",
+  scribe: "durable",
+  dm_notes: "durable",
+  resolve_turn: "expensive",
+  promote_character: "durable",
+  entity: "durable",
+  describe_entity_type: "advisory",
+  list_entity_types: "advisory",
+  validate_entity: "advisory",
+  find_schema_drift: "advisory",
+  detect_orphans: "advisory",
+  manage_objectives: "durable",
+};
+
+/**
  * Callback fired after successful dispatch when the tool mutates state slices.
  * Used by GameEngine to persist state to disk.
  */
@@ -1211,6 +1336,13 @@ class ToolRegistry {
 
   constructor() {
     for (const tool of TOOL_DEFS) {
+      const criticality = TOOL_CRITICALITY[tool.definition.name];
+      if (!criticality) {
+        throw new Error(
+          `Tool '${tool.definition.name}' is missing a TOOL_CRITICALITY entry.`,
+        );
+      }
+      tool.inputPolicy ??= { criticality };
       this.tools.set(tool.definition.name, tool);
     }
   }
@@ -1235,18 +1367,45 @@ class ToolRegistry {
       .map((t) => t.definition);
   }
 
+  /** Get validation/repair policies for the same executable tool surface. */
+  getInputPolicies(exclude?: Set<string>): Readonly<Record<string, ToolInputPolicy>> {
+    const policies: Record<string, ToolInputPolicy> = {};
+    for (const [name, tool] of this.tools) {
+      if (!exclude || !exclude.has(name)) {
+        policies[name] = tool.inputPolicy ?? {
+          criticality: TOOL_CRITICALITY[name] ?? "advisory",
+        };
+      }
+    }
+    return policies;
+  }
+
   /** Dispatch a tool_use block to the appropriate handler */
-  dispatch(state: GameState, name: string, input: Record<string, unknown>): ToolResult {
+  dispatch(
+    state: GameState,
+    name: string,
+    input: Record<string, unknown>,
+    context?: ToolExecutionContext,
+  ): ToolResult {
     const tool = this.tools.get(name);
     if (!tool) {
       return err(`Unknown tool: ${name}`);
     }
     try {
-      const result = tool.handler(state, input);
+      const validation = validateToolInput<Record<string, unknown>>(
+        tool.definition,
+        input,
+        tool.inputPolicy,
+        context,
+      );
+      if (!validation.ok) return err(validation.content);
+      const validatedInput = validation.value;
+      const result = tool.handler(state, validatedInput);
       if (!result.is_error) {
         const slices = TOOL_STATE_MAP[name];
         const readOps = READ_ONLY_OPS[name];
-        const isReadOnly = readOps && readOps.has(input.operation as string);
+        const isReadOnly = readOps
+          && readOps.has(validatedInput.operation as string);
         if (this.persist && slices && slices.length > 0 && !isReadOnly) {
           this.persist(state, slices);
         }

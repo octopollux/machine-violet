@@ -42,7 +42,7 @@ function defaultProps(overrides?: Partial<MainMenuPhaseProps>): MainMenuPhasePro
     onCancelDelete: vi.fn(),
     onAddContent: vi.fn(),
     onSettings: vi.fn(),
-    onSettingsApiKeys: vi.fn(),
+    onConnectToAI: vi.fn(),
     onQuit: vi.fn(),
     ...overrides,
   };
@@ -148,16 +148,36 @@ describe("MainMenuPhase", () => {
     expect(frame).toContain("○");
   });
 
-  it("renders API Keys in menu when key is invalid", () => {
+  it("renders the Connect to AI CTA when no working connection exists", () => {
     const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
-    expect(lastFrame()).toContain("API Keys");
+    expect(lastFrame()).toContain("Connect to AI");
   });
 
-  it("hides API Keys from menu when key is valid", () => {
+  it("describes the CTA as 'required to play' on first run (no connections)", () => {
+    const { lastFrame } = render(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, hasConnections: false })} />,
+    );
+    expect(lastFrame()).toContain("required to play");
+  });
+
+  it("shows the health message on the CTA when a connection exists but is broken", () => {
+    const { lastFrame } = render(
+      <MainMenuPhase {...defaultProps({
+        apiKeyValid: false,
+        hasConnections: true,
+        apiKeyStatus: "Invalid API key",
+      })} />,
+    );
+    const frame = lastFrame() ?? "";
+    expect(frame).toContain("Connect to AI");
+    expect(frame).toContain("Invalid API key");
+    expect(frame).not.toContain("required to play");
+  });
+
+  it("hides the Connect to AI CTA when the connection is healthy", () => {
     const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: true })} />);
-    // API Keys should not appear as a standalone item when key is valid
-    // (it's inside Settings instead)
-    expect(lastFrame()).not.toContain("API Keys");
+    // A healthy setup manages connections from Settings instead.
+    expect(lastFrame()).not.toContain("Connect to AI");
   });
 
   it("renders Settings menu item", () => {
@@ -175,43 +195,52 @@ describe("MainMenuPhase", () => {
     expect(lastFrame()).toContain("Add Content");
   });
 
-  it("blocks New Campaign when apiKeyValid is false", () => {
+  it("blocks New Campaign when apiKeyValid is false", async () => {
     const onNewCampaign = vi.fn();
-    const { stdin } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />);
-    // First item is New Campaign — pressing Enter should be blocked
+    const { stdin, lastFrame } = render(
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, onNewCampaign })} />,
+    );
+    const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
+    const DOWN = "[B";
+    // Move off the CTA onto the disabled New Campaign, then try to select it.
+    await vi.waitFor(() => {
+      if (!selected().includes("New Campaign")) stdin.write(DOWN);
+      expect(selected()).toContain("New Campaign");
+    });
     stdin.write("\r");
     expect(onNewCampaign).not.toHaveBeenCalled();
   });
 
-  it("shows a 'Requires a valid API key' hint when items are disabled", () => {
+  it("shows a 'Requires an AI connection' hint when items are disabled", () => {
     const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
-    expect(lastFrame()).toContain("Requires a valid API key");
+    expect(lastFrame()).toContain("Requires an AI connection");
   });
 
-  it("does not show the disabled hint when the API key is valid", () => {
+  it("does not show the disabled hint when the connection is healthy", () => {
     const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: true })} />);
-    expect(lastFrame()).not.toContain("Requires a valid API key");
+    expect(lastFrame()).not.toContain("Requires an AI connection");
   });
 
-  it("defaults the caret to API Keys in no-connection mode (#713)", () => {
+  it("defaults the caret to the Connect to AI CTA in no-connection mode (#713)", () => {
     // The disabled "New Campaign" is a dead first stop; the caret should land
     // on the one actionable item instead.
     const { lastFrame } = render(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
     const selected = (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
-    expect(selected).toContain("API Keys");
+    expect(selected).toContain("Connect to AI");
   });
 
-  it("defaults the caret to API Keys past Continue Campaign / Add Content (#713)", () => {
-    // The initial index must track the menu build order — with campaigns and
-    // dev mode both present, API Keys sits below those extra items.
+  it("leads the menu with the CTA even with campaigns and dev mode present (#713)", () => {
     const props = defaultProps({
       apiKeyValid: false,
       campaigns: [{ name: "X", path: "/x" }],
       devModeEnabled: true,
     });
     const { lastFrame } = render(<MainMenuPhase {...props} />);
-    const selected = (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
-    expect(selected).toContain("API Keys");
+    const frame = lastFrame() ?? "";
+    const selected = frame.split("\n").find((l) => l.includes("◆")) ?? "";
+    expect(selected).toContain("Connect to AI");
+    // CTA renders above New Campaign — it's the first item, not an appendix.
+    expect(frame.indexOf("Connect to AI")).toBeLessThan(frame.indexOf("New Campaign"));
   });
 
   it("keeps the default caret on New Campaign when the API key is valid (#713)", () => {
@@ -220,16 +249,16 @@ describe("MainMenuPhase", () => {
     expect(selected).toContain("New Campaign");
   });
 
-  it("selects API Keys with Enter on the default caret in no-connection mode (#713)", () => {
-    const onSettingsApiKeys = vi.fn();
+  it("selects the CTA with Enter on the default caret in no-connection mode (#713)", () => {
+    const onConnectToAI = vi.fn();
     const { stdin } = render(
-      <MainMenuPhase {...defaultProps({ apiKeyValid: false, onSettingsApiKeys })} />,
+      <MainMenuPhase {...defaultProps({ apiKeyValid: false, onConnectToAI })} />,
     );
-    stdin.write("\r"); // Enter on the default (API Keys) item
-    expect(onSettingsApiKeys).toHaveBeenCalled();
+    stdin.write("\r"); // Enter on the default (Connect to AI) item
+    expect(onConnectToAI).toHaveBeenCalled();
   });
 
-  it("moves the caret to API Keys when apiKeyValid flips false after mount (#713)", async () => {
+  it("moves the caret to the CTA when apiKeyValid flips false after mount (#713)", async () => {
     // The real launch path mounts the menu with apiKeyValid=true (optimistic
     // default) and only flips it false once the async connection health check
     // resolves. The caret must follow the mode change, not stay stranded on
@@ -240,28 +269,28 @@ describe("MainMenuPhase", () => {
     const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
     expect(selected()).toContain("New Campaign");
     rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false })} />);
-    await vi.waitFor(() => expect(selected()).toContain("API Keys"), CARET_SETTLE);
+    await vi.waitFor(() => expect(selected()).toContain("Connect to AI"), CARET_SETTLE);
   });
 
-  it("tracks the shifting API Keys index when devModeEnabled loads late (#713)", async () => {
-    // devModeEnabled also arrives async (getMachineSettings), inserting
-    // "Add Content" above API Keys. The default caret must re-resolve to the
-    // new API Keys position, not point one row off.
+  it("keeps the caret on the CTA when devModeEnabled loads late (#713)", async () => {
+    // devModeEnabled arrives async (getMachineSettings), inserting
+    // "Add Content" into the menu. The default caret must stay resolved to
+    // the CTA, not point one row off.
     const { rerender, lastFrame } = render(
       <MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: false })} />,
     );
     const selected = () => (lastFrame() ?? "").split("\n").find((l) => l.includes("◆")) ?? "";
-    await vi.waitFor(() => expect(selected()).toContain("API Keys"), CARET_SETTLE);
+    await vi.waitFor(() => expect(selected()).toContain("Connect to AI"), CARET_SETTLE);
     rerender(<MainMenuPhase {...defaultProps({ apiKeyValid: false, devModeEnabled: true })} />);
     await vi.waitFor(() => {
-      expect(selected()).toContain("API Keys");
+      expect(selected()).toContain("Connect to AI");
       expect(selected()).not.toContain("Add Content");
     }, CARET_SETTLE);
   });
 
   it("does not yank the caret away once the player has navigated (#713)", async () => {
     // If the player has already moved the caret, a late apiKeyValid flip must
-    // respect their choice rather than snapping back to API Keys.
+    // respect their choice rather than snapping back to the CTA.
     const props = defaultProps({ apiKeyValid: true, campaigns: [{ name: "X", path: "/x" }] });
     const { stdin, rerender, lastFrame } = render(<MainMenuPhase {...props} />);
     const frame = () => lastFrame() ?? "";
@@ -277,7 +306,7 @@ describe("MainMenuPhase", () => {
       <MainMenuPhase {...defaultProps({ apiKeyValid: false, campaigns: [{ name: "X", path: "/x" }] })} />,
     );
     await vi.waitFor(() => {
-      expect(frame()).toContain("API Keys"); // item now present…
+      expect(frame()).toContain("Connect to AI"); // CTA now present…
       expect(selected()).toContain("Continue Campaign"); // …but caret unmoved
     }, CARET_SETTLE);
   });
@@ -385,7 +414,7 @@ describe("MainMenuPhase", () => {
     const frame = lastFrame()!;
     // New Campaign, Continue Campaign, Add Content are all disabled — the hint
     // should appear once total, not once per disabled item.
-    const matches = frame.match(/Requires a valid API key/g) ?? [];
+    const matches = frame.match(/Requires an AI connection/g) ?? [];
     expect(matches.length).toBe(1);
   });
 

@@ -60,7 +60,7 @@ The main menu uses the full themed frame (same border components as the playing 
 
 "Continue Campaign" only appears in the main menu when at least one campaign exists.
 
-**No-connection mode.** When no valid API connection exists, an **API Keys** item appears in the menu (colored yellow, linking to Settings → API Keys) and the API-dependent items ("New Campaign", "Continue Campaign", "Add Content") are disabled with a "Requires a valid API key" hint. In this mode the default caret opens on **API Keys** rather than the disabled "New Campaign" — it points the player straight at the one required next step. Once a connection is valid the API Keys item disappears and the caret defaults to "New Campaign" as usual.
+**No-connection mode.** When no working AI connection exists, a **Connect to AI** call-to-action leads the menu (accent-colored with "required to play" on first run; yellow with the health-check message when a configured connection is broken) and the AI-dependent items ("New Campaign", "Continue Campaign", "Add Content") are disabled with a "Requires an AI connection" hint. The CTA opens the Connect to AI wizard directly (see [tui-design.md](tui-design.md#connect-to-ai-phasesconnections)), and the default caret opens on it rather than the disabled "New Campaign" — it points the player straight at the one required next step. Once a connection is healthy the CTA disappears and the caret defaults to "New Campaign" as usual.
 
 Returning from a game via "Save & Exit" or "End Session" runs teardown (graceful shutdown + cache reset) and transitions back to this menu.
 
@@ -123,7 +123,7 @@ Conversational flow — the agent asks about each topic one or two at a time:
 
 The player brings their own premise and the agent builds the campaign from scratch — no bundled seed. The agent warns the player up front that this takes a few minutes, then constructs the world against the shared campaign-construction craft (the [`CampaignConstruction`](../packages/engine/src/prompts/include/CampaignConstruction.md) prompt include — the same design bars documented in [seed-authoring.md](seed-authoring.md), issue #725). Because there is no seed, there are no forks: wherever a seed would branch, the agent just asks the player and commits the one path. Everything it builds routes into the finalize free-form fields — the DM-facing world (place, location skeleton, cast, mystery shape and reveal order, pacing) into `campaign_detail`, turn one into `opening_scene`, the player's own words and tone into `handoff_note`. No `world_slug`/`fork_selections` are emitted, so Step 3's seed-materialization (below) is skipped; the DM grows entities on demand from the `campaign_detail` brief. The player can also drop into this path implicitly by free-form describing a game at any point.
 
-All paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation.
+All paths include a mandatory pre-finalize review where the agent reads back the full configuration and gets explicit confirmation. The engine also validates the core `finalize_setup` handoff fields before scaffolding (campaign identity, DM personality, player name, character name, character concept, and the DM handoff note). If a provider emits a partial tool object or a malformed personality name, setup returns a tool error naming the missing or invalid field and lets the agent repair only that part of the call while retaining the accepted fields; it never turns an incomplete handoff into the fallback `Player` / `Adventurer` / `The Unknown` campaign identity or starts the DM without the player's setup context.
 
 ### Step 3: World Setup (behind the scenes)
 
@@ -199,7 +199,7 @@ The setup agent reports every resolution in `finalize_setup.fork_selections` (`f
 
 ## DM Personalities
 
-The player picks a DM personality during setup — like choosing a narrator in Rimworld. Under the hood, this swaps a personality block into the DM's system prompt. The core DM prompt (role, rules, tool usage) stays the same; the personality block adjusts voice, pacing preferences, and storytelling tendencies.
+The player picks a DM personality during setup — like choosing a narrator in Rimworld. Whenever the setup agent presents personality choices, The Chronicler is always the first option. Under the hood, this swaps a personality block into the DM's system prompt. The core DM prompt (role, rules, tool usage) stays the same; the personality block adjusts voice, pacing preferences, and storytelling tendencies.
 
 Personalities are stored as short prompt fragments shipped with the app. Each is ~100-200 tokens — cheap enough to include in the cached prefix with no meaningful cost impact.
 

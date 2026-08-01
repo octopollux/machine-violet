@@ -48,6 +48,7 @@ const PROVIDERS: ProviderContract[] = [
   { name: "anthropic" },        // wired below — body filled out after mocks
   { name: "openai-apikey" },    // wired below
   { name: "openrouter", unsupportedReason: "shares the Responses-API path with openai-apikey; covered by that entry" },
+  { name: "xai", unsupportedReason: "shares the Responses-API reasoning path with openai-apikey; covered by that entry" },
   { name: "custom", unsupportedReason: "Chat Completions API has no opaque reasoning blob; see openai.ts comment" },
   {
     name: "openai-chatgpt",

@@ -1,20 +1,87 @@
-# openai.ts Provider (openai-apikey and openrouter)
+# openai.ts Provider (OpenAI, OpenRouter, xAI, and custom)
 
-The `openai.ts` adapter (`packages/engine/src/providers/openai.ts`) handles the `openai-apikey` and `openrouter` connection types, plus any `custom` OpenAI-compatible endpoint. It wraps the official OpenAI SDK and talks directly to `api.openai.com`, `openrouter.ai`, or a local server. It is distinct from the `openai-chatgpt` provider (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md)), which drives the Codex app-server subprocess over JSON-RPC for ChatGPT-account auth.
+The `openai.ts` adapter (`packages/engine/src/providers/openai.ts`) handles the `openai-apikey`, `openrouter`, and `xai` connection types, plus any `custom` OpenAI-compatible endpoint. It wraps the official OpenAI SDK and talks directly to `api.openai.com`, `openrouter.ai`, `api.x.ai`, or a local server. It is distinct from the `openai-chatgpt` provider (see [openai-chatgpt-provider.md](openai-chatgpt-provider.md)), which drives the Codex app-server subprocess over JSON-RPC for ChatGPT-account auth.
 
 The adapter owns format translation between the engine's normalized message shape and OpenAI's wire formats: `tool_calls` carry `function.arguments` as a JSON string (vs Anthropic's parsed object), streaming events differ per API, and reasoning tokens and automatic prefix caching are handled per path.
+
+## Shipped OpenAI models
+
+`packages/engine/src/config/known-models.json` is the source of truth for the
+selectable OpenAI catalog. Both API-key and ChatGPT connections default to the
+current GPT-5.6 family: Sol for the large tier, Terra for medium, and Luna for
+small. GPT-5.5, GPT-5.5 Pro, the GPT-5.4 family (including mini and nano), and
+the retained GPT-5/4o models remain selectable with their published context,
+output, pricing, and capability metadata.
+
+GPT-5.5 Pro does not expose SSE streaming. When selected, `stream()` falls
+back to one non-streaming Responses request and emits the completed text as a
+single delta, so the engine-facing provider contract still works.
+
+The GPT-5.6 family supports a distinct `max` reasoning level. The normalized
+Machine Violet `max` effort maps to API `max` for `gpt-5.6*`; older models and
+compatible endpoints receive `xhigh`, preserving their supported ceiling.
+
+## OpenRouter environment connection
+
+At startup, `OPENROUTER_API_KEY` creates an `env-openrouter` connection with
+the shipped model list and tier defaults. Like the Anthropic and OpenAI
+environment connections, it is rebuilt from the process environment on every
+load, cannot be deleted in the UI, and is filtered out of `connections.json` so
+the key is never persisted there.
+
+## OpenRouter model support
+
+The shipped OpenRouter model is `moonshotai/kimi-k3`, selected for every tier.
+As of the 2026-07-24 validation:
+
+- Moonshot released Kimi K3 on 2026-07-16 as its flagship generalist for
+  long-horizon coding, knowledge work, reasoning, and agent orchestration.
+- OpenRouter serves the exact slug with a 1,048,576-token context at $3 / $15
+  per million input/output tokens.
+- A live adapter probe completed a function-tool call and result round trip, a
+  streamed response, and a 305,114-input-token request.
+- Kimi K3 accepts text and image input but emits text only. It does **not**
+  provide image generation, so Machine Violet does not register
+  `generate_image` for an OpenRouter-backed Kimi K3 session.
+
+The last-two-week comparison also included three newer OpenRouter arrivals. All
+three passed live tool-call and streaming probes, but they are poorer defaults
+for a general-purpose tabletop DM:
+
+- `poolside/laguna-s-2.1` (OpenRouter 2026-07-21) is the newest and cheapest,
+  but Poolside positions it specifically as a coding-agent model.
+- `meituan/longcat-2.0` (OpenRouter 2026-07-20) targets coding, repository
+  changes, and long-horizon problem solving rather than creative general use.
+- `thinkingmachines/inkling` (OpenRouter 2026-07-17) is a strong multimodal
+  generalist, but its published capability results trail Kimi's current
+  flagship on key reasoning and agentic measures.
+
+Kimi K3 therefore wins on task fit and frontier capability rather than merely
+the latest catalog timestamp. Sources:
+[Moonshot Kimi K3 release](https://www.kimi.com/code/docs/en/kimi-code/whats-new.html#kimi-k3-july-16-2026),
+[Moonshot product overview](https://www.moonshot.ai/),
+[Poolside Laguna S 2.1 model card](https://huggingface.co/poolside/Laguna-S-2.1),
+[Meituan LongCat 2.0 model card](https://huggingface.co/meituan-longcat/LongCat-2.0),
+[Thinking Machines Inkling release](https://thinkingmachines.ai/news/introducing-inkling/),
+and [OpenRouter live model metadata](https://openrouter.ai/api/v1/models/moonshotai/kimi-k3/endpoints).
 
 ## Responses API vs Chat Completions routing
 
 A single set drives the routing decision:
 
 ```ts
-const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter"]);
+const RESPONSES_API_PROVIDERS = new Set(["openai-apikey", "openrouter", "xai"]);
 ```
 
-`useResponsesAPI(providerId)` returns true for `openai-apikey` and `openrouter`, and the provider routes those through `client.responses.*` (the OpenAI Responses API). For any other provider id — i.e. `custom` OpenAI-compatible endpoints such as Ollama, vLLM, or llama.cpp — it returns false and the provider falls back to `client.chat.completions.*` (the Chat Completions API), which custom endpoints are assumed to implement. The routing gate is consulted in `chat()`/`stream()` dispatch and again in `healthCheck()`, which probes whichever API the provider would actually use.
+`useResponsesAPI(providerId)` returns true for `openai-apikey`, `openrouter`, and `xai`, and the provider routes those through `client.responses.*` (the OpenAI Responses API). xAI officially documents both Responses and Chat Completions and publishes JavaScript examples with the OpenAI SDK pointed at `https://api.x.ai/v1`; Responses is the richer match for MV's reasoning replay. For any other provider id — i.e. `custom` OpenAI-compatible endpoints such as Ollama, vLLM, or llama.cpp — the gate returns false and the provider falls back to `client.chat.completions.*`. The routing gate is consulted in `chat()`/`stream()` dispatch and again in `healthCheck()`.
 
-The same gate also decides image-generation capability: `generateImage` is only wired (and `getCapabilities().imageGeneration` only true) on the Responses API path, because the Chat Completions fallback has no Images API equivalent. See [image-generation.md](image-generation.md) for the image pipeline itself.
+Responses routing and image routing are deliberately separate. `generateImage`
+is wired only for `openai-apikey` and `xai`; the OpenAI implementation targets
+the Images API and defaults to `gpt-image-2`, while xAI targets Grok Imagine.
+Both honor a provider-native explicit image assignment. OpenRouter uses the Responses API for chat but does
+not inherit OpenAI image support; its shipped Kimi K3 model has text-only
+output. Custom Chat Completions endpoints likewise have no guaranteed Images
+API. See [image-generation.md](image-generation.md) for the image pipeline.
 
 ## Streaming reasoning: SDK accumulator bug workaround
 
@@ -33,7 +100,7 @@ Every Responses API call sets `store: false` — no server-side thread storage. 
 
 When a turn requests any reasoning effort (`params.thinking.effort`), `toResponsesParams` adds both:
 
-- `reasoning: { effort, summary: "concise" }` — the effort string maps the engine's `low`/`medium`/`high`/`max` to OpenAI's `low`/`medium`/`high`/`xhigh`.
+- `reasoning: { effort, summary: "concise" }` — the effort string maps the engine's `low`/`medium`/`high`/`max` to OpenAI's `low`/`medium`/`high`/`xhigh`. Grok 4.5 documents only `low`/`medium`/`high`, so the xAI path clamps MV's provider-neutral `max` to `high`.
 - `include: ["reasoning.encrypted_content"]` — opts into the opaque per-reasoning-item encrypted blob.
 
 The blob is what makes reasoning survive across turns under `store: false`. Without it, a `store: false` session restarts cold every turn; the observed symptom is the model re-deriving its tool inventory and role ("do I have roll_dice, am I the DM?") deep into a campaign. The blobs are opaque to the engine — they are persisted as `reasoning` ContentParts on the assistant message and replayed on the next turn. The human-readable summary text surfaces separately via `thinkingText`.
@@ -52,9 +119,21 @@ This same encrypted-blob round-trip is used by the `openai-chatgpt` provider via
 
 The Chat Completions fallback (custom OpenAI-compatible endpoints) supports tool calls, streaming, and reasoning-effort hints (via the flat `reasoning_effort` parameter), but **cannot** preserve reasoning across turns. The Chat Completions API has no encrypted-blob equivalent that the model accepts back on subsequent turns; vendor-specific reasoning fields (DeepSeek's `reasoning_content`, Ollama's `thinking`, etc.) are display-only with no round-trip contract. Each turn's reasoning is re-derived from history on this path. This is an upstream API limitation, not an adapter gap.
 
-## Image generation: text-to-image, image-to-image, and retry
+## xAI compatibility and Grok Imagine
 
-`generateImage` (Responses-API providers only) pins `gpt-image-2`. With no reference images it calls `client.images.generate` (text-to-image). When the caller supplies `referenceImages` — the DM naming `reference_characters`, or `update_portrait` conditioning on the character's current portrait — the adapter switches to `client.images.edit`: each portrait's base64 is turned into an `Uploadable` via `toFile` and passed as the `image` array, conditioning the render on them (image-to-image). The shared reference directive (`buildReferenceDirective`, `packages/engine/src/providers/image-reference-directive.ts`) is appended to the prompt so the edit takes identity from the reference but pose/expression/setting from the description — this brings the API-key path to parity with the codex path's reference conditioning (see [image-generation.md](image-generation.md), Reference conditioning). Without it, `update_portrait` on this provider would render an unrelated character rather than revising the existing one.
+xAI support is temporarily hidden from connection discovery and the Connect to AI wizard under [#749](https://github.com/octopollux/machine-violet/issues/749). Direct Grok 4.5 Responses API probes reproduced schema-valid but semantically corrupted setup handoffs, so `XAI_API_KEY` and saved xAI connections remain dormant until a Grok 4.6 reliability retest. The implementation is retained: the factory supplies `https://api.x.ai/v1`; the catalog contains `grok-4.5`, `grok-4.3`, `grok-build-0.1`, and the three Grok 4.20 variants; and a `conversationId` becomes xAI's `prompt_cache_key`.
+
+Grok Imagine is deliberately provider-paired: an xAI-backed large tier renders through xAI, never OpenAI. `XAI_IMAGE_MODELS` centralizes the current slugs (`grok-imagine-image`, `grok-imagine-image-quality`). `GenerateImageRequest.imageModel` carries the optional explicit assignment from the connection store; when absent, draft/standard choose the standard model at 1K, quality chooses the quality model at 1K, and showcase chooses quality at 2K. An explicit assignment pins that model while effort still controls resolution. Aspect maps to `1:1`, `2:3`, or `3:2`.
+
+Text-to-image and image editing use JSON with `response_format: "b64_json"`. This distinction is load-bearing: xAI [explicitly says the OpenAI SDK's multipart `images.edit()` is unsupported](https://docs.x.ai/developers/model-capabilities/images/editing), so reference portraits are sent to `/images/edits` as base64 data URIs via the SDK's authenticated low-level `post`. A single-reference edit follows the source image's aspect ratio; multi-image edits honor `aspect_ratio`. Both use the shared identity/reference directive.
+
+Grok's reasoning items remain separate from ordinary `output_text`, but the model can still emit operational self-talk as ordinary text immediately before a function call. The provider loop therefore buffers each xAI round until its final shape is known: text attached to a tool-call round is omitted from the player-visible stream and stored history, while the final text-only narration is released canonically. This prevents planning phrases such as “Opening on…” from leaking into gameplay transcripts and avoids concatenating pre-tool fragments directly onto the post-tool narration. A nominally successful xAI response that contains reasoning but no tool call or final text is retried twice before surfacing an error, rather than being accepted as an empty gameplay turn.
+
+Primary references: [Grok 4.5](https://docs.x.ai/developers/grok-4-5), [models](https://docs.x.ai/developers/models), [streaming](https://docs.x.ai/developers/model-capabilities/text/streaming), [function calling](https://docs.x.ai/developers/tools/function-calling), and [image generation](https://docs.x.ai/developers/model-capabilities/images/generation). Live validation on 2026-07-24 proved health, a structured function call, base64 image generation, and JSON reference editing against the real API.
+
+## OpenAI image generation: text-to-image, image-to-image, and retry
+
+`generateImage` on `openai-apikey` defaults to `gpt-image-2` and honors `GenerateImageRequest.imageModel` when an explicit Large-paired selection is configured. With no reference images it calls `client.images.generate` (text-to-image). When the caller supplies `referenceImages` — the DM naming `reference_characters`, or `update_portrait` conditioning on the character's current portrait — the adapter switches to `client.images.edit`: each portrait's base64 is turned into an `Uploadable` via `toFile` and passed as the `image` array, conditioning the render on them (image-to-image). The shared reference directive (`buildReferenceDirective`, `packages/engine/src/providers/image-reference-directive.ts`) is appended to the prompt so the edit takes identity from the reference but pose/expression/setting from the description — this brings the API-key path to parity with the codex path's reference conditioning (see [image-generation.md](image-generation.md), Reference conditioning). Without it, `update_portrait` on this provider would render an unrelated character rather than revising the existing one.
 
 A 200 response carrying no image bytes is treated as transient and retried up to 3 attempts (mirroring the codex path's empty-render retry); a thrown error is terminal, since the SDK already retries transient network / 5xx on its own.
 

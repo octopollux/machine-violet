@@ -85,8 +85,8 @@ async function anthropicChat(
   // API can pinpoint cache divergence. Sent on every call when the caller
   // supplied a conversationId; `null` on the first call of a fresh chain
   // (per Anthropic docs, that's the opt-in signal — no comparison, but
-  // future turns can compare against this one). The SDK at 0.82.0 doesn't
-  // type `diagnostics` yet, so we attach it as an untyped extension.
+  // future turns can compare against this one). The stable SDK doesn't type
+  // the beta `diagnostics` request field, so attach it as an extension.
   const convoId = params.conversationId;
   const diagnosticsParams = convoId !== undefined
     ? { diagnostics: { previous_message_id: previousIdByConversation.get(convoId) ?? null } }
@@ -99,8 +99,8 @@ async function anthropicChat(
 
   let response: Anthropic.Message;
 
-  // Extension fields (`diagnostics`, `betas`) aren't typed by SDK 0.82.0; we
-  // attach them via an unknown cast that resolves to the same shape the
+  // The beta `diagnostics` extension isn't typed by the stable SDK; attach it
+  // via an unknown cast that resolves to the same shape the
   // typed methods accept. `as unknown as ...` keeps the overload resolution
   // correctly disambiguating Message vs Stream return types.
   //
@@ -210,21 +210,31 @@ export function toAnthropicParams(params: ChatParams): {
     }
   }
 
-  // Thinking config — only enable for models that support it.
+  // Thinking config — only enable for models that support it. Fable 5 is a
+  // special case: adaptive thinking is always on and the API rejects
+  // `thinking: { type: "disabled" }`, so omit the field when the caller has
+  // no explicit effort. Other models, including Opus 5, retain Machine
+  // Violet's null=disabled behavior and omit output_config, so Opus 5 uses
+  // its high default. An explicit effort enables adaptive thinking and sends
+  // output_config; Opus 5 also accepts max effort in that adaptive path.
   const modelInfo = getKnownModel(params.model);
   const supportsThinking = modelInfo?.capabilities?.thinking ?? false;
-  const isOpus = params.model.includes("opus");
+  const alwaysAdaptiveThinking = modelInfo?.capabilities?.alwaysAdaptiveThinking === true;
   const effort = supportsThinking ? (params.thinking?.effort ?? null) : null;
-  const thinking: Anthropic.Messages.ThinkingConfigParam =
-    effort ? { type: "adaptive" } : { type: "disabled" };
+  const thinking: Anthropic.Messages.ThinkingConfigParam | undefined =
+    effort ? { type: "adaptive" }
+    : alwaysAdaptiveThinking ? undefined
+    : { type: "disabled" };
   const output_config: Anthropic.Messages.OutputConfig | undefined =
-    effort && isOpus ? { effort } : undefined;
+    effort ? { effort } : undefined;
 
   // When thinking is enabled, max_tokens must cover BOTH thinking and
   // response tokens. Boost to the model's max output so thinking doesn't
   // starve the actual response (especially on turn 1 with heavy tool use).
+  // Always-adaptive models need the same headroom even without an explicit
+  // effort override.
   let maxTokens = params.maxTokens;
-  if (effort) {
+  if (effort || alwaysAdaptiveThinking) {
     const modelMax = modelInfo?.maxOutput ?? 16384;
     maxTokens = Math.max(maxTokens, modelMax);
   }
@@ -283,7 +293,7 @@ export function toAnthropicParams(params: ChatParams): {
     system,
     messages,
     ...(tools ? { tools } : {}),
-    thinking,
+    ...(thinking ? { thinking } : {}),
     ...(output_config ? { output_config } : {}),
   };
 }

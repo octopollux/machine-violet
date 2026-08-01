@@ -1,6 +1,7 @@
 import type { ModelId, UsageStats } from "./agent-loop.js";
 import { runProviderLoop } from "../providers/agent-loop-bridge.js";
 import type { LLMProvider, NormalizedTool, SystemBlock } from "../providers/types.js";
+import type { ToolInputPolicy } from "./tool-contract.js";
 
 // --- Types ---
 
@@ -21,6 +22,8 @@ export interface SubagentConfig {
   tools?: NormalizedTool[];
   /** Tool handler for subagent tool calls (may be async for I/O-bound tools) */
   toolHandler?: (name: string, input: Record<string, unknown>) => { content: string; is_error?: boolean } | Promise<{ content: string; is_error?: boolean }>;
+  /** Consequence and repair/refinement policy for each advertised tool. */
+  toolInputPolicies?: Readonly<Record<string, ToolInputPolicy>>;
   /** Max tool-use rounds before cutting off */
   maxToolRounds?: number;
   /** Stamp cache hints on tools (1h TTL) */
@@ -76,6 +79,7 @@ export async function spawnSubagent(
     stream: isStreaming,
     tools: config.tools,
     toolHandler: config.toolHandler,
+    toolInputPolicies: config.toolInputPolicies,
     cacheHints: config.cacheTools ? [{ target: "tools", ttl: "1h" }] : undefined,
     terseSuffix: true,
     onTextDelta: onStream,

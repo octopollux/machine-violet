@@ -121,7 +121,7 @@ Automatic git snapshots provide point-in-time rollback. API failures retry with 
 
 The DM is not an assistant — it runs a world. The system prompt establishes role (decide things, say no, let bad things happen, have secrets, surprise yourself), voice (personality via swappable DM personality fragments), and tool discipline (call the tool when state changes, delegate mechanical work to subagents).
 
-The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) (preamble) and [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) (`<roles>`, `<directives>`, `<tools>`, `<gameplay>`, `<About_NPCs>`, `<About_Pacing>`, `<formatting>` blocks), with a personality fragment slotted between. Read those files directly when working on prompt content — they are the source of truth.
+The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../packages/engine/src/prompts/dm-identity.md) (preamble) and [dm-directives.md](../packages/engine/src/prompts/dm-directives.md) (`<roles>`, `<directives>`, `<tools>`, `<gameplay>`, `<About_NPCs>`, `<About_Pacing>`, `<About_Mechanics>`, `<About_The_Table>`, `<formatting>` blocks), with a personality fragment slotted between. Read those files directly when working on prompt content — they are the source of truth.
 
 
 ## Implementation Constraints
@@ -149,6 +149,7 @@ The live prompt is split across [packages/engine/src/prompts/dm-identity.md](../
 | [TUI Design](tui-design.md) | Layout, themes, responsive design, DM formatting |
 | [OpenAI Provider](openai-provider.md) | `openai.ts` adapter: Responses API vs Chat Completions routing, streaming-reasoning workaround, encrypted-reasoning replay |
 | [Tools Catalog](tools-catalog.md) | Tools by domain, signatures, tiers |
+| [Tool Input Contracts](tool-input-contracts.md) | Executable schemas, criticality, repair-vs-reject policy, diagnostics, and regression tests |
 | [Subagents Catalog](subagents-catalog.md) | Subagent patterns, models, visibility |
 | [Development Plan](development-plan.md) | 10-phase implementation roadmap, dependency graph, testing strategy |
 | [State Atlas](state-atlas.md) | Runtime state schema, tool×state matrix, invariants, lifecycle |

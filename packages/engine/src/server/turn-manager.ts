@@ -13,7 +13,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type {
-  Turn, TurnContribution, ServerEvent,
+  Turn, TurnContribution, ServerEvent, TranscriptChoiceResponse,
 } from "@machine-violet/shared";
 
 export class TurnManager {
@@ -69,7 +69,7 @@ export class TurnManager {
     playerId: string,
     text: string,
     source: "client" | "engine" = "client",
-    options: { fromChoice?: boolean } = {},
+    options: { fromChoice?: boolean; choiceResponse?: TranscriptChoiceResponse } = {},
   ): TurnContribution {
     const turn = this.currentTurn;
     if (!turn || turn.status !== "open") {
@@ -95,6 +95,7 @@ export class TurnManager {
       text,
       amendment,
       ...(options.fromChoice ? { fromChoice: true } : {}),
+      ...(options.choiceResponse ? { choiceResponse: options.choiceResponse } : {}),
     };
 
     turn.contributions.push(contribution);

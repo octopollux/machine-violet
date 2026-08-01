@@ -25,6 +25,7 @@ The game loop, state management, and AI session handling.
 | `deferred-work.ts` | `DeferredWork` registry — detached background lanes (scribe, scene-tracker) flushed at consistency barriers via `settle()`; blocked settles emit `barrier_wait` spans |
 | `agent-loop.ts` | Single-turn conversation loop: streaming, tool handling, usage |
 | `tool-registry.ts` | All tool definitions + `TOOL_STATE_MAP` + dispatch |
+| `tool-contract.ts` | Shared TypeBox/Ajv tool-input boundary: allowlisted repair, structural + semantic validation, criticality, retryable failures, and structured diagnostics |
 | `scene-manager.ts` | `SceneState`, transitions, pending operations, precis updates |
 | `dm-prompt.ts` | `DMSessionState`, system prompt builder, active state formatting |
 | `setup-agent.ts` | Campaign initialization wizard (delegates to setup-conversation subagent) |
@@ -95,14 +96,15 @@ Token tracking, conversation window, prompt caching, state persistence.
 
 ## Engine: providers/ — LLM Provider Adapters
 
-Abstract provider layer: normalizes Anthropic, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
+Abstract provider layer: normalizes Anthropic, Gemini, OpenAI (API key), OpenAI ChatGPT (Codex), OpenRouter, xAI, and custom Chat-Completions endpoints behind a single `LLMProvider` interface. All model calls in the engine go through this layer.
 
 | File | Purpose |
 |---|---|
 | `index.ts` | `createProviderFromConnection()` — factory that constructs the right provider from a stored `AIConnection` record |
 | `types.ts` | `LLMProvider` and `TierProvider` interfaces, `ChatParams`, `GenerateImageRequest`/`GenerateImageResult`, `ImageEffort` (`draft`/`standard`/`quality`/`showcase`), `ImageAspect` (`portrait`/`landscape`/`square`) |
 | `anthropic.ts` | `createAnthropicProvider()` — Anthropic SDK adapter; streaming, tool use, prompt caching, thinking blocks, rate-limit usage tracking (`anthropic-ratelimit-*` response headers → `getUsageStatus()`) |
-| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, image generation (text-to-image + `images.edit` reference conditioning + empty-render retry), rate-limit usage tracking (`x-ratelimit-*` response headers → `getUsageStatus()`) — see [openai-provider.md](openai-provider.md) |
+| `gemini.ts` | `createGeminiProvider()` — official `@google/genai` Interactions adapter; stateless thought/signature replay, SSE streaming, function tools, usage normalization, and paired Nano Banana 2 image generation/editing — see [gemini-provider.md](gemini-provider.md) |
+| `openai.ts` | `createOpenAIProvider()` — `openai-apikey` / `openrouter` / `xai` / `custom` adapter; Responses API vs Chat Completions routing, streaming, tool use, OpenAI + Grok Imagine generation/editing, and rate-limit tracking — see [openai-provider.md](openai-provider.md) |
 | `agent-loop-bridge.ts` | `runProviderLoop()` — provider-agnostic version of the agent turn loop: concurrent tool dispatch, TUI broadcast, deferred-sentinel logic, `cacheHints` for tool-definition cache_control. Returns normalized (not Anthropic-specific) types |
 | `image-reference-directive.ts` | `buildReferenceDirective()` — the shared "match the reference for identity, take pose/expression from the description" text appended to a reference-conditioned image prompt; used by both the `openai` (`images.edit`) and `openai-chatgpt` (codex) backends |
 | `orphan-patch.ts` | Heals conversation history with orphaned `tool_use` blocks by inserting deterministic synthetic `tool_result` stubs before replay 400s — see [error-recovery.md](error-recovery.md) |
@@ -143,9 +145,9 @@ Model selection, campaign init, DM personalities, campaign seeds.
 | File | Purpose |
 |---|---|
 | `models.ts` | `getModel("large" \| "medium" \| "small")` — tier model selection (cached; tests need `loadModelConfig({ reset: true })`) |
-| `connections.ts` | Multi-provider connection management: load/save/add/remove connections, tier assignments. Supports Anthropic, OpenAI, OpenRouter, custom providers. Persists to `connections.json` |
+| `connections.ts` | Multi-provider connection management: load/save/add/remove connections, text-tier assignments, and the optional exact-Large-paired image assignment. Persists to `connections.json` |
 | `discord.ts` | Discord integration settings: enabled/disabled state persisted to `discord-settings.json` (on by default) |
-| `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Pricing, capabilities, context windows, tier defaults per provider |
+| `model-registry.ts` | Dynamic model registry: shipped `known-models.json` merged with user `model-overrides.json`. Separate text `models` and selectable `imageModels`, plus pricing, capabilities, context windows, and tier defaults per provider |
 | `personality-loader.ts` | `loadAllPersonalities()`, `getPersonality()` — loads `.mvdm` DM personality files from `personalities/` (bundled, strict) and `~/.machine-violet/personalities/` (user, lenient) |
 | `seeds.ts` | `SEEDS`, `seedsForGenre()` — campaign premise seeds by genre |
 | `first-launch.ts` | `.env` loading, config paths, API key format validation |
@@ -186,7 +188,7 @@ PDF ingestion and content processing. **Completely separate from the rest of the
 
 ## Client: phases/ — App Lifecycle
 
-State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). The main menu also branches into settings and its sub-phases (api_keys, discord_settings, archived_campaigns). On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
+State machine for the application: main menu → playing (setup or gameplay) / add content → returning_to_menu → main menu (loop). Out-of-game screens above the main menu are a push/pop stack (settings, connections / connections_wizard, discord_settings, archived_campaigns) — Esc pops one level. On first launch, config.json is auto-created with defaults. Setup runs as a pseudo-campaign session inside PlayingPhase (SetupPhase was removed in #311).
 
 | File | Purpose |
 |---|---|
@@ -194,8 +196,8 @@ State machine for the application: main menu → playing (setup or gameplay) / a
 | `ArchivedCampaignsPhase.tsx` | List archived campaign zips with dates, select to unarchive |
 | `AddContentPhase.tsx` | PDF import flow: name collection → drop files → validate → extract → cache |
 | `PlayingPhase.tsx` | Main game loop — handles both gameplay and setup (setup runs as a pseudo-campaign session) |
-| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Five items: API Keys (→ ConnectionsPhase), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
-| `ConnectionsPhase.tsx` | Full-screen AI provider management wizard (title: "AI Connections"). Sub-screens: Connections list (health indicators, per-connection usage segments, R = recheck / D = delete), Model Assignments (large/medium/small tier picker), Add Connection wizard (provider → API key → label → optional base URL), Sign in with ChatGPT (OAuth via codex app-server) |
+| `SettingsPhase.tsx` | Full-screen out-of-game Settings menu (title: "Settings"). Six items: Connect to AI (→ connections area), Discord (→ DiscordSettingsPhase), Archived Campaigns (→ ArchivedCampaignsPhase), Export Diagnostics (inline status), Enable Dev Mode (ON/OFF toggle, persists via `setMachineSettings` to `machine-settings.json`), Show Debug Info (ON/OFF toggle for verbose narrative lines, session-scoped) |
+| `connections/` | The Connect to AI area (title: "Connect to AI"): `ConnectionsArea.tsx` (push/pop screen stack + data plumbing), `ConnectionsList.tsx` (list-first root: health glyphs, usage segments, in-use marker, add/advanced rows), `ConnectionDetail.tsx` (use/check/delete with confirm + env explanation), `ModelAssignments.tsx` (role-named tiers, `Auto (<model>)` defaults, pickers scoped to the in-use connection), `ConnectWizard.tsx` (provider picker with ChatGPT OAuth folded in and recommended, masked key entry, validate-on-submit), `ChatGptSignIn.tsx` (shared OAuth screen), `FixConnection.tsx` (in-place key re-entry for failed checks), `providers.ts` (provider display copy) |
 | `DiscordSettingsPhase.tsx` | Full-screen Discord Rich Presence Enable/Disable toggle (title: "Discord"). Saves the choice to `discord-settings.json`; ESC returns without saving |
 
 ## Engine: prompts/ — Prompt Templates

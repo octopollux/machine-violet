@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
 import { useInput, Text, useWindowSize } from "ink";
 import type { ResolvedTheme } from "../tui/themes/types.js";
-import { TerminalTooSmall, FullScreenFrame } from "../tui/components/index.js";
+import { TerminalTooSmall, FullScreenFrame, hintBar } from "../tui/components/index.js";
 import { MIN_COLUMNS, MIN_ROWS } from "../tui/responsive.js";
 import { themeColor } from "../tui/themes/color-resolve.js";
 import { APP_VERSION, RELEASE_DATE } from "../version.js";
@@ -10,15 +10,16 @@ const noop = () => { /* no-op */ };
 
 export interface SettingsPhaseProps {
   theme: ResolvedTheme;
-  /** When set, the phase immediately navigates to a sub-screen on mount. */
-  initialView?: "api_keys";
   devModeEnabled?: boolean;
   onToggleDevMode?: () => void;
   showVerbose?: boolean;
   onToggleVerbose?: () => void;
-  onApiKeys: () => void;
+  /** Open the Connect to AI area (connection list). */
+  onConnections: () => void;
   onDiscord: () => void;
   onArchivedCampaigns: () => void;
+  /** Export diagnostics and resolve with the saved bundle's absolute path. */
+  onExportDiagnostics: () => Promise<string>;
   onBack: () => void;
 }
 
@@ -31,35 +32,53 @@ interface MenuItem {
 
 export function SettingsPhase({
   theme,
-  initialView,
   devModeEnabled,
   onToggleDevMode,
   showVerbose,
   onToggleVerbose,
-  onApiKeys,
+  onConnections,
   onDiscord,
   onArchivedCampaigns,
+  onExportDiagnostics,
   onBack,
 }: SettingsPhaseProps) {
   const { columns: cols, rows: termRows } = useWindowSize();
   const [menuIndex, setMenuIndex] = useState(0);
-  const navigatedRef = useRef(false);
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<{
+    text: string;
+    error: boolean;
+  } | null>(null);
+  const diagnosticsBusyRef = useRef(false);
+
+  const exportDiagnostics = useCallback(() => {
+    // The ref is the synchronous guard: repeated Enter events can arrive
+    // before React commits state, so state alone would allow duplicate bundles.
+    if (diagnosticsBusyRef.current) return;
+    diagnosticsBusyRef.current = true;
+    setDiagnosticsStatus({ text: "Saving diagnostics…", error: false });
+    void onExportDiagnostics()
+      .then((path) => {
+        setDiagnosticsStatus({ text: `Diagnostics saved: ${path}`, error: false });
+      })
+      .catch((err: unknown) => {
+        const raw = err instanceof Error ? err.message : String(err);
+        const message = raw.replace(/\s+/g, " ").trim();
+        setDiagnosticsStatus({ text: `Diagnostics failed: ${message}`, error: true });
+      })
+      .finally(() => { diagnosticsBusyRef.current = false; });
+  }, [onExportDiagnostics]);
 
   const items: MenuItem[] = useMemo(() => [
-    { label: "API Keys", action: onApiKeys },
+    { label: "Connect to AI", action: onConnections },
     { label: "Discord", action: onDiscord },
     { label: "Archived Campaigns", action: onArchivedCampaigns },
+    { label: "Export Diagnostics", action: exportDiagnostics },
     { label: "Enable Dev Mode", toggle: devModeEnabled ?? false, action: onToggleDevMode ?? noop },
     { label: "Show Debug Info", toggle: showVerbose ?? false, action: onToggleVerbose ?? noop },
-  ], [onApiKeys, onDiscord, onArchivedCampaigns, devModeEnabled, onToggleDevMode, showVerbose, onToggleVerbose]);
-
-  // Deep-link: if initialView is set, navigate once on mount
-  useEffect(() => {
-    if (initialView === "api_keys" && !navigatedRef.current) {
-      navigatedRef.current = true;
-      onApiKeys();
-    }
-  }, [initialView, onApiKeys, onDiscord]);
+  ], [
+    onConnections, onDiscord, onArchivedCampaigns, exportDiagnostics,
+    devModeEnabled, onToggleDevMode, showVerbose, onToggleVerbose,
+  ]);
 
   useInput((_input, key) => {
     if (key.escape) {
@@ -105,6 +124,20 @@ export function SettingsPhase({
       </Text>,
     );
   }
+  if (diagnosticsStatus) {
+    menuLines.push(<Text key="diagnostics-spacer"> </Text>);
+    menuLines.push(
+      <Text key="diagnostics-status" color={diagnosticsStatus.error ? "red" : dimColor}>
+        {diagnosticsStatus.text}
+      </Text>,
+    );
+  }
+  menuLines.push(<Text key="hint-spacer"> </Text>);
+  menuLines.push(
+    <Text key="hints" color={dimColor}>
+      {hintBar("↑↓ select", "Enter open", "Esc back")}
+    </Text>,
+  );
 
   const versionLabel = RELEASE_DATE
     ? `v${APP_VERSION} · released ${RELEASE_DATE} UTC`

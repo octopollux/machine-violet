@@ -4,6 +4,7 @@
 import type { AIConnection } from "../config/connections.js";
 import type { LLMProvider } from "./types.js";
 import { createAnthropicProvider } from "./anthropic.js";
+import { createGeminiProvider } from "./gemini.js";
 import { createOpenAIProvider } from "./openai.js";
 import { createOpenAIChatGptProvider, createConnectionTokenStore, allocateCodexHome, sweepStaleCodexHomesOnce } from "./openai-chatgpt/index.js";
 
@@ -15,6 +16,7 @@ export type {
 } from "./types.js";
 
 export { createAnthropicProvider } from "./anthropic.js";
+export { createGeminiProvider, DEFAULT_GEMINI_IMAGE_MODEL } from "./gemini.js";
 export { createOpenAIProvider } from "./openai.js";
 export type { OpenAIProviderOptions } from "./openai.js";
 export {
@@ -49,6 +51,9 @@ export function createProviderFromConnection(conn: AIConnection, opts: CreatePro
     case "anthropic":
       return createAnthropicProvider(conn.apiKey);
 
+    case "gemini":
+      return createGeminiProvider(conn.apiKey);
+
     case "openai-apikey":
       return createOpenAIProvider({
         apiKey: conn.apiKey,
@@ -64,6 +69,13 @@ export function createProviderFromConnection(conn: AIConnection, opts: CreatePro
           "X-Title": "Machine Violet",
         },
         providerId: "openrouter",
+      });
+
+    case "xai":
+      return createOpenAIProvider({
+        apiKey: conn.apiKey,
+        baseURL: "https://api.x.ai/v1",
+        providerId: "xai",
       });
 
     case "custom":

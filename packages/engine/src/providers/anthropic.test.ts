@@ -33,6 +33,68 @@ function stampedIndexes(mapped: ReturnType<typeof toAnthropicParams>["messages"]
   });
 }
 
+describe("toAnthropicParams: current adaptive-thinking models", () => {
+  it("preserves null=disabled for Opus 5 at the API's default high effort", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-opus-5",
+      maxTokens: 4096,
+    }));
+    expect(out.thinking).toEqual({ type: "disabled" });
+    expect(out).not.toHaveProperty("output_config");
+    expect(out.max_tokens).toBe(4096);
+  });
+
+  it("sends Opus 5 max effort using adaptive thinking", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-opus-5",
+      maxTokens: 4096,
+      thinking: { effort: "max" },
+    }));
+    expect(out.thinking).toEqual({ type: "adaptive" });
+    expect(out.output_config).toEqual({ effort: "max" });
+    expect(out.max_tokens).toBe(128000);
+  });
+
+  it("sends effort for Sonnet 5 instead of limiting output_config to Opus", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-sonnet-5",
+      maxTokens: 4096,
+      thinking: { effort: "high" },
+    }));
+    expect(out.thinking).toEqual({ type: "adaptive" });
+    expect(out.output_config).toEqual({ effort: "high" });
+    expect(out.max_tokens).toBe(128000);
+  });
+
+  it("does not send the forbidden disabled mode to always-adaptive Fable 5", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-fable-5",
+      maxTokens: 4096,
+    }));
+    expect(out).not.toHaveProperty("thinking");
+    expect(out).not.toHaveProperty("output_config");
+    expect(out.max_tokens).toBe(128000);
+  });
+
+  it("applies an explicit effort to Fable 5 with adaptive thinking", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-fable-5",
+      thinking: { effort: "low" },
+    }));
+    expect(out.thinking).toEqual({ type: "adaptive" });
+    expect(out.output_config).toEqual({ effort: "low" });
+  });
+
+  it("preserves null=disabled behavior for models that allow it", () => {
+    const out = toAnthropicParams(baseParams({
+      model: "claude-opus-4-8",
+      maxTokens: 4096,
+    }));
+    expect(out.thinking).toEqual({ type: "disabled" });
+    expect(out.max_tokens).toBe(4096);
+  });
+});
+
 describe("toAnthropicParams: messages cache stamp (BP4)", () => {
   it("stamps the last message when nothing is ephemeral", () => {
     const messages: NormalizedMessage[] = [

@@ -81,6 +81,13 @@ describe("reducer", () => {
     cursorOffset,
   });
 
+  it("clears the entire line and resets the cursor", () => {
+    expect(reducer(make("partially submitted text", 8), { type: "clear" })).toEqual({
+      value: "",
+      cursorOffset: 0,
+    });
+  });
+
   describe("delete", () => {
     it("is a no-op when cursor is at position 0", () => {
       const state = make("hello", 0);
@@ -262,6 +269,17 @@ describe("InlineTextInput component", () => {
     stdin.write("\x7f");
     await vi.waitFor(() => {
       expect(onChange).toHaveBeenLastCalledWith("he");
+    });
+  });
+
+  it("clears buffered text with Ctrl+U before a retry", async () => {
+    const onChange = vi.fn();
+    const { stdin } = render(
+      React.createElement(InlineTextInput, { defaultValue: "stale action", onChange }),
+    );
+    stdin.write("\x15");
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("");
     });
   });
 

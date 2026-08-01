@@ -48,5 +48,6 @@ export function e2eConnectionStore(): ConnectionStore {
   return {
     connections: [conn],
     tierAssignments: { large: assignment, medium: assignment, small: assignment },
+    imageAssignment: null,
   };
 }

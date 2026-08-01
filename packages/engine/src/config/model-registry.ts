@@ -25,6 +25,19 @@ export interface KnownModelEntry {
   capabilities: ModelCapabilities;
 }
 
+/**
+ * Provider-native image model exposed by the dedicated image-model picker.
+ *
+ * `provider` intentionally uses the connection discriminator rather than the
+ * text-model family. Image generation is paired to the exact Large-tier
+ * connection, so an OpenAI API-key connection may select `gpt-image-2` while
+ * an OpenAI ChatGPT connection continues to use its provider-managed default.
+ */
+export interface KnownImageModelEntry {
+  provider: string;
+  displayName: string;
+}
+
 export interface ModelPricing {
   /** USD per 1M input tokens. */
   input: number;
@@ -38,6 +51,12 @@ export interface ModelPricing {
 
 export interface ModelCapabilities {
   thinking: boolean;
+  /**
+   * Adaptive thinking cannot be disabled for this model. When true, callers
+   * must omit `thinking: { type: "disabled" }` and budget output tokens for
+   * reasoning even when no explicit effort override was requested.
+   */
+  alwaysAdaptiveThinking?: boolean;
   tools: boolean;
   streaming: boolean;
   caching: boolean;
@@ -57,6 +76,7 @@ export interface TierDefaults {
 
 export interface KnownModelsData {
   models: Record<string, KnownModelEntry>;
+  imageModels: Record<string, KnownImageModelEntry>;
   tierDefaults: Record<string, TierDefaults>;
 }
 
@@ -94,6 +114,19 @@ export function loadModelRegistry(configDir?: string, opts?: { reset?: boolean }
           } else {
             // New model from user override
             shipped.models[id] = entry as KnownModelEntry;
+          }
+        }
+      }
+
+      if (overrides.imageModels && typeof overrides.imageModels === "object") {
+        for (const [id, entry] of Object.entries(overrides.imageModels)) {
+          if (shipped.imageModels[id]) {
+            shipped.imageModels[id] = {
+              ...shipped.imageModels[id],
+              ...(entry as Partial<KnownImageModelEntry>),
+            };
+          } else {
+            shipped.imageModels[id] = entry as KnownImageModelEntry;
           }
         }
       }
@@ -142,14 +175,27 @@ export function getModelsForProvider(provider: string, configDir?: string): Reco
   return result;
 }
 
+/** Get selectable image models for a connection provider discriminator. */
+export function getImageModelsForProvider(
+  provider: string,
+  configDir?: string,
+): Record<string, KnownImageModelEntry> {
+  const registry = loadModelRegistry(configDir);
+  const result: Record<string, KnownImageModelEntry> = {};
+  for (const [id, entry] of Object.entries(registry.imageModels)) {
+    if (entry.provider === provider) result[id] = entry;
+  }
+  return result;
+}
+
 /**
  * Map a connection-type (the discriminator on `AIConnection.provider`) to
  * the model-family identifier used in {@link KnownModelEntry.provider}.
  *
  * We split the two namespaces because `openai-apikey` and `openai-chatgpt`
- * connections both reach the same family of GPT-5.x models, but each
- * connection-type has its own tier-defaults entry in `known-models.json`
- * (different defaults: ChatGPT auth doesn't expose `gpt-5-nano`).
+ * connections both reach the same family of GPT models, but each
+ * connection-type has its own tier-defaults entry in `known-models.json` so
+ * the defaults can diverge independently if either surface changes access.
  */
 export function modelFamilyFor(connectionProvider: string): string {
   if (connectionProvider === "openai-apikey" || connectionProvider === "openai-chatgpt") {

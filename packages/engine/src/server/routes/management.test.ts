@@ -1,6 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 import { norm } from "../../utils/paths.js";
+import { loadConnectionStore, saveConnectionStore } from "../../config/connections.js";
 
 // The archive route's concurrency guard is the unit under test: a second
 // archive of the SAME campaign while the first is in flight must be rejected
@@ -13,12 +17,34 @@ interface ArchiveResult { ok: boolean; zipPath?: string; error?: string }
 // Created via vi.hoisted so they exist before vi.mock's factory (hoisted to the
 // top of the module) references them. Both archive and restore are replaced with
 // controllable deferreds so a concurrent overlap is deterministic.
-const { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore } = vi.hoisted(() => {
+const {
+  archiveCampaignMock,
+  pending,
+  unarchiveCampaignMock,
+  pendingRestore,
+  collectDiagnosticsMock,
+  healthCheckMock,
+  createProviderMock,
+} = vi.hoisted(() => {
   const pending: ((v: ArchiveResult) => void)[] = [];
   const archiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pending.push(res); }));
   const pendingRestore: ((v: ArchiveResult) => void)[] = [];
   const unarchiveCampaignMock = vi.fn(() => new Promise<ArchiveResult>((res) => { pendingRestore.push(res); }));
-  return { archiveCampaignMock, pending, unarchiveCampaignMock, pendingRestore };
+  const collectDiagnosticsMock = vi.fn();
+  const healthCheckMock = vi.fn();
+  const createProviderMock = vi.fn(() => ({
+    healthCheck: healthCheckMock,
+    dispose: vi.fn(async () => undefined),
+  }));
+  return {
+    archiveCampaignMock,
+    pending,
+    unarchiveCampaignMock,
+    pendingRestore,
+    collectDiagnosticsMock,
+    healthCheckMock,
+    createProviderMock,
+  };
 });
 
 // Keep the real module (the route relies on the real `archiveDir` for path
@@ -33,6 +59,17 @@ vi.mock("../../config/campaign-archive.js", async (importActual) => {
   };
 });
 
+vi.mock("../diagnostics.js", () => ({
+  collectDiagnostics: collectDiagnosticsMock,
+}));
+
+// Real provider construction would make live network calls from healthCheck;
+// replace only the factory and capture what the check route probes with.
+vi.mock("../../providers/index.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../providers/index.js")>();
+  return { ...actual, createProviderFromConnection: createProviderMock };
+});
+
 import { managementRoutes } from "./management.js";
 
 // In-process Fastify inject (no network) but boot can blow the 5s default
@@ -41,17 +78,278 @@ vi.setConfig({ testTimeout: 30_000 });
 
 const ARCHIVE_URL = "/campaigns/test-campaign/archive";
 
-async function buildApp(opts: { isBusy?: boolean } = {}): Promise<FastifyInstance> {
+async function buildApp(opts: {
+  isBusy?: boolean;
+  configDir?: string;
+  gameState?: { campaignRoot: string; homeDir: string } | null;
+  campaignsDir?: string;
+} = {}): Promise<FastifyInstance> {
   const app = Fastify();
-  app.decorate("configDir", "/tmp/config");
+  app.decorate("configDir", opts.configDir ?? "/tmp/config");
   app.decorate("sessionManager", {
     isBusy: opts.isBusy ?? false,
-    getCampaignsDir: () => "/tmp/campaigns",
+    getCampaignsDir: () => opts.campaignsDir ?? "/tmp/campaigns",
+    getGameState: () => opts.gameState ?? null,
   } as never);
   await app.register(managementRoutes);
   await app.ready();
   return app;
 }
+
+describe("PUT /diagnostics — pre-session export", () => {
+  let app: FastifyInstance;
+
+  beforeEach(() => {
+    collectDiagnosticsMock.mockReset();
+    collectDiagnosticsMock.mockResolvedValue({
+      ok: true,
+      path: "/tmp/diagnostics/machine-violet.mvdiag",
+    });
+  });
+
+  afterEach(async () => {
+    await app?.close();
+  });
+
+  it("collects machine-level diagnostics when no game state exists", async () => {
+    app = await buildApp();
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      path: "/tmp/diagnostics/machine-violet.mvdiag",
+    });
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      undefined,
+      norm("/tmp"),
+      expect.any(Object),
+    );
+  });
+
+  it("includes the active campaign when a game state exists", async () => {
+    app = await buildApp({
+      gameState: {
+        campaignRoot: "/home/campaigns/test",
+        homeDir: "/home",
+      },
+    });
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      "/home/campaigns/test",
+      "/home",
+      expect.any(Object),
+    );
+  });
+
+  it("uses SessionManager's canonical home derivation for a trailing slash", async () => {
+    app = await buildApp({ campaignsDir: "/tmp/campaigns/" });
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(200);
+    expect(collectDiagnosticsMock).toHaveBeenCalledWith(
+      undefined,
+      norm("/tmp"),
+      expect.any(Object),
+    );
+  });
+
+  it("returns a useful error when collection fails", async () => {
+    collectDiagnosticsMock.mockResolvedValue({
+      ok: false,
+      error: "Nothing to collect",
+    });
+    app = await buildApp();
+    const res = await app.inject({ method: "PUT", url: "/diagnostics" });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error).toBe("Nothing to collect");
+  });
+});
+
+describe("POST /connections — provider visibility gate", () => {
+  let app: FastifyInstance;
+  const tempDirs: string[] = [];
+
+  afterEach(async () => {
+    await app?.close();
+    for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("rejects xAI while the provider is hidden pending its 4.6 retest (#749)", async () => {
+    app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/connections",
+      payload: { provider: "xai", apiKey: "xai-test" },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("preserves dormant xAI credentials and untouched assignments across settings writes (#749)", async () => {
+    const configDir = mkdtempSync(join(tmpdir(), "mv-xai-gate-"));
+    tempDirs.push(configDir);
+    const xaiAssignment = { connectionId: "xai-1", modelId: "grok-4.5" };
+    saveConnectionStore(configDir, {
+      connections: [
+        {
+          id: "anthropic-1",
+          provider: "anthropic",
+          label: "Anthropic",
+          apiKey: "ant-test",
+          models: [],
+          source: "manual",
+          addedAt: "2026-07-24",
+        },
+        {
+          id: "xai-1",
+          provider: "xai",
+          label: "xAI",
+          apiKey: "xai-test",
+          models: [],
+          source: "manual",
+          addedAt: "2026-07-24",
+        },
+      ],
+      tierAssignments: {
+        large: xaiAssignment,
+        medium: xaiAssignment,
+        small: xaiAssignment,
+      },
+      imageAssignment: { connectionId: "xai-1", modelId: "grok-imagine-image" },
+    });
+
+    app = await buildApp({ configDir });
+    const update = await app.inject({
+      method: "PUT",
+      url: "/connections/anthropic-1/models",
+      payload: { models: [{ id: "claude-opus-5", displayName: "Claude Opus 5", available: true }] },
+    });
+    expect(update.statusCode).toBe(200);
+
+    const visible = await app.inject({ method: "GET", url: "/connections" });
+    expect(visible.statusCode).toBe(200);
+    expect(visible.json().connections.some((connection: { provider: string }) => connection.provider === "xai"))
+      .toBe(false);
+
+    const persisted = loadConnectionStore(configDir);
+    expect(persisted.connections.find((connection) => connection.id === "xai-1")?.apiKey)
+      .toBe("xai-test");
+    expect(persisted.tierAssignments).toEqual({
+      large: xaiAssignment,
+      medium: xaiAssignment,
+      small: xaiAssignment,
+    });
+    expect(persisted.imageAssignment).toEqual({
+      connectionId: "xai-1",
+      modelId: "grok-imagine-image",
+    });
+  });
+});
+
+describe("connection routes — health probe + in-place key fix", () => {
+  let app: FastifyInstance;
+  const tempDirs: string[] = [];
+
+  /** Real file-backed store in a temp config dir (same pattern as the gate tests above). */
+  function seedStore(connections: Parameters<typeof saveConnectionStore>[1]["connections"]): string {
+    const configDir = mkdtempSync(join(tmpdir(), "mv-conn-fix-"));
+    tempDirs.push(configDir);
+    saveConnectionStore(configDir, {
+      connections,
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+    });
+    return configDir;
+  }
+
+  const openrouterConn = {
+    id: "or-1",
+    provider: "openrouter" as const,
+    label: "OpenRouter",
+    apiKey: "sk-or-original-key-000000000000",
+    models: [],
+    source: "manual" as const,
+    addedAt: "2026-01-01T00:00:00Z",
+  };
+
+  beforeEach(() => {
+    healthCheckMock.mockReset();
+    healthCheckMock.mockResolvedValue({ status: "valid", message: "Valid" });
+    createProviderMock.mockClear();
+  });
+
+  afterEach(async () => {
+    await app?.close();
+    for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("probes the health check with a model the connection actually serves (xAI/OpenRouter gpt-4o-mini regression)", async () => {
+    // Regression: with no explicit model, providers sharing the
+    // OpenAI-compatible client fell back to an api.openai.com model id and
+    // e.g. xAI answered 400 "Model not found: gpt-4o-mini" for a valid key.
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({ method: "POST", url: "/connections/or-1/check" });
+
+    expect(res.statusCode).toBe(200);
+    expect(healthCheckMock).toHaveBeenCalledTimes(1);
+    const probed = healthCheckMock.mock.calls[0][0] as string | undefined;
+    // buildEffectiveConnections fills OpenRouter models from the shipped
+    // registry; the probe is its small-tier default — never an OpenAI id,
+    // never undefined.
+    expect(probed).toBe("moonshotai/kimi-k3");
+  });
+
+  it("PATCH /connections/:id replaces the key in place, preserving id and label", async () => {
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/connections/or-1",
+      body: { apiKey: "sk-or-replacement-key-111111111111" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const conn = (res.json().connections as { id: string; label: string; masked: string }[])
+      .find((c) => c.id === "or-1");
+    expect(conn).toBeDefined();
+    expect(conn!.label).toBe("OpenRouter");
+    expect(conn!.masked).toContain("sk-or-repl");
+    // Persisted, not just echoed.
+    const saved = loadConnectionStore(configDir).connections.find((c) => c.id === "or-1");
+    expect(saved?.apiKey).toBe("sk-or-replacement-key-111111111111");
+  });
+
+  it("PATCH rejects an unknown connection with 404 and an empty key with 400", async () => {
+    const configDir = seedStore([structuredClone(openrouterConn)]);
+    app = await buildApp({ configDir });
+    const missing = await app.inject({
+      method: "PATCH", url: "/connections/nope", body: { apiKey: "k" },
+    });
+    expect(missing.statusCode).toBe(404);
+
+    const empty = await app.inject({
+      method: "PATCH", url: "/connections/or-1", body: { apiKey: "   " },
+    });
+    expect(empty.statusCode).toBe(400);
+  });
+
+  it("PATCH refuses ChatGPT connections — those are fixed by signing in again", async () => {
+    const configDir = seedStore([{
+      id: "cg-1", provider: "openai-chatgpt", label: "ChatGPT", apiKey: "",
+      models: [], source: "oauth", addedAt: "",
+    }]);
+    app = await buildApp({ configDir });
+    const res = await app.inject({
+      method: "PATCH", url: "/connections/cg-1", body: { apiKey: "k" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error).toMatch(/signing in again/i);
+  });
+});
 
 describe("POST /campaigns/:id/archive — concurrency guard", () => {
   let app: FastifyInstance;

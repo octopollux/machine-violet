@@ -35,6 +35,7 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **No globals.** Tool handlers take explicit state objects.
 - **FileIO/GitIO interfaces** abstract all I/O. Never call `fs` directly in game logic.
 - Tool results use `ok(data)` / `err(message)` helpers.
+- **Tool inputs are untrusted.** Every tool call must pass the executable contract in `agents/tool-contract.ts` before its handler or persistence callbacks run. New tools use one TypeBox schema for provider JSON Schema, runtime validation, and inferred handler types; every registry tool needs an explicit `TOOL_CRITICALITY` entry. Coerce only a contract's documented, unambiguous representation slips; reject ambiguous input with actionable, privacy-safe diagnostics. See `docs/tool-input-contracts.md`.
 - Content pipeline (`packages/engine/src/content/`) is **completely separate** from the rest of the game engine. Never import between them.
 
 ### TUI modals
@@ -47,6 +48,7 @@ All documentation lives in `docs/`. Start at `docs/index.md` for navigation, `do
 - **Model config:** tests must call `loadModelConfig({ reset: true })`.
 - Vitest `globals: true` — `describe`/`it`/`expect` available without import.
 - Anthropic client mocked via `vi.fn()`. FileIO mocked with in-memory `Record<string, string>`.
+- **Tool contract changes:** test valid input, each allowlisted repair, rejection before side effects, a corrected model retry, and structured log detail without raw free-form arguments. Keep the registry criticality/schema audit green.
 
 ### CPU-efficient iteration
 
@@ -126,11 +128,11 @@ Full flow, Velopack manifest details, Azure OIDC notes, and bootstrap history in
 
 ## Commit Hygiene
 
-After completing a coding task, make a detailed commit; you'll need this history later. **Commit freely, but only push and open a PR when the user explicitly asks for it.** Don't preemptively push or create PRs.
+After completing a coding task, make a detailed commit; you'll need this history later. **Commit freely, but only push and open a PR when the user explicitly asks for it.** Don't preemptively push or create PRs. When the user does ask for a PR, create it ready for review (non-draft) unless they explicitly request a draft.
 
 ## Code Review
 
-Once the user asks you to push and open a PR, **immediately arm a `Monitor` for Copilot's review — do not ask first.** Copilot reviews exactly once but takes 2-10 minutes to arrive. The monitor polls `gh api` and exits once the review lands — no manual polling, and the notification lets you keep working on other things in the meantime. Cap the timeout at 10 minutes so the watch ends even if the review never arrives.
+Once the user asks you to push and open a PR, **immediately start a runtime-native bounded wait for Copilot's review — do not ask first.** In Claude, dispatch the `Monitor` subagent subtype. In Codex, keep the wait inside one agent turn with a single long-lived polling process or equivalent native wait; **do not create a recurring heartbeat or automation that wakes the task for every poll.** Copilot reviews exactly once but takes 2-10 minutes to arrive. Poll `gh api` and exit once the review lands, with a 10-minute timeout so the watch ends even if the review never arrives.
 
 **The review isn't complete until Copilot's top-level summary comment appears.** Copilot always posts a default summary body on `/pulls/:n/reviews` exactly once per PR — that's the signal review is done. Inline comments alone don't count; if only inline comments have arrived, keep waiting until either the summary lands or the timeout fires. Don't act on a partial review.
 

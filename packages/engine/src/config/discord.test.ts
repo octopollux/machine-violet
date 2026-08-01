@@ -46,6 +46,12 @@ describe("saveDiscordSettings", () => {
     expect(result).toEqual({ enabled: false });
   });
 
+  it("creates the config dir when it does not exist yet (#768)", () => {
+    const freshDir = join(tempDir, "MachineViolet");
+    saveDiscordSettings(freshDir, { enabled: false });
+    expect(loadDiscordSettings(freshDir)).toEqual({ enabled: false });
+  });
+
   it("writes valid JSON to disk", () => {
     saveDiscordSettings(tempDir, { enabled: true });
     const raw = readFileSync(join(tempDir, "discord-settings.json"), "utf-8");
