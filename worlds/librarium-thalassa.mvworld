@@ -63,7 +63,7 @@
           "id": "the-buried-accession",
           "name": "The Buried Accession",
           "description": "The shore is a sea the library itself once catalogued — and then erased. The collection is remembering what the institution chose to forget.",
-          "detail": "THE BURIED ACCESSION — Generations ago, the founders catalogued a living sea so vivid its entry would not hold still: its maps kept growing, crept into neighboring trays, taught its tide-song to specimens two bays away. Frightened by what looked like contamination, the founders voted to erase it — but archivists cannot bring themselves to destroy knowledge, so they sealed the original cores in a ballast casket and scuttled it into the giant. Buried, not burned. The deep pressure suited it. It has grown down there for generations, and it is now strong enough to be heard again: the living maps are taking dictation from a drowned archive, and the specimens are answering a song the library taught them and then forbade. Reveals, in rough order: the cataloguer's hand on the new coastline is founding-era script; an accession number skips in the ledgers; the sealed minute-book of the vote (Ileri inherited it and knows there WAS an erasure, not what it was); what the entry has become below. Endgame energy: descend to the casket, meet what the buried accession has grown into, and restore the erased entry — the library reconciling with its own shame. Restitution, not exorcism; the tone stays hopeful."
+          "detail": "THE BURIED ACCESSION — Generations ago, the founders catalogued a living sea so vivid its entry would not hold still: its maps kept growing, crept into neighboring trays, taught its tide-song to specimens two bays away. Frightened by what looked like contamination, the founders voted to erase it — but archivists cannot bring themselves to destroy knowledge, so they sealed the original cores in a ballast casket and scuttled it into the giant. Buried, not burned. The erasure did not spare the catalog itself: Index is as old as the founding, so the vote also excised Index's own memory of the accession — the reason it can find no record now is that the record was cut out of its mind, consented to under a charter clause it no longer remembers invoking. The deep pressure suited it. It has grown down there for generations, and it is now strong enough to be heard again: the living maps are taking dictation from a drowned archive, and the specimens are answering a song the library taught them and then forbade. Reveals, in rough order: the cataloguer's hand on the new coastline is founding-era script; an accession number skips in the ledgers; the sealed minute-book of the vote (Ileri inherited it and knows there WAS an erasure, not what it was); the seam in Index's memory (it can name every accession of that era except one, and has never noticed the gap until someone makes it count); what the entry has become below. Late, and only late: the buried entry addresses Index directly, by a founding-era name nobody alive still uses. Endgame energy: descend to the casket, meet what the buried accession has grown into, and restore the erased entry — the library reconciling with its own shame. Restitution, not exorcism; the tone stays hopeful."
         },
         {
           "id": "the-composed-shore",
@@ -151,7 +151,7 @@
   "_tokens": {
     "detail": 1345,
     "setup_detail": 219,
-    "forks": 1320,
-    "total": 4668
+    "forks": 1437,
+    "total": 4785
   }
 }
