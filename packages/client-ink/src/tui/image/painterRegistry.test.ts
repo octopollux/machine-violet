@@ -1,4 +1,5 @@
 import { registerPainter, compositePainters, painterCount, clearPainters } from "./painterRegistry.js";
+import type { FrameDamage } from "./frameDamage.js";
 
 describe("painterRegistry", () => {
   beforeEach(() => clearPainters());
@@ -35,6 +36,15 @@ describe("painterRegistry", () => {
     off(); // stale handle — must NOT remove the new painter
     expect(compositePainters()).toBe("NEW");
     expect(painterCount()).toBe(1);
+  });
+
+  it("analyzes the frame block once and hands the damage report to painters", () => {
+    const seen: FrameDamage[] = [];
+    registerPainter("a", (d) => { seen.push(d); return ""; });
+    compositePainters("\x1b[?2026h\x1b[2J\x1b[?2026l"); // clear-frame block
+    compositePainters();                                  // no block (teardown/test path)
+    expect(seen[0].full).toBe(true);
+    expect(seen[1].full).toBe(false);
   });
 
   it("reads painters live (reflects ref changes)", () => {
