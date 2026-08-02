@@ -268,6 +268,25 @@ describe("narrativeLineKeys", () => {
 
 describe("image line remounts (#781)", () => {
   const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /**
+   * Wait until `count()` has been stable for `stableMs` (bounded by
+   * `timeoutMs`). Anchored to the observed decode activity instead of a fixed
+   * sleep, so the test doesn't get slower than needed or flaky under CI load.
+   */
+  const quiesce = async (count: () => number, stableMs = 100, timeoutMs = 3000): Promise<void> => {
+    const start = Date.now();
+    let last = count();
+    let lastChange = Date.now();
+    while (Date.now() - lastChange < stableMs) {
+      if (Date.now() - start > timeoutMs) return;
+      await delay(10);
+      const c = count();
+      if (c !== last) {
+        last = c;
+        lastChange = Date.now();
+      }
+    }
+  };
 
   it("inserting a line above an image does not remount/re-decode it", async () => {
     const sharp = (await import("sharp")).default as unknown as ReturnType<typeof vi.fn>;
@@ -287,15 +306,18 @@ describe("image line remounts (#781)", () => {
       </GameProvider>
     );
     const { rerender, unmount } = render(ui(base));
-    await delay(120); // metadata + decode effects settle
+    // Wait for decode activity to start, then for it to stop changing.
+    while (sharp.mock.calls.length === 0) await delay(10);
+    await quiesce(() => sharp.mock.calls.length);
     const settled = sharp.mock.calls.length;
     expect(settled).toBeGreaterThan(0); // the image actually mounted + decoded
 
     // Reflow: new content ABOVE the image shifts every subsequent index.
     rerender(ui([dm("Inserted!"), dm(""), ...base]));
-    await delay(120);
+    await quiesce(() => sharp.mock.calls.length);
     // Same InlineImage instance → no new metadata read, no re-decode. (With
-    // index keys this was a full remount: dispose + fresh sharp decode.)
+    // index keys this was a full remount: dispose + fresh sharp decode —
+    // quiesce would observe the new calls and the count comparison fails.)
     expect(sharp.mock.calls.length).toBe(settled);
 
     unmount();
