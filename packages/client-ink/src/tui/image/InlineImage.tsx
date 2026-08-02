@@ -60,6 +60,7 @@ import { pickProtocol, sixelPaletteSize } from "./capabilities.js";
 import { selectDriver } from "./drivers/index.js";
 import type { PreparedImage } from "./drivers/types.js";
 import { registerPainter, isIncrementalRendering } from "./painterRegistry.js";
+import { damageTouches, damagedAtRow } from "./frameDamage.js";
 import { composePaint, paintSignature, type PaintBox } from "./paint.js";
 import { visibleBand, bandPixels, fitImage, isOccluded } from "./geometry.js";
 import { useOcclusionSpans, useOcclusionChange } from "./occlusion.js";
@@ -121,7 +122,7 @@ export function InlineImage({
   const heightPx = rows * cell.height;
 
   // --- live refs the painter reads (painter runs outside React, per frame) ---
-  const posRef = useRef<{ slotTop: number; slotLeft: number; appHeight: number } | null>(null);
+  const posRef = useRef<{ slotTop: number; slotLeft: number; cursorRow: number } | null>(null);
   const cachedRef = useRef<CachedBand | null>(null);
   const prevPaintedRef = useRef<PaintBox | null>(null);
   // Signature of the frame the painter last actually blitted, and a generation
@@ -206,7 +207,15 @@ export function InlineImage({
   // Layout's paddingLeft — so the out-of-band graphics land aligned with the
   // text instead of at terminal column 0 (which would paint the image's left
   // edge over the frame border).
-  const measure = (): { slotTop: number; slotLeft: number; appHeight: number } | null => {
+  //
+  // cursorRow is the 0-based app row Ink parks the cursor on after writing a
+  // frame — the anchor all paint moves are relative to. For a FULLSCREEN frame
+  // (app height fills the terminal) Ink writes no trailing newline, so the
+  // cursor rests ON the last app row (appHeight - 1); a non-fullscreen frame's
+  // trailing newline parks it one row below the output (appHeight). Verified
+  // empirically in painter-frame.integration.test.tsx — using appHeight for
+  // fullscreen paints every band one row high.
+  const measure = (): { slotTop: number; slotLeft: number; cursorRow: number } | null => {
     const node = slotRef.current as unknown as { yogaNode?: YogaNode; parentNode?: ParentLike } | null;
     if (!node?.yogaNode) return null;
     let top = 0;
@@ -221,7 +230,9 @@ export function InlineImage({
       }
       cur = cur.parentNode ?? null;
     }
-    return { slotTop: top, slotLeft: left, appHeight };
+    const terminalRows = stdout.rows || 0;
+    const cursorRow = terminalRows > 0 && appHeight >= terminalRows ? appHeight - 1 : appHeight;
+    return { slotTop: top, slotLeft: left, cursorRow };
   };
 
   // Decode + resize once, cache RGBA, prepare the driver. Re-runs if the
@@ -264,7 +275,7 @@ export function InlineImage({
   useEffect(() => {
     if (!driver) return;
     mountedRef.current = true;
-    const off = registerPainter(painterKey, () => {
+    const off = registerPainter(painterKey, (damage) => {
       const prep = preparedRef.current;
       const prev = prevPaintedRef.current;
       const occluders = occlusionRef.current();
@@ -274,7 +285,9 @@ export function InlineImage({
         const clear = prev ? (prep?.img.clear?.() ?? "") : "";
         prevPaintedRef.current = null;
         prevSigRef.current = null;
-        return clear + composePaint("", null, prev, pos?.appHeight ?? 0, occluders);
+        const cursorRow = pos?.cursorRow ?? 0;
+        return clear + composePaint("", null, prev, cursorRow, occluders,
+          (r) => damagedAtRow(damage, r, cursorRow));
       }
       // Clip the footprint to the viewport at the fresh row, then apply modal
       // occlusion. Both are cheap arithmetic — no pixels are touched yet, so the
@@ -293,12 +306,20 @@ export function InlineImage({
       // change on an unrelated re-render (the 1Hz elapsed counter, a tool glyph
       // landing), so the pixels are still on screen and re-emitting the whole
       // payload would be wasted bytes. When the footprint, source band, and
-      // raster all match the frame we last painted, skip. Gated on
+      // raster all match the frame we last painted, skip — but ONLY when this
+      // frame's bytes verifiably left the band's rows alone (`damage`, from
+      // frameDamage.ts). The signature alone is not proof the pixels survived:
+      // Ink clears + rewrites the whole frame on Windows fullscreen renders,
+      // on log.clear() (console patch, resize), and a scroll burst's settling
+      // frame rewrites the rows text moved across — all without changing the
+      // signature. Skipping there left the image blank until it next moved
+      // (the "image blanks if you just leave it / scroll" bug). Gated on
       // isIncrementalRendering(): the standard renderer fully erases + redraws
       // every frame, so there a skip would make the image vanish — it must
       // re-blit unconditionally. (start-client.ts keeps the two in lock-step.)
-      const sig = paintSignature(shown, band ? band.srcTopRows : 0, pos.appHeight, rasterEpochRef.current);
-      if (isIncrementalRendering() && sig !== null && prev !== null && sig === prevSigRef.current) {
+      const sig = paintSignature(shown, band ? band.srcTopRows : 0, pos.cursorRow, rasterEpochRef.current);
+      const clobbered = shown !== null && damageTouches(damage, shown.row, shown.rows, pos.cursorRow);
+      if (isIncrementalRendering() && !clobbered && sig !== null && prev !== null && sig === prevSigRef.current) {
         return "";
       }
 
@@ -321,8 +342,11 @@ export function InlineImage({
       // Placement protocols (kitty) leave a persistent placement a covering modal
       // won't overwrite — on the shown→hidden edge, explicitly delete it.
       const clear = prev && !shown ? (prep.img.clear?.() ?? "") : "";
-      // Pass occluders so vacated-row erase never blanks a row a modal owns.
-      const out = clear + composePaint(payload, shown, prev, pos.appHeight, occluders);
+      // Pass occluders so vacated-row erase never blanks a row a modal owns,
+      // and the frame's damage so it never blanks a row Ink just rewrote
+      // (on a scroll, the old band rows carry fresh narrative text).
+      const out = clear + composePaint(payload, shown, prev, pos.cursorRow, occluders,
+        (r) => damagedAtRow(damage, r, pos.cursorRow));
       prevPaintedRef.current = shown;
       prevSigRef.current = sig;
       return out;
@@ -335,7 +359,7 @@ export function InlineImage({
       // re-blits) lands atomically.
       const pos = posRef.current;
       if (prevPaintedRef.current && pos) {
-        stdout.write(BSU + composePaint("", null, prevPaintedRef.current, pos.appHeight, occlusionRef.current()) + ESU);
+        stdout.write(BSU + composePaint("", null, prevPaintedRef.current, pos.cursorRow, occlusionRef.current()) + ESU);
         prevPaintedRef.current = null;
       }
     };

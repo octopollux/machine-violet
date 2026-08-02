@@ -17,7 +17,14 @@
  * below the React tree. The component manages register/unregister via effects.
  */
 
-export type Painter = () => string;
+import { analyzeFrameDamage, NO_DAMAGE, type FrameDamage } from "./frameDamage.js";
+
+/**
+ * A painter receives the damage report for the frame block it is being
+ * spliced into (which rows Ink's bytes wrote or erased) so it can decide
+ * whether its previously-blitted pixels survived or must be re-emitted.
+ */
+export type Painter = (damage: FrameDamage) => string;
 
 const painters = new Map<string, Painter>();
 
@@ -56,12 +63,18 @@ export function registerPainter(key: string, paint: Painter): () => void {
   };
 }
 
-/** Concatenate every painter's current output. Empty contributions are skipped. */
-export function compositePainters(): string {
+/**
+ * Concatenate every painter's current output. Empty contributions are skipped.
+ * `block` is the synchronized-output block Ink produced (pre-injection); its
+ * damage report is computed once here and shared by all painters. Callers
+ * without a block (tests, teardown) get a no-damage report.
+ */
+export function compositePainters(block?: string): string {
   if (painters.size === 0) return "";
+  const damage = block ? analyzeFrameDamage(block) : NO_DAMAGE;
   let out = "";
   for (const paint of painters.values()) {
-    const s = paint();
+    const s = paint(damage);
     if (s) out += s;
   }
   return out;
