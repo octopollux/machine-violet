@@ -161,6 +161,35 @@ export function useProcessedLines(
   return fullResult;
 }
 
+/**
+ * Content-stable React keys for the processed-line list (issue #781).
+ *
+ * Keying by array index remounts components whenever indices shift — and the
+ * incremental pipeline shifts them routinely (tail reprocessing changes line
+ * counts as paragraphs re-wrap; toggling verbose moves every subsequent line).
+ * For text rows a remount is invisible, but an image line remount destroys the
+ * InlineImage instance: painter unregistered, prepared raster disposed, erase
+ * emitted, then a fresh mount re-reads metadata and re-decodes asynchronously —
+ * the image visibly blinks out and back whenever content above it reflows.
+ *
+ * So image lines get a key derived from their path (`nodes[0]`), disambiguated
+ * by occurrence order for repeated paths — stable because the transcript is
+ * append-only, so an image's same-path predecessors never change. Everything
+ * else keeps its index (numeric keys can't collide with the `img:` strings).
+ * Stable image keys also let ScrollView's per-item height cache survive
+ * reflows, since MeasurableItem entries are keyed by child key.
+ */
+export function narrativeLineKeys(lines: readonly ProcessedLine[]): (string | number)[] {
+  const seen = new Map<string, number>();
+  return lines.map((line, i) => {
+    if (line.kind !== "image") return i;
+    const path = typeof line.nodes[0] === "string" ? line.nodes[0] : "";
+    const n = seen.get(path) ?? 0;
+    seen.set(path, n + 1);
+    return `img:${path}:${n}`;
+  });
+}
+
 export type NarrativeAreaHandle = ScrollHandle;
 
 interface NarrativeAreaProps {
@@ -253,6 +282,9 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
   // Checkpoints survive this pipeline as zero-height processed rows.
   const processedLines = useProcessedLines(visibleLines, width ?? 0, quoteColor);
 
+  // Content-stable keys so image lines never remount when indices shift (#781).
+  const lineKeys = useMemo(() => narrativeLineKeys(processedLines), [processedLines]);
+
   // Build a clamped ScrollHandle and expose it to both parent and local refs
   useScrollHandle(ref, scrollRef);
   useScrollHandle(localHandleRef, scrollRef);
@@ -339,7 +371,7 @@ export const NarrativeArea = forwardRef<NarrativeAreaHandle, NarrativeAreaProps>
       >
         {processedLines.map((line, i) => (
           <NarrativeLineComponent
-            key={i}
+            key={lineKeys[i]}
             line={line}
             playerColor={playerColor}
             width={width}
@@ -520,3 +552,5 @@ const NarrativeLineComponent = React.memo(function NarrativeLineComponent({
     }
   }
 });
+
+

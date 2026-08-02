@@ -1,14 +1,34 @@
 import React, { useRef, useEffect } from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { Text } from "ink";
 import type { NarrativeLine, ProcessedLine } from "@machine-violet/shared/types/tui.js";
 import { processNarrativeLines, toPlainText } from "../formatting.js";
+import { GameProvider, type GameContextValue } from "../game-context.js";
+import { clearPainters } from "../image/painterRegistry.js";
 import {
   checkpointForScrollOffset,
+  narrativeLineKeys,
   useProcessedLines,
   NarrativeArea,
 } from "./NarrativeArea.js";
+
+// Sharp is mocked so the remount-detection test below can (a) run without real
+// image files and (b) count decode activity: every InlineImage mount calls
+// `sharp(path)` from its metadata + decode effects, so a remount shows up as
+// new calls after the tree has settled.
+vi.mock("sharp", () => ({
+  default: vi.fn(() => ({
+    metadata: async () => ({ width: 64, height: 32 }),
+    resize: (w: number, h: number) => ({
+      ensureAlpha: () => ({
+        raw: () => ({
+          toBuffer: async () => ({ data: Buffer.alloc(w * h * 4), info: { width: w, height: h } }),
+        }),
+      }),
+    }),
+  })),
+}));
 
 
 // ---------------------------------------------------------------------------
@@ -217,5 +237,68 @@ describe("NarrativeArea transcript checkpoints", () => {
     expect(checkpointForScrollOffset(processed, 1, getPosition)?.resourceValues.Aldric.HP).toBe("18/30");
     expect(checkpointForScrollOffset(processed, 1.5, getPosition)?.resourceValues.Aldric.HP).toBe("12/30");
     expect(checkpointForScrollOffset(processed, 3, getPosition)?.resourceValues.Aldric.HP).toBe("12/30");
+  });
+});
+
+describe("narrativeLineKeys", () => {
+  const img = (path: string): ProcessedLine => ({ kind: "image", nodes: [path], intent: "scene_snapshot" } as never);
+  const text = (t: string): ProcessedLine => ({ kind: "dm", nodes: [t] } as never);
+
+  it("keys image lines by path, independent of position (#781)", () => {
+    const image = img("/campaign/images/scene-001.png");
+    const before = narrativeLineKeys([text("a"), image, text("b")]);
+    // Insert two lines above — the image key must not move with its index.
+    const after = narrativeLineKeys([text("x"), text("y"), text("a"), image, text("b")]);
+    expect(before[1]).toBe("img:/campaign/images/scene-001.png:0");
+    expect(after[3]).toBe(before[1]);
+  });
+
+  it("disambiguates repeated paths by append-order occurrence", () => {
+    const p = "/campaign/images/scene-001.png";
+    const keys = narrativeLineKeys([img(p), text("a"), img(p)]);
+    expect(keys[0]).toBe(`img:${p}:0`);
+    expect(keys[2]).toBe(`img:${p}:1`);
+    expect(new Set(keys).size).toBe(3);
+  });
+
+  it("keeps index keys for non-image lines", () => {
+    expect(narrativeLineKeys([text("a"), text("b")])).toEqual([0, 1]);
+  });
+});
+
+describe("image line remounts (#781)", () => {
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it("inserting a line above an image does not remount/re-decode it", async () => {
+    const sharp = (await import("sharp")).default as unknown as ReturnType<typeof vi.fn>;
+    clearPainters();
+    const imagePath = "/fake/scene-001.png";
+    const gameCtx = {
+      graphicsCaps: { kitty: false, iterm2: false, sixel: true, cellPixels: { width: 10, height: 20 }, sixelColorRegisters: 256 },
+      stdinFilterChain: null,
+      usageStatus: null,
+    } as unknown as GameContextValue;
+    const image: NarrativeLine = { kind: "image", text: imagePath, intent: "scene_snapshot" };
+    const base: NarrativeLine[] = [dm("Above."), dm(""), image, dm("Below.")];
+
+    const ui = (lines: NarrativeLine[]) => (
+      <GameProvider value={gameCtx}>
+        <NarrativeArea lines={lines} maxRows={16} width={40} viewportTop={0} />
+      </GameProvider>
+    );
+    const { rerender, unmount } = render(ui(base));
+    await delay(120); // metadata + decode effects settle
+    const settled = sharp.mock.calls.length;
+    expect(settled).toBeGreaterThan(0); // the image actually mounted + decoded
+
+    // Reflow: new content ABOVE the image shifts every subsequent index.
+    rerender(ui([dm("Inserted!"), dm(""), ...base]));
+    await delay(120);
+    // Same InlineImage instance → no new metadata read, no re-decode. (With
+    // index keys this was a full remount: dispose + fresh sharp decode.)
+    expect(sharp.mock.calls.length).toBe(settled);
+
+    unmount();
+    clearPainters();
   });
 });
