@@ -128,6 +128,17 @@ describe("installSyncWriteCombiner with pre-ESU injection", () => {
     expect(writes).toEqual(["plain"]);
   });
 
+  it("hands the injector the full pre-injection block (both paths)", () => {
+    const { stream } = makeStream();
+    const blocks: string[] = [];
+    installSyncWriteCombiner(stream, (block) => { blocks.push(block); return ""; });
+    stream.write(BSU);
+    stream.write("buffered");
+    stream.write(ESU);
+    stream.write(BSU + "single-chunk" + ESU);
+    expect(blocks).toEqual([BSU + "buffered" + ESU, BSU + "single-chunk" + ESU]);
+  });
+
   it("calls the injector once per flushed block (fresh content each frame)", () => {
     const { stream, writes } = makeStream();
     let n = 0;

@@ -54,6 +54,15 @@ describe("composePaint", () => {
     expect(eraseCount).toBe(0);
   });
 
+  it("does not erase vacated rows the frame already repainted", () => {
+    // prev [5,9) hidden; frame rewrote rows 6 and 8 (fresh text there) →
+    // erasing them would wipe the text. Only untouched rows 5 and 7 erased.
+    const repainted = (r: number): boolean => r === 6 || r === 8;
+    const out = composePaint("", null, box(5, 4), 30, [], repainted);
+    const eraseCount = (out.match(/ {10}/g) ?? []).length;
+    expect(eraseCount).toBe(2);
+  });
+
   it("erases only the vacated rows the modal does not cover", () => {
     // prev [5,9), modal covers [5,7); rows 5,6 owned by modal, 7,8 free → 2 erased
     const out = composePaint("", null, box(5, 4), 30, [{ top: 5, rows: 2 }]);
