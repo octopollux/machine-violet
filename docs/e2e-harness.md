@@ -277,6 +277,24 @@ Each probe is a standalone TypeScript file under
 [`packages/test-harness/bin/`](../packages/test-harness/bin/). No registry.
 For anything else, write your own one-shot — see "Writing a probe" below.
 
+### Visual testbed: inline images in a browser terminal
+
+Terminal graphics (sixel/iTerm2) can't be verified through the headless
+sidecar — it has no pixel model. `npm run image-testbed` starts a browser rig:
+an xterm.js page with the image addon (decodes **sixel and iTerm2 IIP**; kitty
+is not supported by xterm.js) bridged over a websocket to
+[`image-testbed-app.tsx`](../packages/test-harness/bin/image-testbed-app.tsx) —
+an API-key-free Ink app exercising the full production image stack (ScrollView
+virtual scroll, `InlineImage`, sync-write combiner, frame-damage gating) with
+forced graphics caps and a generated marker image. Open
+`http://127.0.0.1:7391/` (append `?protocol=iterm2` for the IIP driver), scroll
+with PgUp/PgDn/j/k/mouse-wheel, and verify placement **programmatically** from
+the page's devtools: `imageAddon.getImageAtBufferCell(x, y)` reports which
+cells hold image pixels, and the returned bitmap's dimensions verify band
+cropping (e.g. a 10-row clip of a 20px-cell image must be 200px tall). Born in
+the #778 investigation, where it caught bugs the text-grid rigs structurally
+could not.
+
 ### What `smoketest` actually does
 
 1. Boot to the main menu.

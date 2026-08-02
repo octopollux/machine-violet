@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MV image testbed</title>
+  <link rel="stylesheet" href="/xterm.css">
+  <style>
+    body { background: #111; margin: 0; padding: 10px; font-family: monospace; }
+    #status { color: #9f9; padding: 4px 0; }
+    #term { border: 1px solid #444; display: inline-block; }
+  </style>
+</head>
+<body>
+  <div id="status">connecting…</div>
+  <div id="term"></div>
+  <script src="/xterm.js"></script>
+  <script src="/addon-image.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const protocol = params.get("protocol") || "sixel";
+    const COLS = Number(params.get("cols") || 100);
+    const ROWS = Number(params.get("rows") || 32);
+
+    const term = new Terminal({
+      cols: COLS, rows: ROWS,
+      fontSize: 15,
+      fontFamily: "Consolas, monospace",
+      scrollback: 0,
+      // Emulate the tty line discipline's ONLCR (LF → CRLF): the app writes to
+      // a pipe here, but on a real terminal the driver does this translation.
+      convertEol: true,
+      allowProposedApi: true,
+      theme: { background: "#000000" },
+    });
+    const imageAddon = new ImageAddon.ImageAddon({ sixelSupport: true, iipSupport: true, showPlaceholder: true });
+    term.loadAddon(imageAddon);
+    term.open(document.getElementById("term"));
+    term.focus();
+
+    const ws = new WebSocket(`ws://${location.host}/term`);
+    ws.binaryType = "arraybuffer";
+    const status = document.getElementById("status");
+
+    ws.onopen = () => {
+      // Measure real cell pixels so the app's sixel bands land on cell rows.
+      const dims = term._core._renderService.dimensions.css.cell;
+      status.textContent = `connected — ${COLS}x${ROWS}, cell ${dims.width.toFixed(1)}x${dims.height.toFixed(1)}, ${protocol}`;
+      ws.send(JSON.stringify({ type: "hello", cols: COLS, rows: ROWS, cellW: dims.width, cellH: dims.height, protocol }));
+    };
+    ws.onmessage = (ev) => {
+      if (typeof ev.data === "string") {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "exit") status.textContent = `app exited (${msg.code})`;
+        return;
+      }
+      term.write(new Uint8Array(ev.data));
+    };
+    ws.onclose = () => { status.textContent = "disconnected"; };
+
+    term.onData((data) => ws.send(JSON.stringify({ type: "input", data })));
+    // Wheel → fine scroll (j/k), emulating the game's mouse-wheel handler.
+    document.getElementById("term").addEventListener("wheel", (e) => {
+      e.preventDefault();
+      ws.send(JSON.stringify({ type: "input", data: e.deltaY > 0 ? "j" : "k" }));
+    }, { passive: false });
+  </script>
+</body>
+</html>

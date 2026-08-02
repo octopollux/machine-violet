@@ -23,12 +23,14 @@
  *    scroll settles. So there is no layout-effect repositioning and no changing
  *    prop to break the line's React.memo — the painter, which already runs every
  *    Ink frame, re-measures and re-clips itself;
- *  - band re-encode is cheap (sixel: one shared quantization up front, then
- *    ~3-8ms/band from frozen indices; iTerm2/kitty similar), so the painter
- *    re-encodes the clipped band in-frame whenever its identity changes and
- *    reuses the cached payload when it hasn't (a static image never re-encodes).
- *    A future expensive encoder would need a debounce reintroduced in the
- *    painter (re-blit the stale band until the encode settles);
+ *  - band re-encode is cheap (sixel: per-phase slice caches warmed off the
+ *    render path make a scroll-step assembly <1ms, with a slower direct-encode
+ *    fallback until warm; iTerm2: fast-PNG + band LRU ~20-30ms worst;
+ *    kitty: a placement escape), so the painter re-encodes the clipped band
+ *    in-frame whenever its identity changes and reuses the cached payload when
+ *    it hasn't (a static image never re-encodes). A future expensive encoder
+ *    would need a debounce reintroduced in the painter (re-blit the stale band
+ *    until the encode settles);
  *  - the painter is also idempotent across frames: it compares a cheap
  *    signature (footprint + source band + raster generation) against the frame
  *    it last blitted and emits NOTHING when they match. With incremental
