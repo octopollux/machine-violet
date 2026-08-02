@@ -5,7 +5,9 @@
  * band slices the same frozen indices/palette. If someone reverts to per-band
  * `image2sixel` (re-quantize per crop), the overlap-equality test below fails.
  */
-import { decode } from "sixel";
+import { decode, introducer, FINALIZER } from "sixel";
+import { reduce } from "sixel/lib/Quantizer.js";
+import { sixelEncodeIndexed } from "sixel/lib/SixelEncoder.js";
 import { sixelDriver } from "./sixel.js";
 
 const W = 60; // px wide
@@ -25,10 +27,16 @@ function sampleRgba(): Buffer {
   return rgba;
 }
 
-/** Decode a full sixel string and return a row-accessor over its pixels. */
+/**
+ * Decode a full sixel string and return a row-accessor over its pixels.
+ * The pixels are SNAPSHOTTED: the lib's `decode()` returns `data32` as a view
+ * into shared decoder memory, so holding two live decode results at once (as
+ * the sub-rect comparisons below do) silently corrupts the earlier one.
+ */
 function decodeRows(s: string): { width: number; at: (row: number, col: number) => number } {
   const res = decode(s);
-  return { width: res.width, at: (row, col) => res.data32[row * res.width + col] };
+  const pixels = new Uint32Array(res.data32);
+  return { width: res.width, at: (row, col) => pixels[row * res.width + col] };
 }
 
 /** The `#idx;2;r;g;b` palette DEFINITION tokens at the head of a sixel body. */
@@ -89,6 +97,35 @@ describe("sixelDriver", () => {
     const aData = bandData(a), bData = bandData(b);
     expect(aData[2]).toBe(bData[0]); // src rows 12..18
     expect(aData[3]).toBe(bData[1]); // src rows 18..24
+  });
+
+  it("assembles every warm band byte-identical to a direct encode", async () => {
+    // The slice-cache assembly (issue #780) must be indistinguishable from the
+    // pre-cache behavior. A band's top always lands ON its phase's slice grid,
+    // so a warm assembly (cached slices + optional ragged tail) reproduces the
+    // direct `sixelEncodeIndexed` output byte for byte — for EVERY phase, not
+    // just 6px-aligned tops. The reference is rebuilt from the same
+    // deterministic `reduce`. Byte-identity is the strongest possible check
+    // and deliberately avoids the lib's decoder, which renders a handful of
+    // left-edge pixels of a band crop differently from the same rows of the
+    // full image (a pre-existing decoder quirk, reproducible with two direct
+    // encodes and no driver involved; real terminals don't show it).
+    const prepared = sixelDriver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
+    await prepared.whenWarm?.(); // exercise the cache path, not the fallback
+    const opaque = new Uint8Array(sampleRgba());
+    const { indices, palette } = reduce(opaque, W, 256);
+    // cellH=16 → phases {0,4,2}: aligned tops (phase 0), top 16 (phase 4),
+    // top 32 (phase 2, ragged tail), a cold-fallback top no cell grid produces
+    // (7 → phase 1), a single-row band, and a bottom-clamped overrun.
+    const cases: [number, number][] = [[0, 12], [12, 24], [6, 42], [0, H], [16, 18], [32, 15], [7, 17], [16, 1], [32, 999]];
+    for (const [top, rows] of cases) {
+      const clipped = Math.min(rows, H - top);
+      const direct =
+        introducer(0) +
+        sixelEncodeIndexed(indices.subarray(top * W, (top + clipped) * W), W, clipped, palette) +
+        FINALIZER;
+      expect(prepared.encodeBand(top, rows), `band ${top}+${rows}`).toBe(direct);
+    }
   });
 
   it("encodes a given band deterministically across repeated calls", () => {

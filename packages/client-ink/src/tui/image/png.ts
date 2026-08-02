@@ -10,7 +10,7 @@
  * scanline). That's all the renderer needs — the source is already a contiguous
  * RGBA buffer from sharp.
  */
-import { deflateSync } from "node:zlib";
+import { constants, deflateSync } from "node:zlib";
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -43,9 +43,15 @@ function chunk(type: string, data: Buffer): Buffer {
 
 /**
  * Encode an RGBA8888 pixel buffer (`width*height*4` bytes, row-major) to a PNG.
+ *
+ * `fast` switches deflate to `Z_RLE`: ~3× faster than the default strategy on
+ * real scene art (16ms vs 48ms for a 1000×300 band) for ~11% larger output —
+ * the right trade for transient screen payloads re-encoded on every scroll
+ * step (issue #780). Default remains full compression for any caller encoding
+ * durable bytes.
  * @throws if `rgba.length` doesn't match the geometry.
  */
-export function encodePng(rgba: Uint8Array, width: number, height: number): Buffer {
+export function encodePng(rgba: Uint8Array, width: number, height: number, fast = false): Buffer {
   const stride = width * 4;
   if (rgba.length !== stride * height) {
     throw new Error(`encodePng: expected ${stride * height} bytes, got ${rgba.length}`);
@@ -72,7 +78,7 @@ export function encodePng(rgba: Uint8Array, width: number, height: number): Buff
   return Buffer.concat([
     SIGNATURE,
     chunk("IHDR", ihdr),
-    chunk("IDAT", deflateSync(raw)),
+    chunk("IDAT", fast ? deflateSync(raw, { strategy: constants.Z_RLE }) : deflateSync(raw)),
     chunk("IEND", Buffer.alloc(0)),
   ]);
 }

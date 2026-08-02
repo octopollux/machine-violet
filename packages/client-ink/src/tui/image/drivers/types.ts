@@ -33,6 +33,14 @@ export interface PreparedImage {
    * image data so it can be re-placed when shown again). Optional; absent ≡ "".
    */
   clear?(): string;
+  /**
+   * Resolves when any background encode warm-up has finished (sixel's
+   * per-phase slice caches build asynchronously off the render path).
+   * Absent ≡ always warm. Used by tests and benches to deterministically
+   * exercise the warm fast path; the painter never needs it — a cold
+   * `encodeBand` falls back to a direct (slower, correct) encode.
+   */
+  whenWarm?(): Promise<void>;
   /** Release any terminal-side resources (kitty deletes its transmitted image). */
   dispose(): void;
 }

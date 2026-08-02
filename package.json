@@ -21,6 +21,7 @@
     "e2e:boot": "node --import tsx/esm packages/test-harness/bin/boot-and-quit.ts",
     "e2e:replay": "node --import tsx/esm packages/test-harness/bin/replay-golden.ts",
     "play": "node --import tsx/esm packages/test-harness/bin/mvplay.ts",
+    "image-testbed": "node --import tsx/esm packages/test-harness/bin/image-testbed-server.ts",
     "tokens": "node --import tsx/esm scripts/content-tokens.ts",
     "catalog:docs": "node --import tsx/esm scripts/gen-catalog-docs.ts",
     "voice-guide": "node --import tsx/esm packages/test-harness/bin/dm-voice-guide.ts",

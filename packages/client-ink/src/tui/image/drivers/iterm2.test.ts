@@ -42,9 +42,21 @@ describe("iterm2Driver", () => {
   it("sizes the display in CELLS, not pixels, so it lands on the text grid", () => {
     const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
     const esc = p.encodeBand(6, 12); // 12px band ÷ 6px cell = 2 rows; W/6 = 2 cols
-    expect(esc).toContain("width=2;height=2"); // cells (no "px")
-    expect(esc).not.toContain("px");
-    expect(esc).toContain("inline=1");
+    // Only the header is grammar — the base64 payload after ":" can contain
+    // any substring, so assert on the header alone.
+    const header = esc.slice(0, esc.indexOf(":"));
+    expect(header).toContain("width=2;height=2"); // cells (no "px")
+    expect(header).not.toContain("px");
+    expect(header).toContain("inline=1");
+  });
+
+  it("memoizes repeated bands (LRU) and stays correct after eviction", () => {
+    const p = iterm2Driver.prepare(sampleRgba(), W, H, () => {}, 256, CELL);
+    const first = p.encodeBand(0, 6);
+    expect(p.encodeBand(0, 6)).toBe(first); // memo hit → identical output
+    // Churn well past the LRU cap, then re-request the original band.
+    for (let top = 0; top < 12; top++) p.encodeBand(top, 6);
+    expect(p.encodeBand(0, 6)).toBe(first); // re-encoded after eviction, same bytes
   });
 
   it("embeds a PNG that decodes to exactly the requested band", async () => {
