@@ -17,8 +17,10 @@
  * into every synchronized block *just before* the ESU — used by the inline
  * image renderer to re-blit out-of-band graphics (sixel/iTerm2) inside the
  * same atomic frame Ink just drew, so the terminal never shows the blanked
- * intermediate state (see ../image/painterRegistry.ts). Returns "" when there
- * is nothing to inject, which is a no-op.
+ * intermediate state (see ../image/painterRegistry.ts). It receives the full
+ * block Ink produced (pre-injection) so the injector can analyze what the
+ * frame wrote (frame-damage detection). Returns "" when there is nothing to
+ * inject, which is a no-op.
  */
 
 const BSU = "\x1b[?2026h";
@@ -34,7 +36,7 @@ function spliceBeforeEsu(block: string, injection: string): string {
 
 export function installSyncWriteCombiner(
   stream: NodeJS.WriteStream,
-  getPreEsuInjection?: () => string,
+  getPreEsuInjection?: (block: string) => string,
 ): () => void {
   // Keep the true write and guard against double-install.
   const originalWrite: NodeJS.WriteStream["write"] = stream.write;
@@ -59,7 +61,7 @@ export function installSyncWriteCombiner(
       if (str.includes(ESU)) {
         inSync = false;
         syncChunks = [];
-        const block = spliceBeforeEsu(str, inject());
+        const block = spliceBeforeEsu(str, inject(str));
         return originalWrite.call(stream, block, encodingOrCb as BufferEncoding, cb) as boolean;
       }
       return true; // signal "accepted" to callers
@@ -71,7 +73,8 @@ export function installSyncWriteCombiner(
       if (str.includes(ESU)) {
         // Flush the entire synchronized block as one write, splicing any
         // pre-ESU injection (inline-image escapes) inside the atomic frame.
-        const combined = spliceBeforeEsu(syncChunks.join(""), inject());
+        const raw = syncChunks.join("");
+        const combined = spliceBeforeEsu(raw, inject(raw));
         syncChunks = [];
         inSync = false;
         return originalWrite.call(stream, combined, encodingOrCb as BufferEncoding, cb) as boolean;
