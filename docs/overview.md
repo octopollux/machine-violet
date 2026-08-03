@@ -1,6 +1,6 @@
 # Machine Violet: An Agentic RPG in Your Console
 
-Machine Violet is an agentic DM and game state manager designed to run any tabletop RPG in a terminal. The AI is the Dungeon Master — it narrates, adjudicates, manages the world, and manipulates the UI directly. The player never sees game files or internal state. Everything is narrated.
+Machine Violet is an agentic DM and game state manager designed to run tabletop RPGs in a terminal. The AI is the Dungeon Master — it narrates, adjudicates, manages the world, and manipulates the UI directly. The player never sees game files or internal state. Everything is narrated.
 
 
 ## Architecture
@@ -46,6 +46,11 @@ Two clocks manage time automatically. A **calendar** tracks narrative time and a
 
 
 ## Game Systems
+
+Machine Violet plays the systems bundled in `systems/`, plus whatever a user ingests
+from PDF. The binding constraint is context — the DM holds a system's mechanics
+in-window alongside the campaign, so lightweight systems play best and rules-dense ones
+reach only as far as their rule cards and retrieved entity files.
 
 Game system support uses a three-layer content model:
 

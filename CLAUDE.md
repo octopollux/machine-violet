@@ -1,6 +1,6 @@
 # Machine Violet
 
-Agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
+Agentic AI Dungeon Master that runs tabletop RPGs in a terminal.
 
 ## Agent Metadata
 

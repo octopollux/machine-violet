@@ -1,7 +1,7 @@
 {
   "name": "machine-violet",
   "version": "1.1.0",
-  "description": "Machine Violet — an agentic AI Dungeon Master that runs any tabletop RPG in a terminal",
+  "description": "Machine Violet — an agentic AI Dungeon Master that runs tabletop RPGs in a terminal",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {

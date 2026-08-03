@@ -1,6 +1,6 @@
 # Machine Violet Documentation
 
-Agentic AI Dungeon Master that runs any tabletop RPG in a terminal.
+Agentic AI Dungeon Master that runs tabletop RPGs in a terminal.
 Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 
 ## Quick Navigation

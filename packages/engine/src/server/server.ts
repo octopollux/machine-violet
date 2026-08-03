@@ -96,7 +96,7 @@ export async function createServer(
         description: [
           "# Machine Violet Engine API",
           "",
-          "Machine Violet is an agentic AI Dungeon Master that runs any tabletop RPG.",
+          "Machine Violet is an agentic AI Dungeon Master that runs tabletop RPGs.",
           "The engine server exposes game logic over REST (this document) and WebSocket",
           "(see `docs/websocket-api.md` in the repository).",
           "",
