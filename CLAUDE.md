@@ -2,11 +2,6 @@
 
 Agentic AI Dungeon Master that runs tabletop RPGs in a terminal.
 
-Accuracy note for docs and copy: Machine Violet is **not** system-agnostic and does not
-"run any tabletop RPG." It ships with a small set of bundled systems (`systems/`) plus a
-PDF ingestion path; context limits are the binding constraint on how much rules material a
-system can carry. Don't reintroduce "any tabletop RPG" phrasing.
-
 ## Agent Metadata
 
 Keep shared agent guidance in this file and reusable workflows in `.claude/skills/`.

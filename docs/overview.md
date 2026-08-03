@@ -47,11 +47,10 @@ Two clocks manage time automatically. A **calendar** tracks narrative time and a
 
 ## Game Systems
 
-Machine Violet is not system-agnostic: it runs the systems bundled in `systems/` (plus
-whatever a user ingests from PDF), not arbitrary rulesets. The binding constraint is
-context — the DM has to hold a system's mechanics in-window alongside the campaign, so
-lightweight systems play best and rules-dense ones are limited to what rule cards and
-retrieved entity files can cover.
+Machine Violet plays the systems bundled in `systems/`, plus whatever a user ingests from
+PDF. The binding constraint is context — the DM holds a system's mechanics in-window
+alongside the campaign, so lightweight systems play best and rules-dense ones reach only as
+far as their rule cards and retrieved entity files.
 
 Game system support uses a three-layer content model:
 
