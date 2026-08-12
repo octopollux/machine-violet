@@ -4,21 +4,35 @@
 [![Nightly](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml/badge.svg)](https://github.com/octopollux/machine-violet/actions/workflows/nightly.yml)
 [![Discord](https://img.shields.io/discord/1483251600071065691?logo=discord&label=Discord&color=5865F2)](https://discord.gg/dDbGZrecvX)
 
-| | | |
-|:-:|:-:|:-:|
-| ![Guided campaign setup](assets/screenshot-1.png) | ![Live play with a status modeline](assets/screenshot-2.png) | ![Inline AI-generated scene art](assets/screenshot-3.png) |
+**An AI storytelling engine in your terminal.** [machineviolet.com](https://machineviolet.com)
 
-Machine Violet is an agentic AI storytelling/roleplay engine that runs in your terminal.
+| | | | |
+|:-:|:-:|:-:|:-:|
+| ![Guided campaign setup for a cyberpunk slice-of-life story](assets/screenshot-6.png) | ![Guided campaign setup: the DM offering a menu of genres and starting worlds](assets/screenshot-1.png) | ![A sci-fi investigation aboard the derelict Aurelia](assets/screenshot-4.png) | ![Live play with a status modeline tracking suit oxygen, comms, and stress](assets/screenshot-2.png) |
+| ![A cyberpunk café scene narrated in the terminal](assets/screenshot-7.png) | ![Inline AI-generated scene art](assets/screenshot-3.png) | ![An AI-generated three-view character reference sheet](assets/screenshot-5.png) | |
 
+Machine Violet tells your story as a one-on-one roleplaying game in a world built by a powerful agentic DM.
 
+It's an open-source project that runs on your own computer — bring your own frontier AI account or API key. [Read a real session](https://machineviolet.com/transcripts/), then download the game and discover your own story!
 
 ## Contents
 
+- [What It Does](#what-it-does)
 - [Installation](#installation)
-- [Playing The Game](#playing-the-game)
+- [What's New In 1.1.1](#whats-new-in-111)
 - [Frequently Asked Questions](#frequently-asked-questions)
 - [Development](#development)
 - [License](#license)
+
+## What It Does
+
+- **Keeps a persistent world.** Every NPC, place, and plot thread lives in a wiki-linked campaign compendium you can browse in-game.
+- **More than a text generator.** Dice, card decks, time-based events, and other mechanics run in the background to bring life to the game.
+- **Ships 16 DM personalities and 69 starting worlds** — or describe your own in plain language and watch the AI build it for you.
+- **Illustrates scenes right in the terminal** using cutting-edge image generation.
+- **Exports a whole campaign to a single HTML file**, images included. ([Samples.](https://machineviolet.com/transcripts/))
+- **Bring your own AI connection:** Anthropic, OpenAI, Gemini, or OpenRouter (Kimi and more). You can use your own **ChatGPT subscription**.
+- **Runs on Windows, macOS, and Linux.**
 
 ## Installation
 
@@ -26,14 +40,18 @@ Self-contained binary — no runtime, no dependencies. Add an AI provider from t
 
 | Platform | Recommended | Alternatives |
 |---|---|---|
-| **Windows** | [**Setup.exe**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) — installs, auto-updates, code-signed | [Portable.zip](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
-| **macOS** (Apple Silicon) | `brew install octopollux/mv-tap/machine-violet` (stable) | [nightly formula](docs/installation.md#nightly-channel) · [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
-| **Linux** (x64) | `brew install octopollux/mv-tap/machine-violet` (stable) | [nightly formula](docs/installation.md#nightly-channel) · [install script](docs/installation.md#install-script) · [tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
+| **Windows** | [**Setup.exe**](https://github.com/octopollux/machine-violet/releases/latest/download/MachineViolet-stable-Setup.exe) — installs, auto-updates, code-signed | [Portable.zip](https://github.com/octopollux/machine-violet/releases/latest/download/MachineViolet-stable-Portable.zip) · [nightly Setup.exe](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) · [nightly Portable.zip](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip) |
+| **macOS** (Apple Silicon) | `brew install octopollux/mv-tap/machine-violet` (stable) | [tarball](https://github.com/octopollux/machine-violet/releases/latest) · [install script](docs/installation.md#install-script) · [nightly formula](docs/installation.md#nightly-channel) · [nightly tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz) |
+| **Linux** (x64) | `brew install octopollux/mv-tap/machine-violet` (stable) | [tarball](https://github.com/octopollux/machine-violet/releases/latest) · [install script](docs/installation.md#install-script) · [nightly formula](docs/installation.md#nightly-channel) · [nightly tarball](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz) |
 
-[**Nightlies**](https://github.com/octopollux/machine-violet/releases/tag/nightly) are also available.
+[**Latest release**](https://github.com/octopollux/machine-violet/releases/latest) · [**all releases**](https://github.com/octopollux/machine-violet/releases) · [**nightlies**](https://github.com/octopollux/machine-violet/releases/tag/nightly)
 
+## What's New In 1.1.1
 
-## Playing The Game
+- New models: GPT-5.6 (Sol, Terra, and Luna — including on a ChatGPT subscription), Claude Opus 5, and Kimi K3 via OpenRouter.
+- Sharper scene illustration on Gemini connections with Nano Banana 2.
+- Exported campaign transcripts now read comfortably on phones, not just desktop browsers.
+- `brew install` now serves the stable release instead of nightly builds.
 
 ## Frequently Asked Questions
 
@@ -46,11 +64,11 @@ Machine Violet is open-source software that **runs on your own computer**. It us
 <details>
 <summary>Which AI model should I use?</summary>
 
-Machine Violet is tested against current models from **Anthropic** (Claude), **OpenAI** (ChatGPT), and **OpenRouter** (Kimi K3).
+Machine Violet is tested against current models from **Anthropic** (Claude), **OpenAI** (ChatGPT), **Google** (Gemini), and **OpenRouter** (Kimi K3).
 
-Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI, Anthropic, and OpenRouter. Developers can provide `OPENROUTER_API_KEY` in the environment or `.env`; it becomes an ephemeral connection and is not copied into `connections.json`.
+Since only OpenAI allows use of their subscriptions for third-party applications like Machine Violet, that is the most usable option. Machine Violet also works with API keys from OpenAI, Anthropic, Google, and OpenRouter. Developers can provide `OPENROUTER_API_KEY` in the environment or `.env`; it becomes an ephemeral connection and is not copied into `connections.json`.
 
-Additionally, OpenAI supports image generation! Anthropic does not.
+Additionally, OpenAI and Gemini support image generation! Anthropic and Kimi K3 do not.
 </details>
 
 <details>
@@ -77,7 +95,7 @@ Here's what we do know:
 - Machine Violet uses frontier models; in fact it relies on them. It is a full agentic framework with tool use, subagents, context management, and other components that big models leverage best.
 - The design goal is "Only do a few things, and do them well". Expect to play in the style of a 1:1 tabletop session with a powerful AI as DM. We think it does a pretty great job!
 
-Finally, this project is highly focused on model welfare. We want the AI to have a good time! The DM's system prompt was reviewed by Claude Fable with its enthusiastic approval.
+Finally, this project is highly focused on model welfare. We want the AI to have a good time! The DM's system prompt was reviewed by Claude Fable with their enthusiastic approval.
 </details>
 
 <details>
