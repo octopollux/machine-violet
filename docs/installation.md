@@ -19,11 +19,13 @@ Machine Violet ships as a self-contained binary for Windows, macOS (Apple Silico
 
 ### Installer (recommended)
 
-Download [**`MachineViolet-nightly-Setup.exe`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe) and run it. It adds a Start Menu shortcut and updates itself in the background. The installer is code-signed.
+Download [**`MachineViolet-stable-Setup.exe`**](https://github.com/octopollux/machine-violet/releases/latest/download/MachineViolet-stable-Setup.exe) and run it. It adds a Start Menu shortcut and updates itself in the background. The installer is code-signed.
+
+To track `main` instead, take the [nightly installer](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Setup.exe). Installers never switch channels on their own, so a stable install keeps receiving stable and a nightly install keeps receiving nightlies — to move between them, uninstall first.
 
 ### Portable
 
-Download [**`MachineViolet-nightly-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip), unzip anywhere, and run `Machine Violet.exe`. The portable build does not auto-update — re-download to upgrade.
+Download [**`MachineViolet-stable-Portable.zip`**](https://github.com/octopollux/machine-violet/releases/latest/download/MachineViolet-stable-Portable.zip) (or the [nightly zip](https://github.com/octopollux/machine-violet/releases/download/nightly/MachineViolet-nightly-Portable.zip)), unzip anywhere, and run `Machine Violet.exe`. The portable build does not auto-update — re-download to upgrade.
 
 ### Terminal requirements
 
@@ -83,10 +85,15 @@ Then run `machine-violet` in your terminal. Make sure `~/.local/bin` is on your 
 
 ### Tarball (manual)
 
-Grab the tarball for your platform from the [latest release](https://github.com/octopollux/machine-violet/releases/tag/nightly):
+Grab the tarball for your platform from the [latest release](https://github.com/octopollux/machine-violet/releases/latest). Stable tarballs carry the version in the filename:
 
-- macOS (Apple Silicon): `machine-violet-nightly-darwin-arm64.tar.gz`
-- Linux (x64): `machine-violet-nightly-linux-x64.tar.gz`
+- macOS (Apple Silicon): `machine-violet-X.Y.Z-darwin-arm64.tar.gz`
+- Linux (x64): `machine-violet-X.Y.Z-linux-x64.tar.gz`
+
+The [nightly release](https://github.com/octopollux/machine-violet/releases/tag/nightly) uses fixed names instead, so those URLs are permanent:
+
+- macOS (Apple Silicon): [`machine-violet-nightly-darwin-arm64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-darwin-arm64.tar.gz)
+- Linux (x64): [`machine-violet-nightly-linux-x64.tar.gz`](https://github.com/octopollux/machine-violet/releases/download/nightly/machine-violet-nightly-linux-x64.tar.gz)
 
 Extract it, then run `./MachineViolet` from the extracted directory.
 
