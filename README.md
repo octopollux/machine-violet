@@ -20,7 +20,6 @@ It's an open-source project that runs on your own computer — bring your own fr
 - [What It Does](#what-it-does)
 - [Installation](#installation)
 - [What's New In 1.1.1](#whats-new-in-111)
-- [Playing The Game](#playing-the-game)
 - [Frequently Asked Questions](#frequently-asked-questions)
 - [Development](#development)
 - [License](#license)
@@ -53,8 +52,6 @@ Self-contained binary — no runtime, no dependencies. Add an AI provider from t
 - Sharper scene illustration on Gemini connections with Nano Banana 2.
 - Exported campaign transcripts now read comfortably on phones, not just desktop browsers.
 - `brew install` now serves the stable release instead of nightly builds.
-
-## Playing The Game
 
 ## Frequently Asked Questions
 
