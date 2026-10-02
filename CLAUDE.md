@@ -8,6 +8,14 @@ Keep shared agent guidance in this file and reusable workflows in `.claude/skill
 Agents from other runtimes should follow these conventions directly rather than
 adding runtime-specific instruction or memory files to the repository.
 
+### Coding delegation
+
+The primary agent coordinates user discussion, architecture, task breakdown,
+review, and integration. Delegate implementation and coding tasks to GPT-6.1 Sol
+(`gpt-6.1-sol`) by default unless the user directs otherwise. If that model is
+unavailable, report the limitation rather than silently substituting another
+model. This workflow does not change the game's model tiers.
+
 ```bash
 npm install
 npm run check           # lint + tests (run before every PR)
