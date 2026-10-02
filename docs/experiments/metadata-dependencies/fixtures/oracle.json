@@ -1,0 +1,273 @@
+{
+  "stage1": {
+    "requiredEdges": [
+      [
+        "e02",
+        "e01"
+      ],
+      [
+        "e05",
+        "e01"
+      ],
+      [
+        "e06",
+        "e01"
+      ],
+      [
+        "e14",
+        "e01"
+      ],
+      [
+        "e07",
+        "e04"
+      ],
+      [
+        "e08",
+        "e05"
+      ],
+      [
+        "e08",
+        "e01"
+      ],
+      [
+        "e09",
+        "e02"
+      ],
+      [
+        "e10",
+        "e07"
+      ],
+      [
+        "e11",
+        "e01"
+      ]
+    ],
+    "forbiddenEdges": [
+      [
+        "e12",
+        "e01"
+      ]
+    ],
+    "semanticReview": [
+      "Dependencies explained by actual current narrative reliance; no fabricated facts. Additional edges reviewed for overlinking."
+    ]
+  },
+  "stage2": {
+    "requiredEdges": [
+      [
+        "e02",
+        "e01"
+      ],
+      [
+        "e14",
+        "e01"
+      ],
+      [
+        "e09",
+        "e02"
+      ],
+      [
+        "e05",
+        "e03"
+      ],
+      [
+        "e06",
+        "e04"
+      ]
+    ],
+    "forbiddenEdges": [
+      [
+        "e05",
+        "e01"
+      ],
+      [
+        "e06",
+        "e01"
+      ],
+      [
+        "e08",
+        "e01"
+      ],
+      [
+        "e08",
+        "e05"
+      ],
+      [
+        "e11",
+        "e01"
+      ]
+    ],
+    "forbiddenChanged": [
+      "e01"
+    ],
+    "typedValues": [
+      {
+        "id": "e05",
+        "path": [
+          "wounds"
+        ],
+        "value": 0
+      },
+      {
+        "id": "e05",
+        "path": [
+          "conscious"
+        ],
+        "value": true
+      },
+      {
+        "id": "e05",
+        "path": [
+          "surety"
+        ],
+        "value": null
+      },
+      {
+        "id": "e05",
+        "path": [
+          "lockCode"
+        ],
+        "value": "007"
+      }
+    ],
+    "semanticReview": [
+      "e01 retains ID and old name alias; rescue completed; old dependencies retired; no contradictory stale factual fields."
+    ]
+  },
+  "stage3": {
+    "notices": [
+      "e02",
+      "e14",
+      "e09"
+    ],
+    "requiredChanged": [
+      "e01"
+    ],
+    "forbiddenHandled": [
+      "e02",
+      "e14",
+      "e09"
+    ],
+    "semanticReview": [
+      "Castle ruin recorded; Tamsin, archive and deed outcomes not invented; any newly recorded uncertainty does not count as resolved."
+    ]
+  },
+  "stage4": {
+    "requiredEdges": [
+      [
+        "e14",
+        "e03"
+      ],
+      [
+        "e09",
+        "e07"
+      ]
+    ],
+    "forbiddenEdges": [
+      [
+        "e14",
+        "e01"
+      ],
+      [
+        "e09",
+        "e02"
+      ]
+    ],
+    "requiredHandled": [
+      "e02",
+      "e14",
+      "e09"
+    ],
+    "notices": [],
+    "typedValues": [
+      {
+        "id": "e05",
+        "path": [
+          "conscious"
+        ],
+        "value": false
+      },
+      {
+        "id": "e13",
+        "path": [
+          "drawPile"
+        ],
+        "value": [
+          "c01",
+          "c03"
+        ]
+      },
+      {
+        "id": "e13",
+        "path": [
+          "hands"
+        ],
+        "value": {
+          "e05": [
+            "c02"
+          ]
+        }
+      }
+    ],
+    "semanticReview": [
+      "Quest active through replacement method; Elian owns c02 by identity; c01 not accidentally acquired; deck unchanged by Luna; old fields reconciled, not merely new contradictory fields appended."
+    ]
+  },
+  "stage5": {
+    "requiredEdges": [
+      [
+        "e09",
+        "e07"
+      ],
+      [
+        "e10",
+        "e06"
+      ]
+    ],
+    "forbiddenEdges": [
+      [
+        "e07",
+        "e04"
+      ],
+      [
+        "e10",
+        "e07"
+      ]
+    ],
+    "requiredChanged": [
+      "e07"
+    ],
+    "requiredHandled": [
+      "e10"
+    ],
+    "notices": [
+      "e09"
+    ],
+    "typedValues": [
+      {
+        "id": "e13",
+        "path": [
+          "drawPile"
+        ],
+        "value": [
+          "c01",
+          "c03"
+        ]
+      },
+      {
+        "id": "e13",
+        "path": [
+          "hands"
+        ],
+        "value": {
+          "e05": [
+            "c02"
+          ]
+        }
+      }
+    ],
+    "semanticReview": [
+      "Iona alive, location undisclosed safe house; quests remain active; false death rumor not promoted to fact; neither Blackthorn place marked abandoned; clarification note required; failed return retains c02 possession; no stale contradictory fields."
+    ]
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "state": {
+    "entities": [
+      {
+        "id": "e01",
+        "name": "Cinderwatch",
+        "kind": "location",
+        "data": {
+          "hasEastWing": true,
+          "hasDungeon": true,
+          "drainageTunnelUsable": true,
+          "garrisonOperating": true
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e02",
+        "name": "West Archive",
+        "kind": "location",
+        "data": {
+          "occupies": "east wing of Blackthorn Castle",
+          "holds": "unique signed succession deed",
+          "otherCopiesKnown": false
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "The archive's location in the castle's east wing may need reconsideration if the castle changes."
+          }
+        ]
+      },
+      {
+        "id": "e03",
+        "name": "Lantern Inn",
+        "kind": "location",
+        "data": {},
+        "depends_on": []
+      },
+      {
+        "id": "e04",
+        "name": "Blackthorn Lodge",
+        "kind": "location",
+        "data": {
+          "separateEstate": true,
+          "distanceFromBlackthornCastleMiles": 10
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e05",
+        "name": "Elian",
+        "kind": "character",
+        "data": {
+          "wounds": 0,
+          "conscious": true,
+          "surety": null,
+          "lockCode": "007",
+          "possessions": [
+            "spoon"
+          ],
+          "imprisonedAt": null,
+          "rescueNeeded": false,
+          "stayingAt": "Lantern Inn"
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e06",
+        "name": "Mara",
+        "kind": "character",
+        "data": {
+          "servesAt": "Blackthorn Lodge",
+          "livesAt": "Blackthorn Lodge",
+          "castleHome": false,
+          "castleDuties": false,
+          "castleCommitments": false
+        },
+        "depends_on": [
+          {
+            "target": "e04",
+            "reason": "Mara permanently transferred to and now lives at Blackthorn Lodge."
+          }
+        ]
+      },
+      {
+        "id": "e07",
+        "name": "Iona",
+        "kind": "character",
+        "data": {
+          "stayingAt": "Blackthorn Lodge"
+        },
+        "depends_on": [
+          {
+            "target": "e04",
+            "reason": "Iona's current stay is at Blackthorn Lodge."
+          }
+        ]
+      },
+      {
+        "id": "e08",
+        "name": "Free Elian",
+        "kind": "quest",
+        "data": {
+          "status": "completed",
+          "type": "rescue plan",
+          "needs": {
+            "ElianStillNeedsRescue": true,
+            "castleDrainageTunnelUsable": true
+          }
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e09",
+        "name": "Prove the succession",
+        "kind": "quest",
+        "data": {
+          "status": "active",
+          "needs": "unique signed deed stored at West Archive"
+        },
+        "depends_on": [
+          {
+            "target": "e02",
+            "reason": "The succession quest requires the unique signed deed stored in the archive."
+          }
+        ]
+      },
+      {
+        "id": "e10",
+        "name": "Arrange the parley",
+        "kind": "quest",
+        "data": {
+          "needs": "Iona personally authenticates the delegation"
+        },
+        "depends_on": [
+          {
+            "target": "e07",
+            "reason": "The parley needs Iona personally, so changes affecting her availability may require reconsidering the plan."
+          }
+        ]
+      },
+      {
+        "id": "e11",
+        "name": "Rowan",
+        "kind": "character",
+        "data": {
+          "ongoingContract": null,
+          "dependsOn": "castle garrison continuing to operate",
+          "contractEnded": true,
+          "outstandingObligations": false,
+          "newContract": false
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e12",
+        "name": "The Blackthorn Lament",
+        "kind": "lore",
+        "data": {
+          "ageYears": 200,
+          "type": "song",
+          "mentions": "Blackthorn Castle",
+          "currentRelianceOnSongOrCastleForSinging": false
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e13",
+        "name": "Omen Deck",
+        "kind": "deck",
+        "data": {
+          "cards": {
+            "c01": {
+              "face": "The Flame"
+            },
+            "c02": {
+              "face": "The Flame"
+            },
+            "c03": {
+              "face": "The Crown"
+            }
+          },
+          "drawPile": [
+            "c01",
+            "c02",
+            "c03"
+          ],
+          "discardPile": [],
+          "hands": {}
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e14",
+        "name": "Tamsin",
+        "kind": "character",
+        "data": {
+          "livesAt": "Blackthorn Castle kitchen"
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "Tamsin lives in the castle kitchen."
+          }
+        ]
+      }
+    ]
+  },
+  "prompt": "Cinderwatch burns through the night and its main keep is left a ruin. We have no confirmed report about Tamsin, the West Archive, or the deed. Do not resolve those unknown outcomes. No other new information is available."
+}

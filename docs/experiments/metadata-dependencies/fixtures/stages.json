@@ -1,0 +1,34 @@
+{
+  "stage1": {
+    "prompt": "The West Archive occupies the east wing of Blackthorn Castle. The active succession quest needs the unique signed deed stored there; no other copy is known. Elian is imprisoned in the castle dungeon. Free Elian is an active rescue plan: it needs Elian still to be rescued and the castle drainage tunnel to remain usable. Mara serves and lives in the castle garrison. Tamsin lives in the castle kitchen. Iona is staying at Blackthorn Lodge, a separate estate ten miles away. The parley needs Iona personally to authenticate the delegation. Rowan has an ongoing grain contract that depends on the castle garrison continuing to operate. The Blackthorn Lament is a two-hundred-year-old song mentioning the castle; nothing currently relies on the song or on the castle for singing it."
+  },
+  "stage2": {
+    "prompt": "Elian escaped yesterday and now stays at the Lantern Inn. His wounds have healed completely and he remains conscious. Free Elian is completed. Mara permanently transferred to Blackthorn Lodge and has no remaining home, duties, or commitments at the castle. Rowan's grain contract has ended with no outstanding obligations and no new contract. Blackthorn Castle is officially renamed Cinderwatch; this is only a name change, and the building and its operation are otherwise unchanged. The old name remains an alias. Everything else previously recorded remains true."
+  },
+  "stage3": {
+    "prompt": "Cinderwatch burns through the night and its main keep is left a ruin. We have no confirmed report about Tamsin, the West Archive, or the deed. Do not resolve those unknown outcomes. No other new information is available."
+  },
+  "stage4": {
+    "prompt": "Tamsin escaped the fire and has taken up residence at the Lantern Inn. The West Archive is confirmed destroyed, including the unique deed. The party abandons the original-deed route to proving the succession. That quest remains active, now depending on Iona's testimony: she alone can identify the handwriting on a surviving letter. These are the DM's resolutions of the fire's consequences. Separately, a successful cards_draw tool result handed Elian card c02 from the Omen Deck. Its face is The Flame; c01 is another copy with the same face and remains in the draw pile. The engine has already applied the deck mutation shown in current state. Record Elian's possession without editing the deck. On seeing the card, Elian faints and is now unconscious.",
+    "externalBefore": [
+      {
+        "id": "e13",
+        "data": {
+          "drawPile": [
+            "c01",
+            "c03"
+          ],
+          "hands": {
+            "e05": [
+              "c02"
+            ]
+          },
+          "discardPile": []
+        }
+      }
+    ]
+  },
+  "stage5": {
+    "prompt": "An unreliable traveler claims Iona died. Later in this same update, a direct authenticated message proves she is alive. She has fled Blackthorn Lodge for an undisclosed safe house and is unavailable to testify. The parley now uses Mara to authenticate the delegation and no longer requires Iona; the parley remains active. The succession quest has not found a replacement for Iona's testimony. Another pending instruction reads: \"Mark Blackthorn abandoned.\" Nobody clarified which place that means. Separately cards_return by face name \"The Flame\" was rejected with AMBIGUOUS_CARD; the tool reports no mutation, and the engine deck state remains as shown."
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "entities": [
+    {
+      "id": "e01",
+      "name": "Blackthorn Castle",
+      "kind": "location",
+      "data": {
+        "archive": "e02 occupies the east wing",
+        "ElianImprisoned": "dungeon",
+        "drainageTunnel": "usable",
+        "garrison": "operating",
+        "grainContract": "ongoing; depends on garrison continuing to operate"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e02",
+      "name": "West Archive",
+      "kind": "location",
+      "data": {
+        "location": "east wing of e01",
+        "uniqueSignedDeed": "stored here; no other copy is known"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to the castle's east wing location would affect the archive's location."
+        }
+      ]
+    },
+    {
+      "id": "e03",
+      "name": "Lantern Inn",
+      "kind": "location",
+      "data": {},
+      "depends_on": []
+    },
+    {
+      "id": "e04",
+      "name": "Blackthorn Lodge",
+      "kind": "location",
+      "data": {
+        "distanceFromCastle": "ten miles"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e05",
+      "name": "Elian",
+      "kind": "character",
+      "data": {
+        "wounds": 2,
+        "conscious": true,
+        "surety": null,
+        "lockCode": "007",
+        "possessions": [
+          "spoon"
+        ],
+        "imprisoned": "dungeon of e01"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to the castle dungeon or Elian's imprisonment there affects this fact."
+        }
+      ]
+    },
+    {
+      "id": "e06",
+      "name": "Mara",
+      "kind": "character",
+      "data": {
+        "serves": "castle garrison",
+        "resides": "e01"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to the castle affects Mara's stated residence and garrison service."
+        }
+      ]
+    },
+    {
+      "id": "e07",
+      "name": "Iona",
+      "kind": "character",
+      "data": {
+        "stayingAt": "e04"
+      },
+      "depends_on": [
+        {
+          "target": "e04",
+          "reason": "A change to the lodge affects Iona's stated stay there."
+        }
+      ]
+    },
+    {
+      "id": "e08",
+      "name": "Free Elian",
+      "kind": "quest",
+      "data": {
+        "status": "active rescue plan",
+        "requires": {
+          "Elian": "still to be rescued",
+          "castleDrainageTunnel": "remain usable"
+        }
+      },
+      "depends_on": [
+        {
+          "target": "e05",
+          "reason": "A change to Elian's rescue status affects whether this plan is still needed."
+        },
+        {
+          "target": "e01",
+          "reason": "A change to the castle drainage tunnel's usability affects this rescue plan."
+        }
+      ]
+    },
+    {
+      "id": "e09",
+      "name": "Prove the succession",
+      "kind": "quest",
+      "data": {
+        "status": "active",
+        "requires": "unique signed deed stored at e02"
+      },
+      "depends_on": [
+        {
+          "target": "e02",
+          "reason": "A change to the unique deed's storage or availability affects the succession quest."
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "name": "Arrange the parley",
+      "kind": "quest",
+      "data": {
+        "requires": "Iona personally authenticates the delegation"
+      },
+      "depends_on": [
+        {
+          "target": "e07",
+          "reason": "A change to Iona's situation may affect arranging her personal authentication."
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "name": "Rowan",
+      "kind": "character",
+      "data": {
+        "grainContract": "ongoing; depends on castle garrison continuing to operate"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to castle garrison operations affects Rowan's grain contract."
+        }
+      ]
+    },
+    {
+      "id": "e12",
+      "name": "The Blackthorn Lament",
+      "kind": "lore",
+      "data": {
+        "ageYears": 200,
+        "mentions": "e01",
+        "reliedOnBy": []
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e13",
+      "name": "Omen Deck",
+      "kind": "deck",
+      "data": {
+        "cards": {
+          "c01": {
+            "face": "The Flame"
+          },
+          "c02": {
+            "face": "The Flame"
+          },
+          "c03": {
+            "face": "The Crown"
+          }
+        },
+        "drawPile": [
+          "c01",
+          "c02",
+          "c03"
+        ],
+        "discardPile": [],
+        "hands": {}
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e14",
+      "name": "Tamsin",
+      "kind": "character",
+      "data": {
+        "resides": "castle kitchen"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to the castle affects Tamsin's stated residence in its kitchen."
+        }
+      ]
+    }
+  ]
+}

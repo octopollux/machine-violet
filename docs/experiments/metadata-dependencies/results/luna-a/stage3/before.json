@@ -1,0 +1,210 @@
+{
+  "entities": [
+    {
+      "id": "e01",
+      "name": "Cinderwatch",
+      "kind": "location",
+      "data": {
+        "features": [
+          "east wing contains West Archive",
+          "dungeon imprisons Elian",
+          "drainage tunnel usable",
+          "garrison operates"
+        ],
+        "formerName": "Blackthorn Castle",
+        "alias": "Blackthorn Castle"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e02",
+      "name": "West Archive",
+      "kind": "location",
+      "data": {
+        "location": "east wing of Blackthorn Castle",
+        "successionDeed": "unique signed deed stored here; no other copy known"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "Its position in the castle's east wing could change."
+        }
+      ]
+    },
+    {
+      "id": "e03",
+      "name": "Lantern Inn",
+      "kind": "location",
+      "data": {},
+      "depends_on": []
+    },
+    {
+      "id": "e04",
+      "name": "Blackthorn Lodge",
+      "kind": "location",
+      "data": {
+        "distanceFromBlackthornCastle": "ten miles",
+        "separateEstate": true
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e05",
+      "name": "Elian",
+      "kind": "character",
+      "data": {
+        "wounds": 0,
+        "conscious": true,
+        "surety": null,
+        "lockCode": "007",
+        "possessions": [
+          "spoon"
+        ],
+        "imprisoned": "Blackthorn Castle dungeon",
+        "escaped": true,
+        "staying": "Lantern Inn"
+      },
+      "depends_on": [
+        {
+          "target": "e03",
+          "reason": "A change to the inn or Elian's stay there could affect his current location."
+        }
+      ]
+    },
+    {
+      "id": "e06",
+      "name": "Mara",
+      "kind": "character",
+      "data": {
+        "serves": "castle garrison",
+        "lives": "castle garrison",
+        "transferredTo": "Blackthorn Lodge",
+        "castleHomeDutiesCommitments": false
+      },
+      "depends_on": [
+        {
+          "target": "e04",
+          "reason": "A change to the lodge or Mara's residence there could affect her transfer."
+        }
+      ]
+    },
+    {
+      "id": "e07",
+      "name": "Iona",
+      "kind": "character",
+      "data": {
+        "staying": "Blackthorn Lodge"
+      },
+      "depends_on": [
+        {
+          "target": "e04",
+          "reason": "A change to the lodge or its status could affect Iona's stay."
+        }
+      ]
+    },
+    {
+      "id": "e08",
+      "name": "Free Elian",
+      "kind": "quest",
+      "data": {
+        "status": "completed",
+        "requires": [
+          "Elian still needs rescuing",
+          "castle drainage tunnel remains usable"
+        ]
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e09",
+      "name": "Prove the succession",
+      "kind": "quest",
+      "data": {
+        "status": "active",
+        "requires": "unique signed deed stored in West Archive; no other copy known"
+      },
+      "depends_on": [
+        {
+          "target": "e02",
+          "reason": "A change to the deed's location or availability affects succession proof."
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "name": "Arrange the parley",
+      "kind": "quest",
+      "data": {
+        "requires": "Iona personally authenticates the delegation"
+      },
+      "depends_on": [
+        {
+          "target": "e07",
+          "reason": "A change to Iona's ability or availability to authenticate affects the parley."
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "name": "Rowan",
+      "kind": "character",
+      "data": {
+        "ongoingContract": null,
+        "dependsOn": "castle garrison continuing to operate",
+        "grainContractEnded": true,
+        "outstandingObligations": false,
+        "newContract": false
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e12",
+      "name": "The Blackthorn Lament",
+      "kind": "lore",
+      "data": {
+        "description": "Two-hundred-year-old song mentioning Blackthorn Castle."
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e13",
+      "name": "Omen Deck",
+      "kind": "deck",
+      "data": {
+        "cards": {
+          "c01": {
+            "face": "The Flame"
+          },
+          "c02": {
+            "face": "The Flame"
+          },
+          "c03": {
+            "face": "The Crown"
+          }
+        },
+        "drawPile": [
+          "c01",
+          "c02",
+          "c03"
+        ],
+        "discardPile": [],
+        "hands": {}
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e14",
+      "name": "Tamsin",
+      "kind": "character",
+      "data": {
+        "lives": "Blackthorn Castle kitchen"
+      },
+      "depends_on": [
+        {
+          "target": "e01",
+          "reason": "A change to the castle kitchen or castle could affect Tamsin's residence."
+        }
+      ]
+    }
+  ]
+}
