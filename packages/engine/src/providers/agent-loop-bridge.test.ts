@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage, ContentPart } from "./types.js";
 import { runProviderLoop } from "./agent-loop-bridge.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadModelConfig } from "../config/models.js";
 
 function mockUsage(): NormalizedUsage {
   return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -42,6 +46,38 @@ function networkError(): Error {
   err.name = "TypeError";
   return err;
 }
+
+describe("runProviderLoop model-specific effort", () => {
+  let configDir: string;
+  beforeEach(() => {
+    configDir = mkdtempSync(join(tmpdir(), "mv-effort-default-"));
+    loadModelConfig({ cwd: configDir, reset: true });
+  });
+  afterEach(() => {
+    rmSync(configDir, { recursive: true, force: true });
+    loadModelConfig({ reset: true });
+  });
+
+  it.each([
+    ["dm", "gpt-6.1-sol", "medium"],
+    ["ooc", "gpt-6.1-sol", "high"],
+    ["dm", "claude-opus-4-6", "low"],
+  ])("uses the effective effort for %s on %s", async (name, model, effort) => {
+    const chat = vi.fn(async () => textResult("ok"));
+    const provider: LLMProvider = { providerId: "test", chat, stream: vi.fn(), healthCheck: vi.fn() };
+    await runProviderLoop(provider, "system", [], { name, model, maxTokens: 100, stream: false });
+    expect(chat.mock.calls[0][0]).toMatchObject({ thinking: { effort } });
+  });
+
+  it.each([null, "high"] as const)("keeps explicit loop effort %s ahead of a model default", async (effort) => {
+    const chat = vi.fn(async () => textResult("ok"));
+    const provider: LLMProvider = { providerId: "test", chat, stream: vi.fn(), healthCheck: vi.fn() };
+    await runProviderLoop(provider, "system", [], {
+      name: "dm", model: "gpt-6.1-sol", maxTokens: 100, stream: false, effort,
+    });
+    expect(chat.mock.calls[0][0].thinking).toEqual(effort === null ? undefined : { effort });
+  });
+});
 
 describe("runProviderLoop retry", () => {
   beforeEach(() => { vi.useFakeTimers(); });

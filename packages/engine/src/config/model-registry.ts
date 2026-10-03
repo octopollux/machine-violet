@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assetDir } from "../utils/paths.js";
+import type { EffortLevel } from "./models.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +24,8 @@ export interface KnownModelEntry {
   defaultTier: "large" | "medium" | "small";
   pricing: ModelPricing;
   capabilities: ModelCapabilities;
+  /** Agent-specific defaults used only when no explicit effort was configured. */
+  effortDefaults?: Record<string, EffortLevel | null>;
 }
 
 /**

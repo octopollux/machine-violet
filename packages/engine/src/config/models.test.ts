@@ -203,6 +203,44 @@ describe("model config", () => {
   });
 
   describe("getEffortConfig", () => {
+    it("selects medium only for the GPT-6.1 Sol DM", () => {
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe("medium");
+      expect(getEffortConfig("ooc", "gpt-6.1-sol").effort).toBe("high");
+      expect(getEffortConfig("setup", "gpt-6.1-sol").effort).toBe("high");
+      expect(getEffortConfig("dm", "claude-opus-5-5").effort).toBe("low");
+      expect(getEffortConfig("dm", "claude-opus-4-6").effort).toBe("low");
+      expect(getEffortConfig("dm", "unknown-model").effort).toBe("low");
+    });
+
+    it.each([null, "high"] as const)("preserves an explicit DM override %s over the model default", (effort) => {
+      writeFileSync(join(testDir, "dev-config.jsonc"), JSON.stringify({ effort: { dm: effort } }));
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe(effort);
+    });
+
+    it.each([null, "low"] as const)("keeps dev default %s as a fallback without erasing named defaults", (effort) => {
+      writeFileSync(join(testDir, "dev-config.jsonc"), JSON.stringify({ effort: { default: effort } }));
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe("medium");
+      expect(getEffortConfig("dm", "claude-opus-4-6").effort).toBe("low");
+      expect(getEffortConfig("setup", "gpt-6.1-sol").effort).toBe("high");
+      expect(getEffortConfig("ooc", "gpt-6.1-sol").effort).toBe("high");
+      expect(getEffortConfig("unknown-agent", "gpt-6.1-sol").effort).toBe(effort);
+    });
+
+    it("ignores invalid overrides and clears override provenance on reset", () => {
+      writeFileSync(join(testDir, "dev-config.jsonc"), JSON.stringify({ effort: { dm: "turbo", default: "turbo" } }));
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe("medium");
+      writeFileSync(join(testDir, "dev-config.jsonc"), JSON.stringify({ effort: { dm: "high" } }));
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe("high");
+      rmSync(join(testDir, "dev-config.jsonc"));
+      loadModelConfig({ cwd: testDir, reset: true });
+      expect(getEffortConfig("dm", "gpt-6.1-sol").effort).toBe("medium");
+    });
+
     it("returns null effort for unknown agent with default null", () => {
       loadModelConfig({ cwd: testDir, reset: true });
       const ec = getEffortConfig("unknown-agent");

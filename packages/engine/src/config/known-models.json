@@ -42,6 +42,7 @@
       "contextWindow": 1050000,
       "maxOutput": 128000,
       "defaultTier": "medium",
+      "effortDefaults": { "dm": "medium" },
       "pricing": { "input": 2, "output": 10, "cacheWrite": 2.5, "cacheRead": 0.1 },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },

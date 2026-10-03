@@ -129,6 +129,12 @@ describe("current provider defaults and metadata", () => {
     expect(getTierDefaults("openai-chatgpt")).toEqual(expected);
   });
 
+  it("keeps the Sol DM effort preference separate from tier defaults", () => {
+    expect(getKnownModel("gpt-6.1-sol")?.effortDefaults).toEqual({ dm: "medium" });
+    expect(getKnownModel("gpt-6-astra")?.effortDefaults).toBeUndefined();
+    expect(getKnownModel("claude-opus-5-5")?.effortDefaults).toBeUndefined();
+  });
+
   it.each([
     ["gpt-6-astra", 10, 50, 12.5, 1],
     ["gpt-6.1-sol", 2, 10, 2.5, 0.1],

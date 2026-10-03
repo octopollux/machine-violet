@@ -302,7 +302,7 @@ export async function runProviderLoop(
   const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
   const ec = config.effort !== undefined
     ? { effort: supportsThinking ? config.effort : null }
-    : (supportsThinking ? getEffortConfig(config.name) : { effort: null });
+    : (supportsThinking ? getEffortConfig(config.name, config.model) : { effort: null });
 
   const thinking: ThinkingConfig | undefined =
     ec.effort ? { effort: ec.effort } : undefined;
