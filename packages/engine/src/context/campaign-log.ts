@@ -3,6 +3,8 @@ import { estimateTokens } from "./token-counter.js";
 // --- Data Model ---
 
 export interface CampaignLogEntry {
+  /** Durable scene-transition instance, used for retry-safe narrative updates. */
+  transitionId?: string;
   sceneNumber: number;
   title: string;
   /** Bullet-list summary (existing format) */

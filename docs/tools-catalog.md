@@ -118,7 +118,7 @@ The same two fixed contracts work for every campaign and collection. Collections
 | Tool | Operations | Effect |
 |---|---|---|
 | `knowledge` | `outline`, `read`, `search` | Inspect the current full logical outline, page a record/value/body/log by UID or name, or search typed fields and complete paged prose/logs. Read limits and offsets bound each response. |
-| `remember` | Atomic `operations[]` | Create collections/nodes; upsert or patch facts; remove fields; move, consolidate, delete; append prose/logs; add/remove explicit references. Recursive typed JSON supports numbers, booleans, nulls, arrays, nested objects, and `{$ref: UID}`. Returns canonical identities and candidate impacts. |
+| `remember` | Atomic `operations[]` | Create collections/nodes; upsert or patch facts; disclose an explicit player-safe name/summary/aliases without exposing private canonical data; remove fields; move, consolidate, delete; append prose/logs; add/remove explicit references. Recursive typed JSON supports numbers, booleans, nulls, arrays, nested objects, and `{$ref: UID}`. Returns canonical identities and candidate impacts. |
 
 Bulk strings, object/list instances, and append-only logs are first-class data. List instances have individual UIDs. Partial updates preserve unrelated fields and references; `null` is a typed value, while `remove_fields` deletes keys. Exact read-only preview shapes `{$text|$list|$object: UID, length: n}` are engine-owned and cannot be authored as values. Objects using those key names with additional data remain ordinary data.
 
@@ -128,7 +128,7 @@ Raw Dev file tools cannot write/read database bytes or bypass the shared campaig
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns a small storyteller subagent with `knowledge`, `remember`, and a separate machine-profile tool. Fresh collection organization, bounded canonical reads, and one serialized scribe lane preserve identity and narrative batching. Committed canonical feedback is independent of its prose summary. |
+| `scribe` | Small (configured) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns a small storyteller subagent with `knowledge`, `remember`, and a separate machine-profile tool. Fresh collection organization, bounded canonical reads, and one serialized scribe lane preserve identity and narrative batching. Mixed-visibility facts use one private canonical identity plus `disclose` for the explicitly public account. Committed canonical feedback is independent of its prose summary. |
 | `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search logical SQLite knowledge plus scene summaries, transcripts, session recaps, and logs. The subagent uses `knowledge`, `grep_campaign`, and bounded logical `read_campaign_file` reads. Returns terse excerpts with `[[wikilinks]]` and source references. |
 | `search_content` | T2 (Haiku) | DM | `({ query })` | Search the game system's ingested content library — monsters, spells, equipment, rules — by mechanical criteria (CR, level, type, rarity). Spawns a search subagent that queries faceted indexes and returns matching entities with key stats. Async-dispatched (the handler delegates to the game engine). Requires ingested system content. |
 

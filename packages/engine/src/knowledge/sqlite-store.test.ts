@@ -1,3 +1,5 @@
+import type { KnowledgeValue } from "@machine-violet/shared/types/knowledge.js";
+import { readPublicCampaignRecord } from "../entities/public-knowledge.js";
 import { SqliteKnowledgeStore } from "./sqlite-store.js";
 import { mkdtemp,readFile,rm,copyFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -102,6 +104,26 @@ describe("SQLite campaign knowledge",()=>{
     expect((await store.read("Bob")).logs).toHaveLength(1);
     await expect(store.mutate([],{operationId:"turn-1"})).rejects.toThrow("reused");
   });
+  it("defaults append_log provenance to the current scene without changing explicit historical metadata", async () => {
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Chronicle" }]);
+    const metadata = { action: "observed" };
+    await store.mutate([
+      { op: "append_log", uid: "Chronicle", body: "No metadata" },
+      { op: "append_log", uid: "Chronicle", body: "Empty metadata", metadata: {} },
+      { op: "append_log", uid: "Chronicle", body: "Extra metadata", metadata },
+      { op: "append_log", uid: "Chronicle", body: "Historical scene", metadata: { scene: 1 } },
+      { op: "append_log", uid: "Chronicle", body: "Historical sceneNumber", metadata: { sceneNumber: 2 } },
+      { op: "append_log", uid: "Chronicle", body: "Explicit zero", metadata: { scene: 0 } },
+      { op: "append_log", uid: "Chronicle", body: "Explicit unknown", metadata: { sceneNumber: null } },
+    ], { sceneNumber: 3 });
+    expect((await store.read("Chronicle")).logs.map(log => log.metadata)).toEqual([
+      { scene: 3 }, { scene: 3 }, { action: "observed", scene: 3 },
+      { scene: 1 }, { sceneNumber: 2 }, { scene: 0 }, { sceneNumber: null },
+    ]);
+    expect(metadata).toEqual({ action: "observed" });
+    await store.mutate([{ op: "append_log", uid: "Chronicle", body: "Offline entry", metadata: {} }]);
+    expect((await store.read("Chronicle")).logs.at(-1)!.metadata).toEqual({});
+  });
   it("notifies dependencies on leaves and preserves links on unrelated partial writes",async()=>{
     await store.mutate([{op:"upsert",collection:"Locations",name:"Castle",fields:{burning:false}},{op:"upsert",collection:"Characters",name:"Resident",fields:{home:{$ref:"Castle"}}}]);
     const leaf=(await store.read("Castle")).children![0].uid;
@@ -131,6 +153,143 @@ describe("SQLite campaign knowledge",()=>{
     await store.mutate([{op:"move",uid:cards[1].uid,parent:hand,index:0}]);
     expect((await store.read(hand)).children![0].uid).toBe(cards[1].uid);
     expect((await store.read(draw)).children![0].uid).toBe(cards[0].uid);
+  });
+  it("appends to the actual string leaf while retaining UID, references and full text paging", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Lore", name: "Chronicle", fields: { text: "Beginning. ", untouched: true }, body: "Entity body" },
+      { op: "upsert", collection: "Lore", name: "Watcher" },
+    ]);
+    const leaf = (await store.read("Chronicle")).children!.find(node => node.name === "text")!.uid;
+    await store.mutate([{ op: "add_reference", source: "Watcher", target: leaf, label: "depends_on" }]);
+    const suffix = "continued ".repeat(3000) + "Final discovery.";
+    const result = await store.mutate([{ op: "append_text", uid: leaf, text: suffix }]);
+    expect(result.candidates).toContain(await store.resolve("Watcher"));
+    const owner = await store.read("Chronicle");
+    expect(owner.fields.untouched).toBe(true);
+    expect(owner.body).toBe("Entity body");
+    expect(owner.children!.find(node => node.name === "text")!.uid).toBe(leaf);
+    expect(owner.fields.text).toMatchObject({ $text: leaf, length: "Beginning. ".length + suffix.length });
+    let recovered = "";
+    let offset = 0;
+    do {
+      const page = await store.read(leaf, { textOffset: offset, textLimit: 2000 });
+      recovered += page.value;
+      expect(page.body).toBe("");
+      offset = page.textNextOffset ?? 0;
+    } while (offset);
+    expect(recovered).toBe("Beginning. " + suffix);
+    expect((await store.read("Watcher")).references).toContainEqual({ source: (await store.resolve("Watcher"))!, target: leaf, label: "depends_on" });
+    await store.mutate([{ op: "append_text", uid: "Chronicle", text: " plus entity prose" }, { op: "append_text", uid: "Lore", text: "Collection prose" }]);
+    expect((await store.read("Chronicle")).body).toBe("Entity body plus entity prose");
+    expect((await store.read("Lore")).body).toBe("Collection prose");
+  });
+  it.each([null, 7, false, {}, [], { $ref: "Lore" }].map(value => ({ value: value as KnowledgeValue })))("rejects appending text to a non-string typed value ($value) atomically", async ({ value }) => {
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Record", fields: { value }, body: "Original" }]);
+    const leaf = (await store.read("Record")).children![0].uid;
+    const before = await store.snapshot();
+    const notices = await store.pendingNotices();
+    await expect(store.mutate([{ op: "append_text", uid: "Record", text: " rolled back" }, { op: "append_text", uid: leaf, text: "invalid" }])).rejects.toThrow("append_text requires a string value");
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual(notices);
+    expect((await store.read("Record")).body).toBe("Original");
+  });
+  it("preserves explicit value: labels when appending or replacing a scalar field", async () => {
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Chronicle", fields: { text: "Beginning" } }, { op: "upsert", collection: "Lore", name: "Other" }]);
+    const uid = (await store.resolve("Chronicle"))!; const other = (await store.resolve("Other"))!;
+    const leaf = (await store.read(uid)).children![0].uid;
+    const edge = { source: uid, target: other, label: `value:${leaf}` };
+    await store.mutate([{ op: "add_reference", ...edge }]);
+    await store.mutate([{ op: "append_text", uid: leaf, text: " continued" }]);
+    expect((await store.read(leaf)).value).toBe("Beginning continued");
+    expect((await store.read(uid)).references).toContainEqual(edge);
+    await store.mutate([{ op: "patch", uid, fields: { text: "Replacement" } }]);
+    expect((await store.read(uid)).references).toContainEqual(edge);
+  });
+  it("removes only matching structural edges when changing references or removing nested fields", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Lore", name: "Old" }, { op: "upsert", collection: "Lore", name: "New" }, { op: "upsert", collection: "Lore", name: "Other" },
+      { op: "upsert", collection: "Lore", name: "Record", fields: { nested: { relation: { $ref: "Old" } }, temporary: "Text" } },
+    ]);
+    const uid = (await store.resolve("Record"))!; const other = (await store.resolve("Other"))!;
+    const nested = (await store.read(uid)).children!.find(node => node.name === "nested")!.uid;
+    const leaf = (await store.read(nested)).children![0].uid;
+    const temporary = (await store.read(uid)).children!.find(node => node.name === "temporary")!.uid;
+    const edges = [leaf, temporary].map(node => ({ source: uid, target: other, label: `value:${node}` }));
+    await store.mutate(edges.map(edge => ({ op: "add_reference", ...edge })));
+    await store.mutate([{ op: "set_value", uid: leaf, value: { $ref: "New" } }]);
+    let references = (await store.read(uid)).references;
+    expect(references).not.toContainEqual({ source: uid, target: (await store.resolve("Old"))!, label: `value:${leaf}` });
+    expect(references).toContainEqual({ source: uid, target: (await store.resolve("New"))!, label: `value:${leaf}` });
+    expect(references).toEqual(expect.arrayContaining(edges));
+    await store.mutate([{ op: "set_value", uid: nested, value: {} }, { op: "remove_fields", uid, keys: ["temporary"] }]);
+    references = (await store.read(uid)).references;
+    expect(references).toEqual(expect.arrayContaining(edges));
+    expect(references).not.toContainEqual({ source: uid, target: (await store.resolve("New"))!, label: `value:${leaf}` });
+  });
+  it("transfers only the actual reference edge when a nested value changes owners", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Lore", name: "Target" }, { op: "upsert", collection: "Lore", name: "Other" },
+      { op: "upsert", collection: "Lore", name: "From", fields: { nested: { text: "Text", relation: { $ref: "Target" } } } },
+      { op: "upsert", collection: "Lore", name: "To", fields: { received: {} } },
+    ]);
+    const from = (await store.resolve("From"))!; const to = (await store.resolve("To"))!;
+    const nested = (await store.read(from)).children![0].uid; const children = (await store.read(nested)).children!;
+    const text = children.find(node => node.name === "text")!.uid; const relation = children.find(node => node.name === "relation")!.uid;
+    const received = (await store.read(to)).children![0].uid; const other = (await store.resolve("Other"))!; const target = (await store.resolve("Target"))!;
+    const explicit = [text, relation].map(uid => ({ source: from, target: other, label: `value:${uid}` }));
+    await store.mutate(explicit.map(edge => ({ op: "add_reference", ...edge })));
+    await store.mutate([{ op: "move", uid: nested, parent: received }]);
+    expect((await store.read(from)).references).toEqual(expect.arrayContaining(explicit));
+    expect((await store.read(from)).references).not.toContainEqual({ source: from, target, label: `value:${relation}` });
+    expect((await store.read(to)).references).toContainEqual({ source: to, target, label: `value:${relation}` });
+    expect((await store.read(to)).references).not.toEqual(expect.arrayContaining(explicit.map(edge => ({ ...edge, source: to }))));
+  });
+  it("consolidates explicit value: labels while dropping only discarded fields' actual edges", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Lore", name: "Other" }, { op: "upsert", collection: "Lore", name: "Elsewhere" },
+      { op: "upsert", collection: "Lore", name: "Source", fields: { text: "Old prose", relation: { $ref: "Other" }, retained: { $ref: "Other" } } },
+      { op: "upsert", collection: "Lore", name: "Winner", fields: { text: "Current prose", relation: { $ref: "Elsewhere" } } },
+    ]);
+    const source = (await store.resolve("Source"))!; const winner = (await store.resolve("Winner"))!;
+    const other = (await store.resolve("Other"))!; const elsewhere = (await store.resolve("Elsewhere"))!;
+    const children = (await store.read(source)).children!;
+    const text = children.find(node => node.name === "text")!.uid;
+    const relation = children.find(node => node.name === "relation")!.uid;
+    const retained = children.find(node => node.name === "retained")!.uid;
+    const explicit = [
+      { source, target: elsewhere, label: `value:${text}` },
+      { source, target: elsewhere, label: `value:${relation}` },
+      { source, target: other, label: "value:custom-label" },
+    ];
+    await store.mutate(explicit.map(edge => ({ op: "add_reference", ...edge })));
+    await store.mutate([{ op: "consolidate", uid: source, target: winner }]);
+    const node = await store.read(winner);
+    expect(node.references).toEqual(expect.arrayContaining(explicit.map(edge => ({ ...edge, source: winner }))));
+    expect(node.references).not.toContainEqual({ source: winner, target: other, label: `value:${relation}` });
+    expect(node.references).toContainEqual({ source: winner, target: other, label: `value:${retained}` });
+    expect((await store.read(retained)).parent).toBe(winner);
+    expect(node.fields).toMatchObject({ text: "Current prose", relation: { $ref: elsewhere }, retained: { $ref: other } });
+    expect(await store.resolveUid(source)).toBe(winner);
+  });
+  it("pages long individual history entries without advertising a misleading global history cursor", async () => {
+    const text = "long history ".repeat(1000);
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Chronicle" }, ...Array.from({ length: 40 }, (_, index) => ({ op: "append_log" as const, uid: "Chronicle", body: index === 39 ? text : `Entry ${index}` }))]);
+    const firstPage = await store.read("Chronicle", { logLimit: 30 });
+    expect(firstPage.logNextOffset).toBe(30);
+    const lastPage = await store.read("Chronicle", { logOffset: 30, logLimit: 30 });
+    expect(lastPage.logs).toHaveLength(10);
+    expect(lastPage.logNextOffset).toBeUndefined();
+    const lastId = lastPage.logs[9].id;
+    let recovered = "";
+    let offset = 0;
+    do {
+      const page = await store.read("Chronicle", { logEntryId: lastId, logTextOffset: offset, logTextLimit: 2000 });
+      expect(page.logNextOffset).toBeUndefined();
+      expect(page.logCount).toBe(40);
+      recovered += page.logs[0].body;
+      offset = page.logs[0].textNextOffset ?? 0;
+    } while (offset);
+    expect(recovered).toBe(text);
   });
   it("keeps bulk text out of snapshots and pages bodies, scalar text and history",async()=>{
     const text="x".repeat(40000);
@@ -227,6 +386,123 @@ describe("compact complete knowledge projection", () => {
     const snapshot = await store.snapshot();
     for (const node of await store.outline()) expect(snapshot.split("\n").some(line => line.trimStart().startsWith(`${node.uid} `))).toBe(true);
     for (const [name, value] of Object.entries(fields)) expect(snapshot).toContain(`${name} = ${value}`);
+  });
+});
+
+describe("explicit immediate player disclosure", () => {
+  let store: SqliteKnowledgeStore;
+  beforeEach(() => { store = new SqliteKnowledgeStore(":memory:"); });
+  afterEach(async () => { await store.close(); });
+  const views = async () => Promise.all((await store.outline()).filter(node => node.kind === "entity" && node.name.startsWith("Player memory:")).map(node => store.read(node.uid)));
+  it("publishes supplied safe facts immediately with the canonical UID while leaving all private facts unchanged", async () => {
+    await store.mutate([
+      { op: "create_collection", parent: "Characters", name: "Visitors" },
+      { op: "upsert", collection: "Characters/Visitors", name: "Secret Queen", aliases: ["King", "k123456789"], body: "Unrevealed plans", fields: { password: "private", public_related: ["hidden relation"] } },
+    ]);
+    const uid = (await store.resolve("Secret Queen"))!;
+    const canonical = await store.read(uid);
+    const summary = "Approved description ".repeat(1500);
+    const result = await store.mutate([{ op: "disclose", uid: "King", name: "Flower Seller", summary, aliases: ["Pansy"] }], { sceneNumber: 3, source: "scribe" });
+    expect(result.identities).toContainEqual(expect.objectContaining({ uid }));
+    expect(await store.read(uid)).toEqual(canonical);
+    for (const handle of [uid, "Flower Seller", "Pansy"]) expect(await readPublicCampaignRecord(store, handle)).toMatchObject({ uid, name: "Flower Seller", content: `# Flower Seller\n\n${summary}`, collection: "Characters/Visitors" });
+    for (const handle of ["Secret Queen", "King", "k123456789"]) expect(await readPublicCampaignRecord(store, handle)).toBeNull();
+    const [view] = await views();
+    expect(view.fields).toMatchObject({ subject: { $ref: uid }, display_name: "Flower Seller", public_aliases: ["Pansy"], firstScene: 3, lastScene: 3 });
+    expect(view.fields).not.toHaveProperty("password");
+    expect(view.fields).not.toHaveProperty("public_related");
+    expect(view.logs[0].metadata).toEqual({ action: "disclose", scene: 3 });
+    expect((await store.pendingNotices()).at(-1)!.source).toBe("scribe");
+  });
+  it("reuses the approved record, preserves approved old handles on a public rename, and keeps retries idempotent", async () => {
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Hidden Identity", aliases: ["Secret Alias"], body: "Private" }]);
+    const uid = (await store.resolve("Hidden Identity"))!;
+    const canonical = await store.read(uid);
+    await store.mutate([{ op: "disclose", uid, name: "Pansy", summary: "A florist", aliases: ["Flower Seller"] }], { sceneNumber: 3 });
+    const firstView = (await views())[0];
+    const disclosure = [{ op: "disclose" as const, uid, name: "Lady Gardener", summary: "An expert botanist", aliases: ["Green Thumb"] }];
+    const result = await store.mutate(disclosure, { operationId: "reveal-5", sceneNumber: 5 });
+    expect(await store.mutate(disclosure, { operationId: "reveal-5", sceneNumber: 5 })).toEqual(result);
+    const [view] = await views();
+    expect(view.uid).toBe(firstView.uid);
+    expect(view.fields).toMatchObject({ display_name: "Lady Gardener", summary: "An expert botanist", public_aliases: ["Pansy", "Flower Seller", "Green Thumb"], firstScene: 3, lastScene: 5 });
+    expect(view.logs).toHaveLength(2);
+    expect(view.logs[1]).toMatchObject({ body: "Lady Gardener\n\nAn expert botanist", metadata: { action: "disclose", scene: 5 } });
+    expect(await views()).toHaveLength(1);
+    expect((await store.outline()).filter(node => node.kind === "entity")).toHaveLength(2);
+    expect(await store.read(uid)).toEqual(canonical);
+    for (const handle of [uid, "Pansy", "Flower Seller", "Green Thumb", "Lady Gardener"]) expect((await readPublicCampaignRecord(store, handle))?.content).toBe("# Lady Gardener\n\nAn expert botanist");
+    expect(await readPublicCampaignRecord(store, "Secret Alias")).toBeNull();
+  });
+  it("rolls creation and existing approved disclosure updates back with the rest of a failed batch", async () => {
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Secret" }]);
+    const uid = (await store.resolve("Secret"))!;
+    const before = await store.snapshot();
+    const notices = await store.pendingNotices();
+    await expect(store.mutate([{ op: "disclose", uid, name: "Known", summary: "Approved" }, { op: "patch", uid: "Missing", body: "invalid" }])).rejects.toThrow("Unknown");
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual(notices);
+    expect(await views()).toHaveLength(0);
+    await store.mutate([{ op: "disclose", uid, name: "Known", summary: "Approved" }]);
+    const approved = await store.snapshot();
+    const approvedNotices = await store.pendingNotices();
+    await expect(store.mutate([{ op: "disclose", uid, name: "New name", summary: "New approval" }, { op: "patch", uid: "Missing", body: "invalid" }])).rejects.toThrow("Unknown");
+    expect(await store.snapshot()).toBe(approved);
+    expect(await store.pendingNotices()).toEqual(approvedNotices);
+    expect((await readPublicCampaignRecord(store, uid))?.content).toBe("# Known\n\nApproved");
+    expect(await readPublicCampaignRecord(store, "New name")).toBeNull();
+  });
+  it("publishes the latest disclosure across multiple consolidated views regardless of their tree order", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Secret A", aliases: ["Hidden A"] },
+      { op: "upsert", collection: "Lore", name: "Secret B", aliases: ["Hidden B"] },
+      { op: "disclose", uid: "Secret A", name: "Tall Hat", summary: "First person", aliases: ["Visitor"] },
+      { op: "disclose", uid: "Secret B", name: "Stranger", summary: "Second person", aliases: ["Sexton"] },
+    ], { sceneNumber: 1 });
+    const oldUid = (await store.resolve("Secret A"))!;
+    const uid = (await store.resolve("Secret B"))!;
+    await store.mutate([{ op: "consolidate", uid: oldUid, target: uid }]);
+    const canonical = await store.read(uid);
+    await store.mutate([{ op: "disclose", uid: oldUid, name: "Known Helper", summary: "Latest approved facts", aliases: ["Guide"] }], { sceneNumber: 8 });
+    const approved = await views();
+    expect(approved).toHaveLength(2);
+    expect(approved.every(view => view.fields.summary === "Latest approved facts" && view.fields.display_name === "Known Helper" && view.fields.lastScene === 8)).toBe(true);
+    expect(await store.read(uid)).toEqual(canonical);
+    for (const handle of [oldUid, uid, "Tall Hat", "Visitor", "Stranger", "Sexton", "Known Helper", "Guide"]) expect(await readPublicCampaignRecord(store, handle)).toMatchObject({ uid, content: "# Known Helper\n\nLatest approved facts" });
+    for (const hidden of ["Secret A", "Secret B", "Hidden A", "Hidden B"]) expect(await readPublicCampaignRecord(store, hidden)).toBeNull();
+  });
+  it("retains pre-batch direct public handles without publishing secret aliases added earlier in the disclosure batch", async () => {
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Bob", aliases: ["Tall Hat"], body: "Known traveler", visibility: "player-facing" }]);
+    const uid = (await store.resolve("Bob"))!;
+    await store.mutate([
+      { op: "patch", uid, aliases: ["Hidden King"], body: "Private plans" },
+      { op: "disclose", uid, name: "Captain Bob", summary: "Now a captain", aliases: ["Skipper"] },
+    ], { sceneNumber: 6 });
+    for (const handle of ["Bob", "Tall Hat", "Captain Bob", "Skipper", uid]) expect(await readPublicCampaignRecord(store, handle)).toMatchObject({ uid, content: "# Captain Bob\n\nNow a captain" });
+    expect(await readPublicCampaignRecord(store, "Hidden King")).toBeNull();
+    expect((await views())[0].fields.public_aliases).toEqual(["Bob", "Tall Hat", "Skipper"]);
+    expect((await store.read(uid)).aliases).toContain("Hidden King");
+    expect((await store.read(uid)).body).toBe("Private plans");
+  });
+  it("rejects a projection target with canonical UID guidance instead of creating recursive public records", async () => {
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Secret" }, { op: "disclose", uid: "Secret", name: "Known", summary: "Approved" }]);
+    const uid = (await store.resolve("Secret"))!;
+    const view = (await views())[0];
+    const before = await store.snapshot();
+    const notices = await store.pendingNotices();
+    await expect(store.mutate([{ op: "disclose", uid: view.uid, name: "Recursive", summary: "Invalid target" }])).rejects.toThrow(`canonical UID ${uid}`);
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual(notices);
+    expect(await views()).toHaveLength(1);
+  });
+  it("rejects non-entity and missing targets and requires a nonempty explicit public name", async () => {
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Secret", fields: { leaf: "text" } }]);
+    const leaf = (await store.read("Secret")).children![0].uid;
+    const before = await store.snapshot();
+    for (const handle of ["Lore", leaf]) await expect(store.mutate([{ op: "disclose", uid: handle, name: "Known", summary: "Approved" }])).rejects.toThrow("narrative entity");
+    await expect(store.mutate([{ op: "disclose", uid: "Missing", name: "Known", summary: "Approved" }])).rejects.toThrow("Unknown");
+    await expect(store.mutate([{ op: "disclose", uid: "Secret", name: " ", summary: "Approved" }])).rejects.toThrow("explicit player-safe name and summary");
+    expect(await store.snapshot()).toBe(before);
   });
 });
 

@@ -1,3 +1,4 @@
+import { writeAtomicFile } from "../utils/atomic-file.js";
 /**
  * Base FileIO implementation using Node.js fs/promises.
  *
@@ -24,6 +25,7 @@ export function createBaseFileIO(): FileIO {
     },
     readFile: (path: string) => readFile(path, "utf-8"),
     writeFile: (path: string, content: string) => writeFile(path, content, "utf-8"),
+    writeFileAtomic: writeAtomicFile,
     writeBinaryFile: (path: string, bytes: Uint8Array) => writeFile(path, bytes),
     readBinaryFile: (path: string) => readFile(path).then((buf) => new Uint8Array(buf)),
     appendFile: (path: string, content: string) => appendFile(path, content, "utf-8"),

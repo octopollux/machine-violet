@@ -199,11 +199,11 @@ One-shot subagent that generates a punchy ≤40-character status string for Disc
 | **Trigger** | `scene_transition` cascade |
 | **Source doc** | [entity-filesystem.md](entity-filesystem.md) |
 
-Scans the completed scene transcript. Identifies every entity meaningfully involved (not just mentioned). Appends a one-line log entry through the shared knowledge store.
+Scans the completed scene transcript. Identifies every entity meaningfully involved (not just mentioned). Resolves the generated entries to canonical UIDs and plans one-line history appends without writing.
 
 **Context**: Scene transcript + canonical entity UID/name list. Variable size.
 
-**Returns**: Atomic log commits enqueue canonical change notices for the next ordinary DM turn.
+**Returns**: Exact history operations for the scene transition journal. The transition saves its complete maintenance plan before one atomic knowledge commit; interrupted retries replay that saved batch without regenerating prose or duplicating history. Committed writes enqueue canonical change notices for the next ordinary DM turn.
 
 ---
 
@@ -218,9 +218,9 @@ Scans the completed scene transcript. Identifies every entity meaningfully invol
 
 Maintains player-approved summary records under nested `Player Knowledge` collections in SQLite; HTTP/UI compendium JSON is a projection. Reads only the player-facing transcript (tool results filtered out), ensuring no DM secrets leak. Updates existing entries when new information is revealed; tracks identity shifts via `aliases` to prevent duplicates when NPCs are renamed.
 
-**Context**: Current approved compendium projection + player-facing scene transcript + canonical identity/alias context.
+**Context**: Current approved compendium projection + player-safe scene summary + canonical identity/alias context.
 
-**Returns**: Updated compendium JSON written to disk. Also populates `DMSessionState.compendiumSummary` for the DM's "Player Knowledge" prefix section.
+**Returns**: Approved knowledge operations planned without writing. Only qualified summary records beneath `Player Knowledge` may be reused as approved views; an unrelated campaign record's `subject` field does not make it a projection. The scene transition journals the exact operations alongside changelog updates before committing them, then refreshes `DMSessionState.compendiumSummary` from the committed public projection. Replanning after a partial commit is not a retry of the saved batch.
 
 ---
 
@@ -235,9 +235,9 @@ Maintains player-approved summary records under nested `Player Knowledge` collec
 
 Receives the DM's batched natural-language updates tagged `private` or `player-facing`. Its provider and model follow the configured Small slot, including Luna when selected; Scribe does not hardcode Haiku. It records narrative facts in arbitrary collections using the same generic tools as the DM. There are no automatic non-DM `runScribe` calls: scene changelog, compendium, promotion, theme, and repair are distinct maintenance writers that commit through the shared store and produce the same feedback.
 
-**Context**: Each call reads the latest collection organization, including empty nested collections and brief conventions. A canonical prefetch matches complete names and aliases in the narrative batch, including one-letter aliases, and supplies at most eight records within 12k characters. It retains current facts and additional dependencies without duplicate child/field-edge inventories. Bulk records remain bounded; missing/overflow details are read explicitly before replacing prose. The DM must hand off changed whereabouts and established ability behavior because the scribe does not receive the whole conversation. The DM's complete scene tree stays frozen independently.
+**Context**: Each call reads the latest collection organization, including empty nested collections and brief conventions. A canonical prefetch matches complete names and aliases in the narrative batch, including one-letter aliases, and supplies at most eight records within 12k characters. It retains current facts and additional dependencies without duplicate child/field-edge inventories. A canonical UID's prior approved public description is included within that budget; truncated public summaries/names have full-read handles. A disclosure replaces the complete public description, preserving still-valid approved facts without borrowing private canonical secrets. Bulk records remain bounded; missing/overflow details are read explicitly before replacing prose. The DM must hand off changed whereabouts and established ability behavior because the scribe does not receive the whole conversation. The DM's complete scene tree stays frozen independently.
 
-**Tools**: Fixed `knowledge` and `remember` contracts, plus `player_profile` for separate machine-level reads and append-only profile updates. Content boundaries append rather than replace. No SQL or schema engineering is requested.
+**Tools**: Fixed `knowledge` and `remember` contracts, plus `player_profile` for separate machine-level reads and append-only profile updates. Mixed private/public facts stay on one private canonical UID; `remember`'s `disclose` operation publishes only an explicit safe name, summary, and optional aliases, making the public account inspectable within the scene. Agents do not construct approved-view fields or folders. Content boundaries append rather than replace. No SQL or schema engineering is requested.
 
 **Max tool rounds**: 8. Known UIDs/names/aliases resolve deterministically; duplicate narrative upserts converge without asking the DM to disambiguate.
 

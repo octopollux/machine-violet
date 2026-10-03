@@ -319,6 +319,12 @@ export class GameEngine {
       this.repo ?? undefined,
       params.entityTree,
       this.tierProviders,
+      async () => {
+        // SceneManager captures the next tree before invoking this callback.
+        // Keep its done marker until identity and snapshot are durable together.
+        this.persistCurrentScene();
+        await this.persister?.flushDurable();
+      },
     );
     this.callbacks = params.callbacks;
     this.model = params.tierProviders.large.model;
@@ -394,6 +400,7 @@ export class GameEngine {
     if (!this.persister) return;
     const scene = this.sceneManager.getScene();
     this.persister.persistScene({
+      sceneNumber: scene.sceneNumber, slug: scene.slug,
       precis: scene.precis || null,
       openThreads: scene.openThreads || null,
       npcIntents: scene.npcIntents || null,
@@ -490,7 +497,21 @@ export class GameEngine {
    * exact same teardown semantics. May throw RollbackCompleteError.
    */
   async applyDeferredTuiCommands(commands: TuiCommand[]): Promise<void> {
-    for (const cmd of commands) {
+    // A boundary snapshots the entire outgoing turn, even when the model
+    // emits it before that turn's Scribe. Keep ordinary command order intact
+    // (especially promote/notes), then run boundaries before terminal rollback.
+    const rollbackIndex = commands.findIndex(cmd => cmd.type === "rollback");
+    const outgoing = rollbackIndex < 0 ? commands : commands.slice(0, rollbackIndex);
+    const isBoundary = (cmd: TuiCommand) => cmd.type === "scene_transition" || cmd.type === "session_end";
+    const hasBoundary = outgoing.some(isBoundary);
+    const isTrailingChoice = (cmd: TuiCommand) => hasBoundary && cmd.type === "present_choices";
+    const ordered = [
+      ...outgoing.filter(cmd => !isBoundary(cmd) && !isTrailingChoice(cmd)),
+      ...outgoing.filter(isBoundary),
+      ...outgoing.filter(isTrailingChoice),
+      ...(rollbackIndex < 0 ? [] : [commands[rollbackIndex]]),
+    ];
+    for (const cmd of ordered) {
       if (cmd.type === "scene_transition") {
         await this.transitionScene(cmd.title as string, cmd.time_advance as number | undefined);
       } else if (cmd.type === "session_end") {
@@ -934,6 +955,7 @@ export class GameEngine {
         }
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
+          sceneNumber: scene.sceneNumber, slug: scene.slug,
           precis: scene.precis || null,
           openThreads: scene.openThreads || null,
           npcIntents: scene.npcIntents || null,
@@ -1232,6 +1254,7 @@ export class GameEngine {
    * Execute a scene transition.
    */
   async transitionScene(title: string, timeAdvance?: number): Promise<void> {
+    const effectiveTitle = this.sceneManager.getPendingOp()?.title ?? title;
     this.injectionRegistry.get<BehaviorInjection>("behavior")?.reset();
     this.injectionRegistry.get<HardStatsInjection>("hard-stats")?.reset();
     // Arm the re-entrancy guard BEFORE the barrier: transitionScene is
@@ -1264,15 +1287,14 @@ export class GameEngine {
       accUsage(this.sessionUsage, result.usage);
       this.callbacks.onUsageUpdate(result.usage, "small");
 
-      // Persist the reset scene state (new sceneNumber, cleared precis/transcript)
-      this.persistCurrentScene();
-
-      // Refresh context so the DM sees the updated campaign log
+      // Refresh context after the next identity/tree were durably advanced.
       await this.sceneManager.contextRefresh();
+      this.persistCurrentScene();
+      await this.persister?.flushDurable();
       this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
 
       // Auto-apply theme from location entity if it has theme metadata
-      await this.applyLocationTheme(title);
+      await this.applyLocationTheme(effectiveTitle);
 
       // Reset the choice session so Haiku doesn't drag a full scene's worth of
       // user/assistant pairs across the cut. Reseed with the condensed campaign
@@ -1384,8 +1406,9 @@ export class GameEngine {
         this.callbacks.onUsageUpdate(result.usage, "small");
       }
 
-      this.persistCurrentScene();
       await this.sceneManager.contextRefresh();
+      this.persistCurrentScene();
+      await this.persister?.flushDurable();
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);

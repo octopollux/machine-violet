@@ -357,6 +357,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 
 ```jsonc
 {
+  "sceneNumber": 3,                       // Durable current scene identity.
+  "slug": "goblin-negotiation",
   "precis": "The party is negotiating with the goblin chief...",
   "openThreads": "Who poisoned the well? Where is the stolen relic?",
   "npcIntents": "Chief Grukk is stalling for time while scouts flank.",
@@ -374,6 +376,10 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 ```
 
 `openThreads`, `npcIntents`, and `precis` follow null semantics: `null` = explicitly cleared (e.g., after scene transition), absent = never assessed.
+
+The saved scene identity owns its frozen knowledge snapshot; resume never infers the current scene solely from the last transcript folder. `pending-operation.json` records a unique `transitionId`, cascade step, exact generated summary/changelog/publication proposals, and (when advancing time) the exact resulting clocks. These proposals are persisted before effects. Required histories and optional public publication use separate SQLite receipts; optional malformed publication rolls back independently. Campaign log entries include that transition ID and are upserted by instance on retry. A `done` pending marker remains until the successor identity, frozen snapshot and cleared conversation are durably saved; a partially saved successor clears old conversation again during completion recovery.
+
+Earlier format-2 saves without identity infer a successor only with an explicitly empty conversation, a completed campaign-log entry/summary and no pending cascade. An ambiguous active conversation retains its prior scene and snapshot until an intentional transition establishes durable identity. Source Markdown saves remain unsupported.
 
 ### 4.7 Conversation (`state/conversation.json`)
 

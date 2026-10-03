@@ -43,6 +43,9 @@ export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
  *   value = present, null = explicitly empty/cleared, undefined = never set.
  */
 export interface PersistedSceneState {
+  /** Durable current scene identity; optional only in earlier format-2 saves. */
+  sceneNumber?: number;
+  slug?: string;
   knowledgeSnapshot?: string | null;
   knowledgeSnapshotScene?: number | null;
   precis: string | null;
@@ -113,7 +116,8 @@ export class StatePersister {
 
   private async doWrite(file: string, content: string): Promise<void> {
     try {
-      await this.fileIO.writeFile(this.path(file), content);
+      if (this.fileIO.writeFileAtomic) await this.fileIO.writeFileAtomic(this.path(file), content);
+      else await this.fileIO.writeFile(this.path(file), content);
       this.failedWrites.delete(file);
     } catch (e) {
       this.failedWrites.set(file, e instanceof Error ? e : new Error(String(e)));

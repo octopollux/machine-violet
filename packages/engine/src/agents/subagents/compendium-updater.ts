@@ -166,16 +166,28 @@ export function canonicalizeCompendium(compendium: Compendium): Compendium {
   return result;
 }
 
-/** Publish only model-approved player summaries, separately from private source records. */
-export async function commitPublicCompendium(store: CampaignKnowledgeStore, compendium: Compendium, sceneNumber: number): Promise<Compendium> {
+/**
+ * Plan approved summaries without writing. Scene transitions persist this exact
+ * batch before committing it: replanning against a partly updated store is not
+ * an idempotent retry of the original operations.
+ */
+export async function planPublicCompendium(store: CampaignKnowledgeStore, compendium: Compendium, sceneNumber: number): Promise<KnowledgeOperation[]> {
   const outline = await store.outline();
   const collections = new Map(outline.filter((entry) => entry.kind === "collection").map((entry) => [collectionPath(entry.uid, outline).toLocaleLowerCase(), entry.uid]));
   const publicRecords = new Map<string, string>();
   for (const entry of outline) {
-    if (entry.kind !== "entity") continue;
+    // A campaign item can legitimately have a subject field. Only engine-owned
+    // approved views may be updated as a compendium projection.
+    if (entry.kind !== "entity" || !/^Player Knowledge(?:\/|$)/i.test(collectionPath(entry.parent, outline))) continue;
     const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
     const subject = node.fields.subject;
-    if (node.visibility === "player-facing" && subject && typeof subject === "object" && !Array.isArray(subject) && typeof subject.$ref === "string") publicRecords.set(subject.$ref, node.uid);
+    if (node.visibility !== "player-facing" || !subject || typeof subject !== "object" || Array.isArray(subject) || typeof subject.$ref !== "string") continue;
+    const displayName = outline.find((leaf) => leaf.parent === entry.uid && leaf.kind === "value" && leaf.name === "display_name");
+    const summary = outline.find((leaf) => leaf.parent === entry.uid && leaf.kind === "value" && leaf.name === "summary");
+    if (!displayName || !summary) continue;
+    if (typeof (await store.read(displayName.uid, { textLimit: 0, logLimit: 0 })).value !== "string" ||
+      typeof (await store.read(summary.uid, { textLimit: 0, logLimit: 0 })).value !== "string") continue;
+    publicRecords.set(subject.$ref, node.uid);
   }
   const operations: KnowledgeOperation[] = [];
   const planned = new Set<string>();
@@ -225,7 +237,15 @@ export async function commitPublicCompendium(store: CampaignKnowledgeStore, comp
         firstScene: entry.firstScene ?? sceneNumber, lastScene: sceneNumber, public_related: related },
       history: `Player learned: ${entry.summary}` });
   }
-  if (operations.length) await store.mutate(operations, { sceneNumber, source: "compendium", operationId: `compendium:${sceneNumber}:${createHash("sha256").update(JSON.stringify(groups)).digest("hex")}` });
+  return operations;
+}
+
+/** Publish only model-approved player summaries, separately from private source records. */
+export async function commitPublicCompendium(store: CampaignKnowledgeStore, compendium: Compendium, sceneNumber: number): Promise<Compendium> {
+  const operations = await planPublicCompendium(store, compendium, sceneNumber);
+  // This convenience caller has no transition journal. Its ID must describe
+  // the actual batch, rather than input prose whose plan depends on store state.
+  if (operations.length) await store.mutate(operations, { sceneNumber, source: "compendium", operationId: `compendium:${sceneNumber}:${createHash("sha256").update(JSON.stringify(operations)).digest("hex")}` });
   return projectCampaignCompendium(store);
 }
 

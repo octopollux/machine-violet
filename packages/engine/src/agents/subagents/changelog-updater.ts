@@ -3,6 +3,8 @@ import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
+import type { CampaignKnowledgeStore } from "../../knowledge/store.js";
+import type { KnowledgeOperation } from "@machine-violet/shared/types/knowledge.js";
 
 /**
  * Changelog updater subagent.
@@ -32,4 +34,27 @@ export async function updateChangelogs(
     getMaxOutput(model),
     "changelog-updater",
   );
+}
+
+export function parseChangelogEntries(text: string): string[] {
+  return text.split("\n").filter((line) => line.includes(":")).map((line) => line.trim());
+}
+
+/** Resolve identities once, before the transition saves its exact mutation journal. */
+export async function planChangelogEntries(
+  store: CampaignKnowledgeStore,
+  entries: string[],
+  sceneNumber: number,
+): Promise<KnowledgeOperation[]> {
+  const operations: KnowledgeOperation[] = [];
+  for (const entry of entries) {
+    const separator = entry.indexOf(": ");
+    if (separator < 0) continue;
+    const handle = entry.slice(0, separator).trim();
+    const body = entry.slice(separator + 2).trim();
+    if (!handle || !body) continue;
+    const uid = await store.resolve(handle);
+    if (uid) operations.push({ op: "append_log", uid, body, metadata: { sceneNumber } });
+  }
+  return operations;
 }

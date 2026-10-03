@@ -1,15 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
 import {
   canonicalizeCompendium,
+  commitPublicCompendium,
   emptyCompendium,
   parseCompendiumOutput,
+  planPublicCompendium,
   renderCompendiumForDM,
   updateCompendium,
 } from "./compendium-updater.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import { slugify } from "@machine-violet/shared/utils/slug.js";
 import { COMPENDIUM_CATEGORIES, type Compendium, type CompendiumEntry } from "@machine-violet/shared/types/compendium.js";
+import { SqliteKnowledgeStore } from "../../knowledge/sqlite-store.js";
+import { readPublicCampaignRecord } from "../../entities/public-knowledge.js";
 
 function mockUsage(): NormalizedUsage {
   return { inputTokens: 50, outputTokens: 80, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -51,6 +55,70 @@ function entry(overrides: Partial<CompendiumEntry> & { name: string; slug: strin
 
 beforeEach(() => {
   resetPromptCache();
+});
+
+const stores: SqliteKnowledgeStore[] = [];
+const makeStore = () => { const store = new SqliteKnowledgeStore(":memory:"); stores.push(store); return store; };
+afterEach(async () => { await Promise.all(stores.splice(0).map((store) => store.close())); });
+
+describe("compendium mutation plans", () => {
+  const memory = () => ({ ...emptyCompendium(), collections: { Characters: [
+    entry({ name: "Ada", slug: "ada", summary: "A watch captain.", related: ["Bela"] }),
+    entry({ name: "Bela", slug: "bela", summary: "A courier." }),
+  ] } });
+
+  it("plans without effects and replays the persisted exact batch after commit", async () => {
+    const store = makeStore();
+    const before = await store.snapshot();
+    const notices = await store.pendingNotices();
+    const plan = await planPublicCompendium(store, memory(), 2);
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual(notices);
+    expect(await store.resolve("Ada")).toBeNull();
+    const savedPlan = JSON.parse(JSON.stringify(plan)) as typeof plan;
+    const options = { operationId: "scene-updates:unique-transition", source: "scene-updates", sceneNumber: 2 };
+    const committed = await store.mutate(savedPlan, options);
+    const after = await store.snapshot();
+    const approvedView = (await store.outline()).find((node) => node.kind === "entity" && node.name === "Player memory: Ada")!;
+    const historyCount = (await store.read(approvedView.uid)).logCount;
+    const committedNotices = await store.pendingNotices();
+    // Replanning sees collections/identities created by the first application;
+    // the journal instead keeps the original operations byte-for-byte.
+    expect(await planPublicCompendium(store, memory(), 2)).not.toEqual(savedPlan);
+    expect(await store.mutate(savedPlan, options)).toEqual(committed);
+    expect(await store.snapshot()).toBe(after);
+    expect((await store.read(approvedView.uid)).logCount).toBe(historyCount);
+    expect(await store.pendingNotices()).toEqual(committedNotices);
+    expect((await readPublicCampaignRecord(store, "Ada"))?.content).toContain("A watch captain.");
+  });
+
+  it("does not reuse an input-only operation ID for state-dependent convenience commits", async () => {
+    const store = makeStore(); const compendium = memory();
+    await commitPublicCompendium(store, compendium, 2);
+    await expect(commitPublicCompendium(store, compendium, 2)).resolves.toMatchObject({ characters: expect.any(Array) });
+  });
+
+  it("updates only qualified approved views, preserving unrelated public subject records", async () => {
+    const store = makeStore();
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Ada", body: "PRIVATE_CANONICAL" },
+      { op: "upsert", collection: "Items", name: "Ada portrait", visibility: "player-facing", body: "An oil portrait.",
+        fields: { subject: { $ref: "Ada" }, display_name: "Portrait of Ada", summary: "Original artwork." } },
+      { op: "create_collection", name: "player knowledge" },
+      { op: "create_collection", parent: "player knowledge", name: "Characters" },
+      { op: "upsert", collection: "player knowledge/Characters", name: "Player memory: Ada", visibility: "player-facing",
+        fields: { subject: { $ref: "Ada" }, display_name: "Ada", summary: "Old approved biography. ".repeat(100) } },
+    ]);
+    const portrait = await store.read("Ada portrait");
+    const view = await store.resolve("Player memory: Ada");
+    const plan = await planPublicCompendium(store, memory(), 3);
+    expect(plan.some((operation) => operation.op === "upsert" && operation.uid === view)).toBe(true);
+    expect(plan.some((operation) => operation.op === "upsert" && operation.uid === portrait.uid)).toBe(false);
+    await store.mutate(plan, { sceneNumber: 3 });
+    expect(await store.read(portrait.uid)).toEqual(portrait);
+    expect((await store.read(view!)).fields.summary).toBe("A watch captain.");
+    expect((await store.read("Ada")).body).toBe("PRIVATE_CANONICAL");
+  });
 });
 
 // --- emptyCompendium ---

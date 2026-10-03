@@ -33,6 +33,32 @@ describe("approved campaign knowledge", () => {
     expect(JSON.stringify(await projectCampaignCompendium(store))).not.toContain("PRIVATE_SENTINEL");
     expect(await readPublicCampaignRecord(store, "Hidden Bob")).toBeNull();
   });
+
+  it("discloses safe facts immediately from a private canonical identity in an arbitrary nested collection", async () => {
+    const store = makeStore();
+    await store.mutate([
+      { op: "create_collection", name: "player knowledge" },
+      { op: "create_collection", name: "Echoes" },
+      { op: "create_collection", parent: "Echoes", name: "Archivists" },
+      { op: "upsert", collection: "Echoes/Archivists", name: "Zhijun Nabo", aliases: ["King"], body: "PRIVATE_SENTINEL", fields: { secret: "PRIVATE_SENTINEL" } },
+    ]);
+    const uid = await store.resolve("Zhijun Nabo"); const canonical = await store.read(uid ?? "missing");
+    await store.mutate([{ op: "disclose", uid: uid ?? "missing", name: "The Junior Archivist", summary: "An echo in the prism confirmed the receipt's missing name belonged to them.", aliases: ["Archivist Echo"] }], { sceneNumber: 3, source: "scribe" });
+    expect(await store.read(uid ?? "missing")).toEqual(canonical);
+    for (const handle of [uid ?? "missing", "The Junior Archivist", "Archivist Echo"]) {
+      expect(await readPublicCampaignRecord(store, handle)).toMatchObject({ uid, name: "The Junior Archivist", collection: "Echoes/Archivists" });
+    }
+    expect(await readPublicCampaignRecord(store, "Zhijun Nabo")).toBeNull();
+    expect(await readPublicCampaignRecord(store, "King")).toBeNull();
+    expect(JSON.stringify(await projectCampaignCompendium(store))).not.toContain("PRIVATE_SENTINEL");
+    const summary = "The echo publicly identified themself as Zhijun Nabo. ".repeat(450);
+    await store.mutate([{ op: "disclose", uid: "King", name: "Zhijun Nabo", summary }], { sceneNumber: 4 });
+    for (const handle of ["The Junior Archivist", "Archivist Echo", "Zhijun Nabo"]) {
+      expect((await readPublicCampaignRecord(store, handle))?.content).toBe(`# Zhijun Nabo\n\n${summary}`);
+    }
+    expect((await store.read(uid ?? "missing")).visibility).toBe("private");
+    expect(await readPublicCampaignRecord(store, "King")).toBeNull();
+  });
   it("preserves one privately revealed identity and its approved public view through hidden-name updates", async () => {
     const store = makeStore(); const publicBody = "Bellwether's practical village sexton.";
     await store.mutate([{ op: "upsert", collection: "Characters", name: "Pansy Jackh", aliases: ["Pansy"], visibility: "player-facing", body: publicBody }]);
@@ -86,6 +112,12 @@ describe("approved campaign knowledge", () => {
     expect(projection.collections?.Characters).toHaveLength(1);
     expect(JSON.stringify(projection)).not.toContain("PRIVATE_SENTINEL");
     expect(JSON.stringify(projection)).not.toContain("Lady Seraphine");
+    await store.mutate([{ op: "disclose", uid: targetUid ?? "missing", name: "The Known Archivist", summary: "The two public identities belong to one archivist." }]);
+    for (const handle of ["Pansy", "The Sexton", "Tall Hat", "The Stranger", oldUid ?? "missing", targetUid ?? "missing"]) {
+      expect(await readPublicCampaignRecord(store, handle)).toMatchObject({ uid: targetUid, name: "The Known Archivist", content: "# The Known Archivist\n\nThe two public identities belong to one archivist." });
+    }
+    expect(await readPublicCampaignRecord(store, "King")).toBeNull();
+    expect(await readPublicCampaignRecord(store, "Knight")).toBeNull();
   });
 
   it("pages a full publicly visible PC sheet and navigates an old public UID after consolidation", async () => {

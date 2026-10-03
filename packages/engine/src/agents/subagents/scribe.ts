@@ -8,7 +8,8 @@ import { machinePaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { Type } from "@sinclair/typebox";
-import { getCampaignKnowledge, type KnowledgeFileIO } from "../../knowledge/store.js";
+import { getCampaignKnowledge, type CampaignKnowledgeStore, type KnowledgeFileIO } from "../../knowledge/store.js";
+import type { KnowledgeOutlineEntry } from "@machine-violet/shared/types/knowledge.js";
 import { ENTITY_TOOLS, ENTITY_INPUT_POLICIES, buildKnowledgeToolHandler } from "../../entities/tools.js";
 import { defineToolContract, validateToolInput, type ToolInputPolicy } from "../tool-contract.js";
 
@@ -231,6 +232,56 @@ export function buildScribeToolHandler(
   };
 }
 
+/** Only approved public leaves are eligible; no private canonical fallback. */
+async function indexApprovedViews(store: CampaignKnowledgeStore, outline: KnowledgeOutlineEntry[]) {
+  const byUid = new Map(outline.map(entry => [entry.uid, entry]));
+  const fields = new Map<string, Map<string, KnowledgeOutlineEntry>>();
+  for (const entry of outline) {
+    if (entry.kind !== "value" || !entry.parent) continue;
+    const siblings = fields.get(entry.parent) ?? new Map<string, KnowledgeOutlineEntry>();
+    siblings.set(entry.name, entry); fields.set(entry.parent, siblings);
+  }
+  const views = new Map<string, Map<string, KnowledgeOutlineEntry>[]>();
+  for (const entry of outline) {
+    if (entry.kind !== "entity") continue;
+    let parent = byUid.get(entry.parent ?? "");
+    while (parent?.parent && parent.parent !== "root") parent = byUid.get(parent.parent);
+    if (parent?.kind !== "collection" || parent.parent !== "root" || parent.name.normalize("NFKC").trim().toLocaleLowerCase() !== "player knowledge") continue;
+    const leaves = fields.get(entry.uid);
+    const subject = leaves?.get("subject");
+    if (!subject || !leaves?.has("display_name") || !leaves.has("summary")) continue;
+    if ((await store.read(entry.uid, { textLimit: 0, logLimit: 0, childLimit: 0 })).visibility !== "player-facing") continue;
+    const value = (await store.read(subject.uid, { textLimit: 0, logLimit: 0, childLimit: 0 })).value;
+    if (value && typeof value === "object" && !Array.isArray(value) && typeof value.$ref === "string") {
+      const candidates = views.get(value.$ref) ?? []; candidates.push(leaves); views.set(value.$ref, candidates);
+    }
+  }
+  return views;
+}
+
+async function approvedPublicPreview(store: CampaignKnowledgeStore, leaves: Map<string, KnowledgeOutlineEntry>) {
+  const nameLeaf = leaves.get("display_name"); const summaryLeaf = leaves.get("summary");
+  if (!nameLeaf || !summaryLeaf) return undefined;
+  const name = await store.read(nameLeaf.uid, { textLimit: 256, logLimit: 0, childLimit: 0 });
+  const summary = await store.read(summaryLeaf.uid, { textLimit: 1500, logLimit: 0, childLimit: 0 });
+  if (typeof name.value !== "string" || typeof summary.value !== "string") return undefined;
+  const aliases: string[] = [];
+  const aliasesLeaf = leaves.get("public_aliases");
+  if (aliasesLeaf) {
+    const page = await store.read(aliasesLeaf.uid, { textLimit: 0, logLimit: 0, childLimit: 16 });
+    if (Array.isArray(page.value)) {
+      for (const child of page.children ?? []) {
+        const alias = await store.read(child.uid, { textLimit: 256, logLimit: 0, childLimit: 0 });
+        if (typeof alias.value === "string" && alias.value.length === alias.textLength) aliases.push(alias.value);
+      }
+    }
+  }
+  return { name: name.value, aliases, summary: summary.value, summaryHandle: summary.uid, summaryLength: summary.textLength,
+    ...(summary.textNextOffset !== undefined ? { summaryNextOffset: summary.textNextOffset } : {}),
+    ...(name.textNextOffset !== undefined ? { nameHandle: name.uid, nameLength: name.textLength, nameNextOffset: name.textNextOffset } : {}),
+  };
+}
+
 /** Bounded canonical records supplement the complete latest organization. */
 export async function buildPrefetchedEntityBlock(
   updates: ScribeUpdate[], _entityTree: EntityTree | undefined,
@@ -239,9 +290,11 @@ export async function buildPrefetchedEntityBlock(
   const store = await getCampaignKnowledge(campaignRoot, fileIO);
   const text = updates.map((update) => update.content).join("\n").toLocaleLowerCase();
   const blocks: string[] = [];
-  let remaining = 12000;
+  const heading = "\n\nCanonical committed records (bulk text may be truncated; read more with knowledge):\n";
+  let remaining = 12000 - heading.length;
   const outline = await store.outline();
   const byUid = new Map(outline.map((entry) => [entry.uid, entry]));
+  let approvedViews: Awaited<ReturnType<typeof indexApprovedViews>> | undefined;
   for (const entry of outline) {
     if (entry.kind !== "entity" || blocks.length >= maxEntities || remaining <= 0) continue;
     const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
@@ -250,6 +303,12 @@ export async function buildPrefetchedEntityBlock(
       return new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?=$|[^\\p{L}\\p{N}_])`, "iu").test(text);
     })) continue;
     const record = await store.read(node.uid, { textLimit: Math.min(1500, remaining), logLimit: 0, childLimit: 32 });
+    approvedViews ??= await indexApprovedViews(store, outline);
+    let approvedPublic: Awaited<ReturnType<typeof approvedPublicPreview>> = undefined;
+    for (const leaves of [...(approvedViews.get(node.uid) ?? [])].reverse()) {
+      approvedPublic = await approvedPublicPreview(store, leaves);
+      if (approvedPublic) break;
+    }
     // Current narrative facts matter here. Child-node inventories and derived
     // value edges repeat the typed fields and can crowd out other identities.
     const references = [];
@@ -268,11 +327,13 @@ export async function buildPrefetchedEntityBlock(
       visibility: record.visibility, fields: record.fields, body: record.body, textLength: record.textLength,
       ...(record.textNextOffset !== undefined ? { textNextOffset: record.textNextOffset } : {}),
       fieldCount: record.childCount, references,
+      ...(approvedPublic ? { approvedPublic } : {}),
     });
-    if (block.length > remaining) continue;
-    blocks.push(block); remaining -= block.length;
+    const separatorLength = blocks.length ? 1 : 0;
+    if (block.length + separatorLength > remaining) continue;
+    blocks.push(block); remaining -= block.length + separatorLength;
   }
-  return blocks.length ? `\n\nCanonical committed records (bulk text may be truncated; read more with knowledge):\n${blocks.join("\n")}` : "";
+  return blocks.length ? `${heading}${blocks.join("\n")}` : "";
 }
 
 export async function runScribe(provider: LLMProvider, input: ScribeInput, fileIO: ScribeFileIO, model: string): Promise<ScribeResult> {

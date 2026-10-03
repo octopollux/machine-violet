@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
 import { ENTITY_TOOLS, buildKnowledgeToolHandler } from "./tools.js";
+import { readPublicCampaignRecord } from "./public-knowledge.js";
 
 const stores: SqliteKnowledgeStore[] = [];
 const setup = () => { const store = new SqliteKnowledgeStore(":memory:"); stores.push(store); return { store, handler: buildKnowledgeToolHandler(store, { sceneNumber: 7 }) }; };
@@ -47,6 +48,33 @@ describe("generic campaign memory contracts", () => {
     expect((await store.read(uid!)).logs).toEqual(expect.arrayContaining([expect.objectContaining({ body: "Took one damage" })]));
   });
 
+  it("validates explicit disclosure before effects and accepts a corrected private/public batch", async () => {
+    const { store, handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Characters", name: "Zhijun Nabo", aliases: ["King"], body: "PRIVATE_SENTINEL", fields: { secret: "PRIVATE_SENTINEL" } }] });
+    await store.acknowledgeNotices((await store.pendingNotices()).map(notice => notice.id));
+    const before = await store.snapshot();
+    for (const operation of [
+      { op: "disclose", uid: "Zhijun Nabo", summary: "The echo identified themself." },
+      { op: "disclose", uid: "Zhijun Nabo", name: "Zhijun Nabo" },
+      { op: "disclose", uid: "Zhijun Nabo", name: "Zhijun Nabo", summary: "The echo identified themself.", fields: { secret: "PRIVATE_SENTINEL" } },
+    ]) {
+      const bad = await handler("remember", { operations: [{ op: "patch", uid: "Zhijun Nabo", body: "Uncommitted change" }, operation] });
+      expect(bad?.is_error).toBe(true);
+      expect(await store.snapshot()).toBe(before);
+      expect(await store.pendingNotices()).toEqual([]);
+    }
+    const retry = await handler("remember", { operations: [
+      { op: "patch", uid: "Zhijun Nabo", fields: { manifestations: "PRIVATE_SENTINEL: incomplete" } },
+      { op: "disclose", uid: "Zhijun Nabo", name: "Zhijun Nabo", summary: "The reflective echo identified themself as Veyruin's last junior archivist." },
+    ] });
+    expect(retry?.is_error).toBeUndefined();
+    expect((await store.read("Zhijun Nabo")).visibility).toBe("private");
+    expect((await readPublicCampaignRecord(store, "Zhijun Nabo"))?.content).toContain("last junior archivist");
+    expect((await readPublicCampaignRecord(store, "Zhijun Nabo"))?.content).not.toContain("PRIVATE_SENTINEL");
+    expect(await readPublicCampaignRecord(store, "King")).toBeNull();
+    expect(JSON.parse(retry!.content).noticeId).toBeTypeOf("number");
+  });
+
   it("preserves references during unrelated edits and returns committed impact candidates", async () => {
     const { store, handler } = setup();
     await handler("remember", { operations: [{ op: "upsert", collection: "Locations", name: "Castle" }, { op: "upsert", collection: "Characters", name: "Resident" }, { op: "add_reference", source: "Resident", target: "Castle", label: "lives there" }] });
@@ -57,6 +85,33 @@ describe("generic campaign memory contracts", () => {
     expect((await store.read("Resident")).fields).not.toHaveProperty("dead");
   });
 
+  it("searches and pages the complete text appended through a string-leaf UID", async () => {
+    const { store, handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Lore", name: "Chronicle", fields: { detail: "Start. " } }] });
+    const leaf = (await store.read("Chronicle")).children![0].uid;
+    const suffix = "x".repeat(20000) + " late discovery";
+    expect((await handler("remember", { operations: [{ op: "append_text", uid: leaf, text: suffix }] }))?.is_error).toBeUndefined();
+    let recovered = "";
+    let offset = 0;
+    do {
+      const page = JSON.parse((await handler("knowledge", { action: "read", handle: leaf, textOffset: offset, textLimit: 3000 }))!.content);
+      recovered += page.value;
+      offset = page.textNextOffset ?? 0;
+    } while (offset);
+    expect(recovered).toBe("Start. " + suffix);
+    const hits = JSON.parse((await handler("knowledge", { action: "search", query: "late discovery" }))!.content);
+    expect(hits).toContainEqual(expect.objectContaining({ uid: leaf, owner: { uid: (await store.resolve("Chronicle"))!, name: "Chronicle" } }));
+  });
+  it("records current-scene provenance for append_log without overwriting an explicit historical scene", async () => {
+    const { store, handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Lore", name: "Chronicle" }] });
+    const result = await handler("remember", { operations: [
+      { op: "append_log", uid: "Chronicle", body: "Current observation", metadata: {} },
+      { op: "append_log", uid: "Chronicle", body: "Earlier observation", metadata: { sceneNumber: 2 } },
+    ] });
+    expect(result?.is_error).toBeUndefined();
+    expect((await store.read("Chronicle")).logs.map(log => log.metadata)).toEqual([{ scene: 7 }, { sceneNumber: 2 }]);
+  });
   it("reads bulk text/history in bounded pages and searches typed scalar leaves", async () => {
     const { handler } = setup();
     await handler("remember", { operations: [{ op: "upsert", collection: "Lore", name: "Chronicle", body: "a".repeat(20000) + "needle", fields: { detail: "x".repeat(1000) + "leafneedle" }, history: "h".repeat(2000) }] });

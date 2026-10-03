@@ -20,6 +20,7 @@ const Operation = Type.Union([
   Type.Object({ op: Type.Literal("create_collection"), parent: Type.Optional(Handle), name: Handle, note: Type.Optional(Type.String()) }, { additionalProperties: false }),
   Type.Object({ op: Type.Literal("upsert"), collection: Handle, uid: Type.Optional(Handle), ...Edits }, { additionalProperties: false }),
   Type.Object({ op: Type.Literal("patch"), uid: Handle, ...Edits }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("disclose"), uid: Handle, name: Handle, summary: Type.String({ description: "Complete updated player-safe description: retain still-valid previously approved facts, not only the new delta." }), aliases: Type.Optional(Type.Array(Handle)) }, { additionalProperties: false }),
   Type.Object({ op: Type.Literal("remove_fields"), uid: Handle, keys: Type.Array(Handle, { minItems: 1 }) }, { additionalProperties: false }),
   Type.Object({ op: Type.Literal("move"), uid: Handle, parent: Handle, index: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }),
   Type.Object({ op: Type.Literal("consolidate"), uid: Handle, target: Handle }, { additionalProperties: false }),
@@ -50,7 +51,7 @@ export const KNOWLEDGE_CONTRACT = defineToolContract({
 });
 export const REMEMBER_CONTRACT = defineToolContract({
   name: "remember", criticality: "durable",
-  description: "Commit campaign memory changes atomically. Resolve UIDs/names/aliases before creating; same names resolve deterministically. Partial fields preserve unrelated values and references; remove_fields explicitly deletes fields. Collections may be nested with brief conventions. Use explicit references and update current facts with history in one batch. Returns canonical UIDs and potential impact candidates; interpret consequences yourself. Never author SQL or database schemas. Omit operationId unless an exact retry ID was supplied.",
+  description: "Commit campaign memory changes atomically. Resolve UIDs/names/aliases before creating; same names resolve deterministically. Partial fields preserve unrelated values and references; remove_fields explicitly deletes fields. disclose replaces the complete player-safe description for a canonical UID: preserve still-valid approved facts in summary, rather than sending only new facts. It publishes only supplied name/summary/aliases, without copying private data or changing visibility. append_text appends a string leaf's typed value, or an entity/collection body; other typed values require set_value. Collections may be nested with brief conventions. Use explicit references and update current facts with history in one batch. Returns canonical UIDs and potential impact candidates; interpret consequences yourself. Never author SQL or database schemas. Omit operationId unless an exact retry ID was supplied.",
   schema: Type.Object({ operations: Type.Array(Operation, { minItems: 1, maxItems: 100 }), operationId: Type.Optional(Handle) }, { additionalProperties: false, $defs: { CampaignKnowledgeValue: Value } }),
   refine: (input) => input.operations.flatMap((op, index) => op.op === "upsert" && !op.uid && !op.name
     ? [{ path: `/operations/${index}/name`, code: "required", expected: "name or UID", actual: "absent", message: "upsert requires name or uid" }] : []),

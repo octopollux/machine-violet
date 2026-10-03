@@ -1248,8 +1248,12 @@ export class SessionManager {
       if (loaded.scene.npcIntents !== undefined) scene.npcIntents = loaded.scene.npcIntents ?? "";
       if (loaded.scene.playerReads != null) scene.playerReads = loaded.scene.playerReads;
       scene.sessionRecapPending = loaded.scene.sessionRecapPending === true;
-      scene.knowledgeSnapshot = loaded.scene.knowledgeSnapshot ?? undefined;
-      scene.knowledgeSnapshotScene = loaded.scene.knowledgeSnapshotScene ?? undefined;
+      // detectSceneState selected a validated current/pending identity. A prior
+      // scene's snapshot cannot override that choice during hydration.
+      if (loaded.scene.knowledgeSnapshotScene === scene.sceneNumber && typeof loaded.scene.knowledgeSnapshot === "string") {
+        scene.knowledgeSnapshot = loaded.scene.knowledgeSnapshot;
+        scene.knowledgeSnapshotScene = scene.sceneNumber;
+      }
     }
 
     // Capture persisted UI state (theme, modelines) for snapshots
@@ -1274,7 +1278,7 @@ export class SessionManager {
 
     // Resume any interrupted scene transition
     const pendingOp = await persister.loadPendingOp();
-    if (pendingOp && pendingOp.step && pendingOp.step !== "done") {
+    if (pendingOp && pendingOp.step) {
       await engine.resumePendingTransition(pendingOp);
     }
 

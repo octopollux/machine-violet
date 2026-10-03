@@ -261,8 +261,22 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
     return row.uid;
   }
   private transferStructuralOwnership(uid: string, from: string, to: string): void {
-    this.statement("UPDATE refs SET source=? WHERE source=? AND label=?").run(to, from, `value:${uid}`);
+    const target = this.structuralReferenceTarget(this.row(uid));
+    if (target !== null)
+      this.statement("UPDATE refs SET source=? WHERE source=? AND target=? AND label=?").run(to, from, target, `value:${uid}`);
     for (const child of this.children(uid)) this.transferStructuralOwnership(child.uid, from, to);
+  }
+  private structuralReferenceTarget(row: Row): string | null {
+    if (row.kind !== "value" || row.value_kind !== "reference") return null;
+    const value = JSON.parse(row.scalar ?? "null") as KnowledgeValue;
+    return value && typeof value === "object" && !Array.isArray(value) && typeof value.$ref === "string" ? value.$ref : null;
+  }
+  private removeStructuralReference(row: Row): void {
+    const target = this.structuralReferenceTarget(row);
+    // Labels are arbitrary user text. A value: prefix alone does not establish
+    // that an edge was generated from this leaf's current typed reference.
+    if (target !== null)
+      this.statement("DELETE FROM refs WHERE source=? AND target=? AND label=?").run(this.owner(row.uid), target, `value:${row.uid}`);
   }
   private assertDiscardableValues(uid: string): void {
     if (this.statement("SELECT source FROM refs WHERE target=? LIMIT 1").get(uid)) {
@@ -278,7 +292,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
     const oldObject = row.value_kind === "object";
     if (!merge || kind !== "object" || !oldObject)
       this.removeValueChildren(uid);
-    this.statement("DELETE FROM refs WHERE source=? AND label=?").run(this.owner(uid), `value:${uid}`);
+    this.removeStructuralReference(row);
     if (kind === "reference") {
       const target = this.require((value as {
         $ref: string;
@@ -305,7 +319,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
   private removeValueChildren(uid: string): void {
     for (const child of this.children(uid).filter(r => r.kind === "value")) {
       this.removeValueChildren(child.uid);
-      this.statement("DELETE FROM refs WHERE source=? AND label=?").run(this.owner(child.uid), `value:${child.uid}`);
+      this.removeStructuralReference(child);
       this.statement("DELETE FROM nodes WHERE uid=?").run(child.uid);
     }
   }
@@ -378,6 +392,67 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
     changed.push(view);
     return changed;
   }
+  private disclose(uid: string, op: Extract<KnowledgeOperation, { op: "disclose" }>, sceneNumber?: number, baseline?: DisclosedView): string[] {
+    const target = this.row(uid);
+    if (target.kind !== "entity")
+      throw new KnowledgeIntegrityError("disclose requires an existing narrative entity, not a collection or typed value");
+    const projectedSubject = this.approvedViewSubject({ ...target, visibility: "player-facing" }, this.disclosedFields(uid));
+    if (projectedSubject)
+      throw new KnowledgeIntegrityError(`disclose must target canonical UID ${projectedSubject}, not its Player Knowledge projection`);
+    if (typeof op.name !== "string" || !op.name.trim() || typeof op.summary !== "string")
+      throw new KnowledgeIntegrityError("disclose requires an explicit player-safe name and summary");
+    const name = op.name.trim();
+    const aliases = new Map<string, string>();
+    const rememberAlias = (alias: string) => {
+      if (typeof alias !== "string" || !alias.trim())
+        throw new KnowledgeIntegrityError("Disclosed aliases must be non-empty strings");
+      const key = normalized(alias);
+      if (key !== normalized(name) && !aliases.has(key)) aliases.set(key, alias.trim());
+    };
+    // Direct player-facing records may have no projection yet. Preserve their
+    // already disclosed handles from the pre-batch baseline, never current
+    // canonical aliases that an earlier operation could have made private.
+    if (typeof baseline?.fields.display_name === "string" && baseline.fields.display_name.trim()) rememberAlias(baseline.fields.display_name);
+    if (Array.isArray(baseline?.fields.public_aliases)) {
+      for (const alias of baseline.fields.public_aliases) if (typeof alias === "string" && alias.trim()) rememberAlias(alias);
+    }
+    const approved = (this.statement("SELECT * FROM nodes WHERE kind='entity' AND visibility='player-facing' ORDER BY uid").all() as unknown as Row[])
+      .map(row => ({ row, fields: this.disclosedFields(row.uid) }))
+      .filter(view => this.approvedViewSubject(view.row, view.fields) === uid);
+    for (const view of approved) {
+      if ((view.fields.display_name as string).trim()) rememberAlias(view.fields.display_name as string);
+      if (Array.isArray(view.fields.public_aliases)) {
+        for (const alias of view.fields.public_aliases) if (typeof alias === "string" && alias.trim()) rememberAlias(alias);
+      }
+    }
+    for (const alias of op.aliases ?? []) rememberAlias(alias);
+    const changed: string[] = [];
+    if (!approved.length) {
+      let parent = this.createCollection("root", "Player Knowledge", "");
+      changed.push(parent);
+      for (const collection of this.collectionNames(uid)) {
+        parent = this.createCollection(parent, collection, "");
+        changed.push(parent);
+      }
+      const viewUid = this.insert(parent, `Player memory: ${uid}`, "entity");
+      this.statement("UPDATE nodes SET visibility='player-facing' WHERE uid=?").run(viewUid);
+      approved.push({ row: this.row(viewUid), fields: {} });
+    }
+    // Several views may survive consolidation. Give every qualified view the
+    // same latest explicit disclosure so tree order can never revive old prose.
+    for (const view of approved) {
+      const fields: Record<string, KnowledgeValue> = {
+        subject: { $ref: uid }, display_name: name, summary: op.summary,
+        public_aliases: [...aliases.values()],
+        firstScene: typeof view.fields.firstScene === "number" ? view.fields.firstScene : sceneNumber ?? 0,
+        lastScene: sceneNumber ?? (typeof view.fields.lastScene === "number" ? view.fields.lastScene : 0),
+      };
+      this.setValue(view.row.uid, fields, true);
+      this.appendLog(view.row.uid, `${name}\n\n${op.summary}`, { action: "disclose", ...(sceneNumber === undefined ? {} : { scene: sceneNumber }) });
+      changed.push(view.row.uid);
+    }
+    return changed;
+  }
   private patch(uid: string, op: Extract<KnowledgeOperation, {
     op: "patch" | "upsert";
   }>, sceneNumber?: number): void {
@@ -441,7 +516,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       logs: logs.map(l => ({ ...l, body: l.body.slice(logTextOffset, logTextOffset + logTextLimit), textLength: l.body.length,
         ...(logTextOffset + logTextLimit < l.body.length ? { textNextOffset: logTextOffset + logTextLimit } : {}), metadata: JSON.parse(l.metadata) as KnowledgeLogEntry["metadata"] })), logCount,
       children: children.slice(childOffset, childOffset + childLimit).map(r => ({ uid: r.uid, parent: r.parent, name: r.name, kind: r.kind, note: r.note, position: r.position })), childCount: children.length,
-      ...(offset + limit < scalarText.length ? { textNextOffset: offset + limit } : {}), ...(logOffset + logs.length < logCount ? { logNextOffset: logOffset + logs.length } : {}) };
+      ...(offset + limit < scalarText.length ? { textNextOffset: offset + limit } : {}), ...(options.logEntryId === undefined && logOffset + logs.length < logCount ? { logNextOffset: logOffset + logs.length } : {}) };
   }
   read(handle: string, options?: KnowledgeReadOptions): Promise<KnowledgeNode> { return this.serialized(() => this.readNode(handle, options)); }
   snapshot(): Promise<string> {
@@ -610,6 +685,12 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
               this.patch(uid, op, options.sceneNumber);
               break;
             }
+            case "disclose": {
+              const uid = this.require(op.uid);
+              for (const changedUid of this.disclose(uid, op, options.sceneNumber, disclosed.get(uid))) touch(changedUid);
+              identityUids.add(uid);
+              break;
+            }
             case "remove_fields": {
               const uid = this.require(op.uid);
               touch(uid);
@@ -617,7 +698,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
                 const child = this.children(uid).find(r => r.slot === key && r.kind === "value");
                 if (child) {
                   this.removeValueChildren(child.uid);
-                  this.statement("DELETE FROM refs WHERE source=? AND label=?").run(this.owner(child.uid), `value:${child.uid}`);
+                  this.removeStructuralReference(child);
                   this.statement("DELETE FROM nodes WHERE uid=?").run(child.uid);
                 }
               }
@@ -626,13 +707,25 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
             case "append_log": {
               const uid = this.require(op.uid);
               touch(uid);
-              this.appendLog(uid, op.body, op.metadata ?? {});
+              const metadata = { ...op.metadata };
+              if (options.sceneNumber !== undefined && !Object.hasOwn(metadata, "scene") && !Object.hasOwn(metadata, "sceneNumber"))
+                metadata.scene = options.sceneNumber;
+              this.appendLog(uid, op.body, metadata);
               break;
             }
             case "append_text": {
               const uid = this.require(op.uid);
-              touch(uid);
-              this.statement("UPDATE nodes SET body=body||? WHERE uid=?").run(op.text, uid);
+              const row = this.row(uid);
+              if (row.kind === "value") {
+                const value = this.decode(uid);
+                if (row.value_kind !== "scalar" || typeof value !== "string")
+                  throw new KnowledgeIntegrityError("append_text requires a string value; use set_value for other typed values");
+                touch(uid);
+                this.setValue(uid, value + op.text);
+              } else {
+                touch(uid);
+                this.statement("UPDATE nodes SET body=body||? WHERE uid=?").run(op.text, uid);
+              }
               break;
             }
             case "create_node": {
@@ -719,9 +812,16 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
               this.statement("INSERT OR REPLACE INTO redirects VALUES (?,?)").run(uid, target);
               const refs = this.statement("SELECT source,target,label FROM refs WHERE source=? OR target=?").all(uid, uid) as unknown as KnowledgeReference[];
               this.statement("DELETE FROM refs WHERE source=? OR target=?").run(uid, uid);
-              for (const ref of refs)
-                if (!(ref.source === uid && ref.label.startsWith("value:")))
-                  this.statement("INSERT OR IGNORE INTO refs VALUES (?,?,?)").run(ref.source === uid ? target : ref.source, ref.target === uid ? target : ref.target, ref.label);
+              for (const ref of refs) {
+                // Remaining source-owned fields will be discarded below. Drop
+                // only their actual derived edges, not arbitrary explicit
+                // labels that happen to use the same value: spelling.
+                const leaf = ref.source === uid && ref.label.startsWith("value:")
+                  ? this.statement("SELECT * FROM nodes WHERE uid=?").get(ref.label.slice(6)) as Row | undefined
+                  : undefined;
+                if (leaf && this.owner(leaf.uid) === uid && this.structuralReferenceTarget(leaf) === ref.target) continue;
+                this.statement("INSERT OR IGNORE INTO refs VALUES (?,?,?)").run(ref.source === uid ? target : ref.source, ref.target === uid ? target : ref.target, ref.label);
+              }
               for (const valueRow of this.statement("SELECT uid,scalar FROM nodes WHERE value_kind='reference'").all() as {
                 uid: string;
                 scalar: string;

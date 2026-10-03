@@ -44,7 +44,7 @@ export async function projectCampaignCompendium(store: CampaignKnowledgeStore): 
     }
     const subject = publicSubject(node);
     const approvedSummary = typeof node.fields.summary === "string" && typeof node.fields.display_name === "string";
-    const collection = collectionPath(node.parent, outline).replace(/^Player Knowledge\/?/, "") || "Campaign";
+    const collection = collectionPath(node.parent, outline).replace(/^Player Knowledge(?:\/|$)/i, "") || "Campaign";
     const summary = approvedSummary ? String(node.fields.summary) : node.body;
     const name = approvedSummary ? String(node.fields.display_name) : node.name;
     const aliases = approvedSummary ? strings(node.fields.public_aliases) : node.aliases;

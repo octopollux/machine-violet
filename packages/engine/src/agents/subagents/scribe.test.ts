@@ -128,6 +128,55 @@ describe("scribe committed memory", () => {
     expect(block).toContain("Bob waits."); expect(block).not.toContain('"children"'); expect(block).toContain("value:watchtower"); expect(block).not.toMatch(/"label":"value:k[0-9a-z]+"/); expect(block).not.toContain("Unneeded history");
   });
 
+  it("prefetch supplies only prior approved public facts with full-read handles for bounded descriptions", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    const summary = "Veyruin's junior archivist catalogued persons using names as keys. ".repeat(350) + "The receipt remains unsigned.";
+    const publicName = "The known archivist " + "n".repeat(300);
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Bob", aliases: ["PRIVATE_ALIAS"], body: "PRIVATE_SENTINEL", fields: { hidden: "PRIVATE_SENTINEL" } },
+      { op: "disclose", uid: "Bob", name: publicName, summary, aliases: ["The Junior Archivist"] },
+    ]);
+    const bob = await store.resolve("Bob"); const privateLeaf = (await store.outline()).find(entry => entry.parent === bob && entry.name === "hidden")!;
+    await store.mutate([
+      { op: "upsert", collection: "Player Knowledge/Characters", name: "Private forged view", fields: { subject: { $ref: "Bob" }, display_name: "Unapproved", summary: "PRIVATE_SENTINEL" } },
+      { op: "create_collection", name: "Player Knowledge Archive" },
+      { op: "upsert", collection: "Player Knowledge Archive", name: "Wrong owner", visibility: "player-facing", fields: { subject: { $ref: "Bob" }, display_name: "Wrong Owner", summary: "WRONG_OWNER_SENTINEL" } },
+      { op: "upsert", collection: "Player Knowledge/Characters", name: "Authored descriptor", visibility: "player-facing", fields: { subject: { $ref: "Bob" }, display_name: "Forged", summary: { $text: privateLeaf.uid, length: 16, authored: true } } },
+    ]);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "player-facing", content: "Bob explained reclaiming names." }], undefined, "/camp", io);
+    const record = block.split("\n").filter(line => line.startsWith("{")).map(line => JSON.parse(line) as { uid: string; approvedPublic?: { name: string; aliases: string[]; summary: string; summaryHandle: string; summaryLength: number; summaryNextOffset: number; nameHandle: string; nameLength: number } }).find(record => record.uid === bob)!;
+    const approved = record.approvedPublic!;
+    expect(approved.summary).toBe(summary.slice(0, 1500)); expect(approved.summaryLength).toBe(summary.length); expect(approved.summaryNextOffset).toBe(1500);
+    expect(approved.name).toBe(publicName.slice(0, 256)); expect(approved.nameLength).toBe(publicName.length);
+    expect(approved.aliases).toEqual(["The Junior Archivist"]);
+    expect(JSON.stringify(approved)).not.toMatch(/PRIVATE_SENTINEL|PRIVATE_ALIAS|WRONG_OWNER_SENTINEL|Forged/);
+    const handler = buildScribeToolHandler(io, "/camp", 3, [], [], [], [], "/home");
+    let recovered = approved.summary;
+    for (let offset = recovered.length; offset < approved.summaryLength; offset += 4000) {
+      const page = JSON.parse((await handler("knowledge", { action: "read", handle: approved.summaryHandle, textOffset: offset, textLimit: 4000 })).content);
+      recovered += page.value as string;
+    }
+    expect(recovered).toBe(summary);
+    expect(JSON.parse((await handler("knowledge", { action: "read", handle: approved.nameHandle, textLimit: 4000 })).content).value).toBe(publicName);
+    expect(block.length).toBeLessThanOrEqual(12000);
+  });
+
+  it("keeps approved public previews inside the total prefetch budget without private fallback", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    for (let index = 0; index < 8; index++) {
+      await store.mutate([
+        { op: "upsert", collection: "Characters", name: `Person ${index}`, body: "Private body. ".repeat(200) },
+        { op: "disclose", uid: `Person ${index}`, name: `Known person ${index}`, summary: "Approved public fact. ".repeat(200) },
+      ]);
+    }
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Unrevealed", body: "SECRET_WITH_NO_APPROVAL" }]);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "private", content: "Unrevealed met " + Array.from({ length: 8 }, (_, index) => `Person ${index}`).join(", ") }], undefined, "/camp", io);
+    expect(block.length).toBeLessThanOrEqual(12000);
+    expect(block).toContain('"approvedPublic"');
+    const unrevealed = await buildPrefetchedEntityBlock([{ visibility: "private", content: "Unrevealed spoke" }], undefined, "/camp", io);
+    expect(unrevealed).toContain("SECRET_WITH_NO_APPROVAL"); expect(unrevealed).not.toContain('"approvedPublic"');
+  });
+
   it("appends machine profile boundaries without creating campaign nodes", async () => {
     const io = mockFileIO({ "/home/players/alice.md": "# Alice\n\n**Type:** player\n\n## Content Boundaries\n- No spiders\n" });
     const handler = buildScribeToolHandler(io, "/camp", 2, [], [], [], [], "/home");

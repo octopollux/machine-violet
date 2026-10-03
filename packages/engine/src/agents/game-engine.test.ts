@@ -10,6 +10,7 @@ import { pruneEmptyDirs } from "../tools/git/index.js";
 import type { EngineCallbacks, EngineState, TurnInfo } from "./game-engine.js";
 import type { GameState } from "./game-state.js";
 import type { ModelTier } from "@machine-violet/shared/types/engine.js";
+import { detectSceneState } from "./scene-manager.js";
 import type { SceneState, FileIO } from "./scene-manager.js";
 import type { DMSessionState } from "./dm-prompt.js";
 import type { TuiCommand, UsageStats } from "./agent-loop.js";
@@ -1047,6 +1048,83 @@ describe("GameEngine", () => {
     expect(engine.getState()).toBe("waiting_input");
   });
 
+  it("durably saves the next identity and tree before any next turn, then resumes without appending a completed transcript", async () => {
+    const io = mockFileIO();
+    vi.mocked(io.listDir).mockImplementation(async path => [...dirs].filter(dir => dir.startsWith(norm(path) + "/") && !dir.slice(norm(path).length + 1).includes("/")).map(dir => dir.slice(norm(path).length + 1)));
+    const state = mockState();
+    const scene = { ...mockScene(), sceneNumber: 2, slug: "untitled", transcript: ["**DM:** Completed scene two."] };
+    const store = await getCampaignKnowledge(state.campaignRoot, io);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Original" }]);
+    scene.knowledgeSnapshot = await store.snapshot(); scene.knowledgeSnapshotScene = 2;
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Recent discovery" }]);
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({ provider: mockProvider([textMessage("- Scene two concluded"), textMessage(""), textMessage(JSON.stringify({ version: 1, lastUpdatedScene: 2, characters: [], places: [], items: [], storyline: [], lore: [], objectives: [] }))]), gameState: state, scene, sessionState: mockSessionState(), fileIO: io, callbacks });
+    await engine.transitionScene("Second scene complete");
+    expect(log.errors).toEqual([]);
+    const saved = JSON.parse(files[norm(state.campaignRoot + "/state/scene.json")]);
+    expect(saved).toMatchObject({ sceneNumber: 3, slug: "", knowledgeSnapshotScene: 3 });
+    expect(saved.knowledgeSnapshot).toContain("Recent discovery");
+    expect(JSON.parse(files[norm(state.campaignRoot + "/state/conversation.json")])).toEqual([]);
+    const oldTranscriptPath = norm(state.campaignRoot + "/campaign/scenes/002-untitled/transcript.md");
+    const oldTranscript = files[oldTranscriptPath];
+    const recovered = await detectSceneState(state.campaignRoot, io);
+    expect(recovered).toMatchObject({ sceneNumber: 3, slug: "", transcript: [], knowledgeSnapshotScene: 3, knowledgeSnapshot: saved.knowledgeSnapshot });
+    const reopened = makeEngine({ provider: mockProvider([textMessage("Next scene begins.")]), gameState: state, scene: recovered, sessionState: mockSessionState(), fileIO: io, callbacks });
+    await reopened.processInput("Aldric", "I continue.");
+    expect(files[oldTranscriptPath]).toBe(oldTranscript);
+    expect(files[norm(state.campaignRoot + "/campaign/scenes/003-untitled/transcript.md")]).toContain("Next scene begins.");
+    expect(recovered.knowledgeSnapshot).toBe(saved.knowledgeSnapshot);
+    const sameOpen = await detectSceneState(state.campaignRoot, io);
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Mid-scene change" }]);
+    const restarted = makeEngine({ provider: mockProvider([textMessage("Still the same scene.")]), gameState: state, scene: sameOpen, sessionState: mockSessionState(), fileIO: io, callbacks });
+    await restarted.processInput("Aldric", "I look around.");
+    expect(sameOpen.knowledgeSnapshot).toBe(saved.knowledgeSnapshot);
+    expect(sameOpen.knowledgeSnapshot).not.toContain("Mid-scene change");
+  });
+  it.each(["scene", "conversation"])("recovers pending completion exactly once after a partial %s persistence failure", async failedSlice => {
+    const io = mockFileIO();
+    vi.mocked(io.listDir).mockImplementation(async path => [...dirs].filter(dir => dir.startsWith(norm(path) + "/") && !dir.slice(norm(path).length + 1).includes("/")).map(dir => dir.slice(norm(path).length + 1)));
+    const state = mockState();
+    const scene = { ...mockScene(), sceneNumber: 2, slug: "untitled", transcript: ["**DM:** Completed scene two."], precis: "Old precis", openThreads: "Old thread", npcIntents: "Old intent", playerReads: [{ focus: ["npc-dialogue"], tone: "curious", offScript: false }] };
+    const store = await getCampaignKnowledge(state.campaignRoot, io);
+    scene.knowledgeSnapshot = await store.snapshot(); scene.knowledgeSnapshotScene = 2;
+    const oldExchange = { user: { role: "user" as const, content: "Old player input" }, assistant: { role: "assistant" as const, content: "Old narration" }, toolResults: [], estimatedTokens: 5 };
+    files[norm(state.campaignRoot + "/state/scene.json")] = JSON.stringify(scene);
+    files[norm(state.campaignRoot + "/state/conversation.json")] = JSON.stringify([oldExchange]);
+    vi.mocked(io.writeFile).mockImplementation(async (path, content) => {
+      if ((failedSlice === "scene" && path.endsWith("state/scene.json") && JSON.parse(content).sceneNumber === 3) || (failedSlice === "conversation" && path.endsWith("state/conversation.json"))) throw new Error("disk full");
+      files[norm(path)] = content;
+    });
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({ provider: mockProvider([textMessage("- The previous scene finished")]), gameState: state, scene, sessionState: mockSessionState(), fileIO: io, callbacks });
+    engine.seedConversation([oldExchange]);
+    await engine.transitionScene("Second scene complete", 60);
+    expect(log.errors.length).toBeGreaterThan(0);
+    const pendingPath = norm(state.campaignRoot + "/pending-operation.json");
+    const pending = JSON.parse(files[pendingPath]);
+    expect(pending).toMatchObject({ step: "done", sceneNumber: 2 });
+    const clockAfterAdvance = JSON.stringify(state.clocks);
+    vi.mocked(io.writeFile).mockImplementation(async (path, content) => { files[norm(path)] = content; });
+    const recovered = await detectSceneState(state.campaignRoot, io);
+    const persisted = JSON.parse(files[norm(state.campaignRoot + "/state/scene.json")]);
+    recovered.precis = persisted.precis; recovered.playerReads = persisted.playerReads; recovered.openThreads = persisted.openThreads; recovered.npcIntents = persisted.npcIntents;
+    expect(recovered.sceneNumber).toBe(failedSlice === "scene" ? 2 : 3);
+    const provider = mockProvider([]);
+    const resumed = makeEngine({ provider, gameState: state, scene: recovered, sessionState: mockSessionState(), fileIO: io, callbacks });
+    resumed.seedConversation([oldExchange]);
+    await resumed.resumePendingTransition(pending);
+    expect(recovered).toMatchObject({ sceneNumber: 3, slug: "", playerReads: [], openThreads: "", npcIntents: "", transcript: [], knowledgeSnapshotScene: 3 });
+    expect(recovered.precis).toContain("Previous scene (Second scene complete):");
+    expect(recovered.precis).toContain("The previous scene finished");
+    expect(JSON.parse(files[norm(state.campaignRoot + "/state/conversation.json")])).toEqual([]);
+    expect(JSON.stringify(state.clocks)).toBe(clockAfterAdvance);
+    expect(provider.chat).not.toHaveBeenCalled();
+    expect(provider.stream).not.toHaveBeenCalled();
+    expect(files[pendingPath]).toBe("");
+    const next = await detectSceneState(state.campaignRoot, io);
+    expect(next.sceneNumber).toBe(3);
+    expect(next.knowledgeSnapshot).toBe(recovered.knowledgeSnapshot);
+  });
   it("refreshes context after scene transition", async () => {
     const provider = mockProvider([textMessage("- Party met in tavern\n---MINI---\nParty met in tavern.")]);
     const { callbacks } = mockCallbacks();
@@ -2571,5 +2649,81 @@ describe("content classifier refusal", () => {
     expect(updated.fields).not.toHaveProperty("sheet_status");
     // But the sheet content should be preserved
     expect(updated.body).toContain("## Skills");
+  });
+});
+
+describe("same-turn deferred boundary ordering", () => {
+  function harness() {
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({ provider: mockProvider([]), gameState: mockState(), scene: mockScene(),
+      sessionState: mockSessionState(), fileIO: mockFileIO(), callbacks, model: "claude-haiku-4-5-20251001" });
+    const handlers = engine as unknown as {
+      handleScribe(cmd: TuiCommand): Promise<void>;
+      handlePromoteCharacter(cmd: TuiCommand): Promise<void>;
+      handleDmNotes(cmd: TuiCommand): Promise<void>;
+      rollbackAndExit(target: string): Promise<void>;
+    };
+    return { engine, handlers, log };
+  }
+
+  it.each(["scene_transition", "session_end"] as const)("%s includes later scribes on the serialized lane before snapshotting", async (type) => {
+    const { engine, handlers, log } = harness();
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    vi.spyOn(handlers, "handleScribe").mockImplementation(async cmd => {
+      const label = String(cmd.label);
+      order.push(`${label}:start`);
+      if (label === "one") await gate;
+      order.push(`${label}:end`);
+    });
+    const boundary = vi.spyOn(engine, type === "scene_transition" ? "transitionScene" : "endSession")
+      .mockImplementation(async () => {
+        await engine.settleDeferredWork();
+        order.push("snapshot");
+      });
+    const pending = engine.applyDeferredTuiCommands([
+      { type, title: "Next" },
+      { type: "scribe", label: "one" },
+      { type: "scribe", label: "two" },
+      { type: "present_choices", choices: [] },
+    ]);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    expect(order).toEqual(["one:start"]);
+    expect(log.tuiCommands.some(cmd => cmd.type === "present_choices")).toBe(false);
+    release();
+    await pending;
+    expect(order).toEqual(["one:start", "one:end", "two:start", "two:end", "snapshot"]);
+    expect(boundary).toHaveBeenCalledOnce();
+    expect(log.tuiCommands.some(cmd => cmd.type === "present_choices")).toBe(true);
+  });
+
+  it("preserves ordinary dispatch order and executes prior boundaries before terminal rollback", async () => {
+    const { engine, handlers } = harness();
+    const order: string[] = [];
+    vi.spyOn(handlers, "handleScribe").mockImplementation(async cmd => { order.push(String(cmd.label)); });
+    vi.spyOn(handlers, "handlePromoteCharacter").mockImplementation(async () => {
+      await engine.settleDeferredWork();
+      order.push("promote");
+    });
+    vi.spyOn(handlers, "handleDmNotes").mockImplementation(async () => { order.push("notes"); });
+    vi.spyOn(engine, "transitionScene").mockImplementation(async () => {
+      await engine.settleDeferredWork(); order.push("scene");
+    });
+    vi.spyOn(engine, "endSession").mockImplementation(async () => { order.push("session"); });
+    vi.spyOn(handlers, "rollbackAndExit").mockImplementation(async () => {
+      order.push("rollback"); throw new Error("terminal rollback");
+    });
+    await expect(engine.applyDeferredTuiCommands([
+      { type: "scene_transition", title: "Next" },
+      { type: "scribe", label: "first" },
+      { type: "promote_character", character: "Aldric" },
+      { type: "dm_notes", action: "write", notes: "known" },
+      { type: "session_end", title: "End" },
+      { type: "scribe", label: "second" },
+      { type: "rollback", target: "HEAD" },
+      { type: "scribe", label: "forbidden" },
+    ])).rejects.toThrow("terminal rollback");
+    expect(order).toEqual(["first", "promote", "notes", "second", "scene", "session", "rollback"]);
   });
 });

@@ -79,6 +79,13 @@ export type KnowledgeOperation = {
   visibility?: KnowledgeNode["visibility"];
   history?: string;
 } | {
+  /** Publish only explicitly supplied player-safe facts about an existing identity. */
+  op: "disclose";
+  uid: string;
+  name: string;
+  summary: string;
+  aliases?: string[];
+} | {
   op: "remove_fields";
   uid: string;
   keys: string[];
