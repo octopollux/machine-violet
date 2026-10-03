@@ -47,6 +47,8 @@ import { log } from "./log.js";
 import { logEvent } from "../../context/engine-log.js";
 import { buildReferenceDirective } from "../image-reference-directive.js";
 import { getCodexClientInfo } from "./client-info.js";
+import { listModelInfo, listModels } from "./models.js";
+import { getTierDefaults } from "../../config/model-registry.js";
 import type { ChatGptTokenStore, PersistedChatGptTokens } from "./token-store.js";
 import type {
   InitializeResult, ThreadStartParams, ThreadStartResult,
@@ -55,7 +57,7 @@ import type {
   ItemCompletedNotification, ItemBase, TokenUsageUpdatedNotification,
   RateLimitsUpdatedNotification, RateLimits,
   DynamicToolCallParams, DynamicToolCallResponse,
-  DynamicToolSpec, ReasoningEffort, ModelListResult,
+  DynamicToolSpec, ReasoningEffort, ModelInfo,
   ChatgptAuthTokensRefreshParams, ChatgptAuthTokensRefreshResponse,
   RawResponseItemCompletedNotification,
 } from "./protocol.js";
@@ -65,6 +67,8 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface OpenAIChatGptProviderOptions {
+  /** Persisted row/backend aliases retained across account catalog refreshes. */
+  modelAliases?: Record<string, string>;
   /** Stable session identifier for log correlation. */
   sessionId?: string;
   /** Working directory passed to thread/start. Cosmetic for our use case. */
@@ -164,7 +168,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
   private readonly toolDispatchers = new Map<string, ThreadToolDispatcher>();
 
   /**
-   * Cached `model/list` default-model lookup for `generateImage`. The
+   * Cached paginated `model/list` account catalog. Also supplies the image default. The
    * image-render thread needs *a* model id for `thread/start`, but codex's
    * `image_gen` skill is model-agnostic — the driving model doesn't affect
    * the rendered bytes. We deliberately resolve the account default here
@@ -174,7 +178,8 @@ export class OpenAIChatGptProvider implements LLMProvider {
    * the small model behind and the image would render under it. The account
    * default is stable and never the wrong-tier surprise.
    */
-  private defaultModelPromise: Promise<string> | null = null;
+  private modelCatalogPromise: Promise<ModelInfo[]> | null = null;
+  private readonly modelAliases: Readonly<Record<string, string>>;
 
   /**
    * Set once we've logged the #597 reasoning tripwire (model reasoned but no
@@ -191,6 +196,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.cwd = opts.cwd ?? process.cwd();
     this.tokenStore = opts.tokenStore;
     this.codexHomeDir = opts.codexHome;
+    this.modelAliases = { ...opts.modelAliases };
   }
 
   // -----------------------------------------------------------------------
@@ -233,6 +239,18 @@ export class OpenAIChatGptProvider implements LLMProvider {
     }
   }
 
+  /** Fresh authenticated discovery for the existing Check connection action. */
+  async discoverModels() {
+    return listModels(await this.ensureStarted(), { includeHidden: true });
+  }
+
+  async resolveModelId(model: string): Promise<string> {
+    const handle = this.modelAliases[model] ?? model;
+    const info = (await this.modelCatalog(await this.ensureStarted()))
+      .find((entry) => entry.model === handle || entry.id === handle);
+    return info?.model || handle;
+  }
+
   getUsageStatus(): UsageStatus | null {
     if (!this.latestRateLimits) return null;
     return toUsageStatus(this.latestRateLimits);
@@ -248,6 +266,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     const rpc = this.rpc;
     this.rpc = null;
     this.startPromise = null;
+    this.modelCatalogPromise = null;
     // Stop the subprocess first (awaits its `exit`), THEN remove our isolation
     // home — by now nothing is writing to it. Only remove a home WE own (an
     // explicit override); never touch the default `~/.codex`. Best-effort: a
@@ -691,15 +710,24 @@ export class OpenAIChatGptProvider implements LLMProvider {
     await removeGeneratedImageDir(this.generatedImageDir(sessionId));
   }
 
-  /** Lazily resolve + cache the account's default model id for image turns. */
-  private resolveDefaultModel(client: CodexRpcClient): Promise<string> {
-    if (!this.defaultModelPromise) {
-      this.defaultModelPromise = client
-        .call<ModelListResult>("model/list", { limit: 50, includeHidden: true })
-        .then((r) => r.data.find((m) => m.isDefault)?.id ?? r.data[0]?.id ?? "gpt-5.5")
-        .catch(() => "gpt-5.5");
-    }
-    return this.defaultModelPromise;
+  /** Cache account model/effort capabilities for the life of this subprocess. */
+  private modelCatalog(client: CodexRpcClient): Promise<ModelInfo[]> {
+    if (this.modelCatalogPromise) return this.modelCatalogPromise;
+    const request = listModelInfo(client, { includeHidden: true }).catch(() => {
+      // A transient failure can fall back for this request, but must not pin
+      // empty capabilities for this subprocess. A late old failure must not
+      // clear a newer catalog installed after disposal/restart.
+      if (this.modelCatalogPromise === request) this.modelCatalogPromise = null;
+      return [];
+    });
+    this.modelCatalogPromise = request;
+    return request;
+  }
+
+  private async resolveDefaultModel(client: CodexRpcClient): Promise<string> {
+    const visible = (await this.modelCatalog(client)).filter((m) => !m.hidden);
+    const selected = visible.find((m) => m.isDefault) ?? visible[0];
+    return selected ? selected.model || selected.id : getTierDefaults("openai-chatgpt")?.large ?? "gpt-6-astra";
   }
 
   // -----------------------------------------------------------------------
@@ -733,6 +761,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
         if (this.rpc !== client) return;
         this.rpc = null;
         this.startPromise = null;
+        this.modelCatalogPromise = null;
         log.subprocessReset({ code: info.code, signal: info.signal, sessionId: this.sessionId });
       });
 
@@ -1018,8 +1047,10 @@ export class OpenAIChatGptProvider implements LLMProvider {
       ? params.tools.map(toolToDynamicSpec)
       : undefined;
 
+    const modelHandle = this.modelAliases[params.model] ?? params.model;
+    const modelInfo = (await this.modelCatalog(client)).find((m) => m.model === modelHandle || m.id === modelHandle);
     const startParams = buildThreadStartParams({
-      model: params.model,
+      model: modelInfo?.model || modelHandle,
       developerInstructions,
       // Replace codex's built-in coding-agent base prompt. None of MV's codex
       // chat agents are coding agents, and that base persona ("you are Codex …
@@ -1233,12 +1264,14 @@ export class OpenAIChatGptProvider implements LLMProvider {
       // reasoning effort. Without this, codex defaults to summary="none" for
       // chatgpt-account flows and our thinkingText never gets populated even
       // though reasoning tokens are billed — see protocol.ts:TurnStartParams.
+      const effort = params.thinking?.effort
+        ? selectReasoningEffort(params.thinking.effort, modelInfo) : undefined;
       const turnReq: TurnStartParams = {
         threadId,
         input: turnInput,
-        ...(params.thinking?.effort
+        ...(effort
           ? {
-              effort: mapEffort(params.thinking.effort),
+              effort,
               summary: "detailed",
             }
           : {}),
@@ -1581,10 +1614,27 @@ function toolToDynamicSpec(tool: NormalizedTool): DynamicToolSpec {
   };
 }
 
-function mapEffort(effort: "low" | "medium" | "high" | "max" | null): ReasoningEffort {
-  if (effort === "max") return "xhigh";
-  if (effort === null) return "minimal";
-  return effort;
+/** Use the requested wire level when advertised, otherwise the nearest supported lower level. */
+export function selectReasoningEffort(
+  effort: "low" | "medium" | "high" | "xhigh" | "max" | null,
+  model?: Partial<Pick<ModelInfo, "supportedReasoningEfforts" | "defaultReasoningEffort" | "model" | "id">>,
+): ReasoningEffort | undefined {
+  if (effort === null) return undefined;
+  const currentFamily = /^gpt-6(?:[.-])/.test(model?.model || model?.id || "");
+  const requested = effort === "max" && !currentFamily ? "xhigh" : effort ?? "minimal";
+  const advertised = model?.supportedReasoningEfforts;
+  // Old app-servers did not expose max; retain their established xhigh mapping.
+  if (advertised === undefined) return requested === "max" ? "xhigh" : requested;
+  if (advertised.length === 0) return undefined;
+  const allowed = advertised.map((e) => e.reasoningEffort);
+  if (allowed.includes(requested)) return requested;
+  const order: ReasoningEffort[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+  const ceiling = order.indexOf(requested);
+  const lower = order.slice(0, ceiling + 1).reverse().find((e) => allowed.includes(e));
+  const lowest = order.find((e) => allowed.includes(e));
+  if (lower) return lower;
+  if (lowest) return lowest;
+  throw new Error("Codex model advertises no supported Machine Violet reasoning effort");
 }
 
 interface SplitHistory {

@@ -94,16 +94,23 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
   /** Wizard completion always lands on the list, whatever the entry point. */
   const landOnList = useCallback(() => setStack([{ kind: "list" }]), []);
 
+  // A successful ChatGPT check may refresh its account model catalog on the server.
+  const checkHealth = useCallback(async (id: string) => {
+    const result = await props.onCheckHealth(id);
+    if (result.status === "valid") props.onRefreshConnections();
+    return result;
+  }, [props.onCheckHealth, props.onRefreshConnections]);
+
   // Auto-check health for connections that have no result yet.
   const checkedRef = useRef(new Set<string>());
   useEffect(() => {
     for (const conn of props.connections) {
       if (!props.healthResults[conn.id] && !checkedRef.current.has(conn.id)) {
         checkedRef.current.add(conn.id);
-        void props.onCheckHealth(conn.id).catch(() => { /* recorded as error state by the caller */ });
+        void checkHealth(conn.id).catch(() => { /* recorded as error state by the caller */ });
       }
     }
-  }, [props.connections, props.healthResults, props.onCheckHealth]);
+  }, [props.connections, props.healthResults, checkHealth]);
 
   // Per-connection usage cache, polled every 30s while the list or a detail
   // screen is visible. Connections without a live snapshot stay absent and
@@ -132,16 +139,18 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
 
   /**
    * Make `conn` the game's connection: assign every tier to that provider's
-   * registry defaults (falling back to the connection's first model where a
+   * registry defaults (falling back to an available model for the same tier where a
    * default is missing, so no tier is ever left pointing at another
    * provider), and reset the image model to the provider default.
    */
   const applyConnection = useCallback(async (conn: ConnectionInfo) => {
     const defaults = props.tierDefaults[conn.provider] ?? {};
-    const fallback = conn.models[0]?.id;
+    const available = conn.models.filter((m) => m.available);
     const pick = (tier: "large" | "medium" | "small"): TierAssignmentEntry => {
       const def = defaults[tier];
-      const modelId = def && conn.models.some((m) => m.id === def) ? def : fallback;
+      const modelId = (available.find((m) => m.id === def)
+        ?? available.find((m) => props.knownModels[m.id]?.defaultTier === tier)
+        ?? available[0])?.id;
       if (!modelId) throw new Error("This connection has no models to use.");
       return { connectionId: conn.id, modelId };
     };
@@ -151,7 +160,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
       small: pick("small"),
       imageAssignment: null,
     });
-  }, [props.tierDefaults, props.onSetTiers]);
+  }, [props.tierDefaults, props.knownModels, props.onSetTiers]);
 
   if (cols < MIN_COLUMNS || termRows < MIN_ROWS) {
     return <TerminalTooSmall columns={cols} rows={termRows} />;
@@ -170,7 +179,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
         knownModels={props.knownModels}
         onAddConnection={props.onAddConnection}
         onRemoveConnection={props.onRemoveConnection}
-        onCheckHealth={props.onCheckHealth}
+        onCheckHealth={checkHealth}
         onApplyConnection={applyConnection}
         onStartChatGptLogin={props.onStartChatGptLogin}
         onPollChatGptLogin={props.onPollChatGptLogin}
@@ -192,7 +201,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
           rows={termRows}
           connection={conn}
           onUpdateKey={(apiKey) => props.onUpdateConnectionKey(conn.id, apiKey)}
-          onCheck={() => props.onCheckHealth(conn.id)}
+          onCheck={() => checkHealth(conn.id)}
           onDone={pop}
           onBack={pop}
         />
@@ -211,7 +220,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
             // The OAuth upsert refreshed the credential in place — reload the
             // list and re-verify so the detail screen shows the fresh state.
             props.onRefreshConnections();
-            void props.onCheckHealth(conn.id).catch(() => { /* recorded as error state */ });
+            void checkHealth(conn.id).catch(() => { /* recorded as error state */ });
             pop();
           }}
           onExit={pop}
@@ -248,7 +257,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
         knownModels={props.knownModels}
         tierAssignments={props.tierAssignments}
         onApply={() => applyConnection(conn)}
-        onCheck={() => props.onCheckHealth(conn.id)}
+        onCheck={() => checkHealth(conn.id)}
         onFix={() => push(
           conn.provider === "openai-chatgpt"
             ? { kind: "signin", connectionId: conn.id }

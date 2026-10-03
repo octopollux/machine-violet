@@ -308,6 +308,43 @@ describe("ConnectionsList", () => {
 });
 
 describe("ConnectionDetail", () => {
+  it("reloads account models after a successful check without re-authentication", async () => {
+    const onRefreshConnections = vi.fn();
+    const props = defaultProps({connections:[conn({provider:"openai-chatgpt"})],onRefreshConnections});
+    const rendered = render(<ConnectionsArea {...props} />);
+    await vi.waitFor(() => expect(onRefreshConnections).toHaveBeenCalled());
+    rendered.rerender(<ConnectionsArea {...props} connections={[conn({provider:"openai-chatgpt",models:[
+      {id:"gpt-6.1-sol",displayName:"Discovered Sol6.1",available:true},
+    ]})]} />);
+    await press(rendered, DOWN); // Add connection
+    await press(rendered, DOWN); // Model assignments
+    await press(rendered, ENTER);
+    await press(rendered, ENTER); // picker
+    await vi.waitFor(() => expect(rendered.lastFrame()).toContain("Discovered Sol6.1"));
+    expect(props.onStartChatGptLogin).not.toHaveBeenCalled();
+  });
+
+  it("uses available models of the same role during a staggered ChatGPT rollout", async () => {
+    const onSetTiers = vi.fn(async () => undefined);
+    const base = {provider:"openai-chatgpt",contextWindow:1,maxOutput:1,pricing:{input:0,output:0,cacheWrite:0,cacheRead:0},capabilities:{thinking:true,tools:true,streaming:true,caching:true}};
+    const connection = conn({provider:"openai-chatgpt",models:[
+      {id:"gpt-6-astra",displayName:"Astra",available:true},
+      {id:"gpt-6.1-sol",displayName:"Sol",available:true},
+      {id:"gpt-6-luna",displayName:"Hidden Luna",available:false},
+      {id:"gpt-5.6-luna",displayName:"Luna5.6",available:true},
+    ]});
+    const rendered = await openDetail({connections:[connection],onSetTiers,
+      tierDefaults:{"openai-chatgpt":{large:"gpt-6-astra",medium:"gpt-6.1-sol",small:"gpt-6-luna"}},
+      knownModels:{"gpt-5.6-luna":{...base,displayName:"Luna5.6",defaultTier:"small"}},
+    });
+    await press(rendered, ENTER);
+    await vi.waitFor(() => expect(onSetTiers).toHaveBeenCalledWith({
+      large:{connectionId:"conn-1",modelId:"gpt-6-astra"},
+      medium:{connectionId:"conn-1",modelId:"gpt-6.1-sol"},
+      small:{connectionId:"conn-1",modelId:"gpt-5.6-luna"},imageAssignment:null,
+    }));
+  });
+
   async function openDetail(props?: Partial<ConnectionsAreaProps>) {
     const rendered = render(<ConnectionsArea {...defaultProps({
       connections: [conn()],

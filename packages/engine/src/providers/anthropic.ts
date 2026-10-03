@@ -154,7 +154,8 @@ export function toAnthropicParams(params: ChatParams): {
   system: string | Anthropic.TextBlockParam[];
   messages: Anthropic.MessageParam[];
   tools?: Anthropic.Tool[];
-  thinking?: Anthropic.Messages.ThinkingConfigParam;
+  // The SDK predates Sonnet 5.5's generally available between_tools mode.
+  thinking?: Anthropic.Messages.ThinkingConfigParam | { type: "between_tools" };
   output_config?: Anthropic.Messages.OutputConfig;
 } {
   // System prompt
@@ -210,20 +211,21 @@ export function toAnthropicParams(params: ChatParams): {
     }
   }
 
-  // Thinking config — only enable for models that support it. Fable 5 is a
-  // special case: adaptive thinking is always on and the API rejects
-  // `thinking: { type: "disabled" }`, so omit the field when the caller has
-  // no explicit effort. Other models, including Opus 5, retain Machine
-  // Violet's null=disabled behavior and omit output_config, so Opus 5 uses
-  // its high default. An explicit effort enables adaptive thinking and sends
-  // output_config; Opus 5 also accepts max effort in that adaptive path.
+  // Explicit effort enables adaptive thinking. A null effort uses the lowest
+  // supported mode: disabled on older models, between-tools on Sonnet 5.5,
+  // or the mandatory adaptive default on Fable and Opus 5.5.
   const modelInfo = getKnownModel(params.model);
   const supportsThinking = modelInfo?.capabilities?.thinking ?? false;
   const alwaysAdaptiveThinking = modelInfo?.capabilities?.alwaysAdaptiveThinking === true;
+  const minimumThinkingMode = modelInfo?.capabilities?.minimumThinkingMode;
   const effort = supportsThinking ? (params.thinking?.effort ?? null) : null;
-  const thinking: Anthropic.Messages.ThinkingConfigParam | undefined =
+  if (effort === "xhigh" && modelInfo?.capabilities?.supportsXhighEffort !== true) {
+    throw new Error(`${params.model} does not support xhigh effort; choose low, medium, high, or max.`);
+  }
+  const thinking: Anthropic.Messages.ThinkingConfigParam | { type: "between_tools" } | undefined =
     effort ? { type: "adaptive" }
     : alwaysAdaptiveThinking ? undefined
+    : minimumThinkingMode ? { type: minimumThinkingMode }
     : { type: "disabled" };
   const output_config: Anthropic.Messages.OutputConfig | undefined =
     effort ? { effort } : undefined;
@@ -234,7 +236,7 @@ export function toAnthropicParams(params: ChatParams): {
   // Always-adaptive models need the same headroom even without an explicit
   // effort override.
   let maxTokens = params.maxTokens;
-  if (effort || alwaysAdaptiveThinking) {
+  if (effort || alwaysAdaptiveThinking || minimumThinkingMode) {
     const modelMax = modelInfo?.maxOutput ?? 16384;
     maxTokens = Math.max(maxTokens, modelMax);
   }

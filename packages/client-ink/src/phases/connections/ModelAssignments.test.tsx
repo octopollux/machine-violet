@@ -68,6 +68,21 @@ function defaultProps(overrides?: Partial<ModelAssignmentsProps>): ModelAssignme
 }
 
 describe("ModelAssignments", () => {
+  it("shows discovered future-model names and excludes hidden account models from choices", async () => {
+    const rendered = render(<ModelAssignments {...defaultProps({connections:[{
+      id:"a-1",provider:"anthropic",label:"Account",masked:"",source:"manual",addedAt:"",
+      models:[{id:"claude-large",displayName:"Account Large",available:true},
+        {id:"future-model",displayName:"Future Account Model",available:true},
+        {id:"hidden-model",displayName:"Hidden Account Model",available:false}],
+    }]})} />);
+    rendered.stdin.write(ENTER);
+    await vi.waitFor(() => {
+      expect(rendered.lastFrame()).toContain("Account Large");
+      expect(rendered.lastFrame()).toContain("Future Account Model");
+      expect(rendered.lastFrame()).not.toContain("Hidden Account Model");
+    });
+  });
+
   it("describes tiers by role, not size", () => {
     const { lastFrame } = render(<ModelAssignments {...defaultProps()} />);
     const frame = lastFrame() ?? "";

@@ -7,9 +7,9 @@ The adapter owns format translation between the engine's normalized message shap
 ## Shipped OpenAI models
 
 `packages/engine/src/config/known-models.json` is the source of truth for the
-selectable OpenAI catalog. Both API-key and ChatGPT connections default to the
-current GPT-5.6 family: Sol for the large tier, Terra for medium, and Luna for
-small. GPT-5.5, GPT-5.5 Pro, the GPT-5.4 family (including mini and nano), and
+selectable OpenAI catalog and tier defaults. GPT-6 Astra, GPT-6.1 Sol,
+GPT-6 Sol and GPT-6 Luna are supported alongside the retained GPT-5.6 family.
+GPT-5.5, GPT-5.5 Pro, the GPT-5.4 family (including mini and nano), and
 the retained GPT-5/4o models remain selectable with their published context,
 output, pricing, and capability metadata.
 
@@ -17,9 +17,13 @@ GPT-5.5 Pro does not expose SSE streaming. When selected, `stream()` falls
 back to one non-streaming Responses request and emits the completed text as a
 single delta, so the engine-facing provider contract still works.
 
-The GPT-5.6 family supports a distinct `max` reasoning level. The normalized
-Machine Violet `max` effort maps to API `max` for `gpt-5.6*`; older models and
+The GPT-5.6, GPT-6 and GPT-6.1 families support a distinct `max` reasoning level. The normalized
+Machine Violet `max` effort maps to API `max` for these direct OpenAI models; older models and
 compatible endpoints receive `xhigh`, preserving their supported ceiling.
+
+The API-key path always uses Responses, including tool calls. Astra and GPT-6.1 Sol require Responses for tools; GPT-6 Sol/Luna also require it when reasoning with tools. Astra/6.1 support `low`, `medium`, `high`, `xhigh`, `max`; Sol/Luna additionally support `none`. MV leaves unspecified/null effort unset, preserving the model's default rather than disabling or increasing reasoning. No `temperature`, `top_p`, or log-probability request fields are emitted. OpenAI function tools explicitly use `strict: false`, retaining optional properties and MV's local runtime validation. See the official [GPT-6 migration guidance](https://developers.openai.com/api/docs/guides/latest-model) and [function-calling contract](https://developers.openai.com/api/docs/guides/function-calling).
+
+Caching remains implicit: no retention override is sent. GPT-5.6 and later use `prompt_cache_options.ttl` (for example `"30m"`) rather than legacy `prompt_cache_retention` when an override is needed. Usage maps `input_tokens_details.cache_write_tokens` to `cacheCreationTokens` and `cached_tokens` to `cacheReadTokens`; input totals retain both. See [OpenAI prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching).
 
 ## OpenRouter environment connection
 
@@ -100,8 +104,10 @@ Every Responses API call sets `store: false` — no server-side thread storage. 
 
 When a turn requests any reasoning effort (`params.thinking.effort`), `toResponsesParams` adds both:
 
-- `reasoning: { effort, summary: "concise" }` — the effort string maps the engine's `low`/`medium`/`high`/`max` to OpenAI's `low`/`medium`/`high`/`xhigh`. Grok 4.5 documents only `low`/`medium`/`high`, so the xAI path clamps MV's provider-neutral `max` to `high`.
+- `reasoning: { effort, summary: "concise" }` — supported effort is preserved; `max` stays distinct on direct GPT-5.6/6/6.1 and maps to `xhigh` on older/compatible endpoints. Grok 4.5 documents only `low`/`medium`/`high`, so the xAI path clamps MV's provider-neutral `max` to `high`.
 - `include: ["reasoning.encrypted_content"]` — opts into the opaque per-reasoning-item encrypted blob.
+
+Direct GPT-5.6/6/6.1 calls also request encrypted content when effort is unspecified, because those models reason by default. They leave `reasoning` itself unset and replay returned opaque items on later turns; this does not change the configured effort. Earlier models retain the explicit-effort opt-in behavior.
 
 The blob is what makes reasoning survive across turns under `store: false`. Without it, a `store: false` session restarts cold every turn; the observed symptom is the model re-deriving its tool inventory and role ("do I have roll_dice, am I the DM?") deep into a campaign. The blobs are opaque to the engine — they are persisted as `reasoning` ContentParts on the assistant message and replayed on the next turn. The human-readable summary text surfaces separately via `thinkingText`.
 

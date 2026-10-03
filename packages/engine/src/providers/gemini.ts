@@ -202,7 +202,8 @@ export function toGeminiParams(params: ChatParams): GeminiCreateParams {
   };
   if (params.thinking?.effort) {
     generationConfig.thinking_level =
-      params.thinking.effort === "max" ? "high" : params.thinking.effort;
+      params.thinking.effort === "max" || params.thinking.effort === "xhigh"
+        ? "high" : params.thinking.effort;
     generationConfig.thinking_summaries = "auto";
   }
 

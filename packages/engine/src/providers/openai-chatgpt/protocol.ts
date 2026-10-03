@@ -140,6 +140,7 @@ export interface ModelInfo {
 export interface ModelListParams {
   limit?: number;
   includeHidden?: boolean;
+  cursor?: string;
 }
 
 export interface ModelListResult {
@@ -153,7 +154,7 @@ export interface ModelListResult {
 
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 export type ApprovalPolicy = "untrusted" | "on-failure" | "on-request" | "never";
-export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+export type ReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ReasoningSummary = "auto" | "concise" | "detailed" | "none";
 
 /** A custom tool registered with the thread. Wire-supported but absent from generated schema. */

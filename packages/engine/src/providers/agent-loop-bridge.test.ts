@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage, ContentPart } from "./types.js";
 import { runProviderLoop } from "./agent-loop-bridge.js";
 import { ContentRefusalError } from "@machine-violet/shared/types/errors.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { loadModelConfig } from "../config/models.js";
 
 function mockUsage(): NormalizedUsage {
   return { inputTokens: 50, outputTokens: 20, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
@@ -43,9 +47,60 @@ function networkError(): Error {
   return err;
 }
 
+describe("runProviderLoop model-specific effort", () => {
+  let configDir: string;
+  beforeEach(() => {
+    configDir = mkdtempSync(join(tmpdir(), "mv-effort-default-"));
+    loadModelConfig({ cwd: configDir, reset: true });
+  });
+  afterEach(() => {
+    rmSync(configDir, { recursive: true, force: true });
+    loadModelConfig({ reset: true });
+  });
+
+  it.each([
+    ["dm", "gpt-6.1-sol", "medium"],
+    ["ooc", "gpt-6.1-sol", "high"],
+    ["dm", "claude-opus-4-6", "low"],
+  ])("uses the effective effort for %s on %s", async (name, model, effort) => {
+    const chat = vi.fn(async () => textResult("ok"));
+    const provider: LLMProvider = { providerId: "test", chat, stream: vi.fn(), healthCheck: vi.fn() };
+    await runProviderLoop(provider, "system", [], { name, model, maxTokens: 100, stream: false });
+    expect(chat.mock.calls[0][0]).toMatchObject({ thinking: { effort } });
+  });
+
+  it.each([null, "high"] as const)("keeps explicit loop effort %s ahead of a model default", async (effort) => {
+    const chat = vi.fn(async () => textResult("ok"));
+    const provider: LLMProvider = { providerId: "test", chat, stream: vi.fn(), healthCheck: vi.fn() };
+    await runProviderLoop(provider, "system", [], {
+      name: "dm", model: "gpt-6.1-sol", maxTokens: 100, stream: false, effort,
+    });
+    expect(chat.mock.calls[0][0].thinking).toEqual(effort === null ? undefined : { effort });
+  });
+});
+
 describe("runProviderLoop retry", () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
+
+  it("keeps model identity startup inside the existing transport retry boundary", async () => {
+    const resolveModelId = vi.fn().mockRejectedValueOnce(apiError(429, "Startup temporarily limited"))
+      .mockResolvedValue("gpt-6.1-sol");
+    const chat = vi.fn(async () => textResult("Resolved after retry"));
+    const provider: LLMProvider = {
+      providerId: "openai-chatgpt", resolveModelId, chat, stream: vi.fn(), healthCheck: vi.fn(),
+    };
+    const onRetry = vi.fn();
+    const config = { name: "dm", model: "saved-catalog-row", maxTokens: 100, stream: false,
+      effort: "high" as const, maxRetries: 1, onRetry };
+    const promise = runProviderLoop(provider, "system", [], config);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect((await promise).text).toBe("Resolved after retry");
+    expect(resolveModelId).toHaveBeenCalledTimes(2);
+    expect(onRetry).toHaveBeenCalledWith(429, expect.any(Number));
+    expect(chat.mock.calls[0][0]).toMatchObject({ model: "gpt-6.1-sol", thinking: { effort: "high" } });
+    expect(config.model).toBe("saved-catalog-row");
+  });
 
   it("retries on 429 and succeeds on second attempt", async () => {
     let callCount = 0;

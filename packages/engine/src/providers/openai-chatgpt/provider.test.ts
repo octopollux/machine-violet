@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  TurnCollector, CodexTurnFailedError, messageToResponsesItems,
+  TurnCollector, CodexTurnFailedError, messageToResponsesItems, selectReasoningEffort,
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
   shouldRetryImageRender, ImageGenNoDataError,
   summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
@@ -15,6 +15,11 @@ import type {
   ItemBase,
 } from "./protocol.js";
 import type { NormalizedMessage } from "../types.js";
+import type { LLMProvider } from "../types.js";
+import { runProviderLoop } from "../agent-loop-bridge.js";
+import { buildTierProviders } from "../../config/tier-resolver.js";
+import { loadModelConfig } from "../../config/models.js";
+import { wrapForRecording, __resetTapeModeForTest } from "../tape-mode.js";
 
 function completedTurn(): TurnCompletedNotification {
   return {
@@ -639,5 +644,201 @@ describe("shouldAutoRetryTurn (codex mid-turn death auto-retry policy)", () => {
   it("does NOT retry when the failure was not a subprocess death", () => {
     // A content/auth/schema failure won't be fixed by a fresh process.
     expect(shouldAutoRetryTurn(false, false, 1)).toBe(false);
+  });
+});
+
+
+describe("account-supported reasoning effort", () => {
+  const caps = (levels: import("./protocol.js").ReasoningEffort[], model = "gpt-6.1-sol") => ({
+    model,
+    defaultReasoningEffort: "high" as const,
+    supportedReasoningEfforts: levels.map((reasoningEffort) => ({reasoningEffort,description:""})),
+  });
+  it("sends native max for current6 and retains explicit xhigh", () => {
+    const model = caps(["low","medium","high","xhigh","max","ultra"]);
+    expect(selectReasoningEffort("max",model)).toBe("max");
+    expect(selectReasoningEffort("xhigh",model)).toBe("xhigh");
+  });
+  it("falls back from max to xhigh for legacy5.5 without selecting ultra", () => {
+    expect(selectReasoningEffort("max",caps(["low","medium","high","xhigh"]))).toBe("xhigh");
+    expect(selectReasoningEffort("max")).toBe("xhigh");
+    expect(selectReasoningEffort("max",caps(["low","medium","high","xhigh","max"],"gpt-5.6-sol"))).toBe("xhigh");
+  });
+  it("chooses the nearest lower effort rather than the account's higher default", () => {
+    expect(selectReasoningEffort("medium",caps(["low","high","max"]))).toBe("low");
+    expect(selectReasoningEffort("low",caps(["medium","high"]))).toBe("medium");
+    expect(() => selectReasoningEffort("max",caps(["ultra"]))).toThrow("no supported");
+  });
+  it("omits an override for explicitly empty capabilities, but retains absent-metadata fallback", () => {
+    expect(selectReasoningEffort("max", caps([]))).toBeUndefined();
+    expect(selectReasoningEffort("medium", caps([]))).toBeUndefined();
+    expect(selectReasoningEffort("medium", { model: "gpt-6.1-sol" })).toBe("medium");
+    expect(selectReasoningEffort("max")).toBe("xhigh");
+  });
+});
+
+function wireCatalog(levels: import("./protocol.js").ReasoningEffort[] = ["low", "medium", "high", "xhigh", "max"]) {
+  return { data: [{ id: "current-sol-row", model: "gpt-6.1-sol", displayName: "Sol",
+    hidden: false, isDefault: true, defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: levels.map((reasoningEffort) => ({ reasoningEffort })),
+  }], nextCursor: null };
+}
+
+/** Drive the actual provider/bridge without spawning Codex or making model calls. */
+function wireFixture(catalog: () => Promise<unknown>, provider: LLMProvider = createOpenAIChatGptProvider()) {
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  const call = vi.fn(async (method: string, _params: unknown) => {
+    if (method === "model/list") return catalog();
+    if (method === "account/read") return { account: { type: "chatgpt" } };
+    if (method === "thread/start") return { thread: { id: "t1" } };
+    if (method === "turn/start") {
+      setImmediate(() => {
+        for (const cb of listeners.get("item/completed") ?? []) cb(agentMessageCompleted("Done"));
+        for (const cb of listeners.get("turn/completed") ?? []) cb(completedTurn());
+      });
+      return { turn: { id: "turn_1" } };
+    }
+    return {};
+  });
+  const client = { call, on: vi.fn(), once: vi.fn(), off: vi.fn(),
+    onNotification(method: string, handler: (payload: unknown) => void) {
+      const set = listeners.get(method) ?? new Set();
+      set.add(handler); listeners.set(method, set);
+      return () => { set.delete(handler); };
+    },
+  } as unknown as import("./rpc.js").CodexRpcClient;
+  const ensureStarted = vi.fn(async () => client);
+  (provider as unknown as { ensureStarted: typeof ensureStarted }).ensureStarted = ensureStarted;
+  return { provider, call, client, ensureStarted };
+}
+
+describe("ChatGPT model/effort wire integration", () => {
+  it("resolves retained row pins before DM defaults through the tier/recording wrapper", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mv-chatgpt-loop-"));
+    loadModelConfig({ cwd: dir, reset: true });
+    const assignment = { connectionId: "chat", modelId: "old-sol-row" };
+    const store = { connections: [{ id: "chat", provider: "openai-chatgpt" as const, apiKey: "", label: "Chat",
+      source: "manual" as const, addedAt: "", models: [{ id: "gpt-6.1-sol", aliases: ["old-sol-row"],
+        displayName: "Sol", available: true }] }],
+      tierAssignments: { large: assignment, medium: assignment, small: assignment } };
+    const tiers = buildTierProviders(store, () => { throw new Error("unexpected fallback"); });
+    const fixture = wireFixture(async () => wireCatalog(), tiers.large.provider);
+    vi.stubEnv("MV_TAPE_MODE", "record");
+    __resetTapeModeForTest();
+    try {
+      const recorded = wrapForRecording(tiers);
+      for (const effort of [undefined, "high", null] as const) {
+        fixture.call.mockClear();
+        await runProviderLoop(recorded.large.provider, "Fixture", [{ role: "user", content: "Hello" }], {
+          name: "dm", model: recorded.large.model, maxTokens: 64, stream: false,
+          ...(effort !== undefined ? { effort } : {}),
+        });
+        expect(fixture.call).toHaveBeenCalledWith("thread/start", expect.objectContaining({ model: "gpt-6.1-sol" }));
+        const turn = fixture.call.mock.calls.find(([method]) => method === "turn/start")?.[1];
+        if (effort === null) {
+          expect(turn).not.toHaveProperty("effort");
+          expect(turn).not.toHaveProperty("summary");
+        } else {
+          expect(turn).toMatchObject({ effort: effort ?? "medium", summary: "detailed" });
+        }
+      }
+      expect(tiers.large.model).toBe("old-sol-row");
+      expect(store.tierAssignments.large).toEqual(assignment);
+    } finally {
+      vi.unstubAllEnvs();
+      __resetTapeModeForTest();
+      await tiers.large.provider.dispose?.();
+      loadModelConfig({ reset: true });
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("retries a failed catalog on a later request and restores row capabilities/default effort", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mv-chatgpt-catalog-"));
+    loadModelConfig({ cwd: dir, reset: true });
+    const catalog = vi.fn().mockRejectedValueOnce(new Error("temporary catalog outage"))
+      .mockResolvedValue(wireCatalog());
+    const { provider, call } = wireFixture(catalog);
+    try {
+      await provider.chat({ model: "current-sol-row", systemPrompt: "Fixture", maxTokens: 64,
+        messages: [{ role: "user", content: "First request" }], thinking: { effort: "max" } });
+      expect(catalog).toHaveBeenCalledTimes(1);
+      call.mockClear();
+      await runProviderLoop(provider, "Fixture", [{ role: "user", content: "Later request" }], {
+        name: "dm", model: "current-sol-row", maxTokens: 64, stream: false,
+      });
+      expect(catalog).toHaveBeenCalledTimes(2);
+      expect(call).toHaveBeenCalledWith("thread/start", expect.objectContaining({ model: "gpt-6.1-sol" }));
+      expect(call).toHaveBeenCalledWith("turn/start", expect.objectContaining({ effort: "medium" }));
+    } finally {
+      await provider.dispose?.();
+      loadModelConfig({ reset: true });
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let a late failed catalog clear a newer cache after disposal", async () => {
+    let rejectFirst: (error: Error) => void = () => { throw new Error("first request not installed"); };
+    const pending = new Promise<unknown>((_resolve, reject) => { rejectFirst = reject; });
+    const catalog = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(wireCatalog());
+    const { provider } = wireFixture(catalog);
+    const first = provider.resolveModelId?.("current-sol-row");
+    await vi.waitFor(() => expect(catalog).toHaveBeenCalledTimes(1));
+    await provider.dispose?.();
+    expect(await provider.resolveModelId?.("current-sol-row")).toBe("gpt-6.1-sol");
+    rejectFirst(new Error("old request failed late"));
+    expect(await first).toBe("current-sol-row");
+    expect(await provider.resolveModelId?.("current-sol-row")).toBe("gpt-6.1-sol");
+    expect(catalog).toHaveBeenCalledTimes(2);
+    await provider.dispose?.();
+  });
+
+  it("omits both effort and summary when the account explicitly advertises no effort support", async () => {
+    const { provider, call } = wireFixture(async () => wireCatalog([]));
+    await provider.chat({ model: "gpt-6.1-sol", systemPrompt: "Fixture", maxTokens: 64,
+      messages: [{ role: "user", content: "Hello" }], thinking: { effort: "high" } });
+    const request = call.mock.calls.find(([method]) => method === "turn/start")?.[1];
+    expect(request).not.toHaveProperty("effort");
+    expect(request).not.toHaveProperty("summary");
+    await provider.dispose?.();
+  });
+
+  it("resolves saved catalog-row IDs to backend IDs, caches discovery, and omits null effort", async () => {
+    const listeners = new Map<string, Set<(payload: unknown) => void>>();
+    const call = vi.fn(async (method: string, _params: unknown) => {
+      if (method === "account/read") return {account:{type:"chatgpt",email:"fixture@example.test",planType:"plus"}};
+      if (method === "model/list") return {data:[{id:"saved-catalog-row",model:"gpt-6.1-sol",
+        displayName:"Sol6.1",hidden:false,isDefault:true,defaultReasoningEffort:"medium",
+        supportedReasoningEfforts:[{reasoningEffort:"xhigh",description:""},{reasoningEffort:"max",description:""}],
+      }],nextCursor:null};
+      if (method === "thread/start") return {thread:{id:"t1"}};
+      if (method === "turn/start") {
+        setImmediate(() => {
+          for (const cb of listeners.get("item/completed") ?? []) cb(agentMessageCompleted("Done"));
+          for (const cb of listeners.get("turn/completed") ?? []) cb(completedTurn());
+        });
+        return {turn:{id:"turn_1"}};
+      }
+      return {};
+    });
+    const client = {call,on:vi.fn(),once:vi.fn(),off:vi.fn(),
+      onNotification(method: string, handler: (payload: unknown) => void) {
+        const set = listeners.get(method) ?? new Set();
+        set.add(handler);listeners.set(method,set);
+        return () => {set.delete(handler);};
+      },
+    } as unknown as import("./rpc.js").CodexRpcClient;
+    const provider = createOpenAIChatGptProvider();
+    (provider as unknown as {ensureStarted:()=>Promise<typeof client>}).ensureStarted = async () => client;
+    const base = {model:"saved-catalog-row",systemPrompt:"Fixture",maxTokens:64,
+      messages:[{role:"user" as const,content:"Hello"}]};
+    await provider.chat({...base,thinking:{effort:"max"}});
+    expect(call).toHaveBeenCalledWith("thread/start",expect.objectContaining({model:"gpt-6.1-sol"}));
+    expect(call).toHaveBeenCalledWith("turn/start",expect.objectContaining({effort:"max"}));
+    call.mockClear();
+    await provider.chat({...base,thinking:{effort:null}});
+    const request = call.mock.calls.find(([method]) => method === "turn/start")?.[1];
+    expect(request).not.toHaveProperty("effort");
+    expect(call.mock.calls.filter(([method]) => method === "model/list")).toHaveLength(0);
   });
 });

@@ -6,12 +6,17 @@
 
 {
   // Per-agent reasoning effort. Keys are agent names; values are
-  // "low" | "medium" | "high" | "max" | null (null = API default; reasoning disabled).
-  // The "default" key is the fallback for agents not listed.
+  // "low" | "medium" | "high" | "xhigh" | "max" | null.
+  // Null preserves the OpenAI default; Anthropic uses its lowest supported
+  // thinking mode (mandatory adaptive on Fable 5.1 / Opus 5.5, between-tools on
+  // Sonnet 5.5). Older Claude models without xhigh support reject that level.
+  // The "default" key is a fallback for agents without named model/baked settings.
+  // Explicit agent overrides take precedence over model-specific
+  // defaults. Without overrides, the GPT-6.1 Sol DM uses medium; other DMs use
+  // low. Setup/OOC/dev-mode still use high. Omit dm here to follow model defaults.
   // Production defaults are inlined in models.ts DEFAULTS.effort; entries here override them.
   "effort": {
     "default": null,
-    "dm": "high",
     "ooc": "high",
     "setup": "high",
     "dev-mode": "high",

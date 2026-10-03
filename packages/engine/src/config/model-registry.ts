@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { assetDir } from "../utils/paths.js";
+import type { EffortLevel } from "./models.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +24,8 @@ export interface KnownModelEntry {
   defaultTier: "large" | "medium" | "small";
   pricing: ModelPricing;
   capabilities: ModelCapabilities;
+  /** Agent-specific defaults used only when no explicit effort was configured. */
+  effortDefaults?: Record<string, EffortLevel | null>;
 }
 
 /**
@@ -57,6 +60,10 @@ export interface ModelCapabilities {
    * reasoning even when no explicit effort override was requested.
    */
   alwaysAdaptiveThinking?: boolean;
+  /** Lowest thinking mode when a null effort cannot disable thinking entirely. */
+  minimumThinkingMode?: "between_tools";
+  /** Explicit support for Anthropic's xhigh effort (older models may reject it). */
+  supportsXhighEffort?: boolean;
   tools: boolean;
   streaming: boolean;
   caching: boolean;

@@ -69,7 +69,7 @@ export function ModelAssignments({
     : connections[0];
   const defaults: ProviderTierDefaults = activeConn ? (tierDefaults[activeConn.provider] ?? {}) : {};
 
-  const modelName = (id: string) => knownModels[id]?.displayName ?? id;
+  const modelName = (id: string) => activeConn?.models.find((m) => m.id === id)?.displayName ?? knownModels[id]?.displayName ?? id;
 
   /** Value text for a tier row: `Auto (X)`, `X (override)`, or `(not set)`. */
   const tierValue = (tier: Tier): string => {
@@ -91,11 +91,14 @@ export function ModelAssignments({
       return options;
     }
     const options: PickOption[] = [];
-    const def = defaults[target];
-    if (def && activeConn.models.some((m) => m.id === def)) {
+    const available = activeConn.models.filter((m) => m.available);
+    const def = (available.find((m) => m.id === defaults[target])
+      ?? available.find((m) => knownModels[m.id]?.defaultTier === target)
+      ?? available[0])?.id;
+    if (def && available.some((m) => m.id === def)) {
       options.push({ modelId: def, label: `Auto — ${modelName(def)} (recommended)` });
     }
-    for (const m of activeConn.models) {
+    for (const m of available) {
       if (m.id === def) continue;
       options.push({ modelId: m.id, label: m.displayName });
     }

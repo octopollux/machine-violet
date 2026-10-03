@@ -1248,7 +1248,7 @@ export function createSetupConversation(
     pendingToolUseId = null;
     turnImageDisplays = [];
 
-    const ec = getEffortConfig("setup");
+    const ec = getEffortConfig("setup", model);
     const thinking = ec.effort ? { effort: ec.effort } : undefined;
 
     // Cache hints: BP3 on tools (1h — stable tool definitions), BP4 on last

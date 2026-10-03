@@ -310,7 +310,7 @@ export interface CacheHint {
 
 export interface ThinkingConfig {
   /** Effort level: maps to Anthropic adaptive/effort or OpenAI reasoning.effort. */
-  effort: "low" | "medium" | "high" | "max" | null;
+  effort: "low" | "medium" | "high" | "xhigh" | "max" | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,6 +520,16 @@ export interface LLMProvider {
 
   /** Minimal API call to validate credentials. */
   healthCheck(model?: string): Promise<HealthCheckResult>;
+
+  /** Optional account catalog discovery; does not run an inference turn. */
+  discoverModels?(): Promise<{
+    id: string; displayName: string; available: boolean;
+    aliases?: string[];
+    isDefault?: boolean; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string;
+  }[]>;
+
+  /** Resolve a persisted catalog handle before runtime model capabilities/defaults. */
+  resolveModelId?(model: string): Promise<string>;
 
   /**
    * Generate an image from a textual prompt + abstract knobs (effort,

@@ -28,6 +28,44 @@ All under `packages/engine/src/providers/openai-chatgpt/`:
 | `provider.ts` | `OpenAIChatGptProvider` — the `LLMProvider` impl. Owns the subprocess, runs turns end-to-end with internal tool dispatch via `params.dispatchTool`. |
 | `log.ts` | Helpers that emit `codex:*` operational events to `.debug/engine.jsonl`. |
 
+## Models and reasoning effort
+
+The bundled Codex app-server is `@openai/codex ^0.160.0`. Its account-specific
+[`model/list`](https://learn.chatgpt.com/docs/app-server) response is authoritative:
+Machine Violet follows every cursor page, uses each row's backend `model` ID for
+requests, and retains display names, availability, default, supported efforts, and
+row-ID aliases. Aliases survive catalog refreshes, connection deduplication, and
+REST serialization, so supported legacy pins keep their original spelling.
+The existing **Check connection** action refreshes the catalog using authenticated
+model discovery, without another login or model turn, and reloads the picker.
+Discovery failure retains the prior catalog and authentication result.
+Hidden models are not offered in the picker. Nonempty discovered account catalogs
+survive connection reloads; the registry supplies a fallback only when discovery
+is absent. Existing saved model assignments remain unchanged, including older
+catalog-row IDs. The provider loop resolves them to backend IDs before selecting
+registry capabilities and model-specific effort defaults, including medium for
+the Sol 6.1 DM. Recording wrappers forward this resolution. Startup resolution
+uses the loop's existing transport retry boundary; failed catalog discovery is
+not cached permanently, and a late failure cannot clear a newer subprocess cache.
+
+New connections default to Astra 6 for DM narration, Sol 6.1 for helpers and AI
+players, and Luna 6 for quick tasks. During staggered account rollout, an unavailable
+default falls back to an available known model for the same tier before the first
+available model. The [current Codex model catalog](https://learn.chatgpt.com/docs/models)
+describes these families; actual account availability can differ.
+
+Requested reasoning effort is constrained by the live model's advertised levels.
+An unsupported level uses the nearest supported lower level, or the lowest supported
+level when none is lower; Machine Violet never automatically selects `ultra`.
+An explicitly empty supported-effort list omits both effort and reasoning-summary
+overrides. Only absent metadata uses the older app-server compatibility fallback.
+Explicit `xhigh` remains distinct from `max`. GPT-6/6.1 sends native `max` when
+supported; GPT-5.x preserves its historical `max` → `xhigh` mapping so existing
+saved configurations do not acquire a higher reasoning budget. With no configured
+effort, the request omits it and Codex chooses its default. Image turns use the
+visible account-default backend model, with the registry's Large default only as
+a discovery-failure fallback.
+
 ## Lifecycle
 
 1. **Construction** is synchronous and free — `createOpenAIChatGptProvider()` returns a provider with no subprocess yet running.

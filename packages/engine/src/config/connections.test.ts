@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
   addConnection, removeConnection, setImageAssignment, setTierAssignment, upsertChatGptConnection,
+  updateConnectionModels,
 } from "./connections.js";
 import type { AIConnection, ConnectionStore, ChatGptAccountInfo } from "./connections.js";
 
@@ -152,6 +153,28 @@ describe("saveConnectionStore", () => {
 });
 
 describe("buildEffectiveConnections", () => {
+  it("preserves live ChatGPT availability/capabilities and chooses role-aware rollout fallbacks", () => {
+    const models = [
+      {id:"gpt-6-astra",displayName:"Astra",available:true,supportedReasoningEfforts:["low","max"]},
+      {id:"gpt-6.1-sol",displayName:"Sol",available:true},
+      {id:"gpt-6-luna",displayName:"Hidden Luna",available:false},
+      {id:"gpt-5.6-luna",displayName:"Account Luna",available:true},
+      {id:"future-account-model",displayName:"Future",available:true},
+    ];
+    const connection: AIConnection = {id:"chat",provider:"openai-chatgpt",label:"ChatGPT",apiKey:"",models,source:"manual",addedAt:""};
+    const store: ConnectionStore = {connections:[connection],tierAssignments:{large:null,medium:null,small:null},imageAssignment:null};
+    const effective = buildEffectiveConnections(store,tempDir);
+    expect(effective.connections[0].models).toEqual(models);
+    expect(effective.tierAssignments).toEqual({
+      large:{connectionId:"chat",modelId:"gpt-6-astra"},
+      medium:{connectionId:"chat",modelId:"gpt-6.1-sol"},
+      small:{connectionId:"chat",modelId:"gpt-5.6-luna"},
+    });
+    const pin = {connectionId:"chat",modelId:"old-saved-row-id"};
+    store.tierAssignments.small = pin;
+    expect(buildEffectiveConnections(store,tempDir).tierAssignments.small).toEqual(pin);
+  });
+
   let savedAnthropic: string | undefined;
   let savedGoogle: string | undefined;
   let savedGemini: string | undefined;
@@ -489,6 +512,40 @@ describe("removeConnection", () => {
 });
 
 describe("upsertChatGptConnection", () => {
+  it("keeps row-ID pins from two legacy connections when their backend IDs are still supported", () => {
+    const store: ConnectionStore = {
+      connections: [
+        { id: "first", provider: "openai-chatgpt", label: "First", apiKey: "", source: "oauth", addedAt: "",
+          models: [{ id: "old-sol-row", displayName: "Sol", available: true }] },
+        { id: "second", provider: "openai-chatgpt", label: "Second", apiKey: "", source: "oauth", addedAt: "",
+          models: [{ id: "old-luna-row", displayName: "Luna", available: true }] },
+      ],
+      tierAssignments: {
+        large: { connectionId: "first", modelId: "old-sol-row" },
+        medium: { connectionId: "second", modelId: "old-luna-row" },
+        small: { connectionId: "second", modelId: "unavailable-row" },
+      },
+    };
+    const result = upsertChatGptConnection(store, freshAccount(), [
+      { id: "gpt-6.1-sol", aliases: ["old-sol-row"], displayName: "Sol", available: true },
+      { id: "gpt-6-luna", aliases: ["old-luna-row"], displayName: "Luna", available: true },
+    ]);
+    expect(result.removedIds).toEqual(["second"]);
+    expect(store.tierAssignments.large).toEqual({ connectionId: "first", modelId: "old-sol-row" });
+    expect(store.tierAssignments.medium).toEqual({ connectionId: "first", modelId: "old-luna-row" });
+    expect(store.tierAssignments.small).toBeNull();
+
+    const refreshed = updateConnectionModels(store, "first", [
+      { id: "gpt-6.1-sol", aliases: ["new-sol-row"], displayName: "Sol", available: true },
+      { id: "gpt-6-luna", aliases: ["new-luna-row"], displayName: "Luna", available: true },
+    ]);
+    saveConnectionStore(tempDir, refreshed);
+    const reloaded = loadConnectionStore(tempDir);
+    expect(reloaded.tierAssignments).toEqual(store.tierAssignments);
+    expect(reloaded.connections[0].models[0].aliases).toEqual(["new-sol-row", "old-sol-row"]);
+    expect(reloaded.connections[0].models[1].aliases).toEqual(["new-luna-row", "old-luna-row"]);
+  });
+
   function freshAccount(overrides: Partial<ChatGptAccountInfo> = {}): ChatGptAccountInfo {
     return {
       id: "acct-new",

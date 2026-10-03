@@ -358,7 +358,25 @@ describe("Responses API integration", () => {
     expect(callArgs.reasoning.effort).toBe("max");
   });
 
-  it("routes xAI through Responses, clamps max reasoning, and sends the cache-affinity key", async () => {
+  it.each(["gpt-6-astra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol-2026-09-30"])("preserves max and Responses tool compatibility for %s", async model => {
+    mockResponses.create.mockResolvedValue(fakeResponse());
+    const provider = createOpenAIProvider({ apiKey: "test-key" });
+    await provider.chat(baseChatParams({ model, thinking: { effort: "max" }, tools: [{ name: "read", inputSchema: { type: "object", properties: { optional: { type: "string" } } } }] }));
+    const request = mockResponses.create.mock.calls[0][0];
+    expect(request.reasoning.effort).toBe("max");
+    expect(request.tools[0].strict).toBe(false);
+    expect(request).not.toHaveProperty("temperature");
+    expect(request).not.toHaveProperty("top_p");
+    expect(request).not.toHaveProperty("prompt_cache_retention");
+  });
+
+  it("reports charged cache-write tokens separately from cache reads", async () => {
+    mockResponses.create.mockResolvedValue(fakeResponse({ usage: { input_tokens: 2000, output_tokens: 10, input_tokens_details: { cached_tokens: 1024, cache_write_tokens: 512 }, output_tokens_details: { reasoning_tokens: 4 } } }));
+    const result = await createOpenAIProvider({ apiKey: "test-key" }).chat(baseChatParams({ model: "gpt-6.1-sol" }));
+    expect(result.usage).toMatchObject({ inputTokens: 2000, cacheReadTokens: 1024, cacheCreationTokens: 512, reasoningTokens: 4 });
+  });
+
+  it.each(["max", "xhigh"] as const)("routes xAI through Responses, clamps %s reasoning, and sends the cache-affinity key", async effort => {
     mockResponses.create.mockResolvedValue(fakeResponse({ model: "grok-4.5" }));
 
     const provider = createOpenAIProvider({
@@ -369,7 +387,7 @@ describe("Responses API integration", () => {
     await provider.chat(baseChatParams({
       model: "grok-4.5",
       conversationId: "campaign-123",
-      thinking: { effort: "max" },
+      thinking: { effort },
     }));
 
     const callArgs = mockResponses.create.mock.calls[0][0];
@@ -622,6 +640,17 @@ describe("Responses API integration", () => {
 
     const callArgs = mockResponses.create.mock.calls[0][0];
     expect(callArgs.include).toBeUndefined();
+  });
+
+  it.each([undefined, { effort: null }] as const)("replays default GPT-6 reasoning without overriding unspecified effort (%j)", async thinking => {
+    mockResponses.create.mockResolvedValueOnce(fakeResponse({ output: [{ id: "rs_default", type: "reasoning", summary: [], encrypted_content: "opaque-default" }] })).mockResolvedValueOnce(fakeResponse());
+    const provider = createOpenAIProvider({ apiKey: "test-key" });
+    const first = await provider.chat(baseChatParams({ model: "gpt-6-astra", thinking }));
+    await provider.chat(baseChatParams({ model: "gpt-6-astra", thinking, messages: [{ role: "user", content: "first" }, { role: "assistant", content: first.assistantContent }, { role: "user", content: "continue" }] }));
+    const firstRequest = mockResponses.create.mock.calls[0][0];
+    expect(firstRequest.reasoning).toBeUndefined();
+    expect(firstRequest.include).toEqual(["reasoning.encrypted_content"]);
+    expect(mockResponses.create.mock.calls[1][0].input).toContainEqual(expect.objectContaining({ type: "reasoning", id: "rs_default", encrypted_content: "opaque-default" }));
   });
 
   it("captures encrypted reasoning into assistantContent for replay", async () => {

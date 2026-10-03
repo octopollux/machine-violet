@@ -1,13 +1,14 @@
 import type { ModelId } from "../agents/agent-loop.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getKnownModel } from "./model-registry.js";
 
 import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 export type { ModelTier } from "@machine-violet/shared/types/engine.js";
 
-export type EffortLevel = "low" | "medium" | "high" | "max";
+export type EffortLevel = "low" | "medium" | "high" | "xhigh" | "max";
 
-const VALID_EFFORT_LEVELS = new Set<string>(["low", "medium", "high", "max"]);
+const VALID_EFFORT_LEVELS = new Set<string>(["low", "medium", "high", "xhigh", "max"]);
 
 export interface ModelConfig {
   large: ModelId;
@@ -151,8 +152,8 @@ function warnBadDevConfig(dir: string, err: unknown): void {
 }
 
 const DEFAULTS: ModelConfig = {
-  large: "claude-opus-5",
-  medium: "claude-sonnet-5",
+  large: "claude-opus-5-5",
+  medium: "claude-sonnet-5-5",
   small: "claude-haiku-4-5-20251001",
   effort: {
     "default": null,
@@ -174,6 +175,9 @@ export interface ModelPricing {
 }
 
 const DEFAULT_PRICING: Record<string, ModelPricing> = {
+  "claude-fable-5-1":            { input: 10,   output: 50,  cacheWrite: 12.5,  cacheRead: 0.25 },
+  "claude-opus-5-5":             { input: 4,    output: 20,  cacheWrite: 5,     cacheRead: 0.20 },
+  "claude-sonnet-5-5":           { input: 2,    output: 10,  cacheWrite: 2.5,   cacheRead: 0.20 },
   "claude-fable-5":              { input: 10,   output: 50,  cacheWrite: 12.5,  cacheRead: 1.00 },
   "claude-opus-5":               { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
   "claude-opus-4-8":             { input: 5,    output: 25,  cacheWrite: 6.25,  cacheRead: 0.50 },
@@ -186,24 +190,24 @@ const DEFAULT_PRICING: Record<string, ModelPricing> = {
 };
 
 let cached: ModelConfig | null = null;
+let explicitEffort: Record<string, EffortLevel | null> = {};
 let cachedPricing: Record<string, ModelPricing> | null = null;
 
 /**
  * Load model config: defaults merged with optional `dev-config.jsonc` effort overrides.
  *
  * Tier model IDs (`large`/`medium`/`small`) returned here are baked-in defaults.
- * Many callers — subagents (scribe, summarizer, precis-updater, etc.), content
- * pipeline, fallbacks — still consult them via `getModel(tier)`. The user-facing
- * Connections UI writes its tier→provider+model assignments to `connections.json`,
- * which currently overrides only the DM's model selection at session start; the
- * subagent call sites have not yet been migrated to the connection store, so they
- * continue to receive these defaults. See PR #440 follow-up for the broader
- * migration.
+ * The Connections UI writes tier→provider+model assignments to connections.json.
+ * Session tier providers route both DM and subagent calls through those saved
+ * assignments; these defaults apply when no connection assignment is available.
  *
  * Reads from cwd. Result is cached after first call. Pass `reset: true` in tests.
  */
 export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): ModelConfig {
-  if (opts?.reset) cached = null;
+  if (opts?.reset) {
+    cached = null;
+    explicitEffort = {};
+  }
   if (cached) return cached;
 
   const config = { ...DEFAULTS };
@@ -223,6 +227,7 @@ export function loadModelConfig(opts?: { cwd?: string; reset?: boolean }): Model
         // Skip invalid entries silently
       }
       if (Object.keys(map).length > 0) {
+        explicitEffort = map;
         config.effort = { ...DEFAULTS.effort, ...map };
       }
     }
@@ -245,16 +250,25 @@ export function getModel(tier: ModelTier): ModelId {
 
 /**
  * Look up effort configuration for a named agent.
- * Falls back to the "default" key, then null (API default).
+ * Explicit dev-config agent overrides precede a model-specific agent default,
+ * then the baked-in agent setting. The default key remains a fallback only for
+ * unnamed agents. Null is an explicit choice when set for an agent.
  *
- * When effort is set, the caller should send `output_config: { effort }`
- * and omit `thinking` (the API handles thinking implicitly).
+ * Provider adapters translate explicit effort to their supported request mode.
  * When effort is null, providers disable thinking when the selected model
  * permits it. Always-adaptive models ignore that preference because their API
  * rejects disabled thinking.
  */
-export function getEffortConfig(agentName: string): EffortConfig {
+export function getEffortConfig(agentName: string, modelId?: string): EffortConfig {
   const map = loadModelConfig().effort;
+  if (Object.hasOwn(explicitEffort, agentName)) return { effort: explicitEffort[agentName] };
+  const modelDefaults = modelId ? getKnownModel(modelId)?.effortDefaults : undefined;
+  if (modelDefaults && Object.hasOwn(modelDefaults, agentName)) {
+    const modelEffort = modelDefaults[agentName];
+    if (modelEffort === null || VALID_EFFORT_LEVELS.has(modelEffort)) {
+      return { effort: modelEffort };
+    }
+  }
   const level = agentName in map ? map[agentName] : (map["default"] ?? null);
   return { effort: level };
 }

@@ -104,7 +104,10 @@ export function createProviderFromConnection(conn: AIConnection, opts: CreatePro
         sweepStaleCodexHomesOnce(Date.now());
         codexHome = allocateCodexHome(conn.id);
       }
-      return createOpenAIChatGptProvider({ tokenStore, codexHome });
+      const modelAliases = Object.fromEntries(conn.models.flatMap((model) =>
+        (model.aliases ?? []).map((alias) => [alias, model.id]),
+      ));
+      return createOpenAIChatGptProvider({ tokenStore, codexHome, modelAliases });
     }
 
     default:

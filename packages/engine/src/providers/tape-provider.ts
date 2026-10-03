@@ -72,6 +72,7 @@ export function createTapingProvider(inner: LLMProvider, writer: TapeWriter): LL
   if (inner.getUsageStatus) taping.getUsageStatus = inner.getUsageStatus.bind(inner);
   if (inner.subscribeUsage) taping.subscribeUsage = inner.subscribeUsage.bind(inner);
   if (inner.dispose) taping.dispose = inner.dispose.bind(inner);
+  if (inner.resolveModelId) taping.resolveModelId = inner.resolveModelId.bind(inner);
 
   return taping;
 }

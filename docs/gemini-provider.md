@@ -70,7 +70,7 @@ Reasoning effort maps directly to Gemini `thinking_level`:
 |---|---|
 | `low` | `low` |
 | `medium` | `medium` |
-| `high` / `max` | `high` |
+| `high` / `xhigh` / `max` | `high` |
 | unset | model default |
 
 When effort is explicit, `thinking_summaries: "auto"` is requested so visible

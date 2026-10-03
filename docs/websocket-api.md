@@ -21,6 +21,19 @@ No authentication is required (localhost-only). Auth will be added when remote c
 
 `GET /session/compendium` returns the approved player projection with arbitrary `collections` (nested collection paths), plus default presentation arrays. Entries carry stable `uid`; their navigation `slug` is that UID. `GET /session/knowledge/:id` reads approved content by UID, and `/session/character/:name` accepts an approved display name/alias or UID. Responses contain `uid`, `name`, `content`, and `collection`. Private identities return 404; private fields, bodies, aliases, and reference reasons never fall back into these responses. Campaign Explorer's offline logical tree is a separate privileged local inspection surface.
 
+### Connection model metadata (REST)
+
+`GET /manage/connections` returns each connection's discovered `models`;
+`PUT /manage/connections/:id/models` accepts the same `ConnectionModel` shape:
+required `id`, `displayName`, `available`, and optional `aliases` (catalog-row
+handles), `isDefault`,
+`supportedReasoningEfforts` (string array), `defaultReasoningEffort` (string).
+ChatGPT IDs are backend model IDs, discovery follows every cursor page, and account
+availability/capabilities and row aliases survive reloads and discovery refreshes. Hidden/unavailable models are excluded
+from new picker choices; existing saved assignments remain unchanged.
+A successful `POST /manage/connections/:id/check` refreshes ChatGPT discovery
+without inference or another login; discovery failure retains the prior catalog.
+
 ## Communication Direction
 
 WebSocket messages are predominantly **server to client**. Clients send gameplay commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/command/:name`, etc.), not over the WebSocket.

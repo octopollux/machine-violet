@@ -195,6 +195,10 @@ export const ConnectionModel = Type.Object({
   id: Type.String(),
   displayName: Type.String(),
   available: Type.Boolean(),
+  isDefault: Type.Optional(Type.Boolean()),
+  supportedReasoningEfforts: Type.Optional(Type.Array(Type.String())),
+  aliases: Type.Optional(Type.Array(Type.String())),
+  defaultReasoningEffort: Type.Optional(Type.String()),
 });
 
 export const SerializedConnection = Type.Object({
