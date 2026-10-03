@@ -44,7 +44,7 @@ export interface ConnectionInfo {
   label: string;
   masked: string;
   baseUrl?: string;
-  models: { id: string; displayName: string; available: boolean; isDefault?: boolean; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }[];
+  models: { id: string; displayName: string; available: boolean; aliases?: string[]; isDefault?: boolean; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string }[];
   source: string;
   addedAt: string;
 }

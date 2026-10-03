@@ -44,6 +44,8 @@ export const PROVIDER_DISPLAY_NAMES: Record<ProviderType, string> = {
 
 export interface DiscoveredModel {
   id: string;
+  /** Prior catalog-row handles for this backend model; saved pins keep their spelling. */
+  aliases?: string[];
   displayName: string;
   available: boolean;
   isDefault?: boolean;
@@ -521,6 +523,21 @@ export function updateConnectionKey(
   };
 }
 
+/** Carry known row handles across a refresh of the same backend identities. */
+function preserveModelAliases(models: DiscoveredModel[], prior: DiscoveredModel[]): DiscoveredModel[] {
+  return models.map((model) => {
+    const handles = new Set([model.id, ...(model.aliases ?? [])]);
+    for (const previous of prior) {
+      const oldHandles = [previous.id, ...(previous.aliases ?? [])];
+      if (oldHandles.some((handle) => handles.has(handle))) {
+        for (const handle of oldHandles) handles.add(handle);
+      }
+    }
+    handles.delete(model.id);
+    return handles.size ? { ...model, aliases: [...handles] } : model;
+  });
+}
+
 export function updateConnectionModels(
   store: ConnectionStore,
   connectionId: string,
@@ -529,7 +546,7 @@ export function updateConnectionModels(
   return {
     ...store,
     connections: store.connections.map((c) =>
-      c.id === connectionId ? { ...c, models } : c,
+      c.id === connectionId ? { ...c, models: c.provider === "openai-chatgpt" ? preserveModelAliases(models, c.models) : models } : c,
     ),
   };
 }
@@ -579,6 +596,7 @@ export function upsertChatGptConnection(
   discoveredModels: DiscoveredModel[],
 ): UpsertChatGptResult {
   const priorChatGpt = store.connections.filter((c) => c.provider === "openai-chatgpt");
+  discoveredModels = preserveModelAliases(discoveredModels, priorChatGpt.flatMap((c) => c.models));
 
   let keepTarget: AIConnection | undefined;
   if (priorChatGpt.length === 1) {
@@ -643,7 +661,7 @@ export function upsertChatGptConnection(
     const assignment = store.tierAssignments[tier];
     if (!assignment) continue;
     if (!removedIds.includes(assignment.connectionId)) continue;
-    const hasModel = keptModels.some((m) => m.id === assignment.modelId);
+    const hasModel = keptModels.some((m) => m.id === assignment.modelId || m.aliases?.includes(assignment.modelId));
     store.tierAssignments[tier] = hasModel
       ? { connectionId, modelId: assignment.modelId }
       : null;

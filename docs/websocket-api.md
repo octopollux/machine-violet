@@ -25,10 +25,11 @@ No authentication is required (localhost-only). Auth will be added when remote c
 
 `GET /manage/connections` returns each connection's discovered `models`;
 `PUT /manage/connections/:id/models` accepts the same `ConnectionModel` shape:
-required `id`, `displayName`, `available`, and optional `isDefault`,
+required `id`, `displayName`, `available`, and optional `aliases` (catalog-row
+handles), `isDefault`,
 `supportedReasoningEfforts` (string array), `defaultReasoningEffort` (string).
 ChatGPT IDs are backend model IDs, discovery follows every cursor page, and account
-availability/capabilities survive reloads. Hidden/unavailable models are excluded
+availability/capabilities and row aliases survive reloads and discovery refreshes. Hidden/unavailable models are excluded
 from new picker choices; existing saved assignments remain unchanged.
 A successful `POST /manage/connections/:id/check` refreshes ChatGPT discovery
 without inference or another login; discovery failure retains the prior catalog.

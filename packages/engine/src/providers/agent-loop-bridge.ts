@@ -298,14 +298,15 @@ export async function runProviderLoop(
   // final text-only narration is released as one canonical chunk.
   const deferXaiRoundText = provider.providerId === "xai";
 
-  // Only enable thinking for models that support it (per model registry).
-  const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
-  const ec = config.effort !== undefined
-    ? { effort: supportsThinking ? config.effort : null }
-    : (supportsThinking ? getEffortConfig(config.name, config.model) : { effort: null });
-
-  const thinking: ThinkingConfig | undefined =
-    ec.effort ? { effort: ec.effort } : undefined;
+  const resolveThinking = (): ThinkingConfig | undefined => {
+    const supportsThinking = getKnownModel(config.model)?.capabilities?.thinking ?? false;
+    const ec = config.effort !== undefined
+      ? { effort: supportsThinking ? config.effort : null }
+      : (supportsThinking ? getEffortConfig(config.name, config.model) : { effort: null });
+    return ec.effort ? { effort: ec.effort } : undefined;
+  };
+  let modelResolved = !provider.resolveModelId;
+  let thinking = modelResolved ? resolveThinking() : undefined;
 
   // Apply terse suffix
   let effectiveSystem = systemPrompt;
@@ -429,14 +430,7 @@ export async function runProviderLoop(
     // Context dump: log params before API call. `thinking` is captured so the
     // dumped request reflects whether reasoning was actually requested — the
     // matching response trace (if any) flows through dumpThinking below.
-    dumpContext(config.name, {
-      model: chatParams.model,
-      max_tokens: chatParams.maxTokens,
-      system: chatParams.systemPrompt,
-      thinking: chatParams.thinking,
-      tools: chatParams.tools,
-      messages: chatParams.messages,
-    });
+    let contextDumped = false;
 
     // api_call span: one per round, covering the retry loop (so backoff
     // sleeps are visible in "where did the time go"). `attempts` distinguishes
@@ -469,6 +463,24 @@ export async function runProviderLoop(
         config.onTextDelta?.(delta);
       };
       try {
+        // Resolve inside the existing transport retry boundary: a transient
+        // subprocess-start failure keeps the same retry policy as chat().
+        // The local config changes; the persisted catalog-row pin does not.
+        if (!modelResolved && provider.resolveModelId) {
+          config = { ...config, model: await provider.resolveModelId(config.model) };
+          thinking = resolveThinking();
+          modelResolved = true;
+        }
+        chatParams.model = config.model;
+        chatParams.thinking = thinking;
+        if (!contextDumped) {
+          dumpContext(config.name, {
+            model: chatParams.model, max_tokens: chatParams.maxTokens,
+            system: chatParams.systemPrompt, thinking: chatParams.thinking,
+            tools: chatParams.tools, messages: chatParams.messages,
+          });
+          contextDumped = true;
+        }
         if (shouldStream) {
           res = await provider.stream(chatParams, wrappedDelta);
         } else {

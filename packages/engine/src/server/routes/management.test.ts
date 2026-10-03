@@ -193,7 +193,7 @@ describe("POST /connections — provider visibility gate", () => {
       id:"chat",provider:"openai-chatgpt",label:"ChatGPT",apiKey:"",source:"manual",addedAt:"",models:[],
     }],tierAssignments:{large:assignment,medium:assignment,small:assignment},imageAssignment:null});
     app = await buildApp({configDir});
-    const models = [{id:"gpt-6.1-sol",displayName:"Account Sol",available:true,isDefault:true,
+    const models = [{id:"gpt-6.1-sol",aliases:["saved-sol-row"],displayName:"Account Sol",available:true,isDefault:true,
       supportedReasoningEfforts:["low","xhigh","max"],defaultReasoningEffort:"low"},
       {id:"gpt-hidden",displayName:"Hidden",available:false}];
     const updated = await app.inject({method:"PUT",url:"/connections/chat/models",payload:{models}});
@@ -206,22 +206,25 @@ describe("POST /connections — provider visibility gate", () => {
   it("refreshes ChatGPT discovery on check without changing pins, and tolerates discovery failure", async () => {
     const configDir = mkdtempSync(join(tmpdir(), "mv-chatgpt-refresh-"));
     tempDirs.push(configDir);
-    const assignment = {connectionId:"chat",modelId:"gpt-5.6-sol"};
-    const oldModels = [{id:"gpt-5.6-sol",displayName:"Old Sol",available:true}];
+    const assignment = {connectionId:"chat",modelId:"old-sol-row"};
+    const oldModels = [{id:"gpt-6.1-sol",aliases:["old-sol-row"],displayName:"Old Sol",available:true}];
     saveConnectionStore(configDir,{connections:[{id:"chat",provider:"openai-chatgpt",label:"ChatGPT",
       apiKey:"",models:oldModels,source:"manual",addedAt:""}],
       tierAssignments:{large:assignment,medium:assignment,small:assignment},imageAssignment:null});
     app = await buildApp({configDir});
-    const models = [{id:"gpt-6.1-sol",displayName:"Sol6.1",available:true,supportedReasoningEfforts:["max"]}];
+    const models = [{id:"gpt-6.1-sol",aliases:["new-sol-row"],displayName:"Sol6.1",available:true,supportedReasoningEfforts:["max"]}];
+    const retainedModels = [{...models[0],aliases:["new-sol-row","old-sol-row"]}];
     const discoverModels = vi.fn().mockResolvedValueOnce(models).mockRejectedValueOnce(new Error("catalog unavailable"));
     healthCheckMock.mockResolvedValue({status:"valid",message:"Signed in"});
     createProviderMock.mockReturnValueOnce({healthCheck:healthCheckMock,discoverModels,dispose:vi.fn(async()=>undefined)} as ReturnType<typeof createProviderMock>);
     expect((await app.inject({method:"POST",url:"/connections/chat/check"})).json().status).toBe("valid");
-    expect(loadConnectionStore(configDir).connections[0].models).toEqual(models);
+    expect(loadConnectionStore(configDir).connections[0].models).toEqual(retainedModels);
     expect(loadConnectionStore(configDir).tierAssignments.large).toEqual(assignment);
     createProviderMock.mockReturnValueOnce({healthCheck:healthCheckMock,discoverModels,dispose:vi.fn(async()=>undefined)} as ReturnType<typeof createProviderMock>);
     expect((await app.inject({method:"POST",url:"/connections/chat/check"})).json().status).toBe("valid");
-    expect(loadConnectionStore(configDir).connections[0].models).toEqual(models);
+    expect(loadConnectionStore(configDir).connections[0].models).toEqual(retainedModels);
+    const listed = await app.inject({method:"GET",url:"/connections"});
+    expect(listed.json().connections.find((c: {id:string}) => c.id === "chat").models).toEqual(retainedModels);
   });
 
   it("rejects xAI while the provider is hidden pending its 4.6 retest (#749)", async () => {

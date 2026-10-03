@@ -67,6 +67,8 @@ import type {
 // ---------------------------------------------------------------------------
 
 export interface OpenAIChatGptProviderOptions {
+  /** Persisted row/backend aliases retained across account catalog refreshes. */
+  modelAliases?: Record<string, string>;
   /** Stable session identifier for log correlation. */
   sessionId?: string;
   /** Working directory passed to thread/start. Cosmetic for our use case. */
@@ -177,6 +179,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
    * default is stable and never the wrong-tier surprise.
    */
   private modelCatalogPromise: Promise<ModelInfo[]> | null = null;
+  private readonly modelAliases: Readonly<Record<string, string>>;
 
   /**
    * Set once we've logged the #597 reasoning tripwire (model reasoned but no
@@ -193,6 +196,7 @@ export class OpenAIChatGptProvider implements LLMProvider {
     this.cwd = opts.cwd ?? process.cwd();
     this.tokenStore = opts.tokenStore;
     this.codexHomeDir = opts.codexHome;
+    this.modelAliases = { ...opts.modelAliases };
   }
 
   // -----------------------------------------------------------------------
@@ -238,6 +242,13 @@ export class OpenAIChatGptProvider implements LLMProvider {
   /** Fresh authenticated discovery for the existing Check connection action. */
   async discoverModels() {
     return listModels(await this.ensureStarted(), { includeHidden: true });
+  }
+
+  async resolveModelId(model: string): Promise<string> {
+    const handle = this.modelAliases[model] ?? model;
+    const info = (await this.modelCatalog(await this.ensureStarted()))
+      .find((entry) => entry.model === handle || entry.id === handle);
+    return info?.model || handle;
   }
 
   getUsageStatus(): UsageStatus | null {
@@ -701,7 +712,16 @@ export class OpenAIChatGptProvider implements LLMProvider {
 
   /** Cache account model/effort capabilities for the life of this subprocess. */
   private modelCatalog(client: CodexRpcClient): Promise<ModelInfo[]> {
-    return this.modelCatalogPromise ??= listModelInfo(client, { includeHidden: true }).catch(() => []);
+    if (this.modelCatalogPromise) return this.modelCatalogPromise;
+    const request = listModelInfo(client, { includeHidden: true }).catch(() => {
+      // A transient failure can fall back for this request, but must not pin
+      // empty capabilities for this subprocess. A late old failure must not
+      // clear a newer catalog installed after disposal/restart.
+      if (this.modelCatalogPromise === request) this.modelCatalogPromise = null;
+      return [];
+    });
+    this.modelCatalogPromise = request;
+    return request;
   }
 
   private async resolveDefaultModel(client: CodexRpcClient): Promise<string> {
@@ -1027,9 +1047,10 @@ export class OpenAIChatGptProvider implements LLMProvider {
       ? params.tools.map(toolToDynamicSpec)
       : undefined;
 
-    const modelInfo = (await this.modelCatalog(client)).find((m) => m.model === params.model || m.id === params.model);
+    const modelHandle = this.modelAliases[params.model] ?? params.model;
+    const modelInfo = (await this.modelCatalog(client)).find((m) => m.model === modelHandle || m.id === modelHandle);
     const startParams = buildThreadStartParams({
-      model: modelInfo?.model || params.model,
+      model: modelInfo?.model || modelHandle,
       developerInstructions,
       // Replace codex's built-in coding-agent base prompt. None of MV's codex
       // chat agents are coding agents, and that base persona ("you are Codex …
@@ -1243,12 +1264,14 @@ export class OpenAIChatGptProvider implements LLMProvider {
       // reasoning effort. Without this, codex defaults to summary="none" for
       // chatgpt-account flows and our thinkingText never gets populated even
       // though reasoning tokens are billed — see protocol.ts:TurnStartParams.
+      const effort = params.thinking?.effort
+        ? selectReasoningEffort(params.thinking.effort, modelInfo) : undefined;
       const turnReq: TurnStartParams = {
         threadId,
         input: turnInput,
-        ...(params.thinking?.effort
+        ...(effort
           ? {
-              effort: selectReasoningEffort(params.thinking.effort, modelInfo),
+              effort,
               summary: "detailed",
             }
           : {}),
@@ -1594,13 +1617,16 @@ function toolToDynamicSpec(tool: NormalizedTool): DynamicToolSpec {
 /** Use the requested wire level when advertised, otherwise the nearest supported lower level. */
 export function selectReasoningEffort(
   effort: "low" | "medium" | "high" | "xhigh" | "max" | null,
-  model?: Pick<ModelInfo, "supportedReasoningEfforts" | "defaultReasoningEffort"> & Partial<Pick<ModelInfo, "model" | "id">>,
-): ReasoningEffort {
+  model?: Partial<Pick<ModelInfo, "supportedReasoningEfforts" | "defaultReasoningEffort" | "model" | "id">>,
+): ReasoningEffort | undefined {
+  if (effort === null) return undefined;
   const currentFamily = /^gpt-6(?:[.-])/.test(model?.model || model?.id || "");
   const requested = effort === "max" && !currentFamily ? "xhigh" : effort ?? "minimal";
-  const allowed = model?.supportedReasoningEfforts.map((e) => e.reasoningEffort) ?? [];
+  const advertised = model?.supportedReasoningEfforts;
   // Old app-servers did not expose max; retain their established xhigh mapping.
-  if (!allowed.length) return requested === "max" ? "xhigh" : requested;
+  if (advertised === undefined) return requested === "max" ? "xhigh" : requested;
+  if (advertised.length === 0) return undefined;
+  const allowed = advertised.map((e) => e.reasoningEffort);
   if (allowed.includes(requested)) return requested;
   const order: ReasoningEffort[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
   const ceiling = order.indexOf(requested);

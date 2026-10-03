@@ -197,6 +197,7 @@ export const ConnectionModel = Type.Object({
   available: Type.Boolean(),
   isDefault: Type.Optional(Type.Boolean()),
   supportedReasoningEfforts: Type.Optional(Type.Array(Type.String())),
+  aliases: Type.Optional(Type.Array(Type.String())),
   defaultReasoningEffort: Type.Optional(Type.String()),
 });
 

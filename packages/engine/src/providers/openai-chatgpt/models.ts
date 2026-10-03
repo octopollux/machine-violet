@@ -46,10 +46,12 @@ function toDiscoveredModel(m: ModelInfo): DiscoveredCodexModel {
   return {
     // id identifies the catalog row; model is the backend ID thread/start uses.
     id: m.model || m.id,
+    ...(m.model && m.id !== m.model ? { aliases: [m.id] } : {}),
     displayName: m.displayName,
     available: !m.hidden,
     isDefault: m.isDefault,
-    supportedReasoningEfforts: m.supportedReasoningEfforts.map((e) => e.reasoningEffort),
+    ...(m.supportedReasoningEfforts !== undefined
+      ? { supportedReasoningEfforts: m.supportedReasoningEfforts.map((e) => e.reasoningEffort) } : {}),
     defaultReasoningEffort: m.defaultReasoningEffort,
   };
 }

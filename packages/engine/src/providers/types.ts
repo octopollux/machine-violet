@@ -524,8 +524,12 @@ export interface LLMProvider {
   /** Optional account catalog discovery; does not run an inference turn. */
   discoverModels?(): Promise<{
     id: string; displayName: string; available: boolean;
+    aliases?: string[];
     isDefault?: boolean; supportedReasoningEfforts?: string[]; defaultReasoningEffort?: string;
   }[]>;
+
+  /** Resolve a persisted catalog handle before runtime model capabilities/defaults. */
+  resolveModelId?(model: string): Promise<string>;
 
   /**
    * Generate an image from a textual prompt + abstract knobs (effort,

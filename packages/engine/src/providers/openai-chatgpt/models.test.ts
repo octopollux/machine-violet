@@ -90,7 +90,20 @@ describe("paginated account catalogs", () => {
     const models = await listModels({call} as unknown as CodexRpcClient, {limit:1, includeHidden:true});
     expect(call).toHaveBeenNthCalledWith(2, "model/list", {limit:1, includeHidden:true, cursor:"page2"});
     expect(models.map((m) => [m.id,m.available])).toEqual([["gpt-6.1-sol",true],["gpt-future",true],["gpt-hidden",false]]);
+    expect(models[0].aliases).toEqual(["catalog-sol"]);
+    expect(models[1].aliases).toEqual(["catalog-future"]);
     expect(models[1].supportedReasoningEfforts).toEqual(["max"]);
+  });
+
+  it("distinguishes an explicitly empty effort list from an older server without metadata", async () => {
+    const empty = row("empty", "gpt-empty");
+    empty.supportedReasoningEfforts = [];
+    const legacy = row("legacy", "gpt-legacy");
+    const withoutEfforts: Partial<typeof legacy> = { ...legacy };
+    delete withoutEfforts.supportedReasoningEfforts;
+    const models = await listModels(fakeClient({ data: [empty, withoutEfforts] } as ModelListResult));
+    expect(models[0].supportedReasoningEfforts).toEqual([]);
+    expect(models[1]).not.toHaveProperty("supportedReasoningEfforts");
   });
   it("rejects repeated cursors instead of hanging discovery", async () => {
     const call = vi.fn().mockResolvedValue({data:[],nextCursor:"repeat"});
