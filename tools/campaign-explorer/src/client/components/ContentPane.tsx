@@ -42,6 +42,7 @@ export function ContentPane({
     }
 
     setLoading(true);
+    let stale = false;
     const url = campaignSlug === MACHINE_SLUG
       ? `/api/machine/file/${selectedFile}`
       : `/api/campaigns/${campaignSlug}/file/${selectedFile}`;
@@ -50,9 +51,10 @@ export function ContentPane({
         if (!res.ok) throw new Error(`${res.status}`);
         return res.text();
       })
-      .then(setContent)
-      .catch(() => setContent(null))
-      .finally(() => setLoading(false));
+      .then((value) => { if (!stale) setContent(value); })
+      .catch(() => { if (!stale) setContent(null); })
+      .finally(() => { if (!stale) setLoading(false); });
+    return () => { stale = true; };
   }, [campaignSlug, selectedFile, refreshKey]);
 
   if (!selectedFile) {

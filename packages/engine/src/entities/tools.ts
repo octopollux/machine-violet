@@ -1,346 +1,125 @@
-/**
- * Agent-facing tools for the entity store.
- *
- * Two layers:
- *  - Tool definitions (NormalizedTool[]) — the JSON-schema-shaped tool surface
- *    that agents see in their tool list.
- *  - Tool handler (dispatchEntityTool) — given a store, runs the requested op
- *    and returns a {content, is_error} payload.
- *
- * Both are stateless w.r.t. session — agents register a single store per
- * session and the handler closes over it.
- */
-
-import type { NormalizedTool } from "../providers/types.js";
+/** Stable, collection-independent campaign memory tools. */
+import { Type } from "@sinclair/typebox";
+import type { KnowledgeOperation } from "@machine-violet/shared/types/knowledge.js";
+import type { CampaignKnowledgeStore } from "../knowledge/store.js";
+import { defineToolContract, validateToolInput, type ToolInputPolicy } from "../agents/tool-contract.js";
 import type { ToolResult } from "../agents/tool-registry.js";
-import {
-  EntityStore,
-  EntityNotFoundError,
-  EntityValidationError,
-  type EntityPatch,
-} from "./store.js";
-import {
-  FILE_BACKED_ENTITY_TYPES,
-  getEntitySchema,
-  isFileBackedEntityType,
-  type FileBackedEntityType,
-} from "@machine-violet/shared/schemas/entities/index.js";
+import type { EntityStore } from "./store.js";
 
-// --- Tool name list (single source of truth) ---
+const Value = Type.Recursive((Self) => Type.Union([
+  Type.Null(), Type.Boolean(), Type.Number(), Type.String(), Type.Array(Self), Type.Record(Type.String(), Self),
+]), { $id: "CampaignKnowledgeValue" });
+const Fields = Type.Record(Type.String(), Type.Ref(Value));
+const Handle = Type.String({ minLength: 1 });
+const Edits = {
+  name: Type.Optional(Handle), aliases: Type.Optional(Type.Array(Handle)), fields: Type.Optional(Fields),
+  body: Type.Optional(Type.String()), visibility: Type.Optional(Type.Union([Type.Literal("private"), Type.Literal("player-facing")])),
+  history: Type.Optional(Type.String()),
+};
+const Operation = Type.Union([
+  Type.Object({ op: Type.Literal("create_collection"), parent: Type.Optional(Handle), name: Handle, note: Type.Optional(Type.String()) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("upsert"), collection: Handle, uid: Type.Optional(Handle), ...Edits }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("patch"), uid: Handle, ...Edits }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("disclose"), uid: Handle, name: Handle, summary: Type.String({ description: "Complete updated player-safe description: retain still-valid previously approved facts, not only the new delta." }), aliases: Type.Optional(Type.Array(Handle)) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("remove_fields"), uid: Handle, keys: Type.Array(Handle, { minItems: 1 }) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("move"), uid: Handle, parent: Handle, index: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("consolidate"), uid: Handle, target: Handle }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("delete"), uid: Handle }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("append_text"), uid: Handle, text: Type.String() }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("append_log"), uid: Handle, body: Type.String(), metadata: Type.Optional(Fields) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("create_node"), parent: Handle, name: Type.Optional(Handle), value: Type.Ref(Value), index: Type.Optional(Type.Integer({ minimum: 0 })) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Literal("set_value"), uid: Handle, value: Type.Ref(Value) }, { additionalProperties: false }),
+  Type.Object({ op: Type.Union([Type.Literal("add_reference"), Type.Literal("remove_reference")]), source: Handle, target: Handle, label: Type.Optional(Type.String()) }, { additionalProperties: false }),
+]);
 
-const ENTITY_TOOL_NAMES = [
-  "entity",
-  "describe_entity_type",
-  "list_entity_types",
-  "validate_entity",
-  "find_schema_drift",
-  "detect_orphans",
-] as const;
+export const KNOWLEDGE_CONTRACT = defineToolContract({
+  name: "knowledge", criticality: "advisory",
+  description: "Inspect campaign memory. outline includes all collections, including empty nested collections and conventions. read accepts a stable UID or known name/alias, with bounded text and history. search checks every collection for a single literal name or phrase.",
+  schema: Type.Object({
+    action: Type.Union([Type.Literal("outline"), Type.Literal("read"), Type.Literal("search")]),
+    handle: Type.Optional(Handle), query: Type.Optional(Type.String()),
+    textOffset: Type.Optional(Type.Integer({ minimum: 0 })), textLimit: Type.Optional(Type.Integer({ minimum: 0, maximum: 16000 })),
+    logOffset: Type.Optional(Type.Integer({ minimum: 0 })), logLimit: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+    childOffset: Type.Optional(Type.Integer({ minimum: 0 })), childLimit: Type.Optional(Type.Integer({ minimum: 0, maximum: 1000 })),
+    logEntryId: Type.Optional(Type.Integer({ minimum: 1 })),
+    logTextOffset: Type.Optional(Type.Integer({ minimum: 0 })), logTextLimit: Type.Optional(Type.Integer({ minimum: 0, maximum: 16000 })),
+  }, { additionalProperties: false }),
+  refine: (input) => input.action === "read" && !input.handle
+    ? [{ path: "/handle", code: "required", expected: "UID or name", actual: "absent", message: "read requires handle" }]
+    : input.action === "search" && !input.query
+      ? [{ path: "/query", code: "required", expected: "search text", actual: "absent", message: "search requires query" }] : [],
+});
+export const REMEMBER_CONTRACT = defineToolContract({
+  name: "remember", criticality: "durable",
+  description: "Commit campaign memory changes atomically. Resolve UIDs/names/aliases before creating; same names resolve deterministically. Partial fields preserve unrelated values and references; remove_fields explicitly deletes fields. disclose replaces the complete player-safe description for a canonical UID: preserve still-valid approved facts in summary, rather than sending only new facts. It publishes only supplied name/summary/aliases, without copying private data or changing visibility. append_text appends a string leaf's typed value, or an entity/collection body; other typed values require set_value. Collections may be nested with brief conventions. Use explicit references and update current facts with history in one batch. Returns canonical UIDs and potential impact candidates; interpret consequences yourself. Never author SQL or database schemas. Omit operationId unless an exact retry ID was supplied.",
+  schema: Type.Object({ operations: Type.Array(Operation, { minItems: 1, maxItems: 100 }), operationId: Type.Optional(Handle) }, { additionalProperties: false, $defs: { CampaignKnowledgeValue: Value } }),
+  refine: (input) => input.operations.flatMap((op, index) => op.op === "upsert" && !op.uid && !op.name
+    ? [{ path: `/operations/${index}/name`, code: "required", expected: "name or UID", actual: "absent", message: "upsert requires name or uid" }] : []),
+});
+export const ENTITY_CONTRACTS = [KNOWLEDGE_CONTRACT, REMEMBER_CONTRACT];
+export const ENTITY_TOOLS = ENTITY_CONTRACTS.map((contract) => contract.definition);
+export const ENTITY_TOOL_NAME_SET: ReadonlySet<string> = new Set(ENTITY_TOOLS.map((tool) => tool.name));
+export const ENTITY_INPUT_POLICIES: Readonly<Record<string, ToolInputPolicy>> = Object.fromEntries(ENTITY_CONTRACTS.map((contract) => [contract.definition.name, contract.policy as ToolInputPolicy]));
+export interface EntityToolHandlerOptions { sceneNumber?: number | (() => number); source?: string }
 
-type EntityToolName = (typeof ENTITY_TOOL_NAMES)[number];
-
-export const ENTITY_TOOL_NAME_SET: ReadonlySet<string> = new Set(ENTITY_TOOL_NAMES);
-
-// --- Tool definitions ---
-
-const TYPE_ENUM = FILE_BACKED_ENTITY_TYPES as readonly string[];
-
-export const ENTITY_TOOLS: NormalizedTool[] = [
-  {
-    name: "entity",
-    description:
-      "CRUD on file-backed entities — characters, locations, factions, lore, items. " +
-      "Replaces direct file editing for entity work. " +
-      "Operations: read | create | update | delete | list. " +
-      "`read` returns the full record (frontmatter + body + refs + schema + drift) — verbose by design so you learn the data shape. " +
-      "`update` patch values of null delete a frontmatter key. " +
-      "`delete` removes the file and reports inbound wikilinks that just became dead. " +
-      "For map placement, use map_entity instead. For narrative writes, use scribe.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        op: { type: "string", enum: ["read", "create", "update", "delete", "list"] },
-        type: { type: "string", enum: [...TYPE_ENUM] },
-        id: { type: "string", description: "Entity slug or display name. Required for read/update/delete." },
-        patch: {
-          type: "object",
-          description: "For create/update. Shape: { displayName?, frontMatter?, body?, changelogEntry? }. On update, frontMatter values of null delete the key.",
-          properties: {
-            displayName: { type: "string" },
-            frontMatter: { type: "object" },
-            body: { type: "string" },
-            changelogEntry: { type: "string" },
-          },
-        },
-      },
-      required: ["op", "type"],
-    },
-  },
-  {
-    name: "describe_entity_type",
-    description:
-      "Describe the data shape of a file-backed entity type: declared schema, observed drift, storage layout, conventions, examples. " +
-      "Call this when you want to learn what fields an entity supports or what people actually put in it — declared schema is canonical; observed-drift fields are real data that haven't been formally adopted yet.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        type: { type: "string", enum: [...TYPE_ENUM] },
-      },
-      required: ["type"],
-    },
-  },
-  {
-    name: "list_entity_types",
-    description:
-      "List all file-backed entity types with their on-disk counts. Cheap inventory pass — use this before describe_entity_type to see what's available.",
-    inputSchema: { type: "object" as const, properties: {}, required: [] },
-  },
-  {
-    name: "validate_entity",
-    description:
-      "Validate a single entity: missing required fields, dead outbound wikilinks, schema conformance. Returns the validation block from the entity record.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        type: { type: "string", enum: [...TYPE_ENUM] },
-        id: { type: "string" },
-      },
-      required: ["type", "id"],
-    },
-  },
-  {
-    name: "find_schema_drift",
-    description:
-      "List frontmatter fields present on disk but not in the declared schema. Optionally scope to a single entity type.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        type: { type: "string", enum: [...TYPE_ENUM], description: "Optional. Omit to scan all types." },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "detect_orphans",
-    description:
-      "List file-backed entities with zero inbound wikilinks across the campaign. Useful for spotting forgotten characters or locations that nothing references.",
-    inputSchema: { type: "object" as const, properties: {}, required: [] },
-  },
-];
-
-// --- Handler ---
-
-/** Whether to expose the dev-only raw escape hatch. */
-export interface EntityToolHandlerOptions {
-  /** Current scene number to weave into changelog entries (defaults to 0). */
-  sceneNumber?: number;
-}
-
-/**
- * Build an async handler that dispatches the entity tool surface against
- * a store. Returns `null` when the tool isn't ours (caller falls through).
- */
-export function buildEntityToolHandler(
-  store: EntityStore,
-  options: EntityToolHandlerOptions = {},
-): (name: string, input: Record<string, unknown>) => Promise<ToolResult | null> {
-  return async (name, input) => {
-    if (!ENTITY_TOOL_NAME_SET.has(name)) return null;
+export function buildKnowledgeToolHandler(store: CampaignKnowledgeStore, options: EntityToolHandlerOptions = {}) {
+  return async (name: string, input: Record<string, unknown>): Promise<ToolResult | null> => {
+    const contract = ENTITY_CONTRACTS.find((candidate) => candidate.definition.name === name);
+    if (!contract) return null;
+    const validation = validateToolInput(contract.definition, input, contract.policy as ToolInputPolicy);
+    if (!validation.ok) return { content: validation.content, is_error: true };
     try {
-      switch (name as EntityToolName) {
-        case "entity":              return await handleEntity(store, input, options.sceneNumber ?? 0);
-        case "describe_entity_type": return await handleDescribe(store, input);
-        case "list_entity_types":   return await handleListTypes(store);
-        case "validate_entity":     return await handleValidate(store, input);
-        case "find_schema_drift":   return await handleFindDrift(store, input);
-        case "detect_orphans":      return await handleDetectOrphans(store);
+      if (name === "remember") {
+        const sceneNumber = typeof options.sceneNumber === "function" ? options.sceneNumber() : options.sceneNumber;
+        return { content: JSON.stringify(await store.mutate(input.operations as KnowledgeOperation[], { sceneNumber, source: options.source ?? "agent", operationId: input.operationId as string | undefined })) };
       }
-    } catch (e) {
-      if (e instanceof EntityNotFoundError || e instanceof EntityValidationError) {
-        return { content: e.message, is_error: true };
+      if (input.action === "outline") return { content: JSON.stringify(await store.outline()) };
+      if (input.action === "read") return { content: JSON.stringify(await store.read(input.handle as string, {
+        textOffset: input.textOffset as number | undefined, textLimit: (input.textLimit as number | undefined) ?? 4000,
+        logOffset: input.logOffset as number | undefined, logLimit: (input.logLimit as number | undefined) ?? 10,
+        childOffset: input.childOffset as number | undefined, childLimit: input.childLimit as number | undefined,
+        logEntryId: input.logEntryId as number | undefined,
+        logTextOffset: input.logTextOffset as number | undefined, logTextLimit: input.logTextLimit as number | undefined,
+      })) };
+      const query = (input.query as string).toLocaleLowerCase();
+      const hits = [];
+      const outline = await store.outline();
+      const byUid = new Map(outline.map((entry) => [entry.uid, entry]));
+      for (const entry of outline) {
+        const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
+        let matched = JSON.stringify({ name: node.name, aliases: node.aliases, fields: node.fields, value: node.value, note: node.note }).toLocaleLowerCase().includes(query);
+        for (let offset = 0; !matched && offset < node.textLength; offset += 4000) {
+          const page = await store.read(node.uid, { textOffset: offset, textLimit: 4000 + query.length, logLimit: 0 });
+          matched = String(page.value ?? page.body).toLocaleLowerCase().includes(query);
+        }
+        for (let offset = 0; !matched && offset < node.logCount; offset += 50) {
+          const page = await store.read(node.uid, { textLimit: 0, logOffset: offset, logLimit: 50 });
+          matched = JSON.stringify(page.logs).toLocaleLowerCase().includes(query);
+          for (const log of page.logs) {
+            for (let textOffset = 0; !matched && textOffset < (log.textLength ?? log.body.length); textOffset += 4000) {
+              const tail = await store.read(node.uid, { textLimit: 0, logEntryId: log.id, logTextOffset: textOffset, logTextLimit: Math.min(16000, 4000 + query.length) });
+              matched = JSON.stringify(tail.logs).toLocaleLowerCase().includes(query);
+            }
+          }
+        }
+        if (matched) {
+          let owner = byUid.get(node.parent ?? "");
+          while (owner?.kind === "value") owner = byUid.get(owner.parent ?? "");
+          hits.push({ uid: node.uid, name: node.name, parent: node.parent, kind: node.kind, ...(owner ? { owner: { uid: owner.uid, name: owner.name } } : {}) });
+        }
       }
-      const msg = e instanceof Error ? e.message : String(e);
-      return { content: `${name} failed: ${msg}`, is_error: true };
-    }
+      return { content: JSON.stringify(hits) };
+    } catch (error) { return { content: error instanceof Error ? error.message : String(error), is_error: true }; }
   };
 }
-
-// --- Individual handlers ---
-
-async function handleEntity(
-  store: EntityStore,
-  input: Record<string, unknown>,
-  sceneNumber: number,
-): Promise<ToolResult> {
-  const op = input.op as string;
-  const type = input.type as string;
-  if (!isFileBackedEntityType(type)) {
-    return { content: `Unknown entity type: ${type}. Try one of ${FILE_BACKED_ENTITY_TYPES.join(", ")}.`, is_error: true };
-  }
-
-  switch (op) {
-    case "read": {
-      const id = input.id as string | undefined;
-      if (!id) return { content: "read requires `id`", is_error: true };
-      const rec = await store.read(type, id);
-      return { content: JSON.stringify(rec, null, 2) };
-    }
-
-    case "list": {
-      const list = await store.list(type);
-      return { content: JSON.stringify(list, null, 2) };
-    }
-
-    case "create": {
-      const patch = (input.patch as EntityPatch | undefined) ?? {};
-      if (!patch.displayName?.trim()) {
-        return { content: "create requires patch.displayName", is_error: true };
-      }
-      const rec = await store.create(type, patch, sceneNumber);
-      return { content: JSON.stringify(rec, null, 2) };
-    }
-
-    case "update": {
-      const id = input.id as string | undefined;
-      if (!id) return { content: "update requires `id`", is_error: true };
-      const patch = (input.patch as EntityPatch | undefined) ?? {};
-      const rec = await store.update(type, id, patch, sceneNumber);
-      return { content: JSON.stringify(rec, null, 2) };
-    }
-
-    case "delete": {
-      const id = input.id as string | undefined;
-      if (!id) return { content: "delete requires `id`", is_error: true };
-      const result = await store.delete(type, id);
-      return { content: JSON.stringify(result, null, 2) };
-    }
-
-    default:
-      return { content: `Unknown op: ${op}. Use read | create | update | delete | list.`, is_error: true };
-  }
-}
-
-async function handleDescribe(
-  store: EntityStore,
-  input: Record<string, unknown>,
-): Promise<ToolResult> {
-  const type = input.type as string;
-  if (!isFileBackedEntityType(type)) {
-    return { content: `Unknown entity type: ${type}.`, is_error: true };
-  }
-  const schema = getEntitySchema(type);
-  const observed = await store.scanObservedFields(type);
-  const list = await store.list(type);
-  const examples = list.slice(0, 3).map(e => e.path);
-
-  const declaredFmKeys = new Set<string>();
-  for (const [name, field] of Object.entries(schema.fields)) {
-    if (field.source === "frontmatter") {
-      declaredFmKeys.add(name);
-    }
-  }
-  const observedDrift: Record<string, { occursIn: number; examples: string[] }> = {};
-  for (const [k, v] of Object.entries(observed)) {
-    if (!declaredFmKeys.has(k)) observedDrift[k] = v;
-  }
-
-  const out = {
-    type,
-    schemaVersion: schema.version,
-    storage: schema.storage,
-    fields: schema.fields,
-    observedDrift,
-    conventions: schema.conventions,
-    examples,
-  };
-  return { content: JSON.stringify(out, null, 2) };
-}
-
-async function handleListTypes(store: EntityStore): Promise<ToolResult> {
-  const result: { type: FileBackedEntityType; count: number; dir: string }[] = [];
-  for (const type of FILE_BACKED_ENTITY_TYPES) {
-    const list = await store.list(type);
-    result.push({ type, count: list.length, dir: getEntitySchema(type).storage.dir });
-  }
-  return { content: JSON.stringify(result, null, 2) };
-}
-
-async function handleValidate(
-  store: EntityStore,
-  input: Record<string, unknown>,
-): Promise<ToolResult> {
-  const type = input.type as string;
-  const id = input.id as string;
-  if (!isFileBackedEntityType(type)) {
-    return { content: `Unknown entity type: ${type}.`, is_error: true };
-  }
-  if (!id) return { content: "validate_entity requires `id`", is_error: true };
-  const rec = await store.read(type, id);
-  return {
-    content: JSON.stringify({
-      type: rec.type,
-      id: rec.id,
-      validation: rec.validation,
-      drift: rec.drift,
-      references: rec.references,
-    }, null, 2),
+export function buildEntityToolHandler(store: EntityStore, options: EntityToolHandlerOptions = {}) {
+  return async (name: string, input: Record<string, unknown>) => {
+    if (!ENTITY_TOOL_NAME_SET.has(name)) return null;
+    return buildKnowledgeToolHandler(await store.knowledge(), options)(name, input);
   };
 }
-
-async function handleFindDrift(
-  store: EntityStore,
-  input: Record<string, unknown>,
-): Promise<ToolResult> {
-  const type = input.type as string | undefined;
-  const types: FileBackedEntityType[] = type && isFileBackedEntityType(type)
-    ? [type]
-    : [...FILE_BACKED_ENTITY_TYPES];
-
-  const out: Record<string, Record<string, { occursIn: number; examples: string[] }>> = {};
-  for (const t of types) {
-    const observed = await store.scanObservedFields(t);
-    const schema = getEntitySchema(t);
-    const declaredFmKeys = new Set<string>();
-    for (const [name, field] of Object.entries(schema.fields)) {
-      if (field.source === "frontmatter") {
-        declaredFmKeys.add(name);
-      }
-    }
-    const drift: Record<string, { occursIn: number; examples: string[] }> = {};
-    for (const [k, v] of Object.entries(observed)) {
-      if (!declaredFmKeys.has(k)) drift[k] = v;
-    }
-    out[t] = drift;
-  }
-  return { content: JSON.stringify(out, null, 2) };
-}
-
-async function handleDetectOrphans(store: EntityStore): Promise<ToolResult> {
-  const orphans = await store.detectOrphans();
-  return { content: JSON.stringify(orphans, null, 2) };
-}
-
-// --- Dev-only raw escape hatch ---
-
-/**
- * Raw byte-level entity I/O. Dev-only. Mirrors the old read_file/write_file/
- * delete_file shape but explicitly named so it stands out in transcripts —
- * if you see `raw_entity_io` in a turn, it means the agent bypassed the
- * structured surface, which is almost always wrong outside debugging.
- */
-export const RAW_ENTITY_IO_TOOL: NormalizedTool = {
-  name: "raw_entity_io",
-  description:
-    "DEV-ONLY. Raw byte-level read/write/delete on an entity file path. " +
-    "Bypasses schema validation and the wikilink-aware delete sweep. " +
-    "Prefer `entity` for everything except recovery from a corrupted file.",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      path: { type: "string", description: "Path relative to the campaign root, e.g. characters/arvid.md" },
-      op: { type: "string", enum: ["read", "write", "delete"] },
-      body: { type: "string", description: "Required for write." },
-    },
-    required: ["path", "op"],
-  },
+/** Removed byte-level bypass, retained only until Dev's tool list is rebuilt. */
+export const RAW_ENTITY_IO_TOOL = {
+  name: "raw_entity_io", description: "Removed. Use knowledge and remember for campaign memory.",
+  inputSchema: Type.Object({ path: Handle, op: Type.Union([Type.Literal("read"), Type.Literal("write"), Type.Literal("delete")]), body: Type.Optional(Type.String()) }),
 };

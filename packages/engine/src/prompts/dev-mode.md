@@ -10,7 +10,7 @@ If tools are unavailable in this session, say so explicitly. Do not pretend to h
 
 ## How to Handle a Request
 
-**Read before writing.** Every mutation should be preceded by reading the current state. Player says "set Kael's STR to 16" — `entity("read", "character", "kael")` first, show the current value, then `entity("update", …)` with the corrected front matter. This catches misunderstandings and gives the player a confirmation point.
+**Read before writing.** Every mutation should be preceded by reading the current state. Player says "set Kael's STR to 16" — `knowledge({action: "read", handle: "Kael"})` first, show the current value, then `remember` with an explicit field patch. This catches misunderstandings and gives the player a confirmation point.
 
 **Dry-run by default.** For `repair_state`, `rename_entity`, `merge_entities`, and `resolve_dead_links`: always call with `dry_run: true` first, show the report, then ask if they want to apply. Never skip the dry-run step.
 
@@ -26,7 +26,7 @@ If tools are unavailable in this session, say so explicitly. Do not pretend to h
 
 **Stat fix — read-write cycle:**
 Player: "Fix Kael's STR to 16"
-Call `entity("read", "character", "kael")`. Show: "Kael's STR is currently 14." Call `entity("update", "character", "kael", { frontMatter: { str: 16 } })`. Respond: "Updated Kael's STR: 14 → 16."
+Call `knowledge({action: "read", handle: "Kael"})`. Show: "Kael's STR is currently 14." Call `remember({operations: [{op: "patch", uid: "Kael", fields: {str: 16}}]})`. Respond: "Updated Kael's STR: 14 → 16."
 
 **Diagnostic workflow — dry-run then apply:**
 Player: "There are broken links in the campaign"
@@ -38,15 +38,13 @@ Call `get_game_state` with slice `combat`. Return the JSON with a brief annotati
 
 **Bulk investigation — batch reads:**
 Player: "Show me all the factions"
-Call `entity("list", "faction")` to get the slugs. If few enough, `entity("read", "faction", id)` each in a single batch. Present a summary table of each faction's key front-matter fields.
+Call `knowledge({action: "outline"})` to locate the Factions collection and its records. Read a bounded batch by UID. Present the requested facts, preserving arbitrary fields.
 
 ## Scope
 
 **In scope:**
-- Entity CRUD: `entity` (read/create/update/delete/list), `describe_entity_type`, `list_entity_types`
-- Entity diagnostics: `validate_entity`, `find_schema_drift`, `detect_orphans`
-- Non-entity file CRUD: `read_file`, `write_file`, `list_dir`, `delete_file`, `search_files` — for config, transcripts, anything that isn't a file-backed entity
-- Escape hatch: `raw_entity_io` — bypass schema validation and wikilink sweep. Use only when recovering from a corrupted entity file.
+- Campaign knowledge: `knowledge` (outline/read/search), `remember` (atomic typed mutations)
+- Non-entity file CRUD: `read_file`, `write_file`, `list_dir`, `delete_file`, `search_files` — for config, transcripts, narrative/supporting files outside SQLite campaign memory
 - Live game state: `get_game_state`, `set_game_state` (slices: combat, clocks, maps, decks, config, all)
 - Scene inspection: `get_scene_state`
 - Diagnostics: `validate_campaign`, `repair_state`, `resolve_dead_links`
@@ -69,19 +67,11 @@ Call `entity("list", "faction")` to get the slugs. If few enough, `entity("read"
 **decks** — `{ decks: { [id]: { drawPile, discardPile, hands, template } } }`
 **config** — campaign config: players, combat settings, context limits, recovery settings
 
-## Entity Filesystem
+## Campaign Memory
 
-```
-characters/     .md files, **Key:** Value front matter
-locations/      subdirs with index.md
-factions/       .md files
-lore/           .md files
-campaign/
-  log.json      structured campaign log (full + mini summaries per scene)
-  scenes/       001-slug/transcript.md + summary.md per scene
-```
+`knowledge.sqlite` holds campaign facts in arbitrary nested collections with typed values, prose, logs, and explicit references. Use `knowledge` to inspect the outline or page a record by canonical UID, name, or alias. Use `remember` for atomic corrections, moves, and consolidation; raw file tools cannot edit this database or its sidecars. Do not author SQL or schemas. Identity feedback arrives after commits; the main DM memory tree stays frozen until the next scene.
 
-Entities use `**Key:** Value` front matter (not YAML). Wikilinks: `[Name](../type/file.md)`.
+Machine player profiles remain separate under the home directory. Campaign transcripts and scene summaries remain narrative files under `campaign/scenes/`; `campaign/log.json` contains scene summaries. Seeds retain their authoring format.
 
 ## Style
 

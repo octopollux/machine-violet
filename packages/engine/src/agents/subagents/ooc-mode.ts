@@ -152,11 +152,11 @@ export function buildOOCTools(registry: ToolRegistry): NormalizedTool[] {
   tools.push(
     {
       name: "find_references",
-      description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
+      description: "Find explicit incoming dependencies for a canonical campaign UID, name, or alias. Returns source UIDs and labels.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
+          path: { type: "string", description: "Canonical UID, name, or alias" },
         },
         required: ["path"],
       },

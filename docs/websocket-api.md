@@ -17,6 +17,10 @@ Real-time server-to-client event stream for the Machine Violet engine.
 
 No authentication is required (localhost-only). Auth will be added when remote connections are enabled.
 
+### Player-facing knowledge reads
+
+`GET /session/compendium` returns the approved player projection with arbitrary `collections` (nested collection paths), plus default presentation arrays. Entries carry stable `uid`; their navigation `slug` is that UID. `GET /session/knowledge/:id` reads approved content by UID, and `/session/character/:name` accepts an approved display name/alias or UID. Responses contain `uid`, `name`, `content`, and `collection`. Private identities return 404; private fields, bodies, aliases, and reference reasons never fall back into these responses. Campaign Explorer's offline logical tree is a separate privileged local inspection surface.
+
 ## Communication Direction
 
 WebSocket messages are predominantly **server to client**. Clients send gameplay commands via REST endpoints (`POST /session/turn/contribute`, `POST /session/command/:name`, etc.), not over the WebSocket.

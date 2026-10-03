@@ -8,6 +8,8 @@
  */
 
 export interface CompendiumEntry {
+  /** Stable campaign identity; slug is the same UID for new campaign records. */
+  uid?: string;
   name: string;
   slug: string;
   aliases?: string[];
@@ -43,4 +45,6 @@ export interface Compendium {
   storyline: CompendiumEntry[];
   lore: CompendiumEntry[];
   objectives: CompendiumEntry[];
+  /** Arbitrary nested campaign collection paths, independent of the legacy tabs. */
+  collections?: Record<string, CompendiumEntry[]>;
 }

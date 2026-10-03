@@ -663,7 +663,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     // Match SessionManager's canonical derivation exactly. `dirname()` differs
     // when campaignsDir has a trailing slash or uses a non-standard layout.
     const homeDir = gs?.homeDir ?? campaignsDir().replace(/[/\\]campaigns\/?$/, "");
-    const io = createArchiveFileIO();
+    const io = createArchiveFileIO(server.sessionManager.getEngine()?.getSceneManager().getFileIO().campaignKnowledge);
     const result = await collectDiagnostics(gs?.campaignRoot, homeDir, io);
 
     if (!result.ok || !result.path) {

@@ -69,35 +69,38 @@ Walk the campaign and separate the two kinds of data:
 
 | Read it (→ world) | Skip it (→ the played story) |
 |---|---|
-| `characters/*.md` — **NPCs only** | `characters/<the PC>.md` — the old player character |
-| `locations/*/index.md` + map JSON | `campaign/scenes/**` — the plot/timeline (but **mine the prose** — see below) |
-| `factions/*.md` | `campaign/log.json` — episodic scene-by-scene record |
-| `lore/*.md` | `campaign/compendium.json` — player-learned knowledge |
-| `items/*.md` | `campaign/session-recaps/**` |
-| `rules/*.md` (if custom) | `state/conversation.json`, `state/display-log.md` |
-| `state/maps.json` | `state/combat.json`, `state/objectives.json` (resolved plot) |
-| `state/clocks.json` calendar (epoch only) | `config.json` players/usage/recovery |
-| `config.json`: `system`, `genre`, `mood`, `difficulty` | |
+| `knowledge.sqlite` logical collections/entities — NPCs, places, factions, lore, items, custom rules | Player Knowledge projections, PC records and episodic knowledge logs |
+| `state/maps.json`, calendar epoch in `state/clocks.json` | Combat, conversation, display logs, resolved plot |
+| `config.json`: system, genre, mood, difficulty | Players/usage/recovery |
 
-**Mine the transcript — the entity files are only a Haiku summary.** This is the
-single biggest quality lever in the whole conversion. The `characters/`,
-`locations/`, and `lore/` files were written by the in-game **Scribe, which runs
+Inspect a supported campaign with `npx tsx scripts/dump-state.ts <campaign-name>` or
+Campaign Explorer's logical UID view. Both open `knowledge.sqlite` read-only.
+For a scratch extracted archive, use `SqliteKnowledgeStore` with
+`{create:false,readOnly:true}`; call `outline()` and `read(uid)` and always `close()`.
+Never open the source with default create/mutation options. Unsupported old
+Markdown saves are rejected; no conversion or repair is part of this workflow.
+Categories and nesting are arbitrary: walk the entire logical tree rather than
+assuming fixed directories. Preserve UID distinctions between duplicate names.
+Translate standing records into the existing seed frontMatter/body format;
+**`.mvworld` and its Markdown seed entities remain unchanged**.
+
+**Mine the transcript — the knowledge records are only a small-model summary.** This is the
+single biggest quality lever in the whole conversion. The logical character, place, and lore records were written by the in-game **Scribe, which runs
 on a small, fast model** — they're a *lossy* index: flattened, generic, often
 padded with duplicated changelog lines. The real material lives in the
 **transcript** (`campaign/scenes/**`, plus any `session-recaps/`): the actual
 voice, specificity, and texture of the world as it was played. You write far
 better entities than the Scribe does — so **read the scenes yourself and
-synthesize from them**, using the entity files only as a checklist of *what
+synthesize from them**, using the knowledge records only as a checklist of *what
 exists* (the cast and places to cover) and the transcript for *what they are
 truly like*. This refines "skip the scenes" in the table above: you skip the
 **plot and timeline** (what happened, in what order), but you read the prose for
 everything standing and worth preserving.
 
-Identify the PC via `config.json` → `players[].character` — **then check the
-`type` front matter of every `characters/*.md` too.** Campaigns used for PC-swap
-testing leave *orphaned* `type: PC` files the config no longer lists; exclude any
-`type: PC`, not just the one config names. Skip `party.md` (`type: Party` — a
-roster, not an entity). Everything else (`type: character`/`NPC`) is fair game.
+Identify the PC via `config.json` → `players[].character` and PC markers in
+knowledge fields. Exclude orphaned PC records too. Player Knowledge is an approved
+player-facing projection; inspect canonical private NPC records for DM truth.
+Machine-scope human player profiles and party rosters are not seed entities.
 
 **Read entity bodies for their DM-facing truth.** NPC files carry dispositions
 and secrets in their body/front matter — that's exactly what a seed should

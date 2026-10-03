@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildScribeToolHandler, splitSections, mergeSectionBodies, sanitizeFrontMatter, buildPrefetchedEntityBlock } from "./scribe.js";
+import { buildScribeToolHandler, splitSections, mergeSectionBodies, sanitizeFrontMatter, buildPrefetchedEntityBlock, runScribe } from "./scribe.js";
 import type { ScribeFileIO } from "./scribe.js";
-import type { EntityTree } from "@machine-violet/shared/types/entities.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
+import type { LLMProvider, ChatResult } from "../../providers/types.js";
+import { loadModelConfig } from "../../config/models.js";
 import { resetPromptCache } from "../../prompts/load-prompt.js";
 import { norm } from "../../utils/paths.js";
 
 beforeEach(() => {
+  loadModelConfig({ reset: true });
   resetPromptCache();
 });
 
@@ -51,520 +54,139 @@ function mockFileIO(files: Record<string, string> = {}): ScribeFileIO {
   };
 }
 
-describe("buildScribeToolHandler", () => {
-  describe("list_entities", () => {
-    it("lists character files", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/grimjaw.md": "# Grimjaw",
-        "/camp/characters/kael.md": "# Kael",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-      const result = await handler("list_entities", { entity_type: "character" });
-      expect(result.content).toContain("grimjaw");
-      expect(result.content).toContain("kael");
-    });
-
-    it("lists location directories", async () => {
-      const fio = mockFileIO({
-        "/camp/locations/iron-forge/index.md": "# Iron Forge",
-        "/camp/locations/dark-forest/index.md": "# Dark Forest",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-      const result = await handler("list_entities", { entity_type: "location" });
-      expect(result.content).toContain("iron-forge");
-      expect(result.content).toContain("dark-forest");
-    });
-
-    it("returns (none) for empty directories", async () => {
-      const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-      const result = await handler("list_entities", { entity_type: "faction" });
-      expect(result.content).toContain("no entities");
-    });
+describe("scribe committed memory", () => {
+  it("resolves a short alias through the store and preserves unrelated values", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Bob", aliases: ["B"], fields: { hp: 9, promise: "Return" } }]);
+    const updates: string[] = [];
+    const handler = buildScribeToolHandler(io, "/camp", 2, [], updates, []);
+    const result = await handler("remember", { operations: [{ op: "upsert", collection: "Characters", name: "B", fields: { hp: 8 }, history: "Injured" }] });
+    expect(result.is_error).toBeUndefined(); expect(updates).toContain(await store.resolve("Bob"));
+    expect((await store.read("Bob")).fields).toMatchObject({ hp: 8, promise: "Return" });
   });
 
-  describe("read_entity", () => {
-    it("reads an entity file", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n\nA scarred orc.\n",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-      const result = await handler("read_entity", { entity_type: "character", slug: "grimjaw" });
-      expect(result.content).toContain("# Grimjaw");
-      expect(result.content).toContain("scarred orc");
-    });
-
-    it("returns error for missing entity", async () => {
-      const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-      const result = await handler("read_entity", { entity_type: "character", slug: "nobody" });
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("not found");
-    });
+  it("fresh scribes receive latest empty nested collections, bounded records, and unchanged tools", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([{ op: "create_collection", name: "Spells", note: "Named spells; reference practitioners" }, { op: "create_collection", parent: "Spells", name: "Arcane" }, { op: "upsert", collection: "Characters", name: "Bob", body: "q".repeat(30000), fields: { hp: 9 } }]);
+    const response: ChatResult = { text: "Done", toolCalls: [], usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }, stopReason: "end", assistantContent: [{ type: "text", text: "Done" }] };
+    const provider = { providerId: "test", chat: vi.fn(async () => response), healthCheck: vi.fn() } as unknown as LLMProvider;
+    await runScribe(provider, { updates: [{ visibility: "player-facing", content: "Bob learned Firefly" }], campaignRoot: "/camp", sceneNumber: 1, homeDir: "/home" }, io, "claude-haiku-4-5-20251001");
+    const first = vi.mocked(provider.chat).mock.calls[0][0];
+    const text = JSON.stringify(first.messages);
+    expect(text).toContain("Spells"); expect(text).toContain("Arcane"); expect(text).toContain("Named spells; reference practitioners");
+    expect(text.length).toBeLessThan(12000); expect(text).not.toContain('"kind":"value"');
+    await store.mutate([{ op: "create_collection", name: "Promises" }]);
+    await runScribe(provider, { updates: [{ visibility: "private", content: "Bob promised to return" }], campaignRoot: "/camp", sceneNumber: 1, homeDir: "/home" }, io, "claude-haiku-4-5-20251001");
+    const second = vi.mocked(provider.chat).mock.calls[1][0];
+    expect(JSON.stringify(second.messages)).toContain("Promises"); expect(second.tools).toEqual(first.tools);
   });
 
-  describe("write_entity (create)", () => {
-    it("creates a new character entity", async () => {
-      const fio = mockFileIO();
-      const created: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 3, created, [], []);
-
-      const result = await handler("write_entity", {
-        mode: "create",
-        entity_type: "character",
-        name: "Grimjaw",
-        front_matter: { disposition: "hostile", class: "warrior" },
-        body: "A scarred orc chieftain.",
-        changelog_entry: "Introduced as rival",
-      });
-
-      expect(result.content).toContain("Created");
-      expect(result.content).toContain("Grimjaw");
-      expect(created).toHaveLength(1);
-      expect(created[0]).toContain("grimjaw");
-
-      // Verify written content
-      const writeCall = vi.mocked(fio.writeFile).mock.calls[0];
-      const content = writeCall[1] as string;
-      expect(content).toContain("# Grimjaw");
-      expect(content).toContain("**Disposition:** hostile");
-      expect(content).toContain("scarred orc");
-      expect(content).toContain("Scene 003");
-      expect(content).toContain("Introduced as rival");
-    });
-
-    it("creates a location with parent directory", async () => {
-      const fio = mockFileIO();
-      const created: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 1, created, [], []);
-
-      await handler("write_entity", {
-        mode: "create",
-        entity_type: "location",
-        name: "Iron Forge",
-      });
-
-      expect(fio.mkdir).toHaveBeenCalled();
-      expect(created).toHaveLength(1);
-    });
-
-    it("creates an item entity in items/ directory", async () => {
-      const fio = mockFileIO();
-      const created: string[] = [];
-      const deltas: { slug: string; name: string; aliases: string[]; type: string; path: string }[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 4, created, [], deltas);
-
-      const result = await handler("write_entity", {
-        mode: "create",
-        entity_type: "item",
-        name: "Crystal Dagger",
-        front_matter: { owner: "[[Aldric]]", origin: "[[The Pale Queen]]" },
-        body: "A slender blade of translucent crystal.",
-        changelog_entry: "Found in the Pale Queen's reliquary",
-      });
-
-      expect(result.content).toContain("Created");
-      expect(created).toHaveLength(1);
-      expect(norm(created[0])).toContain("items/crystal-dagger.md");
-
-      const writeCall = vi.mocked(fio.writeFile).mock.calls[0];
-      const writtenPath = writeCall[0] as string;
-      const content = writeCall[1] as string;
-      expect(norm(writtenPath)).toContain("items/crystal-dagger.md");
-      expect(content).toContain("# Crystal Dagger");
-      expect(content).toContain("**Type:** item");
-      expect(content).toContain("**Owner:** [[Aldric]]");
-      expect(content).toContain("**Origin:** [[The Pale Queen]]");
-      expect(content).toContain("translucent crystal");
-      expect(content).toContain("Scene 004");
-
-      // Verify entity delta
-      expect(deltas).toHaveLength(1);
-      expect(deltas[0].type).toBe("item");
-      expect(deltas[0].name).toBe("Crystal Dagger");
-      expect(norm(deltas[0].path)).toContain("items/crystal-dagger.md");
-    });
-
-    it("rejects duplicate creation", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/grimjaw.md": "# Grimjaw\n",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-
-      const result = await handler("write_entity", {
-        mode: "create",
-        entity_type: "character",
-        name: "Grimjaw",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("already exists");
-    });
+  it("dispatches narrative recall through remember and returns canonical notices independently of prose", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([{ op: "create_collection", name: "Spells" }, { op: "create_collection", parent: "Spells", name: "Arcane" }, { op: "upsert", collection: "Characters", name: "Bob", aliases: ["B"] }]);
+    await store.acknowledgeNotices((await store.pendingNotices()).map((notice) => notice.id));
+    const bob = await store.resolve("Bob");
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 };
+    const input = { operations: [{ op: "upsert", collection: "Spells/Arcane", name: "Firefly", fields: { practitioner: { $ref: "B" }, level: 1 }, history: "Bob learned Firefly" }] };
+    const responses: ChatResult[] = [
+      { text: "", toolCalls: [{ id: "recall", name: "remember", input }], usage, stopReason: "tool_use", assistantContent: [{ type: "tool_use", id: "recall", name: "remember", input }] },
+      { text: "Recorded the new spell.", toolCalls: [], usage, stopReason: "end", assistantContent: [{ type: "text", text: "Recorded the new spell." }] },
+    ];
+    const provider = { providerId: "test", chat: vi.fn(async () => responses.shift()), healthCheck: vi.fn() } as unknown as LLMProvider;
+    const result = await runScribe(provider, { updates: [{ visibility: "private", content: "B learned Firefly" }], campaignRoot: "/camp", sceneNumber: 3, homeDir: "/home" }, io, "claude-haiku-4-5-20251001");
+    const spell = await store.read("Firefly");
+    expect(spell.fields).toMatchObject({ practitioner: { $ref: bob }, level: 1 });
+    expect(result.updated).toContain(spell.uid); expect(result.summary).not.toContain(spell.uid);
+    expect(await store.pendingNotices()).toEqual([expect.objectContaining({ source: "scribe", identities: expect.arrayContaining([expect.objectContaining({ uid: spell.uid, name: "Firefly" })]) })]);
+    const toolResults = JSON.stringify(vi.mocked(provider.chat).mock.calls[1][0].messages);
+    expect(toolResults).toContain(spell.uid); expect(io.writeFile).not.toHaveBeenCalled();
   });
 
-  describe("write_entity (update)", () => {
-    it("updates front matter, appends plain body, adds changelog", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nA scarred orc.\n",
-      });
-      const updated: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 5, [], updated, []);
-
-      const result = await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Grimjaw",
-        front_matter: { disposition: "friendly" },
-        body: "Now an ally.",
-        changelog_entry: "Befriended by Kael",
-      });
-
-      expect(result.content).toContain("Updated");
-      expect(updated).toHaveLength(1);
-
-      const writeCall = vi.mocked(fio.writeFile).mock.calls[0];
-      const content = writeCall[1] as string;
-      expect(content).toContain("friendly");
-      expect(content).toContain("Now an ally.");
-      expect(content).toContain("Scene 005");
-      expect(content).toContain("Befriended by Kael");
-    });
-
-    it("replaces existing ## sections instead of appending duplicates", async () => {
-      const existing = [
-        "# Aldric",
-        "",
-        "**Type:** character",
-        "",
-        "A brave knight.",
-        "",
-        "## Inventory",
-        "- [[Rusty Sword]]",
-        "",
-        "## Notes",
-        "Prefers diplomacy.",
-      ].join("\n");
-
-      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
-      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
-
-      await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Aldric",
-        body: "## Inventory\n- [[Rusty Sword]]\n- [[Crystal Dagger]] — gifted by the Pale Queen",
-      });
-
-      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
-      // Should have exactly one ## Inventory
-      const inventoryCount = (content.match(/## Inventory/g) || []).length;
-      expect(inventoryCount).toBe(1);
-      // Should contain the updated inventory
-      expect(content).toContain("Crystal Dagger");
-      // Should preserve the untouched ## Notes section
-      expect(content).toContain("## Notes");
-      expect(content).toContain("Prefers diplomacy.");
-      // Should preserve the preamble
-      expect(content).toContain("A brave knight.");
-    });
-
-    it("appends genuinely new sections", async () => {
-      const existing = [
-        "# Aldric",
-        "",
-        "**Type:** character",
-        "",
-        "A brave knight.",
-        "",
-        "## Inventory",
-        "- [[Rusty Sword]]",
-      ].join("\n");
-
-      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
-      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
-
-      await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Aldric",
-        body: "## Conditions\n- Poisoned (2 rounds remaining)",
-      });
-
-      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
-      expect(content).toContain("## Inventory");
-      expect(content).toContain("## Conditions");
-      expect(content).toContain("Poisoned");
-      // Inventory should be unchanged
-      expect(content).toContain("[[Rusty Sword]]");
-    });
-
-    it("handles mixed replace and append in one update", async () => {
-      const existing = [
-        "# Aldric",
-        "",
-        "**Type:** character",
-        "",
-        "A brave knight.",
-        "",
-        "## Inventory",
-        "- [[Rusty Sword]]",
-        "",
-        "## Notes",
-        "Prefers diplomacy.",
-      ].join("\n");
-
-      const fio = mockFileIO({ "/camp/characters/aldric.md": existing });
-      const handler = buildScribeToolHandler(fio, "/camp", 5, [], [], []);
-
-      await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Aldric",
-        body: "## Inventory\n- [[Rusty Sword]]\n- [[Crystal Dagger]]\n\n## Conditions\n- Blessed",
-      });
-
-      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
-      const inventoryCount = (content.match(/## Inventory/g) || []).length;
-      expect(inventoryCount).toBe(1);
-      expect(content).toContain("Crystal Dagger");
-      expect(content).toContain("## Notes");
-      expect(content).toContain("## Conditions");
-      expect(content).toContain("Blessed");
-    });
-
-    it("deletes front matter keys with null value", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nOrc.\n",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-
-      await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Grimjaw",
-        front_matter: { disposition: null },
-      });
-
-      const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
-      expect(content).not.toContain("Disposition");
-    });
-
-    it("returns error when entity does not exist", async () => {
-      const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-
-      const result = await handler("write_entity", {
-        mode: "update",
-        entity_type: "character",
-        name: "Nobody",
-        body: "text",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("not found");
-    });
+  it("canonical prefetch remains bounded and recognizes one-letter aliases", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Bob", aliases: ["B"], body: "x".repeat(20000) }]);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "private", content: "B arrived" }], undefined, "/camp", io);
+    expect(block).toContain("Canonical committed"); expect(block).toContain("Bob"); expect(block.length).toBeLessThan(12000);
   });
 
-  it("unescapes literal \\n in body and changelog", async () => {
-    const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-
-    await handler("write_entity", {
-      mode: "create",
-      entity_type: "character",
-      name: "Test",
-      body: "Line one.\\nLine two.\\n\\nParagraph two.",
-      changelog_entry: "Created.\\nWith extra line.",
-    });
-
-    const content = vi.mocked(fio.writeFile).mock.calls[0][1] as string;
-    expect(content).toContain("Line one.\nLine two.");
-    expect(content).toContain("\n\nParagraph two.");
-    expect(content).not.toContain("\\n");
+  it("prefetch matches complete aliases and preserves current facts without duplicate child/edge inventories", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([
+      { op: "upsert", collection: "Locations", name: "Archive" },
+      { op: "upsert", collection: "Characters", name: "Bob", aliases: ["B"], body: "Bob waits.", fields: { location: { $ref: "Archive" }, title: "Keeper" } },
+      { op: "upsert", collection: "Characters", name: "Ada", aliases: ["A"] },
+      { op: "add_reference", source: "Bob", target: "Archive", label: "guards sealed archive" },
+      { op: "add_reference", source: "Bob", target: "Archive", label: "value:watchtower" },
+      { op: "append_log", uid: "Bob", body: "Unneeded history. ".repeat(1000) },
+    ]);
+    const bob = await store.resolve("Bob"); const archive = await store.resolve("Archive"); const ada = await store.resolve("Ada");
+    const unrelated = await buildPrefetchedEntityBlock([{ visibility: "private", content: "The borrowing ritual changed" }], undefined, "/camp", io);
+    expect(unrelated).not.toContain(`"uid":"${bob}"`); expect(unrelated).not.toContain(`"uid":"${ada}"`);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "private", content: "B guards the Archive" }], undefined, "/camp", io);
+    expect(block).toContain(`"uid":"${bob}"`); expect(block).not.toContain(`"uid":"${ada}"`);
+    expect(block).toContain(`"location":{"$ref":"${archive}"}`); expect(block).toContain("guards sealed archive");
+    expect(block).toContain("Bob waits."); expect(block).not.toContain('"children"'); expect(block).toContain("value:watchtower"); expect(block).not.toMatch(/"label":"value:k[0-9a-z]+"/); expect(block).not.toContain("Unneeded history");
   });
 
-  it("returns error when write_entity is called without name", async () => {
-    const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-
-    const result = await handler("write_entity", {
-      mode: "create",
-      entity_type: "character",
-      body: "A mysterious figure.",
-    });
-
-    expect(result.is_error).toBe(true);
-    expect(result.content).toContain("name");
+  it("prefetch supplies only prior approved public facts with full-read handles for bounded descriptions", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    const summary = "Veyruin's junior archivist catalogued persons using names as keys. ".repeat(350) + "The receipt remains unsigned.";
+    const publicName = "The known archivist " + "n".repeat(300);
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Bob", aliases: ["PRIVATE_ALIAS"], body: "PRIVATE_SENTINEL", fields: { hidden: "PRIVATE_SENTINEL" } },
+      { op: "disclose", uid: "Bob", name: publicName, summary, aliases: ["The Junior Archivist"] },
+    ]);
+    const bob = await store.resolve("Bob"); const privateLeaf = (await store.outline()).find(entry => entry.parent === bob && entry.name === "hidden")!;
+    await store.mutate([
+      { op: "upsert", collection: "Player Knowledge/Characters", name: "Private forged view", fields: { subject: { $ref: "Bob" }, display_name: "Unapproved", summary: "PRIVATE_SENTINEL" } },
+      { op: "create_collection", name: "Player Knowledge Archive" },
+      { op: "upsert", collection: "Player Knowledge Archive", name: "Wrong owner", visibility: "player-facing", fields: { subject: { $ref: "Bob" }, display_name: "Wrong Owner", summary: "WRONG_OWNER_SENTINEL" } },
+      { op: "upsert", collection: "Player Knowledge/Characters", name: "Authored descriptor", visibility: "player-facing", fields: { subject: { $ref: "Bob" }, display_name: "Forged", summary: { $text: privateLeaf.uid, length: 16, authored: true } } },
+    ]);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "player-facing", content: "Bob explained reclaiming names." }], undefined, "/camp", io);
+    const record = block.split("\n").filter(line => line.startsWith("{")).map(line => JSON.parse(line) as { uid: string; approvedPublic?: { name: string; aliases: string[]; summary: string; summaryHandle: string; summaryLength: number; summaryNextOffset: number; nameHandle: string; nameLength: number } }).find(record => record.uid === bob)!;
+    const approved = record.approvedPublic!;
+    expect(approved.summary).toBe(summary.slice(0, 1500)); expect(approved.summaryLength).toBe(summary.length); expect(approved.summaryNextOffset).toBe(1500);
+    expect(approved.name).toBe(publicName.slice(0, 256)); expect(approved.nameLength).toBe(publicName.length);
+    expect(approved.aliases).toEqual(["The Junior Archivist"]);
+    expect(JSON.stringify(approved)).not.toMatch(/PRIVATE_SENTINEL|PRIVATE_ALIAS|WRONG_OWNER_SENTINEL|Forged/);
+    const handler = buildScribeToolHandler(io, "/camp", 3, [], [], [], [], "/home");
+    let recovered = approved.summary;
+    for (let offset = recovered.length; offset < approved.summaryLength; offset += 4000) {
+      const page = JSON.parse((await handler("knowledge", { action: "read", handle: approved.summaryHandle, textOffset: offset, textLimit: 4000 })).content);
+      recovered += page.value as string;
+    }
+    expect(recovered).toBe(summary);
+    expect(JSON.parse((await handler("knowledge", { action: "read", handle: approved.nameHandle, textLimit: 4000 })).content).value).toBe(publicName);
+    expect(block.length).toBeLessThanOrEqual(12000);
   });
 
-  it("returns error for unknown tool", async () => {
-    const fio = mockFileIO();
-    const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], []);
-    const result = await handler("unknown_tool", {});
-    expect(result.is_error).toBe(true);
+  it("keeps approved public previews inside the total prefetch budget without private fallback", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    for (let index = 0; index < 8; index++) {
+      await store.mutate([
+        { op: "upsert", collection: "Characters", name: `Person ${index}`, body: "Private body. ".repeat(200) },
+        { op: "disclose", uid: `Person ${index}`, name: `Known person ${index}`, summary: "Approved public fact. ".repeat(200) },
+      ]);
+    }
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Unrevealed", body: "SECRET_WITH_NO_APPROVAL" }]);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "private", content: "Unrevealed met " + Array.from({ length: 8 }, (_, index) => `Person ${index}`).join(", ") }], undefined, "/camp", io);
+    expect(block.length).toBeLessThanOrEqual(12000);
+    expect(block).toContain('"approvedPublic"');
+    const unrevealed = await buildPrefetchedEntityBlock([{ visibility: "private", content: "Unrevealed spoke" }], undefined, "/camp", io);
+    expect(unrevealed).toContain("SECRET_WITH_NO_APPROVAL"); expect(unrevealed).not.toContain('"approvedPublic"');
   });
 
-  describe("rename_entity", () => {
-    const placeholder = [
-      "# Starting Location",
-      "",
-      "**Type:** Location",
-      "**Placeholder:** true",
-      "",
-      "_Placeholder._",
-      "",
-    ].join("\n");
-
-    it("moves the file, updates the H1, rewrites wikilinks, and tracks tree deltas", async () => {
-      const fio = mockFileIO({
-        "/camp/locations/starting-location/index.md": placeholder,
-        "/camp/characters/aldric.md": [
-          "# Aldric",
-          "",
-          "**Type:** character",
-          "**Location:** [Starting Location](../locations/starting-location/index.md)",
-          "",
-          "Met at the [Starting Location](../locations/starting-location/index.md).",
-          "",
-        ].join("\n"),
-      });
-      const updated: string[] = [];
-      const deltas: { slug: string; name: string; aliases: string[]; type: string; path: string }[] = [];
-      const removedSlugs: string[] = [];
-      const handler = buildScribeToolHandler(fio, "/camp", 7, [], updated, deltas, removedSlugs);
-
-      const result = await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Starting Location",
-        new_name: "The Crooked Coin Tavern",
-      });
-
-      expect(result.is_error).toBeFalsy();
-      expect(result.content).toContain("Renamed");
-      expect(result.content).toContain("Crooked Coin Tavern");
-
-      // Old file is gone, new file exists. Note: `slugify` strips leading
-      // articles, so "The Crooked Coin Tavern" lands at `crooked-coin-tavern`.
-      expect(await fio.exists("/camp/locations/starting-location/index.md")).toBe(false);
-      expect(await fio.exists("/camp/locations/crooked-coin-tavern/index.md")).toBe(true);
-
-      // New file has the new H1 + carries the placeholder flag forward
-      // (Scribe is supposed to remove `Placeholder:` in a follow-up update.)
-      const moved = await fio.readFile("/camp/locations/crooked-coin-tavern/index.md");
-      expect(moved).toContain("# The Crooked Coin Tavern");
-      expect(moved).toContain("**Placeholder:** true");
-      expect(moved).toContain("Renamed from Starting Location to The Crooked Coin Tavern");
-      expect(moved).toContain("Scene 007");
-
-      // Wikilinks in aldric.md are rewritten
-      const aldric = await fio.readFile("/camp/characters/aldric.md");
-      expect(aldric).not.toContain("starting-location");
-      expect(aldric).toContain("crooked-coin-tavern");
-
-      // Tree bookkeeping
-      expect(removedSlugs).toEqual(["starting-location"]);
-      expect(deltas).toHaveLength(1);
-      expect(deltas[0].slug).toBe("crooked-coin-tavern");
-      expect(deltas[0].name).toBe("The Crooked Coin Tavern");
-      expect(deltas[0].type).toBe("location");
-      expect(norm(deltas[0].path)).toBe("locations/crooked-coin-tavern/index.md");
-
-      // Old empty location dir was rmdir'd
-      expect(fio.rmdir).toHaveBeenCalled();
-    });
-
-    it("uses caller-supplied changelog entry when provided", async () => {
-      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
-      const handler = buildScribeToolHandler(fio, "/camp", 2, [], [], [], []);
-
-      await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Starting Location",
-        new_name: "Bell Harbor",
-        changelog_entry: "Named on entry to the city",
-      });
-
-      const moved = await fio.readFile("/camp/locations/bell-harbor/index.md");
-      expect(moved).toContain("Named on entry to the city");
-      expect(moved).not.toContain("Renamed from Starting Location");
-    });
-
-    it("rejects when the target slug already exists", async () => {
-      const fio = mockFileIO({
-        "/camp/locations/starting-location/index.md": placeholder,
-        "/camp/locations/bell-harbor/index.md": "# Bell Harbor\n\n**Type:** Location\n",
-      });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
-
-      const result = await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Starting Location",
-        new_name: "Bell Harbor",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("already exists");
-    });
-
-    it("rejects when the source entity does not exist", async () => {
-      const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
-
-      const result = await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Nowhere",
-        new_name: "Somewhere",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("not found");
-    });
-
-    it("rejects when both names slugify identically", async () => {
-      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
-
-      const result = await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Starting Location",
-        new_name: "starting-location",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("nothing to rename");
-    });
-
-    it("rejects player entities (machine-scope, not campaign-scope)", async () => {
-      const fio = mockFileIO();
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
-
-      const result = await handler("rename_entity", {
-        entity_type: "player",
-        old_name: "Alex",
-        new_name: "Alexandra",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("player");
-    });
-
-    it("rejects when deleteFile is unavailable", async () => {
-      const fio = mockFileIO({ "/camp/locations/starting-location/index.md": placeholder });
-      fio.deleteFile = undefined;
-      const handler = buildScribeToolHandler(fio, "/camp", 1, [], [], [], []);
-
-      const result = await handler("rename_entity", {
-        entity_type: "location",
-        old_name: "Starting Location",
-        new_name: "Bell Harbor",
-      });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("file deletion support");
-    });
+  it("appends machine profile boundaries without creating campaign nodes", async () => {
+    const io = mockFileIO({ "/home/players/alice.md": "# Alice\n\n**Type:** player\n\n## Content Boundaries\n- No spiders\n" });
+    const handler = buildScribeToolHandler(io, "/camp", 2, [], [], [], [], "/home");
+    const result = await handler("player_profile", { action: "append", player: "Alice", section: "Content Boundaries", text: "No drowning" });
+    expect(result.is_error).toBeUndefined();
+    const profile = await io.readFile("/home/players/alice.md"); expect(profile).toContain("No spiders"); expect(profile).toContain("No drowning");
+    expect(await (await getCampaignKnowledge("/camp", io)).resolve("Alice")).toBeNull();
+    const bad = await handler("player_profile", { action: "replace", player: "Alice", text: "Clear" }); expect(bad.is_error).toBe(true);
   });
 });
-
 describe("splitSections", () => {
   it("returns single entry for body with no headings", () => {
     const result = splitSections("Just plain text.\n\nAnother paragraph.");
@@ -729,63 +351,5 @@ describe("sanitizeFrontMatter", () => {
     // information. `null` always means delete — never substitute.
     const out = sanitizeFrontMatter({ "**Location:** [[Old]]": null });
     expect(out).toEqual({ location: null });
-  });
-});
-
-describe("buildPrefetchedEntityBlock", () => {
-  const tree: EntityTree = {
-    grimjaw: { name: "Grimjaw", aliases: ["Captain Grimjaw"], type: "character", path: "characters/grimjaw.md" },
-    kael: { name: "Kael", aliases: [], type: "character", path: "characters/kael.md" },
-  };
-
-  it("prefetches a referenced entity as canonical and excludes the rest", async () => {
-    const fio = mockFileIO({
-      "/camp/characters/grimjaw.md": "# Grimjaw\n\n**Type:** character\n\nA scarred orc chieftain.",
-      "/camp/characters/kael.md": "# Kael\n\nA quiet ranger.",
-    });
-    const block = await buildPrefetchedEntityBlock(
-      [{ visibility: "private", content: "Grimjaw takes 8 damage in the ambush" }],
-      tree, "/camp", fio,
-    );
-    expect(block).toContain("CANONICAL");
-    expect(block).toContain("Grimjaw (character)");
-    expect(block).toContain("A scarred orc chieftain.");
-    expect(block).not.toContain("Kael"); // unreferenced — not prefetched
-  });
-
-  it("matches by alias", async () => {
-    const fio = mockFileIO({ "/camp/characters/grimjaw.md": "# Grimjaw\n\nbody" });
-    const block = await buildPrefetchedEntityBlock(
-      [{ visibility: "private", content: "Captain Grimjaw draws his axe" }],
-      tree, "/camp", fio,
-    );
-    expect(block).toContain("Grimjaw (character)");
-  });
-
-  it("returns empty when no known entity is referenced", async () => {
-    const fio = mockFileIO({ "/camp/characters/grimjaw.md": "# Grimjaw" });
-    const block = await buildPrefetchedEntityBlock(
-      [{ visibility: "private", content: "A new merchant named Voss appears" }],
-      tree, "/camp", fio,
-    );
-    expect(block).toBe("");
-  });
-
-  it("respects word boundaries (no substring matches)", async () => {
-    const fio = mockFileIO({ "/camp/characters/kael.md": "# Kael" });
-    const block = await buildPrefetchedEntityBlock(
-      [{ visibility: "private", content: "Kaeldor the dragon stirs" }], // 'Kael' is a substring, not a word
-      tree, "/camp", fio,
-    );
-    expect(block).toBe("");
-  });
-
-  it("skips a referenced entity whose file is missing — the tool fetches it instead", async () => {
-    const fio = mockFileIO({}); // grimjaw is in the tree but absent on disk
-    const block = await buildPrefetchedEntityBlock(
-      [{ visibility: "private", content: "Grimjaw takes 8 damage" }],
-      tree, "/camp", fio,
-    );
-    expect(block).toBe("");
   });
 });

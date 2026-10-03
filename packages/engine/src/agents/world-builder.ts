@@ -10,6 +10,8 @@ import { processingPaths } from "../config/processing-paths.js";
 import { loadWorldBySlug } from "../config/world-loader.js";
 import type { WorldFile, WorldEntity } from "@machine-violet/shared/types/world.js";
 import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import type { KnowledgeOperation, KnowledgeValue } from "@machine-violet/shared/types/knowledge.js";
 
 /**
  * Build the entire campaign directory from setup results.
@@ -45,34 +47,23 @@ export async function buildCampaignWorld(
     JSON.stringify(config, null, 2) + "\n",
   );
 
-  // 3. Write character file
-  const charPath = norm(paths.character(slugify(result.characterName)));
+  // 3. Create the player-facing character identity
+  const knowledge = await getCampaignKnowledge(root, fileIO, {create:true});
   let charBody = result.characterDescription || "A newly created character. Their story unfolds through play.";
   if (result.characterDetails) {
     charBody += "\n\n## Character Details\n" + result.characterDetails;
   }
-  const charContent = serializeEntity(
-    result.characterName,
-    {
+  const charFields:Record<string,KnowledgeValue> = {
       type: "PC",
       player: result.playerName,
       display_resources: "HP",
-      theme_color: result.themeColor,
-    },
-    charBody,
-    [],
-  );
-  await fileIO.writeFile(charPath, charContent);
+      ...(result.themeColor ? {theme_color: result.themeColor} : {}),
+  };
+  const character = await knowledge.mutate([{op:"upsert",collection:"Characters",name:result.characterName,fields:charFields,body:charBody,visibility:"player-facing"}],{source:"setup"});
 
-  // 4. Write party file
+  // 4. Create the party record with an explicit character reference
   const charSlug = slugify(result.characterName);
-  const partyContent = serializeEntity(
-    "The Party",
-    { type: "Party" },
-    `## Members\n- [[${charSlug}]]\n\n## Shared Resources\n(None yet)`,
-    [],
-  );
-  await fileIO.writeFile(norm(paths.party), partyContent);
+  await knowledge.mutate([{op:"create_collection",name:"Party",note:"Player roster and shared resources"},{op:"upsert",collection:"Party",name:"The Party",fields:{members:[{$ref:character.identities[0].uid}]},visibility:"player-facing"}],{source:"setup"});
 
   // 5. Write player file (machine-scope — persists across campaigns)
   if (homeDir) {
@@ -104,17 +95,7 @@ export async function buildCampaignWorld(
 
   // 7. Write starting location (placeholder — DM renames via Scribe once it
   // has named the opening locale; see scribe.md "Placeholder entities").
-  const locationSlug = "starting-location";
-  const locationPath = norm(paths.location(locationSlug));
-  const locationDir = locationPath.replace(/\/index\.md$/, "");
-  await fileIO.mkdir(locationDir);
-  const locationContent = serializeEntity(
-    "Starting Location",
-    { type: "Location", placeholder: true },
-    "_Placeholder — rename via `rename_entity` once the opening locale has a real name in the fiction._",
-    [],
-  );
-  await fileIO.writeFile(locationPath, locationContent);
+  await knowledge.mutate([{op:"upsert",collection:"Locations",name:"Starting Location",fields:{type:"Location",placeholder:true},body:"Placeholder: rename once the opening locale has a real name in the fiction."}],{source:"setup"});
 
   // 8. Copy bundled rule card to ~/.machine-violet/systems/<slug>/ if available
   if (homeDir && result.system) {
@@ -129,14 +110,8 @@ export async function buildCampaignWorld(
     }
   }
 
-  // 8b. Materialize inline world content from the chosen seed, if the campaign
-  // was built from a rich .mvworld. This runs entirely in code — the entity
-  // tree, maps, rules, and calendar never pass through the setup agent's
-  // context. NPCs/locations/factions/lore/items become entity files (the DM
-  // picks them up via the entity registry, which is scanned from disk at
-  // session start); maps and calendar seed runtime state. The player-facing
-  // compendium and the PC sheet are deliberately left unseeded — see
-  // materializeWorldContent.
+  // 8b. Materialize unchanged .mvworld seed records into SQLite knowledge;
+  // maps, rules and calendar keep their existing storage boundaries.
   if (result.worldSlug) {
     const userWorldsDir = homeDir ? machinePaths(homeDir).worldsDir : undefined;
     const world = loadWorldBySlug(result.worldSlug, userWorldsDir);
@@ -168,38 +143,12 @@ export async function buildCampaignWorld(
 }
 
 /**
- * Write a seed's inline world content into a freshly scaffolded campaign.
- *
- * Pure serialization — no model in the loop. Maps the .mvworld inline content
- * (format-spec.md §10) onto the on-disk campaign format (format-spec.md §6, §4):
- *
- *  - entities.characters → characters/<slug>.md  (NPCs only; the PC is created
- *    during chargen, so any seed entity flagged `type: PC` is skipped to avoid
- *    duplicating / colliding with the live character)
- *  - entities.locations  → locations/<slug>/index.md
- *  - entities.factions   → factions/<slug>.md
- *  - entities.lore       → lore/<slug>.md
- *  - entities.items      → items/<slug>.md
- *  - rules               → rules/<slug>.md  (verbatim rule-card content)
- *  - maps                → state/maps.json   (authoritative runtime copy)
- *  - calendar            → state/clocks.json (world time + epoch, idle clocks)
- *
- * Deliberately NOT seeded:
- *  - campaign/compendium.json — the compendium is the *player-facing* knowledge
- *    base ("what the player has learned"). A fresh seed's player knows nothing,
- *    so it must start empty: pre-filling it both spoils the player's discovery
- *    and misinforms the DM about what the party already knows.
- *  - the PC character sheet — created live during chargen.
- *  - campaign/log.json entries — a seed carries no prior episodic record.
- *
- * Entity filenames come from the canonical `campaignPaths` helpers, which
- * slugify the entity title — so a correctly authored seed (record key ==
- * slugify(title)) round-trips, and a mismatched key still lands on the
- * engine-canonical path rather than a parallel orphan file.
- *
- * `selections` (the campaign's resolved `fork_selections`) gates fork-scoped
- * entities: one carrying `appliesWhen` is written only if its fork resolved to
- * its option. Entities without `appliesWhen` are universal and always written.
+ * Materialize unchanged .mvworld content into a new campaign without a model call.
+ * Entity front matter/body become typed fields and bulk text in knowledge.sqlite.
+ * Authored aliases and exact known [[Name]] metadata references become identity
+ * handles and graph edges. Unknown links and arbitrary prose remain literal text.
+ * Rules, maps and calendar retain their existing file formats; PC seed records
+ * and the player knowledge projection are deliberately not seeded.
  */
 export async function materializeWorldContent(
   root: string,
@@ -217,48 +166,36 @@ export async function materializeWorldContent(
     !e.appliesWhen || selections?.[e.appliesWhen.fork] === e.appliesWhen.option;
 
   if (ents) {
-    for (const entity of Object.values(ents.characters ?? {})) {
-      // The PC comes from chargen — never materialize one from the seed.
-      if (String(entity.frontMatter?.type ?? "").toLowerCase() === "pc") continue;
-      if (!applies(entity)) continue;
-      await fileIO.writeFile(
-        norm(paths.character(entity.title)),
-        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
-      );
+    const knowledge = await getCampaignKnowledge(root, fileIO, { create: true });
+    const operations: KnowledgeOperation[] = [];
+    const selected: WorldEntity[] = [];
+    const authoredHandles = new Set<string>();
+    const normalize = (name: string) => name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+    for (const [category, collection] of Object.entries({ characters: "Characters", locations: "Locations", factions: "Factions", lore: "Lore", items: "Items" })) {
+      for (const entity of Object.values(ents[category as keyof typeof ents] ?? {})) {
+        if (!applies(entity) || String(entity.frontMatter?.type ?? "").toLowerCase() === "pc") continue;
+        const aliases = typeof entity.frontMatter?.additional_names === "string"
+          ? entity.frontMatter.additional_names.split(",").map(name => name.trim()).filter(Boolean) : [];
+        selected.push(entity);
+        for (const handle of [entity.title, ...aliases]) authoredHandles.add(normalize(handle));
+        operations.push({ op: "upsert", collection, name: entity.title, aliases, fields: entity.frontMatter as Record<string, KnowledgeValue>, body: entity.body });
+      }
     }
-
-    for (const entity of Object.values(ents.locations ?? {})) {
-      if (!applies(entity)) continue;
-      // Locations live in their own subdirectory (index.md) — mkdir first.
-      const locPath = norm(paths.location(entity.title));
-      await fileIO.mkdir(locPath.replace(/\/index\.md$/, ""));
-      await fileIO.writeFile(
-        locPath,
-        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
-      );
+    // Relationships are appended after every identity has been allocated in the
+    // same transaction. Only an entire metadata value authored as [[Name]] is a
+    // relationship declaration; bodies and ambiguous prose do not create edges.
+    for (const entity of selected) {
+      for (const [key, value] of Object.entries(entity.frontMatter ?? {})) {
+        if (typeof value !== "string") continue;
+        const match = /^\[\[(.+)\]\]$/.exec(value.trim());
+        if (!match) continue;
+        const target = match[1].trim();
+        if (authoredHandles.has(normalize(target)) || await knowledge.resolve(target)) {
+          operations.push({ op: "add_reference", source: entity.title, target, label: `field:${key}` });
+        }
+      }
     }
-
-    for (const entity of Object.values(ents.factions ?? {})) {
-      if (!applies(entity)) continue;
-      await fileIO.writeFile(
-        norm(paths.faction(entity.title)),
-        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
-      );
-    }
-    for (const entity of Object.values(ents.lore ?? {})) {
-      if (!applies(entity)) continue;
-      await fileIO.writeFile(
-        norm(paths.lore(entity.title)),
-        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
-      );
-    }
-    for (const entity of Object.values(ents.items ?? {})) {
-      if (!applies(entity)) continue;
-      await fileIO.writeFile(
-        norm(paths.item(entity.title)),
-        serializeEntity(entity.title, entity.frontMatter, entity.body, []),
-      );
-    }
+    if (operations.length) await knowledge.mutate(operations, { source: "seed" });
   }
 
   // Rule cards → the campaign's rules/ dir, written verbatim.

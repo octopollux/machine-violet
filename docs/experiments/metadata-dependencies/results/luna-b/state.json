@@ -1,0 +1,199 @@
+{
+  "entities": [
+    {
+      "id": "e01",
+      "name": "Cinderwatch",
+      "kind": "location",
+      "data": {
+        "archive": "e02 occupies the east wing",
+        "ElianImprisoned": "dungeon",
+        "drainageTunnel": "usable",
+        "garrison": "operating",
+        "grainContract": "ongoing; depends on garrison continuing to operate",
+        "alias": "Blackthorn Castle",
+        "fire": "burned through the night",
+        "mainKeep": "ruin"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e02",
+      "name": "West Archive",
+      "kind": "location",
+      "data": {
+        "location": "east wing of e01",
+        "uniqueSignedDeed": "destroyed; no surviving copy reported",
+        "status": "destroyed in fire"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e03",
+      "name": "Lantern Inn",
+      "kind": "location",
+      "data": {},
+      "depends_on": []
+    },
+    {
+      "id": "e04",
+      "name": "Blackthorn Lodge",
+      "kind": "location",
+      "data": {
+        "distanceFromCastle": "ten miles"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e05",
+      "name": "Elian",
+      "kind": "character",
+      "data": {
+        "wounds": 0,
+        "conscious": false,
+        "surety": null,
+        "lockCode": "007",
+        "possessions": [
+          "spoon",
+          "c02"
+        ],
+        "imprisoned": "dungeon of e01",
+        "escaped": "yesterday",
+        "staysAt": "e03"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e06",
+      "name": "Mara",
+      "kind": "character",
+      "data": {
+        "serves": null,
+        "resides": "e04",
+        "castleDuties": null,
+        "castleCommitments": null,
+        "authenticatesDelegationFor": "e10"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e07",
+      "name": "Iona",
+      "kind": "character",
+      "data": {
+        "stayingAt": "e04",
+        "alive": true,
+        "location": "fled Blackthorn Lodge for undisclosed safe house",
+        "availableForTestimony": false
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e08",
+      "name": "Free Elian",
+      "kind": "quest",
+      "data": {
+        "status": "completed",
+        "requires": {
+          "Elian": "still to be rescued",
+          "castleDrainageTunnel": "remain usable"
+        }
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e09",
+      "name": "Prove the succession",
+      "kind": "quest",
+      "data": {
+        "status": "active",
+        "requires": "Iona's testimony identifying the handwriting on a surviving letter; she is unavailable and no replacement has been found",
+        "originalDeedRoute": "abandoned"
+      },
+      "depends_on": [
+        {
+          "target": "e07",
+          "reason": "A change to Iona's availability or testimony affects the active succession quest."
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "name": "Arrange the parley",
+      "kind": "quest",
+      "data": {
+        "requires": "Mara authenticates the delegation; Iona is no longer required",
+        "status": "active"
+      },
+      "depends_on": [
+        {
+          "target": "e06",
+          "reason": "A change to Mara's ability to authenticate affects the active parley."
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "name": "Rowan",
+      "kind": "character",
+      "data": {
+        "grainContract": "ended; no outstanding obligations or new contract"
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e12",
+      "name": "The Blackthorn Lament",
+      "kind": "lore",
+      "data": {
+        "ageYears": 200,
+        "mentions": "e01",
+        "reliedOnBy": []
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e13",
+      "name": "Omen Deck",
+      "kind": "deck",
+      "data": {
+        "cards": {
+          "c01": {
+            "face": "The Flame"
+          },
+          "c02": {
+            "face": "The Flame"
+          },
+          "c03": {
+            "face": "The Crown"
+          }
+        },
+        "drawPile": [
+          "c01",
+          "c03"
+        ],
+        "discardPile": [],
+        "hands": {
+          "e05": [
+            "c02"
+          ]
+        }
+      },
+      "depends_on": []
+    },
+    {
+      "id": "e14",
+      "name": "Tamsin",
+      "kind": "character",
+      "data": {
+        "resides": "e03",
+        "escaped": "fire"
+      },
+      "depends_on": [
+        {
+          "target": "e03",
+          "reason": "A change to the Lantern Inn affects Tamsin's stated residence there."
+        }
+      ]
+    }
+  ]
+}

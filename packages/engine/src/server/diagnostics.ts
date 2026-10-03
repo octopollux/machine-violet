@@ -23,6 +23,7 @@ import { join, basename } from "node:path";
 import { norm } from "../utils/paths.js";
 import { zipBinaryFiles, type BinaryFileMap } from "../utils/archive.js";
 import { type ArchiveFileIO, readCampaignName } from "../config/campaign-archive.js";
+import { KNOWLEDGE_FILE } from "../knowledge/store.js";
 
 export interface DiagnosticsResult {
   ok: boolean;
@@ -79,7 +80,8 @@ async function walkForDiagnostics(
       try {
         const content = await io.readBinary(abs);
         results.push({ relativePath: rel, content });
-      } catch {
+      } catch(error) {
+        if(rel===KNOWLEDGE_FILE) throw new Error("Cannot capture campaign knowledge database",{cause:error});
         // Skip unreadable files — they shouldn't break the bundle.
       }
     }
@@ -133,7 +135,8 @@ export async function collectDiagnostics(
 
     // 1. Walk the campaign folder (skips .git) when a session is active.
     if (campaignRoot) {
-      const campaignFiles = await walkForDiagnostics(io, norm(campaignRoot), "");
+      const capture=()=>walkForDiagnostics(io,norm(campaignRoot),"");
+      const campaignFiles = io.campaignKnowledge ? await (await io.campaignKnowledge(campaignRoot,{create:false})).withSnapshot(capture) : await capture();
       for (const f of campaignFiles) {
         fileMap[`campaign/${f.relativePath}`] = f.content;
       }

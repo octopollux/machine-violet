@@ -23,6 +23,7 @@ import { installStdinFilterChain } from "./tui/hooks/stdinFilterChain.js";
 import { compositePainters, setIncrementalRendering } from "./tui/image/painterRegistry.js";
 import { detectGraphicsCapabilities } from "./tui/image/capabilities.js";
 import { getAgentClientState } from "./agent-state-ref.js";
+import { headlessTerminalOutput } from "./headless-output.js";
 
 export interface StartClientOptions {
   /** Engine server URL (default: http://127.0.0.1:7200). */
@@ -139,6 +140,7 @@ export async function startClient(opts: StartClientOptions = {}): Promise<Client
   const renderOpts: RenderOptions = { exitOnCtrlC: !mockStdin, alternateScreen, incrementalRendering };
   if (mockStdin) {
     renderOpts.stdin = mockStdin;
+    renderOpts.stdout = headlessTerminalOutput(process.stdout);
     // Force Ink interactive mode in headless agent mode. Without this, Ink's
     // resolveInteractiveOption() falls back to `Boolean(stdout.isTTY)` — and
     // since the spawning process has no real TTY, stdout.isTTY is false, so

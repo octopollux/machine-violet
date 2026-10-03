@@ -55,6 +55,8 @@ import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import type { LLMProvider } from "../providers/types.js";
 import { campaignPaths } from "../tools/filesystem/index.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 import { norm } from "../utils/paths.js";
 import { TapeReader, TapeWriter, deserializeTape, serializeTape, type Tape } from "../providers/tape.js";
 import { createReplayProvider, createTapingProvider } from "../providers/tape-provider.js";
@@ -318,8 +320,11 @@ describe("setup golden corpus", () => {
         // session manager can inject it into the DM's first-turn priming.
         expect(config.opening_scene).toBe(golden.expectedSetup.openingScene ?? undefined);
 
-        const charRaw = await fileIO.readFile(norm(campaignPaths(root).character(golden.expectedSetup.characterName)));
-        expect(charRaw, "character sheet should be scaffolded").not.toBe("");
+        expect(config.version).toBe(CAMPAIGN_FORMAT_VERSION);
+        const character=await (await getCampaignKnowledge(root,fileIO)).read(golden.expectedSetup.characterName);
+        expect(character.name).toBe(golden.expectedSetup.characterName);
+        expect(character.fields.type).toBe("PC");
+        expect(character.body,"character sheet should be scaffolded").not.toBe("");
       });
     });
   }

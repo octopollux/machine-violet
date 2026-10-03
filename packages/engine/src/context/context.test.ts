@@ -567,12 +567,13 @@ describe("buildCachedPrefix", () => {
 
     // Tier 3 is in volatile
     expect(systemText).not.toContain("Current State");
-    expect(systemText).not.toContain("Entity Registry");
+    expect(systemText).toContain("Campaign Memory (scene snapshot)");
     expect(systemText).not.toContain("UI State");
     expect(volatile).toContain("Current State");
     expect(volatile).toContain("Location: Tavern");
-    expect(volatile).toContain("Entity Registry");
-    expect(volatile).toContain("entity-list");
+    expect(volatile).not.toContain("Campaign Memory");
+    expect(systemText).toContain("entity-list");
+    expect(volatile).not.toContain("entity-list");
     expect(volatile).toContain("UI State");
     expect(volatile).toContain("style=classic");
   });

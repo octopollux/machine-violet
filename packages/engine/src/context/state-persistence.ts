@@ -43,6 +43,11 @@ export type StateSlice = "combat" | "clocks" | "maps" | "decks" | "objectives";
  *   value = present, null = explicitly empty/cleared, undefined = never set.
  */
 export interface PersistedSceneState {
+  /** Durable current scene identity; optional only in earlier format-2 saves. */
+  sceneNumber?: number;
+  slug?: string;
+  knowledgeSnapshot?: string | null;
+  knowledgeSnapshotScene?: number | null;
   precis: string | null;
   openThreads?: string | null;
   npcIntents?: string | null;
@@ -97,6 +102,7 @@ export class StatePersister {
   private fileIO: FileIO;
   private onError?: (error: Error) => void;
   private writeQueues = new Map<string, Promise<void>>();
+  private failedWrites = new Map<string, Error>();
 
   constructor(campaignRoot: string, fileIO: FileIO, onError?: (error: Error) => void) {
     this.root = campaignRoot;
@@ -110,8 +116,11 @@ export class StatePersister {
 
   private async doWrite(file: string, content: string): Promise<void> {
     try {
-      await this.fileIO.writeFile(this.path(file), content);
+      if (this.fileIO.writeFileAtomic) await this.fileIO.writeFileAtomic(this.path(file), content);
+      else await this.fileIO.writeFile(this.path(file), content);
+      this.failedWrites.delete(file);
     } catch (e) {
+      this.failedWrites.set(file, e instanceof Error ? e : new Error(String(e)));
       // Fire-and-forget: best-effort persistence
       this.onError?.(e instanceof Error ? e : new Error(String(e)));
     }
@@ -141,6 +150,13 @@ export class StatePersister {
   async flush(): Promise<void> {
     await Promise.all(this.writeQueues.values());
   }
+
+  /** Durable feedback may only be acknowledged after successful writes. */
+  async flushDurable(): Promise<void> {
+    await this.flush();
+    if (this.failedWrites.size) throw new Error(`Campaign persistence failed: ${[...this.failedWrites.keys()].join(", ")}`);
+  }
+
 
   private async readJSON<T>(file: string): Promise<T | undefined> {
     try {

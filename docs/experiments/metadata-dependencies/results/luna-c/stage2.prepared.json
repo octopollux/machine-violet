@@ -1,0 +1,217 @@
+{
+  "state": {
+    "entities": [
+      {
+        "id": "e01",
+        "name": "Blackthorn Castle",
+        "kind": "location",
+        "data": {
+          "hasEastWing": true,
+          "hasDungeon": true,
+          "drainageTunnelUsable": true,
+          "garrisonOperating": true
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e02",
+        "name": "West Archive",
+        "kind": "location",
+        "data": {
+          "occupies": "east wing of Blackthorn Castle",
+          "holds": "unique signed succession deed",
+          "otherCopiesKnown": false
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "The archive's location in the castle's east wing may need reconsideration if the castle changes."
+          }
+        ]
+      },
+      {
+        "id": "e03",
+        "name": "Lantern Inn",
+        "kind": "location",
+        "data": {},
+        "depends_on": []
+      },
+      {
+        "id": "e04",
+        "name": "Blackthorn Lodge",
+        "kind": "location",
+        "data": {
+          "separateEstate": true,
+          "distanceFromBlackthornCastleMiles": 10
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e05",
+        "name": "Elian",
+        "kind": "character",
+        "data": {
+          "wounds": 2,
+          "conscious": true,
+          "surety": null,
+          "lockCode": "007",
+          "possessions": [
+            "spoon"
+          ],
+          "imprisonedAt": "Blackthorn Castle dungeon",
+          "rescueNeeded": true
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e06",
+        "name": "Mara",
+        "kind": "character",
+        "data": {
+          "servesAt": "Blackthorn Castle garrison",
+          "livesAt": "Blackthorn Castle garrison"
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "Mara's service and residence are in the castle garrison."
+          }
+        ]
+      },
+      {
+        "id": "e07",
+        "name": "Iona",
+        "kind": "character",
+        "data": {
+          "stayingAt": "Blackthorn Lodge"
+        },
+        "depends_on": [
+          {
+            "target": "e04",
+            "reason": "Iona's current stay is at Blackthorn Lodge."
+          }
+        ]
+      },
+      {
+        "id": "e08",
+        "name": "Free Elian",
+        "kind": "quest",
+        "data": {
+          "status": "active",
+          "type": "rescue plan",
+          "needs": {
+            "ElianStillNeedsRescue": true,
+            "castleDrainageTunnelUsable": true
+          }
+        },
+        "depends_on": [
+          {
+            "target": "e05",
+            "reason": "Whether Elian still needs rescue depends on Elian's situation."
+          },
+          {
+            "target": "e01",
+            "reason": "The rescue plan needs the castle drainage tunnel to remain usable."
+          }
+        ]
+      },
+      {
+        "id": "e09",
+        "name": "Prove the succession",
+        "kind": "quest",
+        "data": {
+          "status": "active",
+          "needs": "unique signed deed stored at West Archive"
+        },
+        "depends_on": [
+          {
+            "target": "e02",
+            "reason": "The succession quest requires the unique signed deed stored in the archive."
+          }
+        ]
+      },
+      {
+        "id": "e10",
+        "name": "Arrange the parley",
+        "kind": "quest",
+        "data": {
+          "needs": "Iona personally authenticates the delegation"
+        },
+        "depends_on": [
+          {
+            "target": "e07",
+            "reason": "The parley needs Iona personally, so changes affecting her availability may require reconsidering the plan."
+          }
+        ]
+      },
+      {
+        "id": "e11",
+        "name": "Rowan",
+        "kind": "character",
+        "data": {
+          "ongoingContract": "grain contract",
+          "dependsOn": "castle garrison continuing to operate"
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "The grain contract depends on the castle garrison continuing to operate."
+          }
+        ]
+      },
+      {
+        "id": "e12",
+        "name": "The Blackthorn Lament",
+        "kind": "lore",
+        "data": {
+          "ageYears": 200,
+          "type": "song",
+          "mentions": "Blackthorn Castle",
+          "currentRelianceOnSongOrCastleForSinging": false
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e13",
+        "name": "Omen Deck",
+        "kind": "deck",
+        "data": {
+          "cards": {
+            "c01": {
+              "face": "The Flame"
+            },
+            "c02": {
+              "face": "The Flame"
+            },
+            "c03": {
+              "face": "The Crown"
+            }
+          },
+          "drawPile": [
+            "c01",
+            "c02",
+            "c03"
+          ],
+          "discardPile": [],
+          "hands": {}
+        },
+        "depends_on": []
+      },
+      {
+        "id": "e14",
+        "name": "Tamsin",
+        "kind": "character",
+        "data": {
+          "livesAt": "Blackthorn Castle kitchen"
+        },
+        "depends_on": [
+          {
+            "target": "e01",
+            "reason": "Tamsin lives in the castle kitchen."
+          }
+        ]
+      }
+    ]
+  },
+  "prompt": "Elian escaped yesterday and now stays at the Lantern Inn. His wounds have healed completely and he remains conscious. Free Elian is completed. Mara permanently transferred to Blackthorn Lodge and has no remaining home, duties, or commitments at the castle. Rowan's grain contract has ended with no outstanding obligations and no new contract. Blackthorn Castle is officially renamed Cinderwatch; this is only a name change, and the building and its operation are otherwise unchanged. The old name remains an alias. Everything else previously recorded remains true."
+}

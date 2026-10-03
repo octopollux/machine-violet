@@ -127,9 +127,9 @@ DMSessionState
 ├── scenePacing?: string                   Built from exchange count + thread count
 ├── playerRead?: string                    Synthesized from SceneState.playerReads
 ├── dmNotes?: string                       Loaded from campaign dm-notes
-├── entityIndex?: string                   Built from entity filesystem scan
+├── entityIndex?: string                   Frozen compact SQLite knowledge tree for the current scene
 ├── uiState?: string                       Built from modelines + style info
-├── compendiumSummary?: string             Rendered from campaign/compendium.json
+├── compendiumSummary?: string             Rendered from SQLite Player Knowledge
 └── nameInspiration?: string                Multicultural sample (30 given + 30 family) from src/assets/names/names.json; session-fresh entropy injection — see context-management.md § Name Inspiration Sample
 ```
 
@@ -163,7 +163,7 @@ PersistedUIState                                  → state/ui.json
 
 ## 2. Persistence Map
 
-All state files live under `<campaignRoot>/state/`.
+Mutable knowledge lives in `<campaignRoot>/knowledge.sqlite`; unrelated runtime slices retain their files under `<campaignRoot>/state/`.
 
 | File | Type | Written by | On | Spec |
 |------|------|-----------|-----|------|
@@ -176,6 +176,7 @@ All state files live under `<campaignRoot>/state/`.
 | `state/conversation.json` | `ConversationExchange[]` | `StatePersister.persistConversation` | After each exchange | [§4.7](format-spec.md#47-conversation-stateconversationjson) |
 | `state/resources.json` | `PersistedResourceState` | `StatePersister.persistResources` | React effect on `resources` state change (same pattern as modelines in `ui.json`) | [§4.10](format-spec.md#410-resources-stateresourcesjson) |
 | `state/ui.json` | `PersistedUIState` | `StatePersister.persistUI` | After theme/style/modeline changes | [§4.8](format-spec.md#48-ui-stateuijson) |
+| `knowledge.sqlite` | `CampaignKnowledgeStore` | Serialized atomic mutations | Nodes, aliases, refs, body/history, notices and retry receipts | [§6](format-spec.md#6-sqlite-knowledge-knowledgesqlite) |
 | `config.json` | `CampaignConfig` | `buildCampaignConfig` / `createDefaultCampaignConfig`; `StatePersister.persistConfig` | Written at campaign creation. During play it is otherwise read-only — the in-session mutations are the PC roster (`players[]`) via `swap_pc` and the DM voice (`dm_personality`) via `swap_dm_personality`, both calling `persistConfig` from `GameEngine.onToolSuccess`. Includes `version` (`CAMPAIGN_FORMAT_VERSION`) and `createdAt` (ISO 8601) manifest fields. | |
 | `pending-operation.json` | `PendingOperation` | `SceneManager` | During scene transition cascade steps | [§4.11](format-spec.md#411-pending-operation-pending-operationjson) |
 
@@ -311,9 +312,12 @@ Tools not in this map (`roll_dice`, all TUI tools, scene/session tools, entity t
 | **Dev mode** | Sonnet | No | State inspection tools (`inspect_state`, `mutate_state`), file read/write | Yes (direct mutation via dev tools) |
 
 Key isolation properties:
+
 - **No subagent receives `GameState` directly.** The DM is the sole holder.
+
 - **Subagent context windows are independent.** The DM's context is never polluted by subagent work.
-- **File I/O is the bridge.** Subagents that need world data read entity files; those that produce results write files or return text to the DM.
+
+- **Injected stores and I/O are the bridge.** Subagents inspect/update campaign knowledge through the SQLite store. Narrative records and unrelated runtime state retain their existing I/O boundaries.
 
 ---
 
@@ -552,58 +556,27 @@ Canonical directory tree for a campaign. Machine-managed files are marked with t
 
 ```
 <campaignRoot>/
-├── config.json                            [machine] CampaignConfig. Written at init, read-only during play.
-│                                          Manifest fields: version (CAMPAIGN_FORMAT_VERSION), createdAt (ISO 8601).
-│
-├── pending-operation.json                 [machine] PendingOperation. Crash recovery breadcrumb.
-│
-├── state/                                 [machine] All runtime state JSON files.
-│   ├── combat.json                        CombatState
-│   ├── clocks.json                        ClocksState
-│   ├── maps.json                          Record<string, MapData>
-│   ├── decks.json                         DecksState
-│   ├── objectives.json                    ObjectivesState
-│   ├── scene.json                         PersistedSceneState (precis, threads, intents, playerReads, activePlayerIndex)
-│   ├── conversation.json                  SerializedExchange[]
-│   └── ui.json                            PersistedUIState (styleName, variant, keyColor, modelines)
-│
-├── campaign/                              [machine + DM] The knowledge backbone.
-│   ├── log.md                             [machine] Append-only campaign log. Dense, wikilinked.
-│   ├── compendium.json                    [machine] Player-facing knowledge base. Updated at scene transitions.
-│   ├── session-recaps/
-│   │   └── session-NNN.md                 [machine] Haiku-generated session recaps.
-│   └── scenes/
-│       └── NNN-slug/
-│           ├── transcript.md              [machine] Full scene transcript. Wikilinked.
-│           └── dm-notes.md                [DM] DM-only notes (optional, DM-written).
-│
-├── players/                               [DM] Real human profiles.
-│   └── <name>.md
-│
-├── characters/                            [DM + machine] PCs, NPCs, creatures.
-│   ├── <name>.md                          Changelog section is machine-appended.
-│   └── party.md                           Optional party-level notes.
-│
-├── locations/                             [DM + machine] Places with optional maps.
-│   └── <slug>/
-│       ├── index.md                       Changelog section is machine-appended.
-│       └── <mapId>.json                   Map data (also in state/maps.json at runtime).
-│
-├── factions/                              [DM + machine]
-│   └── <name>.md
-│
-├── lore/                                  [DM + machine]
-│   └── <name>.md
-│
-└── rules/                                 [machine] Game system mechanics, rule cards.
-    └── <topic>.md
++-- config.json                         CampaignConfig; format version 2.
++-- knowledge.sqlite                    Typed tree, UIDs, aliases, refs, logs, notices.
++-- pending-operation.json              Scene cascade recovery breadcrumb.
++-- state/                              Unrelated runtime slices retain JSON formats.
+|   +-- combat.json, clocks.json, maps.json, decks.json, objectives.json
+|   +-- scene.json                      Includes frozen knowledgeSnapshot/scene identity.
+|   +-- conversation.json, resources.json, display-log.md, ui.json
++-- campaign/
+|   +-- log.json                        Structured episodic record.
+|   +-- session-recaps/session-NNN.md
+|   +-- scenes/NNN-slug/
+|       +-- transcript.md, summary.md, dm-notes.md
++-- characters/                         Optional portrait/media assets.
++-- rules/                              Game mechanics and rule cards.
 ```
 
 **Machine-managed** = written by engine code, subagents, or tools. Never hand-edited during play.
 
-**DM-managed** = written by the DM agent via the `scribe` subagent or file I/O. The machine only appends changelog entries.
+**Knowledge-managed** = every campaign metadata mutation uses the injected store transaction, including mechanics, scribe and Dev/OOC. Specialized sheets render typed records and do not persist Markdown.
 
-**Dual** = characters, locations, factions, items, lore files are DM-created but have machine-appended changelog sections.
+FileIO owns a serialized store per canonical root. Startup rejects unsupported config/database versions before providers or repair. Frozen scene knowledge snapshots persist in `state/scene.json`; durable notices report canonical identities and dependency candidates. Git/archive/rollback share the snapshot boundary. Source seeds, machine player profiles and unrelated state files retain their formats.
 
 ---
 
@@ -653,14 +626,23 @@ Additionally, `dev-config.jsonc` (read from the process working directory, not t
 The engine writes a structured, append-only JSONL event log to `../.debug/engine.jsonl` relative to the campaigns directory (i.e. a sibling `.debug/` directory next to the campaigns root). Each line is a JSON object with `{ t, event, ...data }` where `t` is a Unix timestamp.
 
 **Event categories:**
+
 - **Server lifecycle:** startup, shutdown
+
 - **Session lifecycle:** session start, session end, campaign load
+
 - **Turn lifecycle:** turn open, turn commit, turn resolve
+
 - **API calls:** model, tier, token counts, latency
+
 - **Subagent lifecycle:** spawn, complete, usage
+
 - **Tool input contracts:** allowlisted repairs and rejected calls, with
+
   criticality, call correlation, stable issue codes, and shape-only
+
   diagnostics (`tool_input:repaired`, `tool_input:rejected`)
+
 - **Errors:** unhandled exceptions, API failures
 
 The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an external reader — the campaign-explorer, a diagnostics bundle — sees each line the instant it lands; the per-event cost is microseconds and writes never throw. It is initialized once at server creation via `initEngineLog(campaignsDir)` and closed on shutdown via `closeEngineLog()`.
@@ -672,9 +654,13 @@ The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an ext
 `engine.jsonl` is a *flat* event stream — good for "what happened and how long did it take", but it can't reconstruct *causality* when the engine fans out (parallel tool calls in one round, nested subagents). The span trace fills that gap: a sibling append-only JSONL at `../.debug/trace.jsonl` where each line is a completed **span** — `{ id, parentId, turnId, campaignId, kind, name, t0, t1, durMs, isError?, attrs? }`.
 
 - **kinds:** `turn` (the player-turn wall-clock envelope) → `agent` (one DM or subagent loop) → `api_call` (one model round) / `tool` (one tool call) / `image_gen` (a render) / `background` (detached work like suggested-choice generation). The DM turn nests as `turn → agent(dm) → { api_call×rounds, tool× }`; a tool that spawns a subagent nests as `tool(search_campaign) → agent(search_campaign) → api_call`.
+
 - **correlation:** `parentId` rebuilds the tree; `turnId` groups every span of one player turn. Parallel tool calls appear as sibling spans with overlapping `[t0, t1]`.
+
 - **mechanism:** nesting propagates through the async call stack via `AsyncLocalStorage` (`withSpan`) — no ctx parameter is threaded through call sites. Spans are emitted **on completion** (one line per span), with the same synchronous-append rationale as `engine.jsonl`. Writes are gated on `initTraceLog` (server start, non-test only), so unit tests and golden replay exercise the nesting without touching disk.
+
   - *Provider caveat:* a provider that dispatches tools **in-band** over a persistent connection (codex/openai-chatgpt) invokes its `dispatchTool` callback inside the ALS context captured when the connection first opened, not the current turn's. The bridge re-anchors each in-band dispatch to the round's `api_call` span via `captureContext` / `runInContext` (`trace.ts`); without it, every codex-dispatched tool leaks onto turn 1. Loop-style providers (Anthropic) dispatch in the correct context already.
+
 - **consumer:** the campaign-explorer **Timeline** view renders this as a per-turn flame chart (`GET /engine-log/spans?campaign=<slug>`).
 
 **Code:** `packages/engine/src/context/trace.ts`, instrumented at `agents/game-engine.ts` (turn span) and `providers/agent-loop-bridge.ts` (agent / api_call / tool spans).
@@ -684,9 +670,13 @@ The log uses synchronous `appendFileSync` (not a buffered WriteStream) so an ext
 This document is a living reference. During gameplay testing:
 
 - **Annotate friction points** directly in the relevant section. If a tool's access pattern turns out wrong, update the matrix.
+
 - **Track subagent visibility changes.** If a subagent needs more context than listed, note what was added and why — context creep is a cost concern.
+
 - **Record new invariants** as they're discovered. Many invariants only surface under gameplay pressure (e.g., "what happens when combat ends mid-scene-transition?").
+
 - **Watch the cross-slice sync points.** The `CombatState.active ↔ CombatClock.active` pairing is the first of potentially many. If more appear, consider a unified state transaction pattern.
+
 - **Monitor persistence timing.** Write-through persistence is fire-and-forget. If state loss becomes an issue, track which slices are most vulnerable and consider batching or confirmation.
 
 When this document diverges from the code, the code wins. Update the atlas.

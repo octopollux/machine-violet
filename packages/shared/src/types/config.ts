@@ -1,7 +1,7 @@
 import type { CombatConfig } from "./combat.js";
 
 /** Bump when CampaignConfig schema changes in a breaking way. */
-export const CAMPAIGN_FORMAT_VERSION = 1;
+export const CAMPAIGN_FORMAT_VERSION = 2;
 
 export type ChoiceFrequency = "never" | "rarely" | "sometimes" | "often" | "always";
 

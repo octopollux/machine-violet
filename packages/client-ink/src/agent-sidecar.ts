@@ -91,7 +91,9 @@ export async function startAgentSidecar(
 
   const cols = process.stdout.columns || 80;
   const rows = process.stdout.rows || 24;
-  const term = new Terminal({ cols, rows, allowProposedApi: true });
+  // A real TTY turns stdout LF into a new line at column zero. The tee sees
+  // bytes before terminal processing; model that translation in the vterm.
+  const term = new Terminal({ cols, rows, allowProposedApi: true, convertEol: true });
   const serializeAddon = new SerializeAddon();
   term.loadAddon(serializeAddon);
 

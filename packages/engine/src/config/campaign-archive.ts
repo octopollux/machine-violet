@@ -8,15 +8,19 @@
  * All file I/O is binary to preserve git objects and other non-UTF-8 data.
  */
 
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { readFile, writeFile, mkdir, access, readdir, unlink, rmdir, stat } from "node:fs/promises";
 import { norm } from "../utils/paths.js";
 import { zipBinaryFiles, unzipBinaryFiles } from "../utils/archive.js";
 import type { BinaryFileMap } from "../utils/archive.js";
+import { KNOWLEDGE_FILE, type KnowledgeFileIO } from "../knowledge/store.js";
+import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
+import { assertSupportedCampaign, validateConfig } from "../tools/filesystem/config.js";
+import { validateKnowledgeDatabaseBytes } from "../knowledge/validate-database.js";
 
 // --- I/O abstraction (superset of game FileIO, adds binary + stat + recursive ops) ---
 
-export interface ArchiveFileIO {
+export interface ArchiveFileIO extends KnowledgeFileIO {
   readFile(path: string): Promise<string>;
   readBinary(path: string): Promise<Uint8Array>;
   writeFile(path: string, content: string): Promise<void>;
@@ -111,7 +115,8 @@ async function walkAllBinary(
       try {
         const content = await io.readBinary(abs);
         results.push({ relativePath: rel, content });
-      } catch {
+      } catch (error) {
+        if(rel===KNOWLEDGE_FILE) throw new Error("Cannot capture campaign knowledge database",{cause:error});
         // Skip unreadable files
       }
     }
@@ -208,6 +213,10 @@ async function buildAndWriteVerifiedZip(
   archDir: string,
   io: ArchiveFileIO,
 ): Promise<ArchiveResult> {
+  if(io.campaignKnowledge) {
+    const store=await io.campaignKnowledge(campaignPath,{create:false});
+    return store.withSnapshot(()=>buildAndWriteVerifiedZip(campaignPath,zipPath,archDir,{...io,campaignKnowledge:undefined}));
+  }
   // Step 1: Walk all files as binary
   const files = await walkAllBinary(io, campaignPath, "");
   const fileCount = files.length;
@@ -218,6 +227,11 @@ async function buildAndWriteVerifiedZip(
 
   const fileMap: BinaryFileMap = {};
   for (const f of files) fileMap[f.relativePath] = f.content;
+  const manifest=fileMap["config.json"];
+  if(manifest) {
+    const config=JSON.parse(new TextDecoder().decode(manifest)) as {version?:number};
+    if(config.version===2 && !fileMap[KNOWLEDGE_FILE]) return {ok:false,error:"Campaign knowledge database is missing; archive aborted"};
+  }
 
   // Step 2: Zip
   const zipped = zipBinaryFiles(fileMap);
@@ -322,6 +336,10 @@ export async function archiveCampaign(
   io: ArchiveFileIO,
 ): Promise<ArchiveResult> {
   try {
+    if(io.campaignKnowledge) {
+      const store=await io.campaignKnowledge(campaignPath,{create:false});
+      return await store.withSnapshot(()=>archiveCampaign(campaignPath,campaignsDir,{...io,campaignKnowledge:undefined}));
+    }
     const normalizedPath = norm(campaignPath);
     const campaignName = await readCampaignName(normalizedPath, io);
     const safeName = sanitizeFilename(campaignName);
@@ -447,6 +465,16 @@ export async function unarchiveCampaign(
   // Determine campaign directory name from config.json in the archive, or from zip filename
   let campaignName: string | null = null;
   const configBytes = fileMap["config.json"];
+  try {
+    if(!configBytes) throw new Error("Archive is missing config.json");
+    const config = JSON.parse(new TextDecoder().decode(configBytes));
+    assertSupportedCampaign(config);
+    const configErrors = validateConfig(config);
+    if (configErrors.length) throw new Error(`Invalid campaign configuration: ${configErrors.join("; ")}`);
+    const database=fileMap[KNOWLEDGE_FILE];
+    if(!database) throw new Error("Archive has no supported campaign knowledge database");
+    await validateKnowledgeDatabaseBytes(database);
+  } catch(error) { return {ok:false,error:error instanceof Error ? error.message : "Unsupported campaign archive"}; }
   if (configBytes) {
     try {
       const config = JSON.parse(new TextDecoder().decode(configBytes));
@@ -519,8 +547,19 @@ export async function deleteCampaign(
  * rollback chokepoint in tools/git) can construct it without importing the
  * server layer. Tests inject in-memory mocks instead.
  */
-export function createArchiveFileIO(): ArchiveFileIO {
+export function createArchiveFileIO(provider?:KnowledgeFileIO["campaignKnowledge"]): ArchiveFileIO {
+  const stores=new Map<string,SqliteKnowledgeStore>();
   return {
+    campaignKnowledge: provider ?? (async (root) => {
+      const absoluteRoot = resolve(root);
+      const key = process.platform === "win32" ? absoluteRoot.toLowerCase() : absoluteRoot;
+      let store = stores.get(key);
+      if (!store) {
+        store = new SqliteKnowledgeStore(join(absoluteRoot, KNOWLEDGE_FILE), { readOnly: true, create: false });
+        stores.set(key, store);
+      }
+      return store;
+    }),
     readFile: (path: string) => readFile(path, "utf-8"),
     readBinary: (path: string) => readFile(path).then((buf) => new Uint8Array(buf)),
     writeFile: (path: string, content: string) => writeFile(path, content, "utf-8"),

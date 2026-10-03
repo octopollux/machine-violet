@@ -2,9 +2,9 @@
 
 The DM runs on Opus, which is the most expensive model. Every token in the conversation history is paid on every turn. Context management is not just about fitting within limits — it's about cost control. The goal is to keep the conversation as small as possible while preserving the DM's ability to narrate coherently.
 
-## Core Principle: Filesystem Is Memory, Conversation Is Ephemeral
+## Core Principle: Durable Campaign Knowledge, Scene Conversation
 
-The entity filesystem, campaign log, and scene transcripts are the DM's long-term memory. The conversation history is short-term — just the last few exchanges, enough for conversational coherence and tone. If the DM needs to remember something from earlier, it reads a file.
+SQLite campaign knowledge, the campaign log, and scene transcripts provide durable memory. The DM reads canonical facts with `knowledge` and delegates narrative updates to `scribe`; `remember` supports explicit atomic corrections. Conversation accumulates within the current scene.
 
 ## Context Layout
 
@@ -15,10 +15,10 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 │ System prompt: DM identity                     ~800t  │
 │ Tool definitions: all available tools         ~2000t  │
 │ Rules appendix: distilled rule cards          ~1500t  │
-│ PC sheets: verbatim character files            ~2000t  │
+│ PC sheets: rendered canonical records          ~2000t  │
 │ Session recap: "last time..."                  ~300t  │
 │ Campaign summary: log with wikilinks           ~800t  │
-│ Active state: location, PC summaries, alarms  ~1500t  │
+│ Campaign memory: complete condensed scene snapshot   │
 │ Current scene summary: running precis          ~500t  │
 │                                        Total: ~9500t  │
 ├───────────────────────────────────────────────────────┤
@@ -32,6 +32,14 @@ The entity filesystem, campaign log, and scene transcripts are the DM's long-ter
 │ Player's latest message                       ~100t   │
 └───────────────────────────────────────────────────────┘
 ```
+
+### Frozen campaign memory
+
+`SceneManager.prepareKnowledgeContext()` captures the complete condensed knowledge tree once per scene. The tree appears in the cached scene prefix, including empty nested collections, canonical UIDs, typed value structure, and compact descriptors for bulk values. It is never ranked or automatically selected for relevance. `knowledgeSnapshot` and `knowledgeSnapshotScene` persist with scene state, so reload/resume preserves the same bytes. Scribe writes, context refresh, and even 100+ turns cannot replace this tree within the scene. The next scene captures the latest complete tree. The `knowledge:snapshot` diagnostic records its byte and estimated token counts; growth is visible rather than hidden by selection.
+
+A fresh scribe receives the current collection organization and conventions, plus at most eight mentioned canonical records in a bounded 12k-character prefetch, including its heading. Complete names/aliases match narrative handoffs; one-letter aliases do not match inside unrelated words. Records include current fields, visibility, bounded prose, and additional explicit dependencies; derived field edges and child inventories are omitted. Existing approved public descriptions accompany their canonical UID within the same budget, with safe public aliases and handles/lengths for reading truncated names or summaries. No private fallback supplies that approved context. Text length and field count expose remaining pages through `knowledge`; replacing prose or a public description requires reading the full prior text first. This fresh small context is independent of the DM's frozen scene tree. Other prompt blocks retain their existing refresh behavior; the frozen-tree guarantee does not claim the entire system prompt is immutable.
+
+Committed writes atomically enqueue canonical identity/change and dependency notices. After detached work settles, `GameEngine.processInput()` coalesces whole pending notice rows into terse `Memory:` feedback in the next ordinary input. Names, meaningful aliases, and impact UIDs remain recoverable in conversation; candidate impacts require narrative judgment. Only rows delivered into successfully flushed conversation/state are acknowledged. Failed or interrupted turns and failed persistence leave notices queued. Large transactions split outbox rows so delivery can progress over bounded normal-turn batches.
 
 ### Cost mechanics
 
@@ -166,17 +174,15 @@ The DM's input context stays small. Haiku does the reading in its own cheap cont
 Session start:
   → Build cached prefix: system prompt, tools, rules, PC sheets,
     campaign summary, session recap, active state, name-inspiration sample
-  → PC sheets read verbatim from characters/<slug>.md; not refreshed
+  → PC sheets rendered from canonical SQLite records; not refreshed
     again until next session start (stale-vs-disk after scribe edits is
-    accepted — the DM sees its own scribe call in the conversation)
+    accepted — committed identity feedback arrives in conversation)
   → Conversation is empty (or session_resume provides a brief recap)
 
 Each exchange:
+  → Prior detached work settles; committed identity/impact feedback joins input
   → Player input added to conversation
   → DM responds (tool calls + narrative)
-  → If all tool calls are TUI-only (fire-and-forget):
-      → Tool results recorded in conversation history
-      → Acknowledgment API call skipped (saves one Opus round-trip)
   → Exchange recorded in full (tool results preserved)
   → If conversation exceeds max_conversation_tokens:
       → Oldest exchanges dropped until under cap
@@ -194,7 +200,7 @@ Scene transition:
 Context refresh (mid-scene, DM-initiated):
   → Scene precis regenerated from transcript on disk
   → Active state re-read (character sheets, map viewport)
-  → Cached prefix updated (causes one cache miss, then re-cached)
+  → Other refreshed blocks may change the prefix; campaign memory stays frozen
   → Conversation retained as-is
 
 Session end:

@@ -1,6 +1,14 @@
 import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 
+/** A format break is deliberate: older saves must never enter the live engine. */
+export function assertSupportedCampaign(config: unknown): asserts config is CampaignConfig {
+  const version = typeof config === "object" && config !== null ? (config as Record<string,unknown>).version : undefined;
+  if (version !== CAMPAIGN_FORMAT_VERSION) {
+    throw new Error(`Campaign format ${version ?? "unversioned"} is not supported by this release (requires ${CAMPAIGN_FORMAT_VERSION}). Markdown-based campaigns cannot be loaded or converted. Create a new campaign, or open this save with its original release.`);
+  }
+}
+
 /**
  * Validate a campaign config object.
  * Returns an array of error messages (empty = valid).
@@ -13,6 +21,7 @@ export function validateConfig(config: unknown): string[] {
   }
 
   const c = config as Record<string, unknown>;
+  try { assertSupportedCampaign(c); } catch(error) { errors.push(error instanceof Error ? error.message : String(error)); }
 
   if (typeof c.name !== "string" || c.name.length === 0) {
     errors.push("name is required and must be a non-empty string");
@@ -32,6 +41,10 @@ export function validateConfig(config: unknown): string[] {
   } else {
     for (let i = 0; i < c.players.length; i++) {
       const p = c.players[i] as Record<string, unknown>;
+      if (!p || typeof p !== "object" || Array.isArray(p)) {
+        errors.push(`players[${i}] must be an object`);
+        continue;
+      }
       if (typeof p.name !== "string") errors.push(`players[${i}].name is required`);
       if (typeof p.character !== "string")
         errors.push(`players[${i}].character is required`);

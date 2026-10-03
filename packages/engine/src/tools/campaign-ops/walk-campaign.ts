@@ -2,17 +2,11 @@ import type { FileIO } from "../../agents/scene-manager.js";
 import { norm } from "../../utils/paths.js";
 
 export interface CampaignFile {
-  relativePath: string; // e.g. "characters/kael.md"
+  relativePath: string; // e.g. "campaign/scenes/001-gate/transcript.md"
   content: string;
 }
 
-/**
- * Walk all .md files in a campaign directory tree.
- *
- * Walks: characters/, locations/ (with subdirs + index.md), factions/, lore/,
- * campaign/log.md, campaign/scenes/star/transcript.md, campaign/scenes/star/dm-notes.md,
- * campaign/session-recaps/*.md, players/.
- */
+/** Walk narrative Markdown, rule cards and the campaign JSON log. */
 export async function walkCampaignFiles(
   root: string,
   fileIO: FileIO,
@@ -41,40 +35,8 @@ export async function walkCampaignFiles(
     }
   }
 
-  // Walk a directory that may contain subdirs with index.md (like locations/)
-  async function walkWithSubdirs(dir: string, relPrefix: string): Promise<void> {
-    let entries: string[];
-    try {
-      entries = await fileIO.listDir(dir);
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.endsWith(".md")) {
-        const abs = normalizedRoot + "/" + relPrefix + "/" + entry;
-        try {
-          const content = await fileIO.readFile(abs);
-          files.push({ relativePath: relPrefix + "/" + entry, content });
-        } catch {
-          // Skip unreadable
-        }
-      } else if (!entry.includes(".")) {
-        // Likely a subdirectory — recurse
-        await walkWithSubdirs(
-          normalizedRoot + "/" + relPrefix + "/" + entry,
-          relPrefix + "/" + entry,
-        );
-      }
-    }
-  }
-
-  // Top-level entity dirs (flat .md files)
-  for (const dir of ["characters", "factions", "lore", "items"]) {
-    await walkFlat(normalizedRoot + "/" + dir, dir);
-  }
-
-  // Locations (with subdirs containing index.md)
-  await walkWithSubdirs(normalizedRoot + "/locations", "locations");
+  // Metadata is inspected via SQLite; this walker covers narrative and rules only.
+  await walkFlat(normalizedRoot + "/rules", "rules");
 
   // Campaign log (JSON format — expand entries into searchable text)
   try {
@@ -83,14 +45,7 @@ export async function walkCampaignFiles(
     // Provide the raw JSON as content — wikilink scanner handles text matching
     files.push({ relativePath: "campaign/log.json", content: raw });
   } catch {
-    // Try legacy log.md as fallback
-    try {
-      const legacyPath = normalizedRoot + "/campaign/log.md";
-      const content = await fileIO.readFile(legacyPath);
-      files.push({ relativePath: "campaign/log.md", content });
-    } catch {
-      // Missing log is fine
-    }
+    // A fresh campaign may not have a log yet.
   }
 
   // Scene transcripts and dm-notes

@@ -3,6 +3,7 @@ import type { FileIO } from "./scene-manager.js";
 import type { SetupResult } from "./setup-agent.js";
 import type { WorldFile } from "@machine-violet/shared/types/world.js";
 import { norm } from "../utils/paths.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
 
 /** In-memory FileIO keyed by normalized path. Records writes + mkdirs. */
 function mockFileIO(): { io: FileIO; store: Record<string, string>; dirs: Set<string> } {
@@ -100,31 +101,17 @@ describe("materializeWorldContent", () => {
     const { io, store } = mockFileIO();
     await materializeWorldContent(ROOT, richWorld(), io);
 
-    expect(paths(store)).toContain(norm(`${ROOT}/characters/vesper-caine.md`));
-    expect(store[norm(`${ROOT}/characters/vesper-caine.md`)]).toContain("# Vesper Caine");
-    expect(store[norm(`${ROOT}/characters/vesper-caine.md`)]).toContain("A cartographer");
-
-    // The PC-typed entity is deliberately not materialized.
-    expect(paths(store)).not.toContain(norm(`${ROOT}/characters/old-hero.md`));
+    const knowledge=await getCampaignKnowledge(ROOT,io);
+    expect((await knowledge.read("Vesper Caine")).body).toContain("A cartographer");
+    expect(await knowledge.resolve("Old Hero")).toBeNull();
+    expect(paths(store).some(p=>p.includes("characters/"))).toBe(false);
   });
 
-  it("writes locations under their own subdirectory and mkdirs it", async () => {
-    const { io, store, dirs } = mockFileIO();
-    await materializeWorldContent(ROOT, richWorld(), io);
-
-    expect(paths(store)).toContain(norm(`${ROOT}/locations/arcade/index.md`));
-    // slugify strips the leading "The"
-    expect(store[norm(`${ROOT}/locations/arcade/index.md`)]).toContain("# The Arcade");
-    expect(dirs).toContain(norm(`${ROOT}/locations/arcade`));
-  });
-
-  it("writes factions, lore, and items to their category dirs", async () => {
-    const { io, store } = mockFileIO();
-    await materializeWorldContent(ROOT, richWorld(), io);
-
-    expect(paths(store)).toContain(norm(`${ROOT}/factions/reformist-council.md`));
-    expect(paths(store)).toContain(norm(`${ROOT}/lore/cascade.md`));
-    expect(paths(store)).toContain(norm(`${ROOT}/items/cipher-disc.md`));
+  it("materializes locations, factions, lore and items into their default collections", async()=>{
+    const {io}=mockFileIO();await materializeWorldContent(ROOT,richWorld(),io);
+    const knowledge=await getCampaignKnowledge(ROOT,io);
+    for(const name of ["The Arcade","Reformist Council","The Cascade","The Cipher Disc"]) expect(await knowledge.resolve(name)).not.toBeNull();
+    expect((await knowledge.read("The Arcade")).fields.theme).toBe("gothic");
   });
 
   it("writes rule cards verbatim to rules/", async () => {
@@ -195,16 +182,16 @@ describe("materializeWorldContent", () => {
     // Sci-fi branch selected → only the scifi-scoped + universal NPCs.
     const a = mockFileIO();
     await materializeWorldContent(ROOT, scoped, a.io, { wrapper: "scifi" });
-    expect(paths(a.store)).toContain(norm(`${ROOT}/characters/data-archivist.md`));
-    expect(paths(a.store)).toContain(norm(`${ROOT}/characters/always-here.md`));
-    expect(paths(a.store)).not.toContain(norm(`${ROOT}/characters/temple-scribe.md`));
+    expect(await (await getCampaignKnowledge(ROOT,a.io)).resolve("Data Archivist")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(ROOT,a.io)).resolve("Always Here")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(ROOT,a.io)).resolve("Temple Scribe")).toBeNull();
 
     // No selection → scoped entities are withheld; universal still written.
     const b = mockFileIO();
     await materializeWorldContent(ROOT, scoped, b.io);
-    expect(paths(b.store)).toContain(norm(`${ROOT}/characters/always-here.md`));
-    expect(paths(b.store)).not.toContain(norm(`${ROOT}/characters/data-archivist.md`));
-    expect(paths(b.store)).not.toContain(norm(`${ROOT}/characters/temple-scribe.md`));
+    expect(await (await getCampaignKnowledge(ROOT,b.io)).resolve("Always Here")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(ROOT,b.io)).resolve("Data Archivist")).toBeNull();
+    expect(await (await getCampaignKnowledge(ROOT,b.io)).resolve("Temple Scribe")).toBeNull();
   });
 
   it("is a no-op-safe for a minimal seed with no inline content", async () => {
@@ -249,15 +236,18 @@ describe("buildCampaignWorld rich import (wiring)", () => {
     const root = await buildCampaignWorld("/camp", setupResult({ worldSlug: "the-salt-wedding" }), io);
 
     // The live PC from chargen.
-    expect(paths(store)).toContain(norm(`${root}/characters/wren.md`));
+    expect(await (await getCampaignKnowledge(root,io)).resolve("Wren")).not.toBeNull();
     // Seeded NPCs materialized from the world file.
-    expect(paths(store)).toContain(norm(`${root}/characters/maren-holt.md`));
-    expect(paths(store)).toContain(norm(`${root}/characters/dunmore-vane.md`));
+    expect(await (await getCampaignKnowledge(root,io)).resolve("Maren Holt")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(root,io)).resolve("Dunmore Vane")).not.toBeNull();
     // Seeded location, faction, lore, item.
-    expect(paths(store)).toContain(norm(`${root}/locations/tideward-hall/index.md`));
-    expect(paths(store)).toContain(norm(`${root}/factions/house-holt.md`));
-    expect(paths(store)).toContain(norm(`${root}/lore/drowning-pact.md`));
-    expect(paths(store)).toContain(norm(`${root}/items/salt-ring.md`));
+    expect(await (await getCampaignKnowledge(root,io)).resolve("The Tideward Hall")).not.toBeNull();
+    const seededKnowledge = await getCampaignKnowledge(root, io);
+    expect(await seededKnowledge.resolve("The Hall")).toBe(await seededKnowledge.resolve("The Tideward Hall"));
+    expect((await seededKnowledge.read("Maren Holt")).references.map(reference => reference.target)).toContain(await seededKnowledge.resolve("The Tideward Hall"));
+    expect(await (await getCampaignKnowledge(root,io)).resolve("House Holt")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(root,io)).resolve("The Drowning Pact")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(root,io)).resolve("The Salt Ring")).not.toBeNull();
     // Runtime state seeded from maps + calendar.
     expect(paths(store)).toContain(norm(`${root}/state/maps.json`));
     expect(paths(store)).toContain(norm(`${root}/state/clocks.json`));
@@ -270,8 +260,8 @@ describe("buildCampaignWorld rich import (wiring)", () => {
     const root = await buildCampaignWorld("/camp", setupResult({ campaignName: "Custom Tale" }), io);
 
     // Chargen PC and scaffold exist, but no seeded NPCs.
-    expect(paths(store)).toContain(norm(`${root}/characters/wren.md`));
-    expect(paths(store)).not.toContain(norm(`${root}/characters/maren-holt.md`));
+    expect(await (await getCampaignKnowledge(root,io)).resolve("Wren")).not.toBeNull();
+    expect(await (await getCampaignKnowledge(root,io)).resolve("Maren Holt")).toBeNull();
     expect(paths(store)).not.toContain(norm(`${root}/state/maps.json`));
   });
 });

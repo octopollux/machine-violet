@@ -7,6 +7,7 @@ import { norm } from "../utils/paths.js";
 import { resetPromptCache } from "../prompts/load-prompt.js";
 import { loadModelConfig } from "../config/models.js";
 import { createObjectivesState } from "../tools/objectives/index.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
 
 // --- Mocks ---
 
@@ -276,8 +277,6 @@ describe("ResolveSession", () => {
   });
 
   it("handles read_character_sheet tool", async () => {
-    files[norm("/tmp/test-campaign/characters/Kael.md")] = "# Kael\nHP: 35\nSTR: +3";
-
     const provider = mockProvider([
       ...toolAndTextResults(
         "read_character_sheet",
@@ -292,16 +291,21 @@ describe("ResolveSession", () => {
     const fileIO = mockFileIO();
     const state = mockState();
 
+    const store = await getCampaignKnowledge(state.campaignRoot, fileIO);
+    const details = "Feature detail ".repeat(100);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael", fields: { HP: 35, STR: 3, conscious: true, features: details }, body: "Sheet introduction\n" + "x".repeat(9000) + "\nFinal ability" }]);
+
     const session = new ResolveSession(provider, fileIO, state, "claude-sonnet-4-6");
     await session.initCombat("stats", "rules");
 
     const result = await session.resolve({ actor: "Kael", action: "Check stats" });
     expect(result.narrative).toBe("Checked sheet.");
 
-    // Verify the character sheet was read. campaignPaths.character slugifies
-    // the name defensively, so "Kael" → "kael.md" on disk.
-    expect(fileIO.readFile).toHaveBeenCalledWith(
-      expect.stringContaining("kael.md"),
-    );
+    const calls = JSON.stringify(vi.mocked(provider.chat).mock.calls);
+    expect(calls).toContain('Final ability');
+    expect(calls).toContain(details);
+    expect(calls).toContain('conscious');
+    expect(calls).toContain('35');
+    expect(fileIO.readFile).not.toHaveBeenCalled();
   });
 });

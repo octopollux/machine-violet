@@ -1,6 +1,6 @@
 # Campaign Explorer
 
-Real-time web viewer for Machine Violet campaign data. Browse entity files, state JSON, transcripts, and context dumps as they're written during gameplay.
+Privileged local, read-only viewer for Machine Violet campaign data. Browse the SQLite logical knowledge tree by stable UID, state JSON, transcripts, and context dumps during gameplay or with the engine stopped. It includes private DM knowledge; it is not a player-facing service.
 
 ## Quick Start
 
@@ -22,6 +22,14 @@ The server finds campaigns in this order:
 3. Platform default: `~/Documents/.machine-violet/campaigns`
 
 Each subdirectory containing a `config.json` is treated as a campaign.
+
+Knowledge inspection requires the supported campaign format and an existing initialized `knowledge.sqlite`; old Markdown saves and unsupported versions fail with an error rather than being converted or repaired. Read-only store handles are closed after each request. The viewer does not create missing databases or change campaign files.
+
+## Logical knowledge view
+
+The tree merges physical debug/state files with `knowledge/<UID>.json` virtual entries. Labels show collection paths and names; identity remains the UID across rename/move, including duplicate names. Collections are arbitrary and nested. JSON shows typed values, private bodies, explicit references, and logs; large text/log records are read in bounded pages. Raw SQLite files and journal/WAL/SHM sidecars are excluded from the tree and blocked by file routes.
+
+On database changes, the server compares read-only per-node fingerprints, including logical paths. It emits ordinary `file-change` SSE events keyed to each changed UID with the current entry, or an unlink when deleted. The selected UID refreshes; other changed nodes receive update dots. These are committed-state revisions observed from disk; rapid commits can coalesce into one observed diff, not an audit-event stream. A renamed ancestor also refreshes descendants' path labels.
 
 ## Architecture
 

@@ -7,6 +7,9 @@
  */
 
 import { dirname } from "node:path";
+import { assertSupportedCampaign, validateConfig } from "../filesystem/config.js";
+import { getCampaignKnowledge, KNOWLEDGE_FILE, type KnowledgeFileIO } from "../../knowledge/store.js";
+import { validateKnowledgeDatabaseBytes } from "../../knowledge/validate-database.js";
 import {
   snapshotCampaign,
   createArchiveFileIO,
@@ -47,6 +50,7 @@ export interface GitIO {
   pruneUnreachable(dir: string): Promise<number>;
   statusMatrix(dir: string): Promise<[string, number, number, number][]>;
   listFiles(dir: string): Promise<string[]>;
+  readFileAtCommit?(dir:string,oid:string,path:string):Promise<Uint8Array>;
 }
 
 const AUTHOR = { name: "machine-violet", email: "machine-violet@local" };
@@ -71,6 +75,8 @@ export class CampaignRepo {
    * before stageAll() reads the filesystem.
    */
   preCommitHook: (() => Promise<void>) | null = null;
+  snapshotHook: (<T>(capture:()=>Promise<T>)=>Promise<T>) | null = null;
+  restoreHook: (<T>(restore:()=>Promise<T>)=>Promise<T>) | null = null;
 
   constructor(params: {
     dir: string;
@@ -228,6 +234,15 @@ export class CampaignRepo {
     if (!targetCommit) {
       throw new Error(`Rollback target not found: ${target}`);
     }
+    if (this.git.readFileAtCommit) {
+      const configBytes = await this.git.readFileAtCommit(this.dir, targetCommit.oid, "config.json");
+      const config = JSON.parse(new TextDecoder().decode(configBytes));
+      assertSupportedCampaign(config);
+      const configErrors = validateConfig(config);
+      if (configErrors.length) throw new Error(`Invalid campaign configuration: ${configErrors.join("; ")}`);
+      const database = await this.git.readFileAtCommit(this.dir, targetCommit.oid, KNOWLEDGE_FILE);
+      await validateKnowledgeDatabaseBytes(database);
+    }
 
     // Safety checkpoint — preserves current state for recovery.
     // Note: this checkpoint becomes dangling after the reset and will be pruned.
@@ -235,10 +250,12 @@ export class CampaignRepo {
     await this.commitIfDirty("checkpoint: before rollback");
 
     // Hard-reset: move branch to target, making everything after it dangling
-    await this.git.resetTo(this.dir, targetCommit.oid);
-
-    // Clean up dangling objects (old commits, trees, blobs)
-    await this.git.pruneUnreachable(this.dir);
+    const restore = async () => {
+      await this.git.resetTo(this.dir, targetCommit.oid);
+      await this.git.pruneUnreachable(this.dir);
+    };
+    if (this.restoreHook) await this.restoreHook(restore);
+    else await restore();
 
     return {
       restoredTo: targetCommit.oid,
@@ -275,6 +292,10 @@ export class CampaignRepo {
   private async stageAll(): Promise<void> {
     // Flush any pending I/O so state files are on disk before we read the filesystem
     await this.preCommitHook?.();
+    if (this.snapshotHook) await this.snapshotHook(() => this.stageFiles());
+    else await this.stageFiles();
+  }
+  private async stageFiles(): Promise<void> {
     const matrix = await this.git.statusMatrix(this.dir);
     for (const [filepath, head, workdir, stage] of matrix) {
       // Skip .debug/ — context dumps are diagnostic and may be locked
@@ -282,7 +303,10 @@ export class CampaignRepo {
       if (workdir === 0 && head !== 0) {
         // File deleted from workdir — stage the removal
         await this.git.remove(this.dir, filepath);
-      } else if (workdir !== stage || head !== workdir) {
+      } else if (filepath === KNOWLEDGE_FILE || workdir !== stage || head !== workdir) {
+        // SQLite rewrites pages in place and often keeps the file size. Always
+        // hash its closed snapshot; coarse Windows stat timestamps are not a
+        // reliable dirty signal for successive database transactions.
         // File added or modified — stage it
         await this.git.add(this.dir, filepath);
       }
@@ -372,7 +396,7 @@ function formatLocalTime(epochSeconds: number): string {
 
 // --- FileIO subset needed for pruneEmptyDirs ---
 
-interface PruneFileIO {
+interface PruneFileIO extends KnowledgeFileIO {
   exists(path: string): Promise<boolean>;
   listDir(path: string): Promise<string[]>;
   rmdir?(path: string): Promise<void>;
@@ -401,7 +425,9 @@ export async function performRollback(
   archiveIO: ArchiveFileIO = createArchiveFileIO(),
   campaignsDir: string = dirname(campaignRoot),
 ): Promise<RollbackResult> {
-  const backup = await snapshotCampaign(campaignRoot, campaignsDir, archiveIO, { label: "pre-rollback" });
+  await repo.preCommitHook?.();
+  const capture=()=>snapshotCampaign(campaignRoot,campaignsDir,{...archiveIO,campaignKnowledge:undefined},{label:"pre-rollback"});
+  const backup = fileIO.campaignKnowledge ? await (await getCampaignKnowledge(campaignRoot,fileIO)).withSnapshot(capture) : await capture();
   if (!backup.ok) {
     throw new Error(`Rollback aborted — pre-rollback backup failed: ${backup.error}`);
   }

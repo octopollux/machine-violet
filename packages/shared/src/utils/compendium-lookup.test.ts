@@ -23,6 +23,18 @@ function sample(): Compendium {
 }
 
 describe("findCompendiumEntryBySlug", () => {
+  it("navigates arbitrary collections by stable UID and approved aliases, refusing ambiguous names", () => {
+    const compendium = sample();
+    compendium.collections = { "Rituals/Arcane": [
+      { ...entry("Lantern", "k1"), uid: "k1", aliases: ["Old Flame"] },
+      { ...entry("Lantern", "k2"), uid: "k2" },
+    ] };
+    expect(findCompendiumEntryBySlug(compendium, "k1")?.category).toBe("Rituals/Arcane");
+    expect(findCompendiumEntryBySlug(compendium, "old-flame")?.entry.uid).toBe("k1");
+    expect(findCompendiumEntryBySlug(compendium, "lantern")).toBeNull();
+    expect(collectCompendiumSlugs(compendium).has("lantern")).toBe(false);
+    expect(findCompendiumEntryBySlug(compendium, "mira")).toBeNull();
+  });
   it("finds an entry across categories", () => {
     const compendium = sample();
     const result = findCompendiumEntryBySlug(compendium, "captain-voss");
@@ -74,6 +86,7 @@ describe("collectCompendiumSlugs", () => {
         "mira",
         "captain-voss",
         "the-undercroft",
+        "undercroft",
         "crystal-dagger",
         "crystal-prophecy",
         "find-the-artifact",

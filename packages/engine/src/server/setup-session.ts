@@ -17,8 +17,7 @@ import { buildCampaignWorld } from "../agents/world-builder.js";
 import { createBaseFileIO } from "./fileio.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import { norm, configDir } from "../utils/paths.js";
-import { slugify } from "../agents/world-builder.js";
-import { campaignPaths, machinePaths } from "../tools/filesystem/scaffold.js";
+import { machinePaths } from "../tools/filesystem/scaffold.js";
 import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatter.js";
 import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -33,6 +32,8 @@ import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CampaignRepo } from "../tools/git/campaign-repo.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import type { KnowledgeValue } from "@machine-violet/shared/types/knowledge.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { logEvent } from "../context/engine-log.js";
 
@@ -62,6 +63,9 @@ export class SetupSession {
   private homeDir: string;
   private fileIO: FileIO;
   private started = false;
+  private disposing = false;
+  private disposal?: Promise<void>;
+  private activeWork = new Set<Promise<unknown>>();
 
   constructor(
     campaignsDir: string,
@@ -112,10 +116,25 @@ export class SetupSession {
    * codex subprocess is disposed exactly once even if two tiers point at
    * it.
    */
-  async dispose(): Promise<void> {
+  dispose(): Promise<void> {
+    if (!this.disposal) {
+      this.disposing = true;
+      this.disposal = this.doDispose();
+    }
+    return this.disposal;
+  }
+
+  private trackWork<T>(run: () => Promise<T>): Promise<T> {
+    if (this.disposing) return Promise.reject(new Error("Setup session has been disposed"));
+    const work = run();
+    this.activeWork.add(work);
+    return work.finally(() => this.activeWork.delete(work));
+  }
+
+  private async doDispose(): Promise<void> {
     const providers = Array.from(this.providersByConnectionId.values());
     this.providersByConnectionId.clear();
-    await Promise.all(providers.map(async (p) => {
+    await this.awaitDisposal(Promise.all(providers.map(async (p) => {
       if (!p.dispose) return;
       try {
         await p.dispose();
@@ -125,7 +144,22 @@ export class SetupSession {
           message: err instanceof Error ? err.message : String(err),
         });
       }
-    }));
+    })), "providers");
+    await this.awaitDisposal(Promise.allSettled([...this.activeWork]), "active setup work");
+    await this.fileIO.closeKnowledgeStores?.();
+  }
+
+  private async awaitDisposal(work: Promise<unknown>, phase: string): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([work, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Setup ${phase} disposal timeout`)), 10_000);
+      })]);
+    } catch (error) {
+      logEvent("setup:dispose_error", { phase, message: error instanceof Error ? error.message : String(error) });
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   /** Scan machine-scope players directory for returning player recognition. */
@@ -161,7 +195,9 @@ export class SetupSession {
   }
 
   /** Start the setup conversation. Streams opening narrative to clients. */
-  async start(): Promise<void> {
+  start(): Promise<void> { return this.trackWork(() => this.doStart()); }
+
+  private async doStart(): Promise<void> {
     const knownPlayers = await this.scanKnownPlayers();
     const paths = machinePaths(this.homeDir);
     // The __setup__ scratch campaign is materialized by SessionManager
@@ -201,7 +237,9 @@ export class SetupSession {
   }
 
   /** Send player input to the setup conversation. */
-  async send(text: string): Promise<{ finalized?: string; campaignName?: string }> {
+  send(text: string): Promise<{ finalized?: string; campaignName?: string }> { return this.trackWork(() => this.doSend(text)); }
+
+  private async doSend(text: string): Promise<{ finalized?: string; campaignName?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
@@ -220,7 +258,9 @@ export class SetupSession {
   }
 
   /** Resolve a choice selection. */
-  async resolveChoice(selectedText: string): Promise<{ finalized?: string; campaignName?: string }> {
+  resolveChoice(selectedText: string): Promise<{ finalized?: string; campaignName?: string }> { return this.trackWork(() => this.doResolveChoice(selectedText)); }
+
+  private async doResolveChoice(selectedText: string): Promise<{ finalized?: string; campaignName?: string }> {
     if (!this.conversation) throw new Error("Setup not started");
 
     this.emitThinking();
@@ -365,12 +405,12 @@ export class SetupSession {
   }
 
   private async buildInitialSheet(campaignRoot: string, result: SetupResult): Promise<void> {
-    const charSlug = slugify(result.characterName);
-    const charPath = norm(campaignPaths(campaignRoot).character(charSlug));
+    const knowledge = await getCampaignKnowledge(campaignRoot,this.fileIO);
 
     let stub: string;
     try {
-      stub = await this.fileIO.readFile(charPath);
+      const node=await knowledge.read(result.characterName,{textLimit:100000,logLimit:1000});
+      stub = serializeEntity(node.name,node.fields,node.body,[]);
     } catch {
       return;
     }
@@ -400,8 +440,7 @@ export class SetupSession {
         const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
         frontMatter.sheet_status = "complete";
         const title = String(frontMatter._title ?? result.characterName);
-        const tagged = serializeEntity(title, frontMatter, body, changelog);
-        await this.fileIO.writeFile(charPath, tagged);
+        await knowledge.mutate([{op:"patch",uid:result.characterName,name:title,fields:frontMatter as Record<string,KnowledgeValue>,body},...changelog.map(entry=>({op:"append_log" as const,uid:result.characterName,body:entry}))],{source:"setup-sheet"});
       }
     } catch {
       // Best-effort — stub is still valid

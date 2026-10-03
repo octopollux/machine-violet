@@ -4,6 +4,7 @@ import { TreeCategory } from "./TreeCategory";
 
 interface FileTreeProps {
   groups: GroupedTree[];
+  error?: string | null;
   selectedFile: string | null;
   updatedItems: Set<string>;
   campaignSlug: string;
@@ -13,12 +14,14 @@ interface FileTreeProps {
 
 export function FileTree({
   groups,
+  error,
   selectedFile,
   updatedItems,
   campaignSlug,
   onSelectFile,
   lastFileChange,
 }: FileTreeProps) {
+  if (error) return <div className="loading">{error}</div>;
   if (groups.length === 0) {
     return <div className="loading">No files found</div>;
   }

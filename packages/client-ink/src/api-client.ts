@@ -180,12 +180,16 @@ export class ApiClient {
     return this.fetch("/session/settings", { method: "PATCH", body: settings });
   }
 
-  async getCharacterSheet(name: string): Promise<{ name: string; content: string }> {
+  async getCharacterSheet(name: string): Promise<{ uid?: string; name: string; content: string; collection?: string }> {
     return this.get(`/session/character/${encodeURIComponent(name)}`);
   }
 
   async getCompendium(): Promise<{ data: unknown }> {
     return this.get("/session/compendium");
+  }
+
+  async getKnowledgeRecord(uid: string): Promise<{ uid?: string; name: string; content: string; collection?: string }> {
+    return this.get(`/session/knowledge/${encodeURIComponent(uid)}`);
   }
 
   async getNotes(): Promise<{ content: string }> {

@@ -86,6 +86,7 @@ async function listLooseObjects(dir: string): Promise<string[]> {
 
 export function createGitIO(): GitIO {
   return {
+    async readFileAtCommit(dir,oid,path) { return (await git.readBlob({fs,dir,oid,filepath:path})).blob; },
     async init(dir) {
       await git.init({ fs, dir });
     },

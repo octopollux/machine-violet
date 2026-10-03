@@ -1,6 +1,6 @@
 # Campaign Format Specification
 
-Version: **1**
+Version: **2**
 
 This document defines the on-disk format for a Machine Violet campaign. It is the canonical reference for any tool that reads, writes, repairs, exports, or migrates campaign state. A conforming implementation can construct a campaign directory from scratch that loads and plays in the engine.
 
@@ -28,22 +28,13 @@ In TypeScript, these map to: value = present, `null` = explicit-empty, `undefine
 
 All text files are UTF-8 with LF line endings. JSON files use 2-space indentation (`JSON.stringify(data, null, 2)`). Markdown files end with a trailing newline.
 
-### 1.3 Slugs
+### 1.3 Identity and references
 
-Entity slugs are kebab-case: lowercase ASCII, hyphens for spaces, no special characters. Example: `"Marta Voss"` → `marta-voss`. Slugs are used as filenames and directory names.
+Campaign knowledge uses stable short UIDs, not entity filenames. Display names and aliases resolve globally; organizational collections use UID or exact nested paths. Structural `{$ref:"UID"}` values and labeled edges establish dependencies. Prose wikilinks do not imply graph edges. Scene/session directory slugs retain their existing conventions.
 
-### 1.4 Wikilinks
+### 1.4 Versioning
 
-Every entity mention in transcripts, changelogs, and campaign logs is a wikilink. Two syntaxes are valid:
-
-- **Relative path:** `[Display Name](../characters/marta-voss.md)` — used in entity files (relative to the file's location).
-- **Double-bracket:** `[[Marta Voss]]` — used in transcripts, campaign logs, and DM notes. Resolved against the entity tree at runtime.
-
-Dead links (wikilinks to entities that don't have files yet) are valid. They represent entities that exist in fiction but haven't been detailed.
-
-### 1.5 Versioning
-
-`config.json` carries a `version` field (currently `1`). State files do not carry independent version fields — they are versioned implicitly by the campaign format version in `config.json`. A tool reading a campaign should check `config.json.version` first.
+`config.json.version` must equal `2`; `knowledge.sqlite` has SQLite `user_version=1`. Check both before loading, repairing or mutating a save. Unversioned, Markdown-based version 1 and unknown future saves fail cleanly. No compatibility or migration is provided. Source `.mvworld` version 1 and DM seeds are unchanged and are not campaign saves.
 
 ---
 
@@ -53,67 +44,40 @@ A campaign is a single directory with this layout:
 
 ```
 campaign-root/
-├── config.json                         # Campaign configuration (§3)
-├── pending-operation.json              # Crash recovery breadcrumb (§4.11)
-│
-├── campaign/
-│   ├── log.json                        # Structured campaign log (§5.1)
-│   ├── compendium.json                 # Player-facing knowledge base (§5.2)
-│   ├── dm-notes.md                     # Campaign-wide DM scratchpad (plain markdown)
-│   ├── player-notes.md                 # Campaign-wide player notes (plain markdown)
-│   ├── scenes/
-│   │   └── NNN-slug/                   # Per-scene directory (§5.3)
-│   │       ├── transcript.md           # Scene transcript (§5.4)
-│   │       ├── summary.md             # Scene summary (plain markdown)
-│   │       └── dm-notes.md            # Scene-specific DM notes (plain markdown)
-│   └── session-recaps/
-│       ├── session-NNN.md              # Bullet-list session recap
-│       └── session-NNN-narrative.md    # Narrative recap (player-facing)
-│
-├── characters/                         # Character entities (§6)
-│   ├── character-slug.md
-│   └── party.md                        # Party composition file
-├── locations/                          # Location entities (§6)
-│   └── location-slug/
-│       ├── index.md                    # Location entity file
-│       └── map-id.json                # Map data (§4.3)
-├── factions/                           # Faction entities (§6)
-│   └── faction-slug.md
-├── lore/                               # Lore entities (§6)
-│   └── lore-slug.md
-├── items/                              # Item entities (§6)
-│   └── item-slug.md
-├── rules/                              # Rule cards (copied from system templates)
-│   └── rule-card-slug.md
-│
-├── state/                              # Runtime state (§4)
-│   ├── combat.json
-│   ├── clocks.json
-│   ├── maps.json
-│   ├── decks.json
-│   ├── objectives.json
-│   ├── scene.json
-│   ├── conversation.json
-│   ├── ui.json
-│   ├── usage.json
-│   ├── resources.json
-│   └── display-log.md
-│
-└── .git/                               # Local git repository (isomorphic-git)
++-- config.json                         Campaign configuration; version 2.
++-- knowledge.sqlite                    Typed knowledge and player projection.
++-- pending-operation.json              Crash recovery breadcrumb.
++-- state/                              Existing runtime slice formats.
+|   +-- combat.json, clocks.json, maps.json, decks.json, objectives.json
+|   +-- scene.json, conversation.json, ui.json, usage.json, resources.json
+|   +-- display-log.md
++-- campaign/
+|   +-- log.json                        Structured campaign record.
+|   +-- player-notes.md
+|   +-- scenes/NNN-slug/transcript.md, summary.md, dm-notes.md
+|   +-- session-recaps/session-NNN.md, session-NNN-narrative.md
++-- characters/                         Optional portrait/media assets.
++-- rules/rule-card-slug.md              Unchanged system rule cards.
 ```
 
 ### 2.1 Naming Conventions
 
 - **Scene directories:** 3-digit zero-padded number + hyphen + slug. Example: `001-tavern-meeting`.
+
 - **Session recaps:** `session-` + 3-digit zero-padded number. Example: `session-001.md`.
-- **Locations** are the only entities that use subdirectories (to co-locate map JSON files). All other entity types are flat files in their category directory.
-- **Entity filenames** are slugified entity names. No filename prefixes for subtypes — type lives in front matter, not the filename.
+
+- Knowledge collections organize arbitrary nested records; stable UIDs survive moves.
+
+
 
 ### 2.2 Required vs Optional Files
 
 A minimal valid campaign requires:
+
 - `config.json`
-- `characters/` with at least one character file
+
+- `knowledge.sqlite` with a valid root, collections and player-character record
+
 - All directories from the scaffold (may be empty)
 
 Everything else is created during play.
@@ -125,9 +89,8 @@ Everything else is created during play.
 ```jsonc
 {
   // Manifest
-  "version": 1,                           // Required. Campaign format version.
+  "version": 2,                           // Required. Campaign format version.
   "createdAt": "2026-04-07T12:00:00Z",    // ISO 8601 timestamp.
-
   // Identity
   "name": "The Sunken Citadel",           // Required. Campaign display name.
   "system": "dnd-5e",                     // System slug (matches systems/<slug>/).
@@ -146,7 +109,6 @@ Everything else is created during play.
   "setup_handoff": "Player wants to...",  // Optional. Postcard from the setup agent for the DM's first-turn priming. Injected once.
   "opening_scene": "Open with the PC...",  // Optional. One-sentence opening-scene directive the setup agent composes at finalize — where/how the DM opens turn 1
                                           // (a character-grounded beat, not the main objective). Injected once into first-turn priming alongside setup_handoff.
-
   // DM personality
   "dm_personality": {
     "name": "The Warden",                 // Required. Display name.
@@ -154,7 +116,6 @@ Everything else is created during play.
     "prompt_fragment": "You are...",      // Required. Injected into DM system prompt.
     "detail": "Hidden tuning notes..."    // DM-only detail block.
   },
-
   // Players — the PC roster. Normally written once at creation, but the
   // `swap_pc` tool may rewrite a slot's `character`/`color`/`name` in-session
   // (a PC handoff) and persists config.json so it survives reload.
@@ -169,7 +130,6 @@ Everything else is created during play.
       "age_group": "adult"                // "child" | "teenager" | "adult"
     }
   ],
-
   // Combat configuration
   "combat": {
     "initiative_method": "d20_dex",       // "d20_dex" | "card_draw" | "fiction_first" | "custom"
@@ -177,30 +137,25 @@ Everything else is created during play.
     "round_structure": "individual",      // "individual" | "side" | "popcorn"
     "surprise_rules": true                // Whether surprise mechanics apply.
   },
-
   // Context window management
   "context": {
     "retention_exchanges": 100,           // Max exchanges retained in conversation window.
     "max_conversation_tokens": 0,         // 0 = disabled (recommended). Token cap for conversation.
     "campaign_log_budget": 15000          // Token budget for campaign log in DM prefix.
   },
-
   // Git recovery
   "recovery": {
     "auto_commit_interval": 1,            // Exchanges between auto-commits. 1 = commit every turn (default).
     "max_commits": 100,                   // Pruning threshold.
     "enable_git": true                    // Whether git snapshots are active.
   },
-
   // Choice presentation
   "choices": {
     "campaign_default": "never",          // "never" | "rarely" | "sometimes" | "often" | "always" — 5-step probability. "none" is still accepted as a legacy alias for "never".
     "player_overrides": {}                // Per-player overrides (same enum), keyed by character name.
   },
-
   // Display
   "calendar_display_format": null,        // Freeform format hint for calendar display.
-
   // DM prose-length tuning
   "dm_turn_length_pct": 80                // Optional. Multiplier (in percent) applied to the
                                           // narrative-row count reported to the DM in each turn's
@@ -209,7 +164,6 @@ Everything else is created during play.
                                           // tracking still uses the real row count. Range 50–150 in
                                           // 5% steps; default 80. Editable from the in-game Campaign
                                           // Settings modal (Esc → Settings).
-
   // Image generation consent
   "image_generation": "on"                // Optional. "on" | "off" | "unset".
                                           // Player consent for inline image generation. Set by the
@@ -225,7 +179,6 @@ Everything else is created during play.
                                           // field is silently ignored. Reversible at any time from the
                                           // in-game Campaign Settings modal's "Image Generation"
                                           // toggle (Esc → Settings; persisted via PATCH /settings).
-
   // Image generation cadence
   "image_cadence_per_100": 8              // Optional. Target number of DM-initiated images per 100
                                           // player exchanges, surfaced to the DM as soft guidance
@@ -236,7 +189,6 @@ Everything else is created during play.
                                           // and don't count against it. Range 0–50; default 8. Only
                                           // meaningful when image generation is enabled. Editable via
                                           // config.json.
-
   // Mechanics handling (light systems only)
   "mechanics_mode": "dm-managed"          // Optional. "dm-managed" | "player-facing".
                                           // How the active LIGHT system's mechanics are surfaced. The
@@ -405,6 +357,8 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
 
 ```jsonc
 {
+  "sceneNumber": 3,                       // Durable current scene identity.
+  "slug": "goblin-negotiation",
   "precis": "The party is negotiating with the goblin chief...",
   "openThreads": "Who poisoned the well? Where is the stolen relic?",
   "npcIntents": "Chief Grukk is stalling for time while scouts flank.",
@@ -415,11 +369,17 @@ All maps, keyed by map ID. Also written individually to `locations/<slug>/<mapId
       "offScript": false
     }
   ],
-  "activePlayerIndex": 0                  // Index into config.players array.
+  "activePlayerIndex": 0,                 // Index into config.players array.
+  "knowledgeSnapshot": "k0001 Characters...", // Frozen tree for this scene, or null.
+  "knowledgeSnapshotScene": 3             // Scene owning that snapshot, or null.
 }
 ```
 
 `openThreads`, `npcIntents`, and `precis` follow null semantics: `null` = explicitly cleared (e.g., after scene transition), absent = never assessed.
+
+The saved scene identity owns its frozen knowledge snapshot; resume never infers the current scene solely from the last transcript folder. `pending-operation.json` records a unique `transitionId`, cascade step, exact generated summary/changelog/publication proposals, and (when advancing time) the exact resulting clocks. These proposals are persisted before effects. Required histories and optional public publication use separate SQLite receipts; optional malformed publication rolls back independently. Campaign log entries include that transition ID and are upserted by instance on retry. A `done` pending marker remains until the successor identity, frozen snapshot and cleared conversation are durably saved; a partially saved successor clears old conversation again during completion recovery.
+
+Earlier format-2 saves without identity infer a successor only with an explicitly empty conversation, a completed campaign-log entry/summary and no pending cascade. An ambiguous active conversation retains its prior scene and snapshot until an intentional transition establishes durable identity. Source Markdown saves remain unsupported.
 
 ### 4.7 Conversation (`state/conversation.json`)
 
@@ -519,14 +479,23 @@ Lives at the campaign root (not in `state/`). Present only during an in-progress
 ```
 
 **Step order** (each step is idempotent and safe to re-run):
+
 1. `finalize_transcript` — write transcript to scene directory
+
 2. `subagent_updates` — campaign log, changelog, compendium (parallel)
+
 3. `advance_calendar` — tick the calendar clock
+
 4. `check_alarms` — fire any triggered alarms
+
 5. `validate` — run campaign validation
+
 6. `reset_precis` — clear scene state for the new scene
+
 7. `prune_context` — clear conversation window
+
 8. `checkpoint` — git commit
+
 9. `done` — clear this file
 
 ### 4.12 Display Log (`state/display-log.md`)
@@ -534,6 +503,7 @@ Lives at the campaign root (not in `state/`). Present only during an in-progress
 Append-only rolling markdown log of human-readable engine activity. Each line is a rendered narrative or system event. Never cleared — grows for the lifetime of the campaign. Used to populate backscroll on session resume and for transcript export.
 
 Most entries are plain text. Durable machine-readable facts are interleaved as
+
 invisible, versioned transcript-metadata events:
 
 ```text
@@ -543,26 +513,43 @@ invisible, versioned transcript-metadata events:
 The decoded event is one of:
 
 - `state_checkpoint` — full `modelines`, `displayResources` (per-character
+
   resource keys), and `resourceValues` maps after a successful gameplay turn.
+
   Full snapshots make each checkpoint independently useful without replaying
+
   deltas.
+
 - `choices_presented` — stable ID, source (`present_choices` or
+
   `suggestion_generator`), prompt, ordered choices, and optional descriptions,
+
   all preserved verbatim including formatting tags.
+
 - `choice_resolved` — presentation ID, player, plain contribution text, and
+
   either the selected zero-based option index or `custom`.
 
 The marker is an HTML comment so Markdown readers do not display it; the TUI
+
 parser consumes it as a zero-height transcript entry. HTML transcript export
+
 folds these events into the non-rendering
+
 `machine-violet-transcript-metadata` JSON script block, with `checkpoints` and
+
 joined `choices` arrays. Unanswered or superseded presentations export with a
+
 null resolution. Malformed reserved markers are ignored rather than shown as
+
 narration. On the first resume of a campaign without state-checkpoint metadata,
+
 the engine appends one compatibility baseline at the end of its legacy
+
 history.
 
 All other lines remain human-readable and intentionally informal; consumers
+
 should only parse the explicitly versioned metadata markers.
 
 ---
@@ -588,49 +575,25 @@ Structured scene-by-scene record of campaign events. Player-safe (no DM secrets)
 ```
 
 - `full`: Bullet-list summary with wikilinks. May be multi-line (joined with `\n`).
+
 - `mini`: Dense one-liner, max 128 characters. Preserves only critical wikilinks.
+
 - Entries are ordered by `sceneNumber` (ascending).
 
-### 5.2 Compendium (`campaign/compendium.json`)
+### 5.2 Player Knowledge
 
-Player-facing knowledge base. Updated by a Haiku subagent at scene transitions.
-
-```jsonc
-{
-  "version": 1,
-  "lastUpdatedScene": 5,
-  "characters": [
-    {
-      "name": "Old Brennan",
-      "slug": "old-brennan",
-      "aliases": ["The Hermit"],          // Optional alternative names.
-      "summary": "A reclusive hermit who knows the Thornwood's secrets.",
-      "firstScene": 1,
-      "lastScene": 5,
-      "related": ["thornwood", "missing-scouts"]
-    }
-  ],
-  "places": [],
-  "items": [],
-  "storyline": [],
-  "lore": [],
-  "objectives": []
-}
-```
-
-**Categories:** `characters`, `places`, `items`, `storyline`, `lore`, `objectives`.
-
-All category arrays use the same `CompendiumEntry` structure. `related` contains slugs of related entries across any category.
-
-Every `slug` must equal `slugify(name)` (see [`packages/shared/src/utils/slug.ts`](../packages/shared/src/utils/slug.ts)) — leading articles `the`/`a`/`an` are stripped, so "The City" gets the slug `city`, not `the-city`. Slugs in `related[]` follow the same rule. The engine canonicalizes compendiums on read and after each subagent update, so older saves with article-retaining slugs migrate transparently.
+The player-facing projection lives beneath `Player Knowledge` in `knowledge.sqlite`, with arbitrary categories, disclosed summaries and explicit links to canonical identities. It starts empty; private seed content is not copied into it. Legacy `campaign/compendium.json` is not a campaign knowledge store.
 
 ### 5.3 Scene Directories
 
 Scene directories live under `campaign/scenes/` and are named `NNN-slug` where NNN is the 3-digit zero-padded scene number and slug is a kebab-case summary.
 
 Contents:
+
 - `transcript.md` — Finalized scene transcript (§5.4). Always present after scene transition.
+
 - `summary.md` — Scene summary generated by the summarizer subagent. Plain markdown with wikilinks.
+
 - `dm-notes.md` — Optional DM-only notes for the scene.
 
 ### 5.4 Transcript Format
@@ -639,23 +602,23 @@ Transcripts are plain markdown with a heading and alternating player/DM turns:
 
 ```markdown
 # Scene 1
-
 **[Marta Voss]** I approach the bar and ask about the missing scouts.
-
 **DM:** The bartender sets down her rag and fixes you with a look. "You're the third person to ask this week," [[Hilde]] says. "The [[Thornwood]] swallows people whole."
-
 > `roll_dice`: 2d20kh1+5 → [18, 7] → 23 (Insight check)
-
 **[Marta Voss]** I study her face for any sign she's hiding something.
-
 **DM:** Her eyes flicker to the back door. She's telling the truth — but she's afraid of something she hasn't mentioned.
 ```
 
 **Conventions:**
+
 - Player input: `**[Character Name]** text`
+
 - DM narration: `**DM:** text`
+
 - Tool results: `> \`tool-name\`: result text`
+
 - All entity names are wikilinked (double-bracket form `[[Name]]`).
+
 - Scene heading is `# Scene N` (unpadded number).
 
 ### 5.5 Session Recaps
@@ -663,143 +626,24 @@ Transcripts are plain markdown with a heading and alternating player/DM turns:
 Two files per session under `campaign/session-recaps/`:
 
 - `session-NNN.md` — Terse bullet-list recap used in the DM's context prefix on resume.
+
 - `session-NNN-narrative.md` — Narrative "previously on..." recap shown to the player.
 
 Both are generated by Haiku subagents. NNN is 3-digit zero-padded.
 
 ---
 
-## 6. Entity Files
+## 6. SQLite Knowledge (`knowledge.sqlite`)
 
-All entity files are markdown with a consistent structure. Entity types: `character`, `location`, `faction`, `lore`, `item`.
+The adapter is [`sqlite-store.ts`](../packages/engine/src/knowledge/sqlite-store.ts), the injected contract is [`store.ts`](../packages/engine/src/knowledge/store.ts), and shared types are [`knowledge.ts`](../packages/shared/src/types/knowledge.ts). See [entity-filesystem.md](entity-filesystem.md) for the behavioral contract.
 
-### 6.1 File Structure
+SQLite schema 1 contains `nodes` (collection/entity/value tree), `aliases`, `redirects`, `refs`, append-only `logs`, durable `notices`, idempotent `operations` and allocation `metadata`. Foreign keys enforce integrity. UIDs include scalar properties and ordered instances. Entities also carry bulk body text and visibility; collections carry navigational notes.
 
-```markdown
-# Entity Name
+Mutations use one serialized atomic transaction. Object patches merge; lists replace explicitly; null is meaningful. References are structural or labeled edges, never inferred from prose. Consequence candidates follow at most two reverse graph edges, cycle-safe and deduplicated; touching a dependent does not acknowledge it. Alias resolution is global by design; organizational collection paths are exact. Snapshots contain every leaf identity with bounded text summaries. Reads page children/typed fields, text and full history.
 
-**Type:** Character
-**Player:** [Alex](../players/alex.md)
-**Location:** [[Rusty Anchor]]
-**Color:** #4488ff
-**Display Resources:** HP, Spell Slots, Lay on Hands
-**Additional Names:** Marta, The Scarred One
-**Theme:** gothic
-**Key Color:** #8844cc
-**Disposition:** friendly
+The exact two-key shapes `{$text:UID,length:n}`, `{$list:UID,length:n}`, `{$object:UID,length:n}` are response-only descriptors and rejected as authored state. Other key names remain arbitrary. Log metadata is inert and limited to 4096 serialized characters; bulk belongs in the log body.
 
-Body text — free-form markdown describing the entity.
-Can include any markdown: paragraphs, lists, headings (##), etc.
-
-## Stats
-STR 14  DEX 12  CON 16  INT 10  WIS 13  CHA 8
-
-## Inventory
-- Longsword (+1)
-- Chain mail
-- Explorer's pack
-
-## Changelog
-- **Scene 001**: First appearance at the [[Rusty Anchor]]
-- **Scene 003**: Promoted to full character sheet
-- **Scene 007**: Acquired the [[Moonblade]] from [[Old Brennan]]
-```
-
-### 6.2 Front Matter
-
-Front matter lines appear immediately after the H1 heading and before the body. Each line has the format:
-
-```
-**Key Name:** Value
-```
-
-**Parsing:** The key is normalized to `lowercase_with_underscores` for storage. On serialization, keys are converted back to `Title Case With Spaces`.
-
-**Known keys:**
-
-| Storage key | Display key | Used by | Example value |
-|---|---|---|---|
-| `type` | Type | All entities | `Character`, `Location`, `Faction`, `Lore`, `Item` |
-| `player` | Player | Characters | `[Alex](../players/alex.md)` |
-| `class` | Class | Characters | `Paladin 5` |
-| `location` | Location | Characters, items | `[[Rusty Anchor]]` |
-| `color` | Color | Characters | `#4488ff` (hex) |
-| `disposition` | Disposition | Characters (NPCs) | `friendly`, `hostile`, `neutral` |
-| `additional_names` | Additional Names | All entities | Comma-separated aliases |
-| `display_resources` | Display Resources | Characters | Comma-separated resource keys |
-| `theme` | Theme | Locations | Theme name to auto-apply |
-| `key_color` | Key Color | Locations | `#8844cc` (hex) |
-| `sheet_status` | Sheet Status | Characters | `minimal`, `full` |
-| `hp` | HP | Characters | `28/35` |
-| `ac` | AC | Characters | `16` |
-| `xp` | XP | Characters | `1200` |
-| `placeholder` | Placeholder | Any | `true` — flags a stub entity that the Scribe should rename + flesh out (e.g. the bootstrap `Starting Location`). Removed once the entity has a real name and content. |
-
-The `_title` key is internal (extracted from the H1 heading) and never serialized.
-
-**Explicit-empty:** `**Key:** <none>` parses to `null`, distinguishing "no value on purpose" from "key not present."
-
-**Value types:** All front matter values are strings on disk. Comma-separated values (like `display_resources` and `additional_names`) are stored as the raw string; consumers split on `, ` as needed.
-
-> **Note — `display_resources` has an array-shaped twin.** The same concept is a `string[]` in `state/resources.json` (§4.10), written by the `set_display_resources` tool. The string form here is what the DM sees when it writes a sheet, so it tends to carry that shape into the tool call. The tool's executable input contract performs the one allowlisted conversion (`"HP, Spell Slots"` → `["HP", "Spell Slots"]`) before runtime validation; see [tool-input-contracts.md](tool-input-contracts.md). Consumers must still route legacy or externally edited persisted values through `coerceResourceKeys` ([`packages/shared/src/utils/resource-keys.ts`](../packages/shared/src/utils/resource-keys.ts)) rather than iterating them directly, since a bare string iterates as characters and fails silently (`"Stress"` → `S | t | r | e | s | s` in the top frame).
-
-### 6.3 Body Sections
-
-The body is free-form markdown. Character sheets commonly use these `##` sections (order is convention, not enforced):
-
-- `## Relationships`
-- `## Stats`
-- `## Skills`
-- `## Inventory`
-- `## Conditions`
-- `## Notes`
-
-Other sections are valid. The body is not parsed by the engine except for the `## Changelog` section.
-
-### 6.4 Changelog
-
-The `## Changelog` section is append-only. Each entry is a single `- ` line:
-
-```
-- **Scene NNN**: Description with [[wikilinks]]
-```
-
-- Scene numbers are 3-digit zero-padded in changelog entries.
-- Wikilinks in changelog entries are mandatory for entity references.
-- Entries are in chronological order (oldest first).
-- The `## Changelog` section is always last. If absent, it is created on first append.
-- The changelog subagent generates entries; `appendChangelog()` in the engine handles formatting and insertion.
-
-### 6.5 Entity Lifecycle
-
-Entities exist on a spectrum from minimal to fully detailed:
-
-1. **Dead link** — A `[[wikilink]]` in a transcript with no corresponding file. Valid; represents an entity that exists in fiction but hasn't been detailed.
-2. **Minimal entity** — Title + type + optional one-line description. Created by the Scribe tool.
-3. **Significant entity** — Has body text, relationships, notes. Grows organically through play.
-4. **Full character sheet** — Has stats, skills, inventory, conditions. Created by `promote_character`.
-
-### 6.6 Special Entity Files
-
-- **`characters/party.md`** — Party composition and dynamics. Updated by the Scribe. No front matter keys beyond `_title`.
-- **`campaign/dm-notes.md`** — Campaign-wide DM scratchpad. Plain markdown, read/written by `dm_notes` tool.
-- **`campaign/player-notes.md`** — Campaign-wide player notes. Plain markdown.
-
-### 6.7 Location Subdirectories
-
-Locations use subdirectories to co-locate map data:
-
-```
-locations/
-└── rusty-anchor/
-    ├── index.md          # The location entity file
-    ├── main-floor.json   # Map data (same schema as state/maps.json values)
-    └── cellar.json       # Another floor/area
-```
-
-Map JSON files in location directories use the same `MapData` schema documented in §4.3. These are also present in `state/maps.json` at runtime (the authoritative copy during play).
-
----
+The built-in Node SQLite runtime uses DELETE journaling and synchronous EXTRA. Git/archive/rollback close the database within its serialized snapshot boundary for staging, capture, source removal and restore. Read-only tools verify schema/integrity without writable pragmas. ZIP/diagnostic/Git operations preserve database bytes; unreadable required database files are fatal.
 
 ## 7. Machine-Scope Files
 
@@ -819,7 +663,9 @@ Some data lives outside the campaign directory, at the machine-scope root. On Wi
 Player files are markdown entity files with the same front matter format. They track cross-campaign player preferences:
 
 - Age group, content boundaries
+
 - Play style observations
+
 - Meta-observations from the DM
 
 ### 7.2 System Rule Cards
@@ -828,22 +674,21 @@ Rule cards use XML-directive format within markdown:
 
 ```xml
 <system name="D&D 5th Edition" version="SRD 5.2" dice="d20, d12, d10, d8, d6, d4">
-
 <core_mechanic>
 d20 + modifier vs target number (DC or AC).
 </core_mechanic>
-
 <character_creation>
 1. Choose race → ability score bonuses
 2. Choose class → hit dice, proficiencies, features
 ...
 </character_creation>
-
 </system>
 ```
 
 At campaign creation, the selected system's rule card is copied to the campaign's `rules/` directory. The lookup order is:
+
 1. User-processed: `~/.machine-violet/systems/<slug>/rule-card.md`
+
 2. Bundled: `systems/<slug>/rule-card.md` (repo root)
 
 ---
@@ -881,7 +726,9 @@ World files are portable campaign seeds or world exports. A single `.mvworld` fi
 ### 10.1 Discovery
 
 The engine loads worlds from two directories:
+
 - **Bundled**: `assetDir("worlds")` — shipped with the binary (copied from `worlds/` at build time)
+
 - **User**: `~/.machine-violet/worlds/` — player-created or imported
 
 Bundled seeds are validated strictly (malformed files fail the build). User worlds are validated leniently (bad files are skipped).
@@ -893,12 +740,10 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   // --- Header (required) ---
   "format": "machine-violet-world",     // Must be this exact string.
   "version": 1,                          // Schema version.
-
   // --- Identity (required) ---
   "name": "The Shattered Crown",
   "summary": "A kingdom's heir is dead. Three factions claim the throne.",
   "genres": ["fantasy"],
-
   // --- Optional campaign config ---
   "description": "...",                  // Short description alongside the summary.
   "system": "dnd-5e",                   // Game system slug.
@@ -908,13 +753,10 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
   "image_style": "NoirCinema",           // Optional. A .mvstyle stem (prompts/include/Image/). Styles the chargen portrait + in-game art (§10.8).
   "dm_personality": { "name": "...", "prompt_fragment": "..." },
   "calendar_display_format": "fantasy",
-
   // --- DM-only content ---
   "detail": "The throne sits empty...",   // Fork-INVARIANT base prose (§10.6). DM-only, assembled in code.
-
   // --- Setup-agent-only content ---
   "setup_detail": "<!--include:Pacing.EndlessCampaigns-->",  // Surfaced to the setup agent (includes expanded); NEVER reaches the DM (§10.7).
-
   // --- Forks: named decision points, resolved at setup (§10.6) ---
   "forks": [
     {
@@ -937,7 +779,6 @@ Bundled seeds are validated strictly (malformed files fail the build). User worl
     }
   ],
   // "suboptions": [...]                  // DEPRECATED legacy player-choice groups; folded into `forks` on load.
-
   // --- Inline content (optional — empty for seeds, rich for exports) ---
   "entities": {                          // Keyed by category, then slug.
     "characters": {},
@@ -988,19 +829,19 @@ When a campaign is built from a world that carries inline content, `buildCampaig
 | World field | On-disk target |
 |---|---|
 | `entities.characters` | `characters/<slug>.md` — **NPCs only**; any `type: PC` entity is skipped (the PC comes from chargen) |
-| `entities.locations` | `locations/<slug>/index.md` |
-| `entities.factions` | `factions/<slug>.md` |
-| `entities.lore` | `lore/<slug>.md` |
-| `entities.items` | `items/<slug>.md` |
+| `entities.locations` | SQLite `Locations` collection |
+| `entities.factions` | SQLite `Factions` collection |
+| `entities.lore` | SQLite `Lore` collection |
+| `entities.items` | SQLite `Items` collection |
 | `rules` | `rules/<slug>.md` (verbatim) |
 | `maps` | `state/maps.json` (authoritative runtime store) |
 | `calendar` | `state/clocks.json` (calendar time + epoch; idle clocks, no alarms) |
 
-Entity filenames come from the canonical `campaignPaths` helpers (which slugify the entity title), so a correctly authored seed round-trips.
+Entity titles become canonical names; `additional_names` becomes aliases. Exact `[[Name]]` metadata declarations receive explicit edges when their target is known. Unknown links and prose remain literal. Seed source fields/parsers are unchanged.
 
 **Fork-scoped entities.** An entity may carry `appliesWhen: { fork, option }` (§10.6). It is materialized only if the campaign's `fork_selections` resolved that fork to that option — so a branch-specific NPC/location (e.g. a data-hall that exists only in the sci-fi wrapper) stays out of campaigns that took a different branch. Entities without `appliesWhen` are universal and always materialized.
 
-**Deliberately not seeded:** `campaign/compendium.json` (the *player-facing* knowledge base — must start empty so the player discovers the world; a pre-filled compendium spoils novelty and misinforms the DM about player knowledge), the PC character sheet (chargen), and `campaign/log.json` entries (a seed carries no episodic record). The bootstrap `starting-location` placeholder is still written; the DM/Scribe renames it to the real opening locale (§6.6, scribe prompt).
+**Deliberately not seeded:** the SQLite `Player Knowledge` projection (the *player-facing* knowledge base — must start empty so the player discovers the world; a pre-filled compendium spoils novelty and misinforms the DM about player knowledge), the PC character sheet (chargen), and `campaign/log.json` entries (a seed carries no episodic record). The bootstrap Starting Location identity is created in SQLite; the DM/Scribe explicitly renames it to the real opening locale while retaining its UID and old handle.
 
 Authoring a `.mvworld` from a played campaign is a manual, brain-in-the-loop task — see the `build-mvworld` skill ([`.claude/skills/build-mvworld/SKILL.md`](../.claude/skills/build-mvworld/SKILL.md)) and the worked example [`worlds/the-salt-wedding.mvworld`](../worlds/the-salt-wedding.mvworld).
 
@@ -1041,6 +882,7 @@ Seed content reaches three different audiences, and a field belongs to exactly o
 A stem may point at either a **single catalog style** (one backtick-fenced `# Style` directive) or a per-seed **composite** — a `.mvstyle` named after the seed whose `# Style` lists a labeled *menu*: a **default** look plus situational variants (outdoor night, dark crisis, a surveillance cam, a player-requested image, …) the DM chooses between per the file's `# Direction`. Composites are authored **default-first**.
 
 1. **The chargen portrait.** The setup agent's character reference sheet is rendered in this style. The engine stamps the style's **default render directive** onto the portrait prompt — for a plain style that's its lone `# Style` sentence; for a composite it's the *default* look (the first backtick-fenced span), never the whole situational menu, whose extra variants and caption clauses would fight the reference-sheet framing. When a seed declares no `image_style` — or the campaign is fully custom — the fallback is `CinematicFilm` (a placeholder until per-seed defaults are graded).
+
 2. **In-game art.** At finalize, `<!--include:Image.<style>-->` is appended to the campaign's `campaign_detail`. At DM-prompt time it resolves into an `<Image>` block that **overrides the bare `<Image>` default** — the `campaign_detail` override slot outranks the `dm-directives` slot where the default lives. A setup-agent-appended `<Image>` (a setup-time style choice) is placed *after* the seed's, so it still wins the in-slot collision.
 
 The value is validated against a real `.mvstyle` at finalize (`resolveImageStyleLine`): a bogus stem or missing file emits **no** include rather than bricking every DM turn with an unresolved-include throw — the campaign just stays on the default look. The setup agent may also override the seed's style (clobbering seed data is a feature — §10.6).
@@ -1050,7 +892,9 @@ The value is validated against a real `.mvstyle` at finalize (`resolveImageStyle
 Prompt-content files carry a **derived, at-a-glance estimate** of their own token weight, stamped by `npm run tokens` ([`scripts/content-tokens.ts`](../scripts/content-tokens.ts)):
 
 - `.mvworld` → a `_tokens` object: `{ detail, setup_detail, forks, total }`. `detail` is the per-turn DM-context cost (the channel that rides in the cached prefix every turn); `total` sums every string in the file.
+
 - `.mvdm` → a `_tokens` object: `{ prompt_fragment, detail, total }`.
+
 - `.mvstyle` → a scalar `tokens:` in frontmatter: the **emitted** weight (`# Direction` + `# Style` only; `# Notes`/`# Example` are authoring-only and don't reach the image model).
 
 The count is an **estimate** — OpenAI's `o200k_base` encoding (GPT-4o/5) via `js-tiktoken`: local, deterministic, offline. The DM may run on Claude or GPT and tokenizers differ by ~10–15%, but the encoding is fixed, so counts are consistent and rank seed weight reliably. The field is **derived bookkeeping**: hand-editing it is pointless (it's overwritten), and the engine never reads it. Counts come from the content fields only (the stamp itself is excluded), so stamping is idempotent.

@@ -39,7 +39,7 @@ node --import tsx/esm packages/test-harness/bin/mvplay.ts <cmd> [args]
 | `wait [--for beat\|handoff\|choices] [--timeout SEC]` | Block until a new beat lands, print it, exit. **Run in background.** |
 | `log [--tail N]` | Tail the launcher log (crash diagnostics). |
 | `list` | List all sessions (id, pid, port, liveness). |
-| `stop` | Kill the session. |
+| `stop` | Kill the session and remove its entire temporary session directory, including default temporary campaigns. |
 
 **Concurrent sessions.** Every command takes a global `--session <id>` (or the
 `MVPLAY_SESSION` env var); omit it for the single `"default"` session, which is
@@ -107,6 +107,11 @@ prints only the new narrative plus any choices.
   custom-input row for you).
 
 When you're done: `mvplay stop`.
+
+Before `stop`, copy any temporary campaign or evidence you need to keep outside
+the session directory. `stop` deletes that directory; locked files may leave an
+incomplete remainder, which is not a resumable save. For restart checks, preserve
+a complete owned fixture outside it, then use `start --fresh --data-dir <fixture-root>`.
 
 ## Critical: run `wait` in the background
 

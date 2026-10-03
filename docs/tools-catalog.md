@@ -81,7 +81,7 @@ IDs are auto-assigned as `obj-1`, `obj-2`, … from the auto-incrementing `next_
 ### Usage patterns
 
 - **Player-facing quests and missions:** use `manage_objectives` — they surface in DM context automatically.
-- **Hidden DM goals, secrets, internal tracking:** use DM notes (entity files) + `alarm`, not objectives. Objectives are always visible to the DM in context and represent goals the characters are actively pursuing.
+- **Hidden DM goals, secrets, internal tracking:** use DM notes (private campaign knowledge) + `alarm`, not objectives. Objectives are always visible to the DM in context and represent goals the characters are actively pursuing.
 - **Deadlines:** set an `alarm` when you create the objective; on alarm fire, call `fail` if the party hasn't completed it.
 
 ---
@@ -111,27 +111,25 @@ Note: Session resume is an engine operation, not a callable tool. It runs automa
 
 ## Entity Tools → [entity-filesystem.md](entity-filesystem.md)
 
-### Structured entity surface (DM + OOC + Dev)
+### Generic campaign knowledge (DM + OOC + Dev)
 
-T1 tools backed by the unified `EntityStore` (`packages/engine/src/entities/`), registered in the shared DM `ToolRegistry` so the DM, OOC, and Dev Mode all see them. The DM uses these for inspection (e.g. `entity("read", "characters", "kael")` to fetch a full record before narrating) and `scribe` for narrative writes; OOC and Dev additionally drive `create`/`update`/`delete` and the diagnostic tools when repairing the campaign.
+The same two fixed contracts work for every campaign and collection. Collections are arbitrary nested names, never tool enums. Agents describe story facts; they do not design SQL or database schemas. Canonical short UIDs, names, and aliases resolve deterministically; same-name conflation is accepted without a DM disambiguation turn.
 
 | Tool | Operations | Effect |
 |---|---|---|
-| `entity` | `read`, `create`, `update`, `delete`, `list` | CRUD on file-backed entities (characters, locations, factions, lore, items). `read` returns frontmatter + body + inbound/outbound refs + schema + drift. `update` patch values of `null` delete a frontmatter key. `delete` reports inbound wikilinks that just became dead. |
-| `describe_entity_type` | — | Returns the declared schema, observed drift, storage layout, conventions, and examples for an entity type. |
-| `list_entity_types` | — | Lists all file-backed entity types with on-disk counts. |
-| `validate_entity` | — | Validates a single entity: missing required fields, dead outbound wikilinks, schema conformance. |
-| `find_schema_drift` | — | Lists frontmatter fields present on disk but not in the declared schema. Optionally scoped to one type. |
-| `detect_orphans` | — | Lists file-backed entities with zero inbound wikilinks across the campaign. |
+| `knowledge` | `outline`, `read`, `search` | Inspect the current full logical outline, page a record/value/body/log by UID or name, or search typed fields and complete paged prose/logs. Read limits and offsets bound each response. |
+| `remember` | Atomic `operations[]` | Create collections/nodes; upsert or patch facts; disclose an explicit player-safe name/summary/aliases without exposing private canonical data; remove fields; move, consolidate, delete; append prose/logs; add/remove explicit references. Recursive typed JSON supports numbers, booleans, nulls, arrays, nested objects, and `{$ref: UID}`. Returns canonical identities and candidate impacts. |
 
-Dev Mode additionally exposes `raw_entity_io` (`read`/`write`/`delete` against a raw path) as a schema-bypass escape hatch for recovering from corrupted entity files. If you see `raw_entity_io` in a turn, it means the agent bypassed the structured surface.
+Bulk strings, object/list instances, and append-only logs are first-class data. List instances have individual UIDs. Partial updates preserve unrelated fields and references; `null` is a typed value, while `remove_fields` deletes keys. Exact read-only preview shapes `{$text|$list|$object: UID, length: n}` are engine-owned and cannot be authored as values. Objects using those key names with additional data remain ordinary data.
+
+Raw Dev file tools cannot write/read database bytes or bypass the shared campaign mutation path. Machine player profiles and seed authoring remain separate. Public reads project only approved knowledge; they never return a raw private node.
 
 ### Narrative + search
 
 | Tool | Tier | Caller | Signature | Effect |
 |---|---|---|---|---|
-| `scribe` | T2 (Haiku) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns Haiku subagent with `list_entities`, `read_entity`, `write_entity`, and `rename_entity` tools for autonomous entity file management. Handles deduplication, front matter, changelogs, and placeholder rename. |
-| `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search across all campaign files — entities, scene summaries, transcripts, session recaps, logs. Spawns Haiku subagent with `grep_campaign` and `read_campaign_file` tools. Returns terse excerpts with `[[wikilinks]]` and source references. |
+| `scribe` | Small (configured) | DM | `({ updates: [{ visibility, content }] })` | Batch entity creation/updates. Each update tagged `private` or `player-facing`. Spawns a small storyteller subagent with `knowledge`, `remember`, and a separate machine-profile tool. Fresh collection organization, bounded canonical reads, and one serialized scribe lane preserve identity and narrative batching. Mixed-visibility facts use one private canonical identity plus `disclose` for the explicitly public account. Committed canonical feedback is independent of its prose summary. |
+| `search_campaign` | T2 (Haiku) | DM | `({ query })` | Search logical SQLite knowledge plus scene summaries, transcripts, session recaps, and logs. The subagent uses `knowledge`, `grep_campaign`, and bounded logical `read_campaign_file` reads. Returns terse excerpts with `[[wikilinks]]` and source references. |
 | `search_content` | T2 (Haiku) | DM | `({ query })` | Search the game system's ingested content library — monsters, spells, equipment, rules — by mechanical criteria (CR, level, type, rarity). Spawns a search subagent that queries faceted indexes and returns matching entities with key stats. Async-dispatched (the handler delegates to the game engine). Requires ingested system content. |
 
 ---

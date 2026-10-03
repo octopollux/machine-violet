@@ -110,12 +110,25 @@ export const CyclePlayerResponse = Type.Object({
 // --- Data responses ---
 
 export const CharacterResponse = Type.Object({
+  uid: Type.Optional(Type.String()),
+  collection: Type.Optional(Type.String()),
   name: Type.String(),
   content: Type.String(),
 });
 
+const PublicCompendiumEntry = Type.Object({
+  uid: Type.Optional(Type.String()), name: Type.String(), slug: Type.String(),
+  aliases: Type.Optional(Type.Array(Type.String())), summary: Type.String(),
+  firstScene: Type.Number(), lastScene: Type.Number(), related: Type.Array(Type.String()),
+});
 export const CompendiumResponse = Type.Object({
-  data: Type.Unknown(),
+  data: Type.Object({
+    version: Type.Literal(1), lastUpdatedScene: Type.Number(),
+    collections: Type.Optional(Type.Record(Type.String(), Type.Array(PublicCompendiumEntry))),
+    characters: Type.Array(PublicCompendiumEntry), places: Type.Array(PublicCompendiumEntry),
+    items: Type.Array(PublicCompendiumEntry), storyline: Type.Array(PublicCompendiumEntry),
+    lore: Type.Array(PublicCompendiumEntry), objectives: Type.Array(PublicCompendiumEntry),
+  }),
 });
 
 export const NotesResponse = Type.Object({

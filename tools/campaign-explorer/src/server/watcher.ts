@@ -2,6 +2,7 @@ import { watch, type FSWatcher } from "chokidar";
 import { relative } from "node:path";
 import type { FileChangeEvent, FileCategory } from "../shared/protocol.js";
 import { MACHINE_SLUG } from "../shared/protocol.js";
+import { inspectKnowledge, changedKnowledge, isKnowledgeFile } from "./knowledge-reader.js";
 
 /** Classify a relative path into a FileCategory. */
 export function classifyPath(relPath: string): FileCategory {
@@ -49,6 +50,8 @@ export function watchCampaign(
 ): FSWatcher {
   const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const DEBOUNCE_MS = 200;
+  let previous = new Map<string, string>();
+  let scan = inspectKnowledge(campaignDir).then((snapshot) => { previous = snapshot.fingerprints; }).catch(() => {});
 
   const watcher = watch(campaignDir, {
     persistent: true,
@@ -66,6 +69,18 @@ export function watchCampaign(
 
   const emit = (changeType: "add" | "change" | "unlink", absPath: string) => {
     const relPath = relative(campaignDir, absPath).replace(/\\/g, "/");
+    if (isKnowledgeFile(relPath)) {
+      if (relPath !== "knowledge.sqlite") return;
+      scan = scan.then(async () => {
+        const snapshot = await inspectKnowledge(campaignDir);
+        for (const uid of changedKnowledge(previous, snapshot.fingerprints)) {
+          const entry = snapshot.entries.find((e) => e.uid === uid);
+          opts.onFileChange({ type: "file-change", campaignSlug, relativePath: `knowledge/${uid}.json`, category: entry?.category ?? "Knowledge", changeType: entry ? previous.has(uid) ? "change" : "add" : "unlink", entry });
+        }
+        previous = snapshot.fingerprints;
+      }).catch((error) => console.error(`Knowledge refresh failed: ${String(error)}`));
+      return;
+    }
     const key = `${campaignSlug}:${relPath}`;
 
     const existing = debounceTimers.get(key);

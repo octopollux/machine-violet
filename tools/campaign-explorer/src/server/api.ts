@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { createInterface } from "node:readline";
 import type { CampaignInfo, TreeEntry } from "../shared/protocol.js";
 import { classifyPath, classifyMachinePath } from "./watcher.js";
+import { inspectKnowledge, isKnowledgeFile } from "./knowledge-reader.js";
 
 /** Check that resolved absPath is inside dir (boundary-safe). */
 function isInsideDir(dir: string, absPath: string): boolean {
@@ -41,6 +42,8 @@ export function createApiRouter(
 
     try {
       const entries = await walkDir(dir, dir);
+      const knowledge = await inspectKnowledge(dir);
+      entries.push(...knowledge.entries);
       res.json(entries);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -60,6 +63,17 @@ export function createApiRouter(
     const relPath = Array.isArray(pathSegments) ? pathSegments.join("/") : String(pathSegments);
     if (!relPath) {
       res.status(400).json({ error: "Missing file path" });
+      return;
+    }
+
+    if (isKnowledgeFile(relPath)) { res.status(403).json({ error: "Use the read-only logical knowledge view." }); return; }
+    const logical = /^knowledge\/([a-z0-9]+)\.json$/i.exec(relPath);
+    if (logical) {
+      try {
+        const node = (await inspectKnowledge(dir)).nodes.get(logical[1]);
+        if (!node) { res.status(404).json({ error: "Knowledge identity no longer exists." }); return; }
+        res.json(node);
+      } catch (error) { res.status(409).json({ error: String(error) }); }
       return;
     }
 
@@ -270,6 +284,7 @@ async function walkDir(
   }
 
   for (const item of items) {
+    if (isKnowledgeFile(item)) continue;
     // Skip dotfiles/dirs (except .debug) and node_modules
     if (item === "node_modules") continue;
     if (item.startsWith(".") && item !== ".debug") continue;

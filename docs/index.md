@@ -53,6 +53,10 @@ This project has three documentation layers. Each has a distinct purpose:
 
 All docs describe only what is implemented. Planned features live in GitHub issues, not in documentation.
 
+## Experiments
+
+- [Narrative dependency bookkeeping](experiments/metadata-dependencies/README.md) — isolated exploratory Luna screen, fixtures, raw results, and limitations; not a production contract.
+
 ## Running the Project
 
 ```bash

@@ -6,9 +6,18 @@ import {
   deleteCampaign,
   getCampaignDeleteInfo,
   archiveDir,
+  createArchiveFileIO,
 } from "./campaign-archive.js";
 import type { ArchiveFileIO } from "./campaign-archive.js";
 import { norm } from "../utils/paths.js";
+import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
+import { mkdtemp,readFile,rm,mkdir,writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import {createDefaultCampaignConfig} from "../tools/filesystem/config.js";
+
+let fixtureDatabase:Uint8Array;
+beforeAll(async()=>{const root=await mkdtemp(join(tmpdir(),"mv-archive-fixture-"));try{const path=join(root,"knowledge.sqlite");const db=new SqliteKnowledgeStore(path,{create:true});await db.close();fixtureDatabase=new Uint8Array(await readFile(path));}finally{await rm(root,{recursive:true,force:true});}});
 
 // --- In-memory filesystem for testing ---
 
@@ -103,9 +112,10 @@ function createMockIO(): ArchiveFileIO & { fs: Record<string, string | Uint8Arra
 function seedCampaign(io: ReturnType<typeof createMockIO>, campaignPath: string) {
   const p = norm(campaignPath);
   io.fs[`${p}/config.json`] = JSON.stringify({
-    name: "Test Campaign",
-    players: [{ character: "Kael" }, { character: "Lyra" }],
+    ...createDefaultCampaignConfig("Test Campaign", "Player", "Kael"),
+    players: [{ name: "Player", character: "Kael", type: "human" }, { name: "Other", character: "Lyra", type: "human" }],
   });
+  io.fs[`${p}/knowledge.sqlite`]=fixtureDatabase;
   io.fs[`${p}/campaign/log.json`] = "[]";
   io.fs[`${p}/characters/kael.md`] = "**Name:** Kael\n\nA bold warrior.";
   io.fs[`${p}/characters/lyra.md`] = "**Name:** Lyra\n\nAn elven mage.";
@@ -438,5 +448,26 @@ describe("getCampaignDeleteInfo", () => {
     expect(info.campaignName).toBe("bare");
     expect(info.characterNames).toEqual([]);
     expect(info.dmTurnCount).toBe(0);
+  });
+});
+
+
+describe("real SQLite archive lifecycle",()=>{
+  it("holds the live store closed through verified capture/removal and restores identities, refs, logs and notices",async()=>{
+    const temporary=await mkdtemp(join(tmpdir(),"mv-sqlite-archive-"));
+    const campaigns=join(temporary,"campaigns"),campaign=join(campaigns,"source");let live:SqliteKnowledgeStore|undefined,restored:SqliteKnowledgeStore|undefined;
+    try{
+      await mkdir(campaign,{recursive:true});await writeFile(join(campaign,"config.json"),JSON.stringify(createDefaultCampaignConfig("Restore Me","Player","Bob")));
+      live=new SqliteKnowledgeStore(join(campaign,"knowledge.sqlite"),{create:true});
+      await live.mutate([{op:"upsert",collection:"Characters",name:"Shadow",fields:{hp:7},history:"Arrived"},{op:"patch",uid:"Shadow",name:"Bob"},{op:"upsert",collection:"Lore",name:"Quest",fields:{hero:{$ref:"Bob"}}}]);
+      const uid=await live.resolve("Bob");const expectedNotices=await live.pendingNotices();
+      const io=createArchiveFileIO(async()=>live!);const archived=await archiveCampaign(campaign,campaigns,io);
+      expect(archived.ok).toBe(true);expect(await io.exists(campaign)).toBe(false);
+      await expect(live.read("Bob")).rejects.toThrow("missing");
+      const extraction=await unarchiveCampaign(archived.zipPath!,campaigns,createArchiveFileIO());expect(extraction.ok).toBe(true);
+      restored=new SqliteKnowledgeStore(join(extraction.zipPath!,"knowledge.sqlite"),{create:false});
+      expect(await restored.resolve("Shadow")).toBe(uid);expect((await restored.read("Bob")).logs[0].body).toBe("Arrived");
+      expect((await restored.read("Quest")).fields.hero).toEqual({$ref:uid});expect(await restored.pendingNotices()).toEqual(expectedNotices);
+    }finally{await live?.close();await restored?.close();await rm(temporary,{recursive:true,force:true});}
   });
 });

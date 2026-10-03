@@ -1,13 +1,17 @@
 import {
   COMPENDIUM_CATEGORIES,
   type Compendium,
-  type CompendiumCategory,
   type CompendiumEntry,
 } from "../types/compendium.js";
+import { slugify } from "./slug.js";
 
 export interface CompendiumLookupResult {
   entry: CompendiumEntry;
-  category: CompendiumCategory;
+  category: string;
+}
+
+export function compendiumCollections(compendium: Compendium): [string, CompendiumEntry[]][] {
+  return compendium.collections !== undefined ? Object.entries(compendium.collections) : COMPENDIUM_CATEGORIES.map((category) => [category, compendium[category] ?? []]);
 }
 
 /**
@@ -23,14 +27,14 @@ export function findCompendiumEntryBySlug(
   compendium: Compendium,
   slug: string,
 ): CompendiumLookupResult | null {
-  for (const category of COMPENDIUM_CATEGORIES) {
-    const entries = compendium[category];
-    if (!entries) continue;
+  const matches: CompendiumLookupResult[] = [];
+  for (const [category, entries] of compendiumCollections(compendium)) {
     for (const entry of entries) {
-      if (entry.slug === slug) return { entry, category };
+      if (entry.uid === slug || entry.slug === slug) return { entry, category };
+      if ([entry.name, ...(entry.aliases ?? [])].some((name) => slugify(name) === slug)) matches.push({ entry, category });
     }
   }
-  return null;
+  return matches.length === 1 ? matches[0] : null;
 }
 
 /**
@@ -39,12 +43,14 @@ export function findCompendiumEntryBySlug(
  */
 export function collectCompendiumSlugs(compendium: Compendium): Set<string> {
   const slugs = new Set<string>();
-  for (const category of COMPENDIUM_CATEGORIES) {
-    const entries = compendium[category];
-    if (!entries) continue;
+  const names = new Set<string>();
+  for (const [, entries] of compendiumCollections(compendium)) {
     for (const entry of entries) {
       slugs.add(entry.slug);
+      if (entry.uid) slugs.add(entry.uid);
+      for (const name of [entry.name, ...(entry.aliases ?? [])]) names.add(slugify(name));
     }
   }
+  for (const name of names) if (findCompendiumEntryBySlug(compendium, name)) slugs.add(name);
   return slugs;
 }

@@ -1,0 +1,1274 @@
+{
+  "scope": "Frozen deterministic oracle plus independent snapshot semantic review; no overall pass assigned.",
+  "originalRejection": {
+    "run": "a",
+    "stage": "stage1",
+    "error": "Expected ':' after property name in JSON at position 269 (line 1 column 270)",
+    "recoveredStage": "stage1-retry1",
+    "provenance": "Coordinator verified malformed text present in original call; no compaction/truncation; see README."
+  },
+  "postHocProbeScope": "Read-only hypothetical inn/lodge changes against final snapshots, after frozen scoring; not additional Luna stages or preregistered scores. No state persisted.",
+  "runs": {
+    "a": {
+      "stages": {
+        "stage1": {
+          "source": "stage1-retry1",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e12->e01",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 11,
+          "deterministicTotal": 11,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "Dependencies explained by actual current narrative reliance; no fabricated facts. Additional edges reviewed for overlinking."
+          ],
+          "overallPass": null
+        },
+        "stage2": {
+          "source": "stage2",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e03",
+              "ok": true
+            },
+            {
+              "name": "required edge e06->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e05->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden changed e01",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.wounds",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.surety",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.lockCode",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 15,
+          "deterministicTotal": 15,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "e01 retains ID and old name alias; rescue completed; old dependencies retired; no contradictory stale factual fields."
+          ],
+          "overallPass": null
+        },
+        "stage3": {
+          "source": "stage3",
+          "checks": [
+            {
+              "name": "required changed e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e02",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e14",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e09",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 4,
+          "deterministicTotal": 4,
+          "noticeMetrics": {
+            "truePositives": 3,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Castle ruin recorded; Tamsin, archive and deed outcomes not invented; any newly recorded uncertainty does not count as resolved."
+          ],
+          "overallPass": null
+        },
+        "stage4": {
+          "source": "stage4",
+          "checks": [
+            {
+              "name": "required edge e14->e03",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e14",
+              "ok": true
+            },
+            {
+              "name": "required handled e09",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 10,
+          "deterministicTotal": 10,
+          "noticeMetrics": {
+            "truePositives": 0,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": null,
+            "recall": null,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Quest active through replacement method; Elian owns c02 by identity; c01 not accidentally acquired; deck unchanged by Luna; old fields reconciled, not merely new contradictory fields appended."
+          ],
+          "overallPass": null
+        },
+        "stage5": {
+          "source": "stage5",
+          "checks": [
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e06",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required changed e07",
+              "ok": true
+            },
+            {
+              "name": "required handled e10",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 8,
+          "deterministicTotal": 8,
+          "noticeMetrics": {
+            "truePositives": 1,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Iona alive, location undisclosed safe house; quests remain active; false death rumor not promoted to fact; neither Blackthorn place marked abandoned; clarification note required; failed return retains c02 possession; no stale contradictory fields."
+          ],
+          "overallPass": null
+        }
+      },
+      "deterministicPassed": 48,
+      "deterministicTotal": 48,
+      "postHocProbes": {
+        "inn": {
+          "hypotheticalChanged": "e03",
+          "expectedCandidates": [
+            "e05",
+            "e14"
+          ],
+          "actualCandidates": [
+            "e05",
+            "e14"
+          ],
+          "truePositives": 2,
+          "falsePositives": [],
+          "falseNegatives": [],
+          "precision": 1,
+          "recall": 1,
+          "overflow": 0,
+          "notices": [
+            {
+              "dependent": "e05",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e03",
+                  "path": [
+                    "e03",
+                    "e05"
+                  ],
+                  "reasons": [
+                    [
+                      "A change to the inn or Elian's stay there could affect his current location."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            },
+            {
+              "dependent": "e14",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e03",
+                  "path": [
+                    "e03",
+                    "e14"
+                  ],
+                  "reasons": [
+                    [
+                      "A change to the inn or Tamsin's residence there could affect her current location."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            }
+          ]
+        },
+        "lodge": {
+          "hypotheticalChanged": "e04",
+          "expectedCandidates": [
+            "e06",
+            "e10"
+          ],
+          "actualCandidates": [
+            "e06",
+            "e10"
+          ],
+          "truePositives": 2,
+          "falsePositives": [],
+          "falseNegatives": [],
+          "precision": 1,
+          "recall": 1,
+          "overflow": 0,
+          "notices": [
+            {
+              "dependent": "e06",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e04",
+                  "path": [
+                    "e04",
+                    "e06"
+                  ],
+                  "reasons": [
+                    [
+                      "A change to the lodge or Mara's residence there could affect her transfer."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            },
+            {
+              "dependent": "e10",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e04",
+                  "path": [
+                    "e04",
+                    "e06",
+                    "e10"
+                  ],
+                  "reasons": [
+                    [
+                      "A change to the lodge or Mara's residence there could affect her transfer."
+                    ],
+                    [
+                      "A change to Mara's ability or availability to authenticate affects the parley."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "b": {
+      "stages": {
+        "stage1": {
+          "source": "stage1",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e12->e01",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 11,
+          "deterministicTotal": 11,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "Dependencies explained by actual current narrative reliance; no fabricated facts. Additional edges reviewed for overlinking."
+          ],
+          "overallPass": null
+        },
+        "stage2": {
+          "source": "stage2",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e03",
+              "ok": true
+            },
+            {
+              "name": "required edge e06->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e05->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden changed e01",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.wounds",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.surety",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.lockCode",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 15,
+          "deterministicTotal": 15,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "e01 retains ID and old name alias; rescue completed; old dependencies retired; no contradictory stale factual fields."
+          ],
+          "overallPass": null
+        },
+        "stage3": {
+          "source": "stage3",
+          "checks": [
+            {
+              "name": "required changed e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e02",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e14",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e09",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 4,
+          "deterministicTotal": 4,
+          "noticeMetrics": {
+            "truePositives": 3,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Castle ruin recorded; Tamsin, archive and deed outcomes not invented; any newly recorded uncertainty does not count as resolved."
+          ],
+          "overallPass": null
+        },
+        "stage4": {
+          "source": "stage4",
+          "checks": [
+            {
+              "name": "required edge e14->e03",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e14",
+              "ok": false
+            },
+            {
+              "name": "required handled e09",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 9,
+          "deterministicTotal": 10,
+          "noticeMetrics": {
+            "truePositives": 0,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": null,
+            "recall": null,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Quest active through replacement method; Elian owns c02 by identity; c01 not accidentally acquired; deck unchanged by Luna; old fields reconciled, not merely new contradictory fields appended."
+          ],
+          "overallPass": null
+        },
+        "stage5": {
+          "source": "stage5",
+          "checks": [
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e06",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required changed e07",
+              "ok": true
+            },
+            {
+              "name": "required handled e10",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 8,
+          "deterministicTotal": 8,
+          "noticeMetrics": {
+            "truePositives": 1,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Iona alive, location undisclosed safe house; quests remain active; false death rumor not promoted to fact; neither Blackthorn place marked abandoned; clarification note required; failed return retains c02 possession; no stale contradictory fields."
+          ],
+          "overallPass": null
+        }
+      },
+      "deterministicPassed": 47,
+      "deterministicTotal": 48,
+      "postHocProbes": {
+        "inn": {
+          "hypotheticalChanged": "e03",
+          "expectedCandidates": [
+            "e05",
+            "e14"
+          ],
+          "actualCandidates": [
+            "e14"
+          ],
+          "truePositives": 1,
+          "falsePositives": [],
+          "falseNegatives": [
+            "e05"
+          ],
+          "precision": 1,
+          "recall": 0.5,
+          "overflow": 0,
+          "notices": [
+            {
+              "dependent": "e14",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e03",
+                  "path": [
+                    "e03",
+                    "e14"
+                  ],
+                  "reasons": [
+                    [
+                      "A change to the Lantern Inn affects Tamsin's stated residence there."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            }
+          ]
+        },
+        "lodge": {
+          "hypotheticalChanged": "e04",
+          "expectedCandidates": [
+            "e06",
+            "e10"
+          ],
+          "actualCandidates": [],
+          "truePositives": 0,
+          "falsePositives": [],
+          "falseNegatives": [
+            "e06",
+            "e10"
+          ],
+          "precision": null,
+          "recall": 0,
+          "overflow": 0,
+          "notices": []
+        }
+      }
+    },
+    "c": {
+      "stages": {
+        "stage1": {
+          "source": "stage1",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e01",
+              "ok": false
+            },
+            {
+              "name": "required edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "required edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e12->e01",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 10,
+          "deterministicTotal": 11,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "Dependencies explained by actual current narrative reliance; no fabricated facts. Additional edges reviewed for overlinking."
+          ],
+          "overallPass": null
+        },
+        "stage2": {
+          "source": "stage2",
+          "checks": [
+            {
+              "name": "required edge e02->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required edge e05->e03",
+              "ok": false
+            },
+            {
+              "name": "required edge e06->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e05->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e06->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e08->e05",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e11->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden changed e01",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.wounds",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.surety",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.lockCode",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 14,
+          "deterministicTotal": 15,
+          "noticeMetrics": null,
+          "semanticReviewRequired": [
+            "e01 retains ID and old name alias; rescue completed; old dependencies retired; no contradictory stale factual fields."
+          ],
+          "overallPass": null
+        },
+        "stage3": {
+          "source": "stage3",
+          "checks": [
+            {
+              "name": "required changed e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e02",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e14",
+              "ok": true
+            },
+            {
+              "name": "forbidden handled e09",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 4,
+          "deterministicTotal": 4,
+          "noticeMetrics": {
+            "truePositives": 3,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Castle ruin recorded; Tamsin, archive and deed outcomes not invented; any newly recorded uncertainty does not count as resolved."
+          ],
+          "overallPass": null
+        },
+        "stage4": {
+          "source": "stage4",
+          "checks": [
+            {
+              "name": "required edge e14->e03",
+              "ok": true
+            },
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e14->e01",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e09->e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e02",
+              "ok": true
+            },
+            {
+              "name": "required handled e14",
+              "ok": true
+            },
+            {
+              "name": "required handled e09",
+              "ok": true
+            },
+            {
+              "name": "typed value e05.conscious",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 10,
+          "deterministicTotal": 10,
+          "noticeMetrics": {
+            "truePositives": 0,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": null,
+            "recall": null,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Quest active through replacement method; Elian owns c02 by identity; c01 not accidentally acquired; deck unchanged by Luna; old fields reconciled, not merely new contradictory fields appended."
+          ],
+          "overallPass": null
+        },
+        "stage5": {
+          "source": "stage5",
+          "checks": [
+            {
+              "name": "required edge e09->e07",
+              "ok": true
+            },
+            {
+              "name": "required edge e10->e06",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e07->e04",
+              "ok": true
+            },
+            {
+              "name": "forbidden edge e10->e07",
+              "ok": true
+            },
+            {
+              "name": "required changed e07",
+              "ok": true
+            },
+            {
+              "name": "required handled e10",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.drawPile",
+              "ok": true
+            },
+            {
+              "name": "typed value e13.hands",
+              "ok": true
+            }
+          ],
+          "deterministicPassed": 8,
+          "deterministicTotal": 8,
+          "noticeMetrics": {
+            "truePositives": 1,
+            "falsePositives": [],
+            "falseNegatives": [],
+            "precision": 1,
+            "recall": 1,
+            "overflow": 0
+          },
+          "semanticReviewRequired": [
+            "Iona alive, location undisclosed safe house; quests remain active; false death rumor not promoted to fact; neither Blackthorn place marked abandoned; clarification note required; failed return retains c02 possession; no stale contradictory fields."
+          ],
+          "overallPass": null
+        }
+      },
+      "deterministicPassed": 46,
+      "deterministicTotal": 48,
+      "postHocProbes": {
+        "inn": {
+          "hypotheticalChanged": "e03",
+          "expectedCandidates": [
+            "e05",
+            "e14"
+          ],
+          "actualCandidates": [
+            "e14"
+          ],
+          "truePositives": 1,
+          "falsePositives": [],
+          "falseNegatives": [
+            "e05"
+          ],
+          "precision": 1,
+          "recall": 0.5,
+          "overflow": 0,
+          "notices": [
+            {
+              "dependent": "e14",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e03",
+                  "path": [
+                    "e03",
+                    "e14"
+                  ],
+                  "reasons": [
+                    [
+                      "Tamsin now resides at the Lantern Inn."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            }
+          ]
+        },
+        "lodge": {
+          "hypotheticalChanged": "e04",
+          "expectedCandidates": [
+            "e06",
+            "e10"
+          ],
+          "actualCandidates": [
+            "e06",
+            "e10"
+          ],
+          "truePositives": 2,
+          "falsePositives": [],
+          "falseNegatives": [],
+          "precision": 1,
+          "recall": 1,
+          "overflow": 0,
+          "notices": [
+            {
+              "dependent": "e06",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e04",
+                  "path": [
+                    "e04",
+                    "e06"
+                  ],
+                  "reasons": [
+                    [
+                      "Mara permanently transferred to and now lives at Blackthorn Lodge."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            },
+            {
+              "dependent": "e10",
+              "candidateOnly": true,
+              "paths": [
+                {
+                  "target": "e04",
+                  "path": [
+                    "e04",
+                    "e06",
+                    "e10"
+                  ],
+                  "reasons": [
+                    [
+                      "Mara permanently transferred to and now lives at Blackthorn Lodge."
+                    ],
+                    [
+                      "The active parley now uses Mara to authenticate the delegation."
+                    ]
+                  ],
+                  "removed": false
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "semanticFindings": [
+    {
+      "run": "a",
+      "severity": "failure",
+      "stages": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Castle.features still says dungeon imprisons Elian after his escape.",
+        "Archive.successionDeed still says unique signed deed stored here after archive and deed are confirmed destroyed."
+      ],
+      "implication": "Related records accumulate stale facts alongside later resolutions."
+    },
+    {
+      "run": "b",
+      "severity": "failure",
+      "stages": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Castle.ElianImprisoned remains dungeon after Elian escapes.",
+        "Castle.grainContract remains ongoing after Rowan contract ends."
+      ],
+      "implication": "Related records retain superseded facts despite primary character updates."
+    },
+    {
+      "run": "c",
+      "severity": "failure",
+      "stages": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Castle rename retains e01 identity but no old-name alias is recorded."
+      ],
+      "implication": "Stage5 ambiguity is still handled correctly in notes; loss of explicit alias is a distinct identity metadata miss."
+    },
+    {
+      "run": "a",
+      "severity": "failure",
+      "stages": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Elian.imprisoned remains Blackthorn Castle dungeon after escape and current Lantern Inn stay.",
+        "Mara.serves and Mara.lives remain castle garrison after permanent Lodge transfer and castleHomeDutiesCommitments=false.",
+        "Iona.staying remains Blackthorn Lodge after flight to an undisclosed safe house.",
+        "Succession.requires remains the unique deed after originalDeedRoute=abandoned and testimony route replacement."
+      ],
+      "source": "Each listed value persists through corresponding after.json snapshots."
+    },
+    {
+      "run": "b",
+      "severity": "failure",
+      "stages": [
+        4,
+        5
+      ],
+      "facts": [
+        "Stage4 Elian.depends_on replaces the existing e03 inn edge with []; current staysAt=e03 remains.",
+        "Stage5 Mara.depends_on replaces the existing e04 lodge edge with [] during a parley authentication update; current resides=e04 remains."
+      ],
+      "implication": "Unrelated updates erase still-valid dependencies. No subsequent inn/lodge event tests the resulting missed notices."
+    },
+    {
+      "run": "b",
+      "severity": "failure",
+      "stages": [
+        2,
+        5
+      ],
+      "facts": [
+        "Elian.imprisoned remains dungeon of e01 after escape.",
+        "Iona.stayingAt remains e04 after location records flight to an undisclosed safe house."
+      ]
+    },
+    {
+      "run": "b",
+      "severity": "bookkeeping_miss",
+      "stages": [
+        4
+      ],
+      "facts": [
+        "Handled omits Tamsin e14 despite explicit resolution of her fire outcome."
+      ],
+      "implication": "Not an observed repeated-notice failure: stage4 did not declare castle e01 changed, and emitted zero notices."
+    },
+    {
+      "run": "c",
+      "severity": "failure",
+      "stages": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Elian has no dependency on castle e01 in stage1 despite imprisonment there.",
+        "Elian never gains dependency on inn e03 after moving there in stage2."
+      ],
+      "implication": "Missing dependencies do not degrade the tested fire query because Elian has already escaped; an inn event was not tested."
+    },
+    {
+      "run": "all",
+      "severity": "review_caution",
+      "stages": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "Completed rescue quest retains old requires/needs fields in all runs; status and empty dependencies make inactivity explicit, so stale historical requirement versus contradiction is ambiguous."
+      ],
+      "implication": "Do not claim active rescue dependencies remain; they were retired correctly."
+    },
+    {
+      "run": "all",
+      "severity": "success",
+      "stages": [
+        3,
+        4,
+        5
+      ],
+      "facts": [
+        "All runs emit exactly e02/e14/e09 candidates at fire stage3, no stage4 candidates, and only e09 at stage5.",
+        "All preserve unknown fire outcomes until explicitly resolved; existing castle dependencies for departed characters and ended rescue/grain commitments are retired before the fire (C never recorded Elian castle dependency).",
+        "All preserve typed baseline fields, record c02 identity, leave engine deck unchanged, retain possession after failed return, reject ambiguous abandonment, and keep Iona alive."
+      ]
+    }
+  ]
+}

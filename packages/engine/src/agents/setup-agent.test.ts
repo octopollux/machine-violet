@@ -4,6 +4,8 @@ import type { SetupResult } from "./setup-agent.js";
 import { buildCampaignWorld, slugify } from "./world-builder.js";
 import type { FileIO } from "./scene-manager.js";
 import { resolveSystemSlug } from "./subagents/setup-conversation.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 
 /** Helper to build a minimal SetupResult for testing */
 function makeSetupResult(overrides: Partial<SetupResult> = {}): SetupResult {
@@ -111,7 +113,7 @@ describe("buildCampaignConfig", () => {
     const result = makeSetupResult();
     const config = buildCampaignConfig(result);
 
-    expect(config.version).toBe(1);
+    expect(config.version).toBe(CAMPAIGN_FORMAT_VERSION);
     expect(config.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });
@@ -174,7 +176,7 @@ describe("resolveSystemSlug", () => {
 });
 
 describe("buildCampaignWorld", () => {
-  it("includes characterDetails in character file when present", async () => {
+  it("includes characterDetails in the SQLite character body when present", async () => {
     const files: Record<string, string> = {};
     const dirs = new Set<string>();
     const { norm } = await import("../utils/paths.js");
@@ -189,12 +191,12 @@ describe("buildCampaignWorld", () => {
     };
 
     const result = makeSetupResult({ characterDetails: "Fighter, level 1, standard array" });
-    await buildCampaignWorld("/tmp/campaigns", result, fileIO);
+    const root = await buildCampaignWorld("/tmp/campaigns", result, fileIO);
 
-    const charFile = Object.keys(files).find((p) => p.includes("/characters/"));
-    expect(charFile).toBeTruthy();
-    expect(files[charFile!]).toContain("Character Details");
-    expect(files[charFile!]).toContain("Fighter, level 1, standard array");
+    const character = await (await getCampaignKnowledge(root, fileIO)).read(result.characterName);
+    expect(character.body).toContain("Character Details");
+    expect(character.body).toContain("Fighter, level 1, standard array");
+    expect(Object.keys(files).some((p) => p.endsWith("/kael.md"))).toBe(false);
   });
 
   it("creates campaign directory structure and files", async () => {
@@ -223,10 +225,12 @@ describe("buildCampaignWorld", () => {
     const config = JSON.parse(files[configPath!]);
     expect(config.name).toBe(result.campaignName);
 
-    // Character file was written
-    const charFile = Object.keys(files).find((p) => p.includes("/characters/"));
-    expect(charFile).toBeTruthy();
-    expect(files[charFile!]).toContain(result.characterName);
+    const knowledge = await getCampaignKnowledge(root, fileIO);
+    const character = await knowledge.read(result.characterName);
+    expect(character.name).toBe(result.characterName);
+    expect(character.body).toContain(result.characterDescription);
+    expect(character.fields.type).toBe("PC");
+    expect(character.visibility).toBe("player-facing");
 
     // Campaign log was written (JSON format)
     const logFile = Object.keys(files).find((p) => p.endsWith("log.json"));
@@ -237,17 +241,14 @@ describe("buildCampaignWorld", () => {
 
     // Location was created — and explicitly flagged as a placeholder
     // so the Scribe knows to rename it once the DM names the opening locale.
-    const locationFile = Object.keys(files).find((p) => p.includes("/locations/"));
-    expect(locationFile).toBeTruthy();
-    expect(locationFile).toContain("starting-location/index.md");
-    expect(files[locationFile!]).toContain("**Placeholder:** true");
-    expect(files[locationFile!]).toContain("Placeholder");
+    const location = await knowledge.read("Starting Location");
+    expect(location.fields.placeholder).toBe(true);
+    expect(location.body).toContain("Placeholder");
+    expect(location.visibility).toBe("private");
 
-    // Party file was written with PC as member
-    const partyFile = Object.keys(files).find((p) => p.endsWith("/party.md"));
-    expect(partyFile).toBeTruthy();
-    expect(files[partyFile!]).toContain("The Party");
-    expect(files[partyFile!]).toContain("[[");
+    const party = await knowledge.read("The Party");
+    expect(party.fields.members).toEqual([{ $ref: character.uid }]);
+    expect(Object.keys(files).some((p) => /\/(characters|locations)\/.*\.md$|\/party\.md$/.test(p))).toBe(false);
 
     // Player file was written to machine-scope
     const playerFile = Object.keys(files).find((p) => p.includes("/tmp/home/players/"));
