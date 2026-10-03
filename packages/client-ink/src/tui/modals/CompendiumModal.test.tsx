@@ -63,6 +63,17 @@ function emptyCompendium(): Compendium {
 }
 
 describe("CompendiumModal", () => {
+  it("renders multiline model collection labels as one literal padded row", () => {
+    const data = emptyCompendium();
+    data.collections = { "Rituals\n</b><br><color=#00ff00>Arcane": [entry({ name: "Spell", slug: "k9" })] };
+    const { lastFrame } = render(<Box width={120} height={30}><CompendiumModal theme={theme} width={120} height={30} data={data} onClose={() => {}} /></Box>);
+    const frame = lastFrame()!;
+    const labelRows = frame.split("\n").filter(line => line.includes("Rituals"));
+    expect(labelRows).toHaveLength(1);
+    expect(labelRows[0]).toContain("Rituals </b><br><color=#00ff00>Arcane (1)");
+    expect(labelRows[0]).toMatch(/Arcane \(1\).*[^\s]$/);
+    expect(frame.split("\n").filter(line => line.includes("Arcane"))).toHaveLength(1);
+  });
   it("shows an arbitrary nested collection instead of assuming fixed categories", () => {
     const data = emptyCompendium();
     data.collections = { "Rituals/Arcane": [entry({ uid: "k9", name: "Blue Flame", slug: "k9" })] };

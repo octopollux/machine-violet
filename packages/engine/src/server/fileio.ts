@@ -15,13 +15,31 @@ import { KNOWLEDGE_FILE, type CampaignKnowledgeStore } from "../knowledge/store.
 export { createArchiveFileIO } from "../config/campaign-archive.js";
 
 export function createBaseFileIO(): FileIO {
-  const stores = new Map<string,CampaignKnowledgeStore>();
+  const stores = new Map<string, CampaignKnowledgeStore>();
+  let closed = false;
+  let closing: Promise<void> | undefined;
   return {
     campaignKnowledge: async (root, options) => {
-      const absolute=resolve(root); const key=process.platform==="win32" ? absolute.toLowerCase() : absolute;
+      if (closed) throw new Error("Campaign I/O knowledge stores have been closed");
+      const absolute = resolve(root);
+      const key = process.platform === "win32" ? absolute.toLowerCase() : absolute;
       let store = stores.get(key);
-      if(!store) { store=new SqliteKnowledgeStore(join(absolute,KNOWLEDGE_FILE),{create:options?.create ?? false}); stores.set(key,store); }
+      if (!store) {
+        store = new SqliteKnowledgeStore(join(absolute, KNOWLEDGE_FILE), { create: options?.create ?? false });
+        stores.set(key, store);
+      }
       return store;
+    },
+    closeKnowledgeStores: () => {
+      if (closing) return closing;
+      closed = true;
+      closing = (async () => {
+        const results = await Promise.allSettled([...stores.values()].map(async store => { await (store.dispose ? store.dispose() : store.close()); }));
+        stores.clear();
+        const errors = results.filter((result): result is PromiseRejectedResult => result.status === "rejected").map(result => result.reason as unknown);
+        if (errors.length) throw new AggregateError(errors, "Failed to close campaign knowledge stores");
+      })();
+      return closing;
     },
     readFile: (path: string) => readFile(path, "utf-8"),
     writeFile: (path: string, content: string) => writeFile(path, content, "utf-8"),

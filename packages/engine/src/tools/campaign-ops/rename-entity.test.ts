@@ -57,6 +57,28 @@ describe("rewriteLinks", () => {
 });
 
 describe("renameEntity SQLite identity", () => {
+  it("preserves trimmed punctuation and old aliases on the same UID", async () => {
+    const store = new SqliteKnowledgeStore(":memory:");
+    try {
+      const io = { campaignKnowledge: async () => store } as FileIO;
+      await store.mutate([{ op: "upsert", collection: "Characters", name: "Captain" }]);
+      const uid = await store.resolve("Captain");
+      await renameEntity("/camp", io, "Captain", "  Jean-Luc / O'Neil.md  ", false);
+      expect((await store.read(uid!)).name).toBe("Jean-Luc / O'Neil.md");
+      expect(await store.resolve("Captain")).toBe(uid);
+      expect(await store.resolve("Jean-Luc / O'Neil.md")).toBe(uid);
+    } finally { await store.close(); }
+  });
+  it("rejects normalized punctuation-name collisions before renaming", async () => {
+    const store = new SqliteKnowledgeStore(":memory:");
+    try {
+      const io = { campaignKnowledge: async () => store } as FileIO;
+      await store.mutate([{ op: "upsert", collection: "Characters", name: "Captain" }, { op: "upsert", collection: "Characters", name: "Jean-Luc" }]);
+      await expect(renameEntity("/camp", io, "Captain", "  JEAN-LUC  ", false)).rejects.toThrow("already exists");
+      expect((await store.read("Captain")).name).toBe("Captain");
+      expect((await store.read("Jean-Luc")).name).toBe("Jean-Luc");
+    } finally { await store.close(); }
+  });
   it("retains UID, old handles and incoming references without prose/file rewriting",async()=>{
     const store=new SqliteKnowledgeStore(":memory:");const io={campaignKnowledge:async()=>store} as FileIO;
     await store.mutate([{op:"upsert",collection:"Characters",name:"Kael",fields:{placeholder:true}},{op:"upsert",collection:"Lore",name:"Story",body:"Kael entered",fields:{hero:{$ref:"Kael"}}}]);

@@ -5,7 +5,7 @@ import type { FormattingNode } from "@machine-violet/shared/types/tui.js";
 import { CenteredModal, computeModalInnerWidth } from "./CenteredModal.js";
 import type { CenteredModalHandle } from "./CenteredModal.js";
 import { themeColor, deriveModalTheme } from "../themes/color-resolve.js";
-import { parseFormatting, wrapNodes } from "../formatting.js";
+import { wrapNodes } from "../formatting.js";
 import { colorizeSheetLines } from "../character-colorization.js";
 import { collectWikilinks, markWikilinks } from "../wikilink-nav.js";
 import { collectCompendiumSlugs, findCompendiumEntryBySlug } from "@machine-violet/shared/utils/compendium-lookup.js";
@@ -334,18 +334,17 @@ export function CompendiumModal({
     if (row.type === "category") {
       const arrow = row.expanded ? "▾" : "▸";
       const prefix = selected ? "◆ " : "  ";
-      const label = `${prefix}${arrow} ${row.label} (${row.count})`;
-      const markup = selected
-        ? `<color=${color}><b>${label}</b></color>`
-        : `<color=${color}>${label}</color>`;
-      return parseFormatting(markup);
+      const label = `${prefix}${arrow} ${row.label.replace(/\s+/g, " ").trim()} (${row.count})`;
+      // Model-authored labels are literal text, never formatting markup.
+      const content: FormattingNode[] = [label];
+      const styled: FormattingNode[] = selected ? [{ type: "bold", content }] : content;
+      return color ? [{ type: "color", color, content: styled }] : styled;
     } else {
       const marker = selected ? "◆" : "○";
-      const label = `    ${marker} ${row.entry.name}`;
-      const markup = selected
-        ? `<color=${color}><b>${label}</b></color>`
-        : `<color=${color}>${label}</color>`;
-      return parseFormatting(markup);
+      const label = `    ${marker} ${row.entry.name.replace(/\s+/g, " ").trim()}`;
+      const content: FormattingNode[] = [label];
+      const styled: FormattingNode[] = selected ? [{ type: "bold", content }] : content;
+      return color ? [{ type: "color", color, content: styled }] : styled;
     }
   });
 

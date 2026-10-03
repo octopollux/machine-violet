@@ -62,11 +62,16 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
   private db: DatabaseSync | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private initialized = false;
+  private disposed = false;
+  private disposalRequested = false;
+  private disposal?: Promise<void>;
+  private snapshotInProgress = false;
   constructor(public readonly path: string, private readonly options: {
     create?: boolean;
     readOnly?: boolean;
   } = {}) { this.open(); }
   private open(): DatabaseSync {
+    if (this.disposed) throw new KnowledgeIntegrityError("Campaign knowledge store has been disposed");
     if (this.db)
       return this.db;
     if (this.path !== ":memory:" && (!this.options.create || this.initialized || this.options.readOnly) && !existsSync(this.path))
@@ -142,6 +147,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
     }
   }
   private serialized<T>(fn: () => T | Promise<T>): Promise<T> {
+    if (this.disposalRequested) return Promise.reject(new KnowledgeIntegrityError("Campaign knowledge store has been disposed"));
     const next = this.queue.then(fn);
     this.queue = next.catch(() => undefined);
     return next;
@@ -908,17 +914,43 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       }
     });
   }
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
+    // Seal new work immediately while the already queued operations drain.
+    this.disposalRequested = true;
+    // An active snapshot has already released its handle. Do not wait for a
+    // hung Git/archive callback; it is sealed against reopening on completion.
+    if (this.snapshotInProgress) {
+      this.disposed = true;
+      this.db?.close();
+      this.db = null;
+      this.disposal = Promise.resolve();
+      return this.disposal;
+    }
+    this.disposal = this.queue.then(() => {
+      try { this.db?.close(); this.db = null; }
+      finally { this.disposed = true; }
+    });
+    this.queue = this.disposal.catch(() => undefined);
+    return this.disposal;
+  }
   withSnapshot<T>(capture: () => Promise<T>): Promise<T> {
     return this.serialized(async () => {
+      if (this.disposalRequested) throw new KnowledgeIntegrityError("Campaign knowledge store has been disposed");
       if (this.path !== ":memory:") {
         this.db?.close();
         this.db = null;
       }
       // A failed callback leaves the handle closed and preserves its error.
       // Archive may remove the source; never recreate that database.
-      const result = await capture();
-      if (!this.options.readOnly && (this.path === ":memory:" || existsSync(this.path))) this.open();
-      return result;
+      this.snapshotInProgress = true;
+      try {
+        const result = await capture();
+        if (!this.disposalRequested && !this.options.readOnly && (this.path === ":memory:" || existsSync(this.path))) this.open();
+        return result;
+      } finally {
+        this.snapshotInProgress = false;
+      }
     });
   }
 }

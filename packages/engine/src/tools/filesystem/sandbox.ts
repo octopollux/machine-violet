@@ -30,7 +30,9 @@ export function sandboxFileIO(inner: FileIO, allowedRoots: string[]): FileIO {
 
   const campaignKnowledge = inner.campaignKnowledge;
   const writeFileAtomic = inner.writeFileAtomic;
+  const closeKnowledgeStores = inner.closeKnowledgeStores;
   return {
+    ...(closeKnowledgeStores ? { closeKnowledgeStores: () => closeKnowledgeStores() } : {}),
     ...(campaignKnowledge ? { campaignKnowledge: (root: string, options?: { create?: boolean }) => campaignKnowledge(guard(root), options) } : {}),
     readFile: async (p) => inner.readFile(guard(p)),
     writeFile: async (p, c) => inner.writeFile(guard(p), c),

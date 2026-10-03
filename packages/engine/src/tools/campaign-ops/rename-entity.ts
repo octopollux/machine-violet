@@ -70,9 +70,8 @@ export async function renameEntity(
 ): Promise<RenameResult> {
   const store=await getCampaignKnowledge(root,fileIO);
   const uid=await store.resolve(oldPath);if(!uid) throw new Error(`Unknown knowledge identity: ${oldPath}`);
-  const occupied=await store.resolve(newPath);if(occupied && occupied!==uid) throw new Error(`Destination identity already exists: ${newPath}`);
-  const parts=newPath.replace(/^knowledge:/,"").split("/");
-  const name=(parts.at(-1)==="index.md" ? parts.at(-2) : parts.at(-1))?.replace(/\.md$/,"").replace(/-/g," ") ?? newPath;
+  const name=newPath.trim();
+  const occupied=await store.resolve(name);if(occupied && occupied!==uid) throw new Error(`Destination identity already exists: ${name}`);
   if(!dryRun) await store.mutate([{op:"patch",uid,name,history:`Renamed to ${name}`},{op:"remove_fields",uid,keys:["placeholder"]}],{source:"rename"});
   return {oldPath:`knowledge:${uid}`,newPath:`knowledge:${uid}`,filesUpdated:[],linksUpdated:0,dryRun};
 }

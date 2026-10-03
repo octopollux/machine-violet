@@ -2727,3 +2727,33 @@ describe("same-turn deferred boundary ordering", () => {
     expect(order).toEqual(["first", "promote", "notes", "second", "scene", "session", "rollback"]);
   });
 });
+
+
+describe("external teardown continuation seal", () => {
+  it.each(["text", "tool"])("discards a late %s provider response and rejects new input without persistence or deferred writes", async responseKind => {
+    let release!: (result: ChatResult) => void;
+    const pending = new Promise<ChatResult>(resolve => { release = resolve; });
+    const provider = mockProvider([textMessage("Unused subsequent response")]);
+    vi.mocked(provider.stream).mockImplementationOnce(async () => pending);
+    const io = mockFileIO();
+    const state = mockState();
+    const store = await getCampaignKnowledge(state.campaignRoot, io);
+    const { callbacks, log } = mockCallbacks();
+    const engine = makeEngine({ provider, gameState: state, scene: mockScene(), sessionState: mockSessionState(), fileIO: io, callbacks });
+    const turn = engine.processInput("Aldric", "A request interrupted by external quit");
+    await vi.waitFor(() => expect(provider.stream).toHaveBeenCalledTimes(1));
+    const persisted = { ...files };
+    engine.beginTeardown();
+    const late = responseKind === "text" ? textMessage("A late reply") : toolAndTextMessages("remember", { operations: [{ op: "upsert", collection: "Characters", name: "Late identity" }] }, "Late tool reply")[0];
+    release(late);
+    await turn;
+    await engine.settleDeferredWork();
+    expect(files).toEqual(persisted);
+    expect(await store.resolve("Late identity")).toBeNull();
+    expect(log.narrativeComplete).toEqual([]);
+    const calls = vi.mocked(provider.stream).mock.calls.length;
+    await engine.processInput("Aldric", "New input after quit");
+    expect(provider.stream).toHaveBeenCalledTimes(calls);
+    expect(files).toEqual(persisted);
+  });
+});

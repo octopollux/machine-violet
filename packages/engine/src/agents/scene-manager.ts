@@ -101,6 +101,8 @@ export interface FileIO extends KnowledgeFileIO {
   writeFile(path: string, content: string): Promise<void>;
   /** Replace a synced complete file without truncating its prior contents. */
   writeFileAtomic?(path: string, content: string): Promise<void>;
+  /** Drain and permanently release all campaign stores owned by this I/O. */
+  closeKnowledgeStores?(): Promise<void>;
   appendFile(path: string, content: string): Promise<void>;
   mkdir(path: string): Promise<void>;
   exists(path: string): Promise<boolean>;

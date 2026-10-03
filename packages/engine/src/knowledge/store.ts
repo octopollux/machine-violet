@@ -13,6 +13,8 @@ export interface CampaignKnowledgeStore {
   acknowledgeNotices(ids: number[]): Promise<void>;
   flush(): Promise<void>;
   close(): Promise<void>;
+  /** Permanent owning-session teardown; unlike close(), later access is rejected. */
+  dispose?(): Promise<void>;
   withSnapshot<T>(capture: () => Promise<T>): Promise<T>;
 }
 export interface KnowledgeFileIO {

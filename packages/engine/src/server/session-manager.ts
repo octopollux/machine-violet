@@ -1,3 +1,4 @@
+import type { FileIO } from "../agents/scene-manager.js";
 import { EntityStore } from "../entities/store.js";
 import { getCampaignKnowledge } from "../knowledge/store.js";
 /**
@@ -188,6 +189,8 @@ export class SessionManager {
   /** Incremented on each session start; stale callbacks check this to avoid leaking events. */
   private sessionGeneration = 0;
   private engine: GameEngine | null = null;
+  /** Owning I/O survives startup failures so every opened SQLite handle is released. */
+  private ownedFileIO: FileIO | null = null;
   private gameState: GameState | null = null;
   private costTracker: CostTracker | null = null;
   /** Providers held for this session — disposed on endSession. Stateful providers
@@ -415,7 +418,9 @@ export class SessionManager {
     try {
       await this.doStartSetup();
     } catch (err) {
-      this.status = "idle";
+      try { await this.setupSession?.dispose(); }
+      catch (cleanupError) { this.logCleanupError("setup startup disposal", cleanupError); }
+      finally { this.setupSession = null; this.status = "idle"; }
       throw err;
     }
   }
@@ -514,7 +519,7 @@ export class SessionManager {
     const setup = this.setupSession;
     void setup.start().then(() => {
       if (this.setupSession === setup) this.openNextTurn();
-    }).catch((err) => {
+    }).catch(async (err) => {
       // Only handle errors for the current setup session / generation
       if (this.setupSession !== setup || this.sessionGeneration !== gen) return;
 
@@ -534,8 +539,10 @@ export class SessionManager {
       const oldSetup = this.setupSession;
       this.setupSession = null;
       this.turnManager = null;
-      this.status = "idle";
-      void oldSetup?.dispose();
+      this.status = "stopping";
+      try { await oldSetup?.dispose(); }
+      catch (cleanupError) { this.logCleanupError("setup fatal disposal", cleanupError); }
+      finally { this.status = "idle"; }
 
       // Session-fatal: setup has died for a reason the player must address
       // (auth, model, classifier refusal). Surfacing as `recoverable: false`
@@ -633,8 +640,19 @@ export class SessionManager {
     try {
       await this.doStartSession(campaignId);
     } catch (err) {
-      // Reset to idle so subsequent starts aren't blocked
-      this.status = "idle";
+      this.engine?.beginTeardown();
+      try {
+        // A failed startup has no healthy work to preserve: cancel first.
+        await this.awaitTeardown(this.disposeSessionProviders(), "startup provider disposal");
+        if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "startup deferred work");
+      } finally {
+        try { await this.ownedFileIO?.closeKnowledgeStores?.(); }
+        catch (cleanupError) { this.logCleanupError("startup knowledge closure", cleanupError); }
+        this.ownedFileIO = null;
+        this.engine = null;
+        this.gameState = null;
+        this.status = "idle";
+      }
       throw err;
     }
   }
@@ -726,6 +744,7 @@ export class SessionManager {
 
     // --- Create and sandbox FileIO ---
     const baseIO = createBaseFileIO();
+    this.ownedFileIO = baseIO;
     const campaignsDir = dirname(campaignRoot);
     const homeDir = dirname(this.campaignsDir);
     const fileIO = sandboxFileIO(baseIO, [campaignRoot, campaignsDir, homeDir]);
@@ -1478,6 +1497,7 @@ export class SessionManager {
     }
 
     this.status = "stopping";
+    this.engine?.beginTeardown();
     this.clearIdleTimer();
     if (this.campaignId) {
       logEvent("session:end", { reason, campaignId: this.campaignId });
@@ -1488,32 +1508,84 @@ export class SessionManager {
     const { resetContextDump } = await import("../config/context-dump.js");
     resetContextDump();
 
+    const setupToDispose = this.setupSession;
     try {
-      // Flush any pending state, with a timeout so a hanging flush
-      // can never permanently brick the session lifecycle.
-      //
-      // Skip this block when ending due to a rollback: disk has just been
-      // reset to the target commit, but the engine's in-memory state
-      // (ConversationManager, SceneState) is still ahead by the rolled-back
-      // turns. A flush+checkpoint here would persist that stale state and
-      // silently undo the rollback for whole-file artifacts like
-      // conversation.json and scene.json.
+      // Healthy quits first give pending scribes a bounded chance to commit.
+      // If that stalls, provider cancellation and sealing prevent stale work
+      // from reopening the database after the owning session has ended.
+      if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "graceful deferred work");
+      await this.awaitTeardown(this.disposeSessionProviders(), "provider disposal");
+      if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "final deferred work");
+      // Rollback must never flush the stale in-memory state over restored disk.
       if (this.engine && reason !== "rollback") {
-        const timeout = (ms: number) => new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error("endSession flush timeout")), ms));
         const persister = this.engine.getPersister();
-        if (persister) await Promise.race([persister.flush(), timeout(10_000)]);
+        if (persister) await this.awaitTeardown(persister.flush(), "state persistence");
         const repo = this.engine.getRepo();
-        if (repo) await Promise.race([repo.checkpoint("Session end"), timeout(10_000)]);
+        if (repo) await this.awaitTeardown(repo.checkpoint("Session end"), "session checkpoint");
       }
-    } catch (err) {
-      logEvent("session:error", {
-        phase: "cleanup",
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      });
+    } finally {
+      try { await this.ownedFileIO?.closeKnowledgeStores?.(); }
+      catch (error) { this.logCleanupError("knowledge closure", error); }
+      this.ownedFileIO = null;
+      // Setup owns a distinct I/O instance and closes its own campaign handles.
+      try { await setupToDispose?.dispose(); }
+      catch (error) { this.logCleanupError("setup disposal", error); }
     }
 
+    this.campaignId = null;
+    this.turnManager = null;
+    this.engine = null;
+    this.gameState = null;
+    this.choicePresentations.clear();
+    this.activeChoicePresentation = null;
+    this.setupSession = null;
+    this.costTracker = null;
+    this.currentMode = "play";
+    this.persistedUI = {};
+    this.status = "idle";
+
+    this.broadcast({
+      type: "discord:presence",
+      data: { action: "stop" },
+    });
+
+    // Push a final snapshot so any client still tracking mode state sees the
+    // authoritative reset to "play" before the session winds down. Without
+    // this, teardown paths that null the engine's mode session (e.g. the OOC
+    // rollback path that calls endSession("rollback") from the commit handler)
+    // leave clients believing they're still in OOC/Dev — the next ESC sends
+    // /exit_mode against a dead session and surfaces "Not in a mode session."
+    // instead of opening the menu.
+    this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
+
+    this.broadcast({
+      type: "session:ended",
+      data: { summary: "Session ended." },
+    });
+  }
+
+  private logCleanupError(phase: string, error: unknown): void {
+    logEvent("session:error", {
+      phase,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
+
+  private async awaitTeardown(work: Promise<unknown>, phase: string): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([work, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${phase} timeout`)), 10_000);
+      })]);
+    } catch (error) {
+      this.logCleanupError(phase, error);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private async disposeSessionProviders(): Promise<void> {
     // Drain usage subscriptions before disposing providers so the
     // unsubscribe callback (which removes from the provider's listener
     // set) can't race with subprocess teardown.
@@ -1542,43 +1614,6 @@ export class SessionManager {
       }
     }));
 
-    // Dispose the setup-session's tier providers alongside the game
-    // session's. endSession is called when the user ends from either
-    // setup or play, so a lingering setup-session must shed its
-    // subprocess too.
-    const setupToDispose = this.setupSession;
-
-    this.campaignId = null;
-    this.turnManager = null;
-    this.engine = null;
-    this.gameState = null;
-    this.choicePresentations.clear();
-    this.activeChoicePresentation = null;
-    this.setupSession = null;
-    this.costTracker = null;
-    if (setupToDispose) await setupToDispose.dispose();
-    this.currentMode = "play";
-    this.persistedUI = {};
-    this.status = "idle";
-
-    this.broadcast({
-      type: "discord:presence",
-      data: { action: "stop" },
-    });
-
-    // Push a final snapshot so any client still tracking mode state sees the
-    // authoritative reset to "play" before the session winds down. Without
-    // this, teardown paths that null the engine's mode session (e.g. the OOC
-    // rollback path that calls endSession("rollback") from the commit handler)
-    // leave clients believing they're still in OOC/Dev — the next ESC sends
-    // /exit_mode against a dead session and surfaces "Not in a mode session."
-    // instead of opening the menu.
-    this.broadcast({ type: "state:snapshot", data: this.buildStateSnapshot() });
-
-    this.broadcast({
-      type: "session:ended",
-      data: { summary: "Session ended." },
-    });
   }
 
   // --- Turn management ---

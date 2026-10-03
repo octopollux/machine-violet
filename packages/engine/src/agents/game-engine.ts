@@ -110,6 +110,7 @@ export class GameEngine {
   private conversation: ConversationManager;
   private sceneManager: SceneManager;
   private callbacks: EngineCallbacks;
+  private closing = false;
   private engineState: EngineState = "idle";
   private sessionUsage: UsageStats = {
     inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
@@ -358,6 +359,7 @@ export class GameEngine {
 
     // Wire engine-specific tool hooks (combat lifecycle, player switching)
     this.registry.onToolSuccess = (toolName, state) => {
+      if (this.closing) return;
       if (toolName === "switch_player") {
         this.persistCurrentScene();
       }
@@ -383,6 +385,7 @@ export class GameEngine {
 
   /** Persist specific state slices after mutations */
   private persistSlices(state: GameState, slices: StateSlice[]): void {
+    if (this.closing) return;
     if (!this.persister) return;
     for (const slice of slices) {
       switch (slice) {
@@ -397,6 +400,7 @@ export class GameEngine {
 
   /** Persist current scene state (precis, threads, player index, etc.) */
   private persistCurrentScene(): void {
+    if (this.closing) return;
     if (!this.persister) return;
     const scene = this.sceneManager.getScene();
     this.persister.persistScene({
@@ -487,6 +491,7 @@ export class GameEngine {
    * client just like the DM's.
    */
   dispatchImmediateTuiCommand(cmd: TuiCommand): void {
+    if (this.closing) return;
     this.callbacks.onTuiCommand(cmd);
   }
 
@@ -497,6 +502,7 @@ export class GameEngine {
    * exact same teardown semantics. May throw RollbackCompleteError.
    */
   async applyDeferredTuiCommands(commands: TuiCommand[]): Promise<void> {
+    if (this.closing) return;
     // A boundary snapshots the entire outgoing turn, even when the model
     // emits it before that turn's Scribe. Keep ordinary command order intact
     // (especially promote/notes), then run boundaries before terminal rollback.
@@ -644,6 +650,7 @@ export class GameEngine {
    * This is the main game loop entry point.
    */
   async processInput(characterName: string, text: string, opts?: ProcessInputOptions): Promise<void> {
+    if (this.closing) return;
     if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
     }
@@ -690,6 +697,7 @@ export class GameEngine {
     // usually a no-op, since the player's think-time dwarfs the work.
     try {
       await this.deferred.settle("next-turn", this.campaignId);
+      if (this.closing) return;
       await this.sceneManager.prepareKnowledgeContext();
       // Preserve the exact scene tree before the provider can observe it,
       // including interrupted first turns and resumes after a failed call.
@@ -859,6 +867,7 @@ export class GameEngine {
         config,
       );
 
+      if (this.closing) return;
       // Count wrapped lines for length steering, then update all injection counters
       let wrappedLineCount = 0;
       if (result.text && this.terminalDims) {
@@ -1078,6 +1087,7 @@ export class GameEngine {
       this.lastFailedInput = null;
 
     } catch (e) {
+      if (this.closing) return;
       setSpanAttrs({ failed: true });
       if (e instanceof ContentRefusalError) {
         // Content classifier refusal — don't persist exchange or set retry
@@ -1121,6 +1131,7 @@ export class GameEngine {
     // player frame, "the DM is creating an image…"), so a multi-minute render
     // would make the player wait their own turn out for no reason. The image
     // arrives on its own; the turn is the player's now.
+    if (this.closing) return;
     this.setState("waiting_input");
 
     // Check if an AI player should auto-act next
@@ -1439,6 +1450,9 @@ export class GameEngine {
   // --- Validation ---
 
   // --- Worldbuilding Entity I/O ---
+
+  /** Seal new turns and discard late provider continuations during external teardown. */
+  beginTeardown(): void { this.closing = true; }
 
   /**
    * Barrier: flush all detached background lanes (scribe, scene-tracker) before
@@ -2178,6 +2192,7 @@ export class GameEngine {
       asyncToolHandler: (name, input) => this.handleAsyncToolInternal(name, input),
       onTextDelta: (delta) => this.callbacks.onNarrativeDelta(delta),
       onToolStart: (name) => {
+        if (this.closing) throw new Error("Session is closing");
         // A SYNCHRONOUS (player_request) image render owns the "creating an
         // image" indicator for its whole duration — hold it across any faster
         // sibling tool batched in the same response. Background renders are
