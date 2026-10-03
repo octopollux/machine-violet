@@ -1073,7 +1073,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "scribe",
-      description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). A storyteller subagent resolves canonical identities and commits facts to campaign memory.",
+      description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). Include known canonical UIDs beside recurring or re-described referents; without a known UID, retain an established name or alias. A storyteller subagent resolves canonical identities and commits facts to campaign memory.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -1083,7 +1083,7 @@ const TOOL_DEFS: RegisteredTool[] = [
               type: "object",
               properties: {
                 visibility: { type: "string", enum: ["private", "player-facing"], description: "Whether this info is DM-only or visible to players" },
-                content: { type: "string", description: "Natural language description of what changed" },
+                content: { type: "string", description: "Natural language description of what changed. Include each known UID beside its recurring or re-described referent; otherwise retain an established name or alias. No extra lookup turn is required solely for a UID." },
               },
               required: ["visibility", "content"],
             },
