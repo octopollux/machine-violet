@@ -18,8 +18,8 @@ describe("model config", () => {
 
   it("returns defaults when no dev-config.jsonc", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-opus-5");
-    expect(config.medium).toBe("claude-sonnet-5");
+    expect(config.large).toBe("claude-opus-5-5");
+    expect(config.medium).toBe("claude-sonnet-5-5");
     expect(config.small).toBe("claude-haiku-4-5-20251001");
   });
 
@@ -27,7 +27,7 @@ describe("model config", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     writeFileSync(join(testDir, "dev-config.jsonc"), "not json {{{");
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-opus-5");
+    expect(config.large).toBe("claude-opus-5-5");
     warn.mockRestore();
   });
 
@@ -44,8 +44,8 @@ describe("model config", () => {
 
   it("getModel returns tier value", () => {
     loadModelConfig({ cwd: testDir, reset: true });
-    expect(getModel("large")).toBe("claude-opus-5");
-    expect(getModel("medium")).toBe("claude-sonnet-5");
+    expect(getModel("large")).toBe("claude-opus-5-5");
+    expect(getModel("medium")).toBe("claude-sonnet-5-5");
     expect(getModel("small")).toBe("claude-haiku-4-5-20251001");
   });
 
@@ -83,6 +83,13 @@ describe("model config", () => {
     const config = loadModelConfig({ cwd: testDir, reset: true });
     expect(config.effort.dm).toBe("low"); // invalid "turbo" rejected, default preserved
     expect(config.effort.ooc).toBe("low");
+  });
+
+  it("preserves xhigh as a distinct configured effort", () => {
+    writeFileSync(join(testDir, "dev-config.jsonc"), JSON.stringify({ effort: { dm: "xhigh" } }));
+    const config = loadModelConfig({ cwd: testDir, reset: true });
+    expect(config.effort.dm).toBe("xhigh");
+    expect(getEffortConfig("dm").effort).toBe("xhigh");
   });
 
   it("accepts null/none as disabled effort", () => {
@@ -155,7 +162,7 @@ describe("model config", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     writeFileSync(join(testDir, "dev-config.jsonc"), "{ this is not json");
     const config = loadModelConfig({ cwd: testDir, reset: true });
-    expect(config.large).toBe("claude-opus-5"); // still falls back to defaults
+    expect(config.large).toBe("claude-opus-5-5"); // still falls back to defaults
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain("dev-config.jsonc");
     warn.mockRestore();
@@ -254,6 +261,9 @@ describe("pricing config", () => {
 
   it("returns defaults when no dev-config.jsonc", () => {
     const pricing = loadPricingConfig({ cwd: testDir, reset: true });
+    expect(pricing["claude-fable-5-1"]).toEqual({ input: 10, output: 50, cacheWrite: 12.5, cacheRead: 0.25 });
+    expect(pricing["claude-opus-5-5"]).toEqual({ input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 });
+    expect(pricing["claude-sonnet-5-5"]).toEqual({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 });
     expect(pricing["claude-fable-5"].input).toBe(10);
     expect(pricing["claude-fable-5"].output).toBe(50);
     expect(pricing["claude-opus-5"].input).toBe(5);

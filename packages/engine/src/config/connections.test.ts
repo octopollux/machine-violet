@@ -152,6 +152,28 @@ describe("saveConnectionStore", () => {
 });
 
 describe("buildEffectiveConnections", () => {
+  it("preserves live ChatGPT availability/capabilities and chooses role-aware rollout fallbacks", () => {
+    const models = [
+      {id:"gpt-6-astra",displayName:"Astra",available:true,supportedReasoningEfforts:["low","max"]},
+      {id:"gpt-6.1-sol",displayName:"Sol",available:true},
+      {id:"gpt-6-luna",displayName:"Hidden Luna",available:false},
+      {id:"gpt-5.6-luna",displayName:"Account Luna",available:true},
+      {id:"future-account-model",displayName:"Future",available:true},
+    ];
+    const connection: AIConnection = {id:"chat",provider:"openai-chatgpt",label:"ChatGPT",apiKey:"",models,source:"manual",addedAt:""};
+    const store: ConnectionStore = {connections:[connection],tierAssignments:{large:null,medium:null,small:null},imageAssignment:null};
+    const effective = buildEffectiveConnections(store,tempDir);
+    expect(effective.connections[0].models).toEqual(models);
+    expect(effective.tierAssignments).toEqual({
+      large:{connectionId:"chat",modelId:"gpt-6-astra"},
+      medium:{connectionId:"chat",modelId:"gpt-6.1-sol"},
+      small:{connectionId:"chat",modelId:"gpt-5.6-luna"},
+    });
+    const pin = {connectionId:"chat",modelId:"old-saved-row-id"};
+    store.tierAssignments.small = pin;
+    expect(buildEffectiveConnections(store,tempDir).tierAssignments.small).toEqual(pin);
+  });
+
   let savedAnthropic: string | undefined;
   let savedGoogle: string | undefined;
   let savedGemini: string | undefined;

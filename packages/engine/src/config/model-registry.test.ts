@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   getKnownModel,
+  getModelsForProvider,
   getImageModelsForProvider,
   getMaxOutput,
   getTierDefaults,
   loadModelRegistry,
+  modelFamilyFor,
   supportsImageGeneration,
 } from "./model-registry.js";
 
@@ -62,10 +64,28 @@ describe("current provider defaults and metadata", () => {
     loadModelRegistry(undefined, { reset: true });
   });
 
+  it("keeps every shipped text model in a valid family and tier", () => {
+    for (const [id, entry] of Object.entries(loadModelRegistry().models)) {
+      expect(["large", "medium", "small"], id).toContain(entry.defaultTier);
+      expect(["anthropic", "openai", "gemini", "xai", "openrouter"], id).toContain(entry.provider);
+      expect(getModelsForProvider(entry.provider)[id], id).toBe(entry);
+    }
+  });
+
+  it.each(["openai-apikey", "openai-chatgpt"])("exposes the current OpenAI catalog to %s connections", (provider) => {
+    const models = getModelsForProvider(modelFamilyFor(provider));
+    for (const id of ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna", "gpt-6-sol", "gpt-5.6-sol"]) {
+      expect(models[id], id).toBeDefined();
+    }
+    expect(models["gpt-6-astra"].defaultTier).toBe("large");
+    expect(models["gpt-6.1-sol"].defaultTier).toBe("medium");
+    expect(models["gpt-6-luna"].defaultTier).toBe("small");
+  });
+
   it("ships the current Anthropic tier family", () => {
     expect(getTierDefaults("anthropic")).toEqual({
-      large: "claude-opus-5",
-      medium: "claude-sonnet-5",
+      large: "claude-opus-5-5",
+      medium: "claude-sonnet-5-5",
       small: "claude-haiku-4-5-20251001",
     });
     expect(getKnownModel("claude-opus-5")).toMatchObject({
@@ -79,16 +99,47 @@ describe("current provider defaults and metadata", () => {
       maxOutput: 128_000,
       capabilities: { thinking: true, alwaysAdaptiveThinking: true },
     });
+    expect(getKnownModel("claude-fable-5-1")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      pricing: { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 0.25 },
+      capabilities: { thinking: true, alwaysAdaptiveThinking: true, supportsXhighEffort: true },
+    });
+    expect(getKnownModel("claude-opus-5-5")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      pricing: { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 },
+      capabilities: { thinking: true, alwaysAdaptiveThinking: true, supportsXhighEffort: true },
+    });
+    expect(getKnownModel("claude-sonnet-5-5")).toMatchObject({
+      contextWindow: 1_000_000,
+      maxOutput: 128_000,
+      pricing: { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 },
+      capabilities: { thinking: true, minimumThinkingMode: "between_tools", supportsXhighEffort: true },
+    });
   });
 
-  it("ships GPT-5.6 as the API-key and ChatGPT tier family", () => {
+  it("assigns Astra / Sol / Luna to API-key and ChatGPT tiers", () => {
     const expected = {
-      large: "gpt-5.6-sol",
-      medium: "gpt-5.6-terra",
-      small: "gpt-5.6-luna",
+      large: "gpt-6-astra",
+      medium: "gpt-6.1-sol",
+      small: "gpt-6-luna",
     };
     expect(getTierDefaults("openai-apikey")).toEqual(expected);
     expect(getTierDefaults("openai-chatgpt")).toEqual(expected);
+  });
+
+  it.each([
+    ["gpt-6-astra", 10, 50, 12.5, 1],
+    ["gpt-6.1-sol", 2, 10, 2.5, 0.1],
+    ["gpt-6-luna", 0.1, 0.5, 0.125, 0.01],
+    ["gpt-6-sol", 2, 10, 2.5, 0.2],
+  ])("ships verified limits and pricing for %s", (id, input, output, cacheWrite, cacheRead) => {
+    expect(getKnownModel(String(id))).toMatchObject({
+      contextWindow: 1_050_000,
+      maxOutput: 128_000,
+      pricing: { input, output, cacheWrite, cacheRead },
+    });
   });
 
   it("uses current OpenAI context and output ceilings", () => {
@@ -124,6 +175,9 @@ describe("supportsImageGeneration", () => {
   });
 
   it("returns false for current Anthropic models (no inline image gen yet)", () => {
+    expect(supportsImageGeneration("claude-fable-5-1")).toBe(false);
+    expect(supportsImageGeneration("claude-opus-5-5")).toBe(false);
+    expect(supportsImageGeneration("claude-sonnet-5-5")).toBe(false);
     expect(supportsImageGeneration("claude-fable-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-5")).toBe(false);
     expect(supportsImageGeneration("claude-opus-4-8")).toBe(false);

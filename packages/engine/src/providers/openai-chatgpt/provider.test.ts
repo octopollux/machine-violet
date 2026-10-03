@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  TurnCollector, CodexTurnFailedError, messageToResponsesItems,
+  TurnCollector, CodexTurnFailedError, messageToResponsesItems, selectReasoningEffort,
   buildImagePromptText, extractGeneratedImage, createOpenAIChatGptProvider,
   shouldRetryImageRender, ImageGenNoDataError,
   summarizeItem, readNewestPngAsBase64, removeGeneratedImageDir,
@@ -639,5 +639,71 @@ describe("shouldAutoRetryTurn (codex mid-turn death auto-retry policy)", () => {
   it("does NOT retry when the failure was not a subprocess death", () => {
     // A content/auth/schema failure won't be fixed by a fresh process.
     expect(shouldAutoRetryTurn(false, false, 1)).toBe(false);
+  });
+});
+
+
+describe("account-supported reasoning effort", () => {
+  const caps = (levels: import("./protocol.js").ReasoningEffort[], model = "gpt-6.1-sol") => ({
+    model,
+    defaultReasoningEffort: "high" as const,
+    supportedReasoningEfforts: levels.map((reasoningEffort) => ({reasoningEffort,description:""})),
+  });
+  it("sends native max for current6 and retains explicit xhigh", () => {
+    const model = caps(["low","medium","high","xhigh","max","ultra"]);
+    expect(selectReasoningEffort("max",model)).toBe("max");
+    expect(selectReasoningEffort("xhigh",model)).toBe("xhigh");
+  });
+  it("falls back from max to xhigh for legacy5.5 without selecting ultra", () => {
+    expect(selectReasoningEffort("max",caps(["low","medium","high","xhigh"]))).toBe("xhigh");
+    expect(selectReasoningEffort("max")).toBe("xhigh");
+    expect(selectReasoningEffort("max",caps(["low","medium","high","xhigh","max"],"gpt-5.6-sol"))).toBe("xhigh");
+  });
+  it("chooses the nearest lower effort rather than the account's higher default", () => {
+    expect(selectReasoningEffort("medium",caps(["low","high","max"]))).toBe("low");
+    expect(selectReasoningEffort("low",caps(["medium","high"]))).toBe("medium");
+    expect(() => selectReasoningEffort("max",caps(["ultra"]))).toThrow("no supported");
+  });
+});
+
+
+describe("ChatGPT model/effort wire integration", () => {
+  it("resolves saved catalog-row IDs to backend IDs, caches discovery, and omits null effort", async () => {
+    const listeners = new Map<string, Set<(payload: unknown) => void>>();
+    const call = vi.fn(async (method: string, _params: unknown) => {
+      if (method === "account/read") return {account:{type:"chatgpt",email:"fixture@example.test",planType:"plus"}};
+      if (method === "model/list") return {data:[{id:"saved-catalog-row",model:"gpt-6.1-sol",
+        displayName:"Sol6.1",hidden:false,isDefault:true,defaultReasoningEffort:"medium",
+        supportedReasoningEfforts:[{reasoningEffort:"xhigh",description:""},{reasoningEffort:"max",description:""}],
+      }],nextCursor:null};
+      if (method === "thread/start") return {thread:{id:"t1"}};
+      if (method === "turn/start") {
+        setImmediate(() => {
+          for (const cb of listeners.get("item/completed") ?? []) cb(agentMessageCompleted("Done"));
+          for (const cb of listeners.get("turn/completed") ?? []) cb(completedTurn());
+        });
+        return {turn:{id:"turn_1"}};
+      }
+      return {};
+    });
+    const client = {call,on:vi.fn(),once:vi.fn(),off:vi.fn(),
+      onNotification(method: string, handler: (payload: unknown) => void) {
+        const set = listeners.get(method) ?? new Set();
+        set.add(handler);listeners.set(method,set);
+        return () => {set.delete(handler);};
+      },
+    } as unknown as import("./rpc.js").CodexRpcClient;
+    const provider = createOpenAIChatGptProvider();
+    (provider as unknown as {ensureStarted:()=>Promise<typeof client>}).ensureStarted = async () => client;
+    const base = {model:"saved-catalog-row",systemPrompt:"Fixture",maxTokens:64,
+      messages:[{role:"user" as const,content:"Hello"}]};
+    await provider.chat({...base,thinking:{effort:"max"}});
+    expect(call).toHaveBeenCalledWith("thread/start",expect.objectContaining({model:"gpt-6.1-sol"}));
+    expect(call).toHaveBeenCalledWith("turn/start",expect.objectContaining({effort:"max"}));
+    call.mockClear();
+    await provider.chat({...base,thinking:{effort:null}});
+    const request = call.mock.calls.find(([method]) => method === "turn/start")?.[1];
+    expect(request).not.toHaveProperty("effort");
+    expect(call.mock.calls.filter(([method]) => method === "model/list")).toHaveLength(0);
   });
 });

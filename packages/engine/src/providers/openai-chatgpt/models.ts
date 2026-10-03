@@ -20,16 +20,32 @@ export interface DiscoveredCodexModel extends DiscoveredModel {
 }
 
 export async function listModels(client: CodexRpcClient, opts?: { limit?: number; includeHidden?: boolean }): Promise<DiscoveredCodexModel[]> {
-  const result = await client.call<ModelListResult>("model/list", {
-    limit: opts?.limit ?? 50,
-    includeHidden: opts?.includeHidden ?? false,
-  });
-  return result.data.map(toDiscoveredModel);
+  return (await listModelInfo(client, opts)).map(toDiscoveredModel);
+}
+
+/** Account availability and capabilities can span several opaque cursor pages. */
+export async function listModelInfo(client: CodexRpcClient, opts?: { limit?: number; includeHidden?: boolean }): Promise<ModelInfo[]> {
+  const models: ModelInfo[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  do {
+    const result = await client.call<ModelListResult>("model/list", {
+      limit: opts?.limit ?? 50,
+      includeHidden: opts?.includeHidden ?? false,
+      ...(cursor ? { cursor } : {}),
+    });
+    models.push(...result.data);
+    cursor = result.nextCursor ?? undefined;
+    if (cursor && seen.has(cursor)) throw new Error("Codex model/list repeated a pagination cursor");
+    if (cursor) seen.add(cursor);
+  } while (cursor);
+  return models;
 }
 
 function toDiscoveredModel(m: ModelInfo): DiscoveredCodexModel {
   return {
-    id: m.id,
+    // id identifies the catalog row; model is the backend ID thread/start uses.
+    id: m.model || m.id,
     displayName: m.displayName,
     available: !m.hidden,
     isDefault: m.isDefault,

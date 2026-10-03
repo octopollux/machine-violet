@@ -75,3 +75,26 @@ describe("listModels", () => {
     expect(callSpy).toHaveBeenCalledWith("model/list", { limit: 5, includeHidden: true });
   });
 });
+
+
+describe("paginated account catalogs", () => {
+  const row = (id: string, model = id, hidden = false) => ({
+    id, model, displayName: model, hidden, isDefault: false,
+    defaultReasoningEffort: "medium" as const,
+    supportedReasoningEfforts: [{ reasoningEffort: "max" as const, description: "deep" }],
+    inputModalities: ["text" as const], supportsPersonality: false, additionalSpeedTiers: [],
+  });
+  it("follows opaque cursors and uses backend model IDs, including unknown future models", async () => {
+    const call = vi.fn().mockResolvedValueOnce({data:[row("catalog-sol", "gpt-6.1-sol")], nextCursor:"page2"})
+      .mockResolvedValueOnce({data:[row("catalog-future", "gpt-future"),row("hidden", "gpt-hidden", true)], nextCursor:null});
+    const models = await listModels({call} as unknown as CodexRpcClient, {limit:1, includeHidden:true});
+    expect(call).toHaveBeenNthCalledWith(2, "model/list", {limit:1, includeHidden:true, cursor:"page2"});
+    expect(models.map((m) => [m.id,m.available])).toEqual([["gpt-6.1-sol",true],["gpt-future",true],["gpt-hidden",false]]);
+    expect(models[1].supportedReasoningEfforts).toEqual(["max"]);
+  });
+  it("rejects repeated cursors instead of hanging discovery", async () => {
+    const call = vi.fn().mockResolvedValue({data:[],nextCursor:"repeat"});
+    await expect(listModels({call} as unknown as CodexRpcClient)).rejects.toThrow("repeated a pagination cursor");
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+});

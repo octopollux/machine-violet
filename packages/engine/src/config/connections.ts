@@ -46,6 +46,9 @@ export interface DiscoveredModel {
   id: string;
   displayName: string;
   available: boolean;
+  isDefault?: boolean;
+  supportedReasoningEfforts?: string[];
+  defaultReasoningEffort?: string;
 }
 
 /**
@@ -326,15 +329,12 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
   // future probe step) may have set models manually against a custom
   // OpenAI-compatible endpoint.
   //
-  // `openai-chatgpt` is harmless either way: its models are overwritten by
-  // a live `model/list` call against the codex subprocess at session
-  // startup, so whatever lands here gets replaced before the model picker
-  // ever consults it.
+  // Account-specific ChatGPT discovery is authoritative. Catalog is fallback only.
   for (const conn of stored.connections.filter((c) => c.source !== "env" && c.provider !== "xai")) {
     if (!conn.models) conn.models = [];
     const knownModels = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
     const knownIds = Object.keys(knownModels);
-    if (knownIds.length > 0) {
+    if (knownIds.length > 0 && (conn.provider !== "openai-chatgpt" || conn.models.length === 0)) {
       conn.models = knownIds.map((id) => ({
         id, displayName: knownModels[id].displayName, available: true,
       }));
@@ -358,9 +358,13 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     for (const conn of connections) {
       const defaults = getTierDefaults(conn.provider, configDir);
       if (defaults?.[tier]) {
-        const modelId = defaults[tier];
-        if (conn.models.find((m) => m.id === modelId)) {
-          tierAssignments[tier] = { connectionId: conn.id, modelId };
+        const available = conn.models.filter((m) => m.available);
+        const known = getModelsForProvider(modelFamilyFor(conn.provider), configDir);
+        const model = available.find((m) => m.id === defaults[tier])
+          ?? available.find((m) => known[m.id]?.defaultTier === tier)
+          ?? available[0];
+        if (model) {
+          tierAssignments[tier] = { connectionId: conn.id, modelId: model.id };
           break;
         }
       }

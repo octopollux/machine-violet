@@ -57,6 +57,10 @@ export interface ModelCapabilities {
    * reasoning even when no explicit effort override was requested.
    */
   alwaysAdaptiveThinking?: boolean;
+  /** Lowest thinking mode when a null effort cannot disable thinking entirely. */
+  minimumThinkingMode?: "between_tools";
+  /** Explicit support for Anthropic's xhigh effort (older models may reject it). */
+  supportsXhighEffort?: boolean;
   tools: boolean;
   streaming: boolean;
   caching: boolean;

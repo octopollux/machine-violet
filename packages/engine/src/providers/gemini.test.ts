@@ -32,6 +32,10 @@ beforeEach(() => {
 });
 
 describe("toGeminiParams", () => {
+  it("clamps xhigh to Gemini's supported high thinking level", () => {
+    expect(toGeminiParams(baseParams({ thinking: { effort: "xhigh" } })).generation_config)
+      .toMatchObject({ thinking_level: "high", thinking_summaries: "auto" });
+  });
   it("builds a stateless Interactions request with current function-tool schema", () => {
     const mapped = toGeminiParams(baseParams({
       thinking: { effort: "max" },

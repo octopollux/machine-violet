@@ -267,6 +267,18 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       : conn.models[0]?.id;
     try {
       const result = await provider.healthCheck(probeModel);
+      if (result.status === "valid" && conn.provider === "openai-chatgpt" && provider.discoverModels) {
+        try {
+          const models = await provider.discoverModels();
+          // Reload after network I/O: preserve any concurrently changed credentials/pins.
+          const latest = loadConnectionStore(server.configDir);
+          const current = latest.connections.find((c) => c.id === conn.id);
+          if (models.length && current?.provider === "openai-chatgpt"
+            && current.chatgptAccount?.id === conn.chatgptAccount?.id) {
+            saveConnectionStore(server.configDir, updateConnectionModels(latest, conn.id, models));
+          }
+        } catch { /* Discovery is best-effort; retain the old catalog and valid auth result. */ }
+      }
       return { id: conn.id, ...result };
     } catch (err) {
       return { id: conn.id, status: "error" as const, message: err instanceof Error ? err.message : String(err) };
@@ -425,11 +437,9 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
 
         // Discover available models up front so the tier-picker isn't empty
         // on first open.
-        let discovered: { id: string; displayName: string; available: boolean }[] = [];
+        let discovered: Awaited<ReturnType<typeof listModels>> = [];
         try {
-          discovered = (await listModels(codex)).map((m) => ({
-            id: m.id, displayName: m.displayName, available: m.available,
-          }));
+          discovered = await listModels(codex);
         } catch { /* best effort */ }
         if (entry.status !== "pending") return;
 

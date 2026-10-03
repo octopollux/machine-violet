@@ -34,6 +34,41 @@ function stampedIndexes(mapped: ReturnType<typeof toAnthropicParams>["messages"]
 }
 
 describe("toAnthropicParams: current adaptive-thinking models", () => {
+  it.each(["claude-fable-5-1", "claude-opus-5-5"])("inherits mandatory adaptive thinking on %s with null effort", (model) => {
+    const out = toAnthropicParams(baseParams({ model, thinking: { effort: null }, maxTokens: 4096 }));
+    expect(out.thinking).toBeUndefined();
+    expect(out.output_config).toBeUndefined();
+    expect(out.max_tokens).toBe(128000);
+  });
+
+  it.each(["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5"])("passes every documented effort level to %s", (model) => {
+    for (const effort of ["low", "medium", "high", "xhigh", "max"] as const) {
+      const out = toAnthropicParams(baseParams({ model, thinking: { effort } }));
+      expect(out.thinking).toEqual({ type: "adaptive" });
+      expect(out.output_config).toEqual({ effort });
+      expect(out.max_tokens).toBe(128000);
+    }
+  });
+
+  it("uses Sonnet 5.5's lowest supported thinking mode with null effort", () => {
+    const out = toAnthropicParams(baseParams({ model: "claude-sonnet-5-5", thinking: { effort: null } }));
+    expect(out.thinking).toEqual({ type: "between_tools" });
+    expect(out.output_config).toBeUndefined();
+    expect(out.max_tokens).toBe(128000);
+  });
+
+  it.each(["claude-opus-4-6", "claude-sonnet-4-6", "claude-sonnet-4-5-20250929"])("rejects unsupported xhigh on retained %s before sending", (model) => {
+    expect(() => toAnthropicParams(baseParams({ model, thinking: { effort: "xhigh" } })))
+      .toThrow(`${model} does not support xhigh effort; choose low, medium, high, or max.`);
+  });
+
+  it("keeps Haiku effort unsupported rather than sending adaptive thinking", () => {
+    const out = toAnthropicParams(baseParams({ model: "claude-haiku-4-5-20251001", thinking: { effort: "xhigh" } }));
+    expect(out.thinking).toEqual({ type: "disabled" });
+    expect(out.output_config).toBeUndefined();
+    expect(out.max_tokens).toBe(1024);
+  });
+
   it("preserves null=disabled for Opus 5 at the API's default high effort", () => {
     const out = toAnthropicParams(baseParams({
       model: "claude-opus-5",

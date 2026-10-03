@@ -82,7 +82,8 @@ const XAI_OUTPUT_DISCIPLINE =
 
 /**
  * Map Machine Violet's provider-neutral effort scale onto OpenAI's. GPT-5.6
- * is the first shipped family where `max` is a distinct API level; older
+ * is the first shipped family where `max` is a distinct API level; GPT-6
+ * and GPT-6.1 retain it. Older
  * models and OpenAI-compatible providers continue to receive `xhigh`.
  */
 function mapReasoningEffort(
@@ -90,11 +91,12 @@ function mapReasoningEffort(
   model: string,
   effort: NonNullable<ChatParams["thinking"]>["effort"],
 ): ReasoningEffort {
+  // Grok 4.5 supports low/medium/high only. The multi-agent model retains
+  // xhigh; other xAI models clamp both upper MV levels to their ceiling.
+  if (providerId === "xai" && model !== "grok-4.20-multi-agent-0309"
+      && (effort === "max" || effort === "xhigh")) return "high";
   if (effort === "max") {
-    if (providerId === "openai-apikey" && model.startsWith("gpt-5.6")) return "max";
-    // Grok 4.5 supports low/medium/high only. The multi-agent model retains
-    // xhigh, while the rest of xAI's shipped family is clamped to its ceiling.
-    if (providerId === "xai" && model !== "grok-4.20-multi-agent-0309") return "high";
+    if (providerId === "openai-apikey" && /^gpt-(?:5\.6|6(?:\.1)?)(?:-|$)/.test(model)) return "max";
     return "xhigh";
   }
   return effort ?? "medium";
@@ -680,6 +682,11 @@ function toResponsesParams(params: ChatParams, providerId: string): ResponsesPar
     };
     include = ["reasoning.encrypted_content"];
   }
+  // These models reason by default even when MV leaves effort unspecified.
+  // Preserve their opaque output for our manually managed, store:false history.
+  if (providerId === "openai-apikey" && /^gpt-(?:5\.6|6(?:\.1)?)(?:-|$)/.test(params.model)) {
+    include = ["reasoning.encrypted_content"];
+  }
 
   return {
     model: params.model,
@@ -970,7 +977,7 @@ function mapResponsesUsage(usage?: OAIResponse["usage"]): NormalizedUsage {
     inputTokens: usage.input_tokens,
     outputTokens: usage.output_tokens,
     cacheReadTokens: usage.input_tokens_details?.cached_tokens ?? 0,
-    cacheCreationTokens: 0,
+    cacheCreationTokens: (usage.input_tokens_details as typeof usage.input_tokens_details & { cache_write_tokens?: number })?.cache_write_tokens ?? 0,
     reasoningTokens: usage.output_tokens_details?.reasoning_tokens ?? 0,
   };
 }
