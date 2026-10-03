@@ -1,253 +1,72 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { EntityStore, type EntityFileIO } from "./store.js";
-import { buildEntityToolHandler } from "./tools.js";
-import { norm } from "../utils/paths.js";
+import { describe, it, expect, afterEach } from "vitest";
+import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
+import { ENTITY_TOOLS, buildKnowledgeToolHandler } from "./tools.js";
 
-// --- In-memory FileIO (same shape as store.test.ts) ---
+const stores: SqliteKnowledgeStore[] = [];
+const setup = () => { const store = new SqliteKnowledgeStore(":memory:"); stores.push(store); return { store, handler: buildKnowledgeToolHandler(store, { sceneNumber: 7 }) }; };
+afterEach(async () => { await Promise.all(stores.splice(0).map((store) => store.close())); });
 
-function inMemoryFileIO(initial: Record<string, string> = {}): EntityFileIO & { _files: Map<string, string> } {
-  const files = new Map<string, string>();
-  for (const [k, v] of Object.entries(initial)) files.set(norm(k), v);
-  return {
-    _files: files,
-    async readFile(p) {
-      const v = files.get(norm(p));
-      if (v === undefined) throw new Error(`ENOENT: ${p}`);
-      return v;
-    },
-    async writeFile(p, content) { files.set(norm(p), content); },
-    async mkdir() { /* implicit */ },
-    async exists(p) {
-      const k = norm(p);
-      if (files.has(k)) return true;
-      for (const existing of files.keys()) {
-        if (existing.startsWith(k + "/")) return true;
-      }
-      return false;
-    },
-    async listDir(p) {
-      const k = norm(p);
-      const seen = new Set<string>();
-      for (const existing of files.keys()) {
-        if (existing.startsWith(k + "/")) {
-          const rest = existing.slice(k.length + 1);
-          const slash = rest.indexOf("/");
-          seen.add(slash === -1 ? rest : rest.slice(0, slash));
-        }
-      }
-      if (seen.size === 0) throw new Error(`ENOENT: ${k}`);
-      return [...seen];
-    },
-    async deleteFile(p) {
-      const k = norm(p);
-      if (!files.delete(k)) throw new Error(`ENOENT: ${k}`);
-    },
-    async rmdir() { /* ok */ },
-  };
-}
-
-const ROOT = "/root";
-
-function makeStore(initial: Record<string, string> = {}): {
-  store: EntityStore;
-  io: ReturnType<typeof inMemoryFileIO>;
-  handler: ReturnType<typeof buildEntityToolHandler>;
-} {
-  const io = inMemoryFileIO(initial);
-  const store = new EntityStore(ROOT, io);
-  const handler = buildEntityToolHandler(store, { sceneNumber: 3 });
-  return { store, io, handler };
-}
-
-// --- Tests ---
-
-describe("entity tool — CRUD facade", () => {
-  let stuff: ReturnType<typeof makeStore>;
-
-  beforeEach(() => {
-    stuff = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n\nA grim soldier.\n",
-    });
+describe("generic campaign memory contracts", () => {
+  it("keeps schemas stable while nested empty collections and typed data are created", async () => {
+    const { store, handler } = setup();
+    const definitions = JSON.stringify(ENTITY_TOOLS);
+    const result = await handler("remember", { operations: [
+      { op: "create_collection", name: "Spells", note: "Learned named spells and practitioners" },
+      { op: "create_collection", parent: "Spells", name: "Arcane" },
+      { op: "upsert", collection: "Spells/Arcane", name: "Firefly", fields: { level: 2, learned: true, notes: null, casts: [1, { potency: 0.5 }] } },
+    ] });
+    expect(result?.is_error).toBeUndefined();
+    const node = await store.read("Firefly");
+    expect(node.fields).toMatchObject({ level: 2, learned: true, notes: null, casts: [1, { potency: 0.5 }] });
+    expect(JSON.stringify(ENTITY_TOOLS)).toBe(definitions);
+    expect(JSON.stringify(ENTITY_TOOLS)).not.toContain('"enum":["character"');
+    expect(JSON.parse((await handler("knowledge", { action: "outline" }))!.content)).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Spells", kind: "collection", note: "Learned named spells and practitioners" })]));
   });
 
-  it("returns null for unknown tool names", async () => {
-    const out = await stuff.handler("not_a_tool", {});
-    expect(out).toBeNull();
+  it("rejects bad operations before writes, then accepts corrected input", async () => {
+    const { store, handler } = setup();
+    const before = await store.snapshot();
+    const bad = await handler("remember", { operations: [{ op: "upsert", collection: "Characters" }] });
+    expect(bad?.is_error).toBe(true);
+    expect(bad?.content).toContain("name or uid");
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual([]);
+    const retry = await handler("remember", { operations: [{ op: "upsert", collection: "Characters", name: "Bob" }] });
+    expect(retry?.is_error).toBeUndefined();
+    expect(JSON.parse(retry!.content).identities).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Bob", uid: expect.any(String) })]));
   });
 
-  it("read returns the rich record", async () => {
-    const out = await stuff.handler("entity", { op: "read", type: "character", id: "arvid" });
-    expect(out?.is_error).toBeUndefined();
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.displayName).toBe("Arvid");
-    expect(parsed.schema.knownFields).toContain("displayName");
-    expect(parsed.references.outbound).toEqual([]);
+  it("resolves aliases and same-name updates without a clarification result", async () => {
+    const { store, handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Characters", name: "Tall Hat", aliases: ["Bob"], fields: { mood: "happy", hp: 8 } }] });
+    const uid = await store.resolve("Tall Hat");
+    const result = await handler("remember", { operations: [{ op: "upsert", collection: "Characters", name: "Bob", fields: { hp: 7 }, history: "Took one damage" }] });
+    expect(result?.is_error).toBeUndefined();
+    expect(await store.resolve("Bob")).toBe(uid);
+    expect((await store.read(uid!)).fields).toMatchObject({ mood: "happy", hp: 7 });
+    expect((await store.read(uid!)).logs).toEqual(expect.arrayContaining([expect.objectContaining({ body: "Took one damage" })]));
   });
 
-  it("read surfaces EntityNotFoundError as is_error", async () => {
-    const out = await stuff.handler("entity", { op: "read", type: "character", id: "ghost" });
-    expect(out?.is_error).toBe(true);
-    expect(out?.content).toContain("Entity not found");
+  it("preserves references during unrelated edits and returns committed impact candidates", async () => {
+    const { store, handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Locations", name: "Castle" }, { op: "upsert", collection: "Characters", name: "Resident" }, { op: "add_reference", source: "Resident", target: "Castle", label: "lives there" }] });
+    const result = await handler("remember", { operations: [{ op: "patch", uid: "Castle", fields: { burned: true }, history: "Burned" }] });
+    expect(JSON.parse(result!.content).candidates).toContain(await store.resolve("Resident"));
+    await handler("remember", { operations: [{ op: "patch", uid: "Resident", fields: { hp: 8 } }] });
+    expect((await store.read("Resident")).references).toEqual(expect.arrayContaining([expect.objectContaining({ target: await store.resolve("Castle") })]));
+    expect((await store.read("Resident")).fields).not.toHaveProperty("dead");
   });
 
-  it("create writes a new entity and returns the record", async () => {
-    const out = await stuff.handler("entity", {
-      op: "create",
-      type: "lore",
-      patch: { displayName: "Fall of Arvid", body: "It happened long ago." },
-    });
-    expect(out?.is_error).toBeUndefined();
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.id).toBe("fall-of-arvid");
-    expect(stuff.io._files.has("/root/lore/fall-of-arvid.md")).toBe(true);
-  });
-
-  it("create errors when displayName is missing", async () => {
-    const out = await stuff.handler("entity", { op: "create", type: "lore", patch: {} });
-    expect(out?.is_error).toBe(true);
-  });
-
-  it("update merges patch and writes scene-numbered changelog", async () => {
-    const out = await stuff.handler("entity", {
-      op: "update",
-      type: "character",
-      id: "arvid",
-      patch: { frontMatter: { disposition: "wary" }, changelogEntry: "Lost his sword" },
-    });
-    expect(out?.is_error).toBeUndefined();
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.frontMatter.disposition).toBe("wary");
-    expect(parsed.changelog[0]).toBe("**Scene 003**: Lost his sword");
-  });
-
-  it("delete reports inbound dead refs", async () => {
-    stuff = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n",
-      "/root/lore/echoes.md": "# Echoes\n\n**Type:** lore\n\n[Arvid](../characters/arvid.md) walked here.\n",
-    });
-    const out = await stuff.handler("entity", { op: "delete", type: "character", id: "arvid" });
-    expect(out?.is_error).toBeUndefined();
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.deadReferences).toHaveLength(1);
-    expect(parsed.deadReferences[0].file).toBe("lore/echoes.md");
-  });
-
-  it("list returns all entities of a type", async () => {
-    stuff = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n",
-      "/root/characters/mira.md": "# Mira\n\n**Type:** character\n",
-    });
-    const out = await stuff.handler("entity", { op: "list", type: "character" });
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.map((e: { id: string }) => e.id).sort()).toEqual(["arvid", "mira"]);
-  });
-
-  it("rejects unknown op", async () => {
-    const out = await stuff.handler("entity", { op: "drop", type: "character", id: "arvid" });
-    expect(out?.is_error).toBe(true);
-  });
-
-  it("rejects unknown type", async () => {
-    const out = await stuff.handler("entity", { op: "read", type: "spaceship", id: "x" });
-    expect(out?.is_error).toBe(true);
-  });
-});
-
-describe("describe_entity_type tool", () => {
-  it("merges declared schema with observed drift", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md":
-        "# Arvid\n\n**Type:** character\n**Mood Today:** tense\n",
-      "/root/characters/mira.md":
-        "# Mira\n\n**Type:** character\n**Mood Today:** merry\n",
-    });
-    const out = await handler("describe_entity_type", { type: "character" });
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.fields.displayName).toBeDefined();
-    expect(parsed.observedDrift.mood_today.occursIn).toBe(2);
-    // Declared `type` field should not show up as drift
-    expect(parsed.observedDrift.type).toBeUndefined();
-    expect(parsed.examples).toContain("characters/arvid.md");
-  });
-});
-
-describe("list_entity_types tool", () => {
-  it("returns counts per type", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n",
-      "/root/factions/red-hand.md": "# Red Hand\n\n**Type:** faction\n",
-      "/root/factions/black-rose.md": "# Black Rose\n\n**Type:** faction\n",
-    });
-    const out = await handler("list_entity_types", {});
-    const parsed = JSON.parse(out!.content) as { type: string; count: number }[];
-    const byType = Object.fromEntries(parsed.map(p => [p.type, p.count]));
-    expect(byType.character).toBe(1);
-    expect(byType.faction).toBe(2);
-    expect(byType.lore).toBe(0);
-  });
-});
-
-describe("validate_entity tool", () => {
-  it("flags dead outbound refs as warnings", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md":
-        "# Arvid\n\n**Type:** character\n\nKnows [Gone](../characters/gone.md).\n",
-    });
-    const out = await handler("validate_entity", { type: "character", id: "arvid" });
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.validation.status).toBe("warnings");
-    expect(parsed.validation.issues.some((i: { msg: string }) => i.msg.includes("does not resolve"))).toBe(true);
-  });
-
-  it("succeeds on a clean entity", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n",
-    });
-    const out = await handler("validate_entity", { type: "character", id: "arvid" });
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.validation.status).toBe("ok");
-  });
-});
-
-describe("find_schema_drift tool", () => {
-  it("returns drift keyed by type when no type given", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md":
-        "# Arvid\n\n**Type:** character\n**Mood Today:** tense\n",
-      "/root/factions/red-hand.md":
-        "# Red Hand\n\n**Type:** faction\n**Stance:** hostile\n",
-    });
-    const out = await handler("find_schema_drift", {});
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.character.mood_today.occursIn).toBe(1);
-    expect(parsed.faction.stance.occursIn).toBe(1);
-    expect(parsed.lore).toEqual({});
-  });
-
-  it("scopes to a single type when given", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md":
-        "# Arvid\n\n**Type:** character\n**Mood Today:** tense\n",
-      "/root/factions/red-hand.md":
-        "# Red Hand\n\n**Type:** faction\n**Stance:** hostile\n",
-    });
-    const out = await handler("find_schema_drift", { type: "character" });
-    const parsed = JSON.parse(out!.content);
-    expect(parsed.character.mood_today.occursIn).toBe(1);
-    expect(parsed.faction).toBeUndefined();
-  });
-});
-
-describe("detect_orphans tool", () => {
-  it("lists entities with no inbound refs", async () => {
-    const { handler } = makeStore({
-      "/root/characters/arvid.md": "# Arvid\n\n**Type:** character\n",
-      "/root/characters/mira.md":
-        "# Mira\n\n**Type:** character\n\nKnows [Arvid](../characters/arvid.md).\n",
-      "/root/lore/orphan.md": "# Orphan Lore\n\n**Type:** lore\n",
-    });
-    const out = await handler("detect_orphans", {});
-    const parsed = JSON.parse(out!.content) as { id: string }[];
-    expect(parsed.map(o => o.id).sort()).toEqual(["mira", "orphan"]);
+  it("reads bulk text/history in bounded pages and searches typed scalar leaves", async () => {
+    const { handler } = setup();
+    await handler("remember", { operations: [{ op: "upsert", collection: "Lore", name: "Chronicle", body: "a".repeat(20000) + "needle", fields: { detail: "x".repeat(1000) + "leafneedle" }, history: "h".repeat(2000) }] });
+    const first = JSON.parse((await handler("knowledge", { action: "read", handle: "Chronicle", textLimit: 12, logTextLimit: 13 }))!.content);
+    expect(first.body).toHaveLength(12);
+    expect(first.logs[0].body).toHaveLength(13);
+    expect(first.textLength).toBe(20006);
+    const hits = JSON.parse((await handler("knowledge", { action: "search", query: "leafneedle" }))!.content);
+    expect(hits.length).toBeGreaterThan(0);
+    const bad = await handler("knowledge", { action: "read", handle: "Chronicle", textOffset: -1 });
+    expect(bad?.is_error).toBe(true);
   });
 });

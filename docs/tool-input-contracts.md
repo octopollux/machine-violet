@@ -137,3 +137,13 @@ Follow the checklist in [maintenance.md](maintenance.md). In particular,
 choose criticality before implementing repairs, keep schema and handler type
 derived from one source for new tools, and update this document when the
 policy or validation pipeline changes.
+
+## Campaign knowledge contracts
+
+`entities/tools.ts` defines only `knowledge` (`advisory`) and `remember` (`durable`) for campaign memory. Their provider schemas and runtime validators remain fixed as collections are added. The recursive typed value schema has one root definition referenced from operation fields; provider serialization and Ajv compilation use that same definition. No generic entity type enum is generated per campaign.
+
+`remember` requires 1–100 operations and validates every operation before committing one atomic transaction. An invalid later reference rolls back the whole batch. `upsert` requires a canonical UID or name. The store resolves known names/aliases before creation without another DM turn. `remove_fields` is explicit deletion; `null` remains meaningful data. Unknown operations and extra operation arguments are rejected before effects. Store validation also reserves exact internal preview descriptor shapes; authored objects cannot forge a bulk-value read into another record.
+
+Read contracts expose explicit text, child, log-entry, and log-text offsets/limits. Results carry continuation information rather than expanding huge prose or logs into model context. Public materialization authenticates marker ancestry inside the exact approved field subtree and recognizes only exact internal shapes. The public projection never substitutes a private body or dependency label for an approved summary.
+
+Scripted-provider tests exercise the actual scribe loop and tool dispatch, not just the advertised tool list. Regression tests cover retries before effects, atomic rollback, bounded long text/logs, empty nested collection organization, alias/reference resolution, frozen 120-turn scene snapshots and resume, outbox delivery after failed turns, and failed-persistence notice retention.

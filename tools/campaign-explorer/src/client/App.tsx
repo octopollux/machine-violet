@@ -64,7 +64,7 @@ export function App() {
   // Track which scope the selected file belongs to
   const [selectedScope, setSelectedScope] = useState<"campaign" | "machine">("campaign");
 
-  const { groups, loading: treeLoading, updatedItems, markRead, handleFileChange } =
+  const { groups, loading: treeLoading, error: treeError, updatedItems, markRead, handleFileChange } =
     useFileTree(selectedCampaign, selectedFile);
 
   const {
@@ -157,11 +157,14 @@ export function App() {
     (target: string) => {
       const slug = target.toLowerCase().replace(/\s+/g, "-");
       const allEntries = groups.flatMap((g) => g.entries);
-      const match = allEntries.find(
+      const matches = allEntries.filter(
         (e) =>
-          e.relativePath.includes(slug) ||
+          e.uid === target ||
+          e.displayName?.split("/").pop()?.toLocaleLowerCase() === target.toLocaleLowerCase() ||
+          (!e.uid && e.relativePath.includes(slug)) ||
           e.relativePath.toLowerCase().includes(target.toLowerCase()),
       );
+      const match = matches.length === 1 ? matches[0] : undefined;
       if (match) {
         handleSelectFile(match.relativePath);
       }
@@ -216,6 +219,7 @@ export function App() {
           ) : selectedCampaign ? (
             <FileTree
               groups={groups}
+              error={treeError}
               selectedFile={selectedScope === "campaign" ? selectedFile : null}
               updatedItems={updatedItems}
               campaignSlug={selectedCampaign}

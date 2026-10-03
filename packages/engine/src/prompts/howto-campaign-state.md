@@ -14,7 +14,7 @@ If one of those fits, use it. This guide is for everything else.
 
 | You want to change | Use |
 |---|---|
-| A character / location / faction / lore / item | `entity` (read / create / update / delete / list) |
+| A character / location / faction / lore / item | `knowledge` to inspect; `scribe` to record changes |
 | The PC roster (who's played) | `swap_pc` (see `howto_swap_pc`) |
 | The DM's personality | `swap_dm_personality` (see `howto_swap_dm_personality`) |
 | Campaign or scene DM notes | `dm_notes` |
@@ -46,18 +46,13 @@ campaign-root/
 ├── pending-operation.json   # Crash-recovery breadcrumb. Engine-owned.
 ├── campaign/
 │   ├── log.json             # Structured campaign log (scene/session entries)
-│   ├── compendium.json      # Player-facing knowledge base
 │   ├── dm-notes.md          # Campaign-wide DM scratchpad → dm_notes
 │   ├── player-notes.md      # Campaign-wide player notes
 │   ├── scenes/NNN-slug/     # Per-scene: transcript.md, summary.md, dm-notes.md
 │   └── session-recaps/      # session-NNN.md (+ -narrative.md, player-facing)
-├── characters/              # Character entities → entity (type: character)
-│   ├── <slug>.md            #   PC/NPC role is the **Type:** field (PC|NPC|character)
-│   └── party.md             #   Party roster (Members list of [[wikilinks]])
-├── locations/<slug>/index.md  # Location entities (subdir co-locates map JSON) → entity (type: location)
-├── factions/<slug>.md       # → entity (type: faction)
-├── lore/<slug>.md           # → entity (type: lore)
-├── items/<slug>.md          # → entity (type: item)
+├── knowledge.sqlite         # Typed arbitrary knowledge tree: entities, values, references, history
+│                            # Characters and Party are logical collections, not Markdown files
+├── characters/              # Portrait assets only
 ├── rules/<slug>.md          # System rule cards (copied from the system template)
 └── state/                   # Runtime state — each file owned by a tool (table below)
 ```
@@ -88,20 +83,26 @@ only in-session mutations are `players[]` (via `swap_pc`) and `dm_personality`
 
 ## Conventions
 
-- **Slugs:** entity filenames are the slugified display name (`Marta Voss` →
-  `marta-voss.md`). Locations are the only entities in subdirectories.
-- **Wikilinks:** `[[entity-slug]]` (or markdown `[Display](../type/slug.md)`),
-  tracked bidirectionally. The `entity` delete/rename tools keep them coherent.
-- **Entity `**Type:**`:** the category for non-characters (location/faction/…),
-  but on a character sheet it's the *role* (PC | NPC | character). The functional
-  PC is `config.players`, not this field.
+- **Identity:** entities have stable UIDs. Names and aliases resolve to that
+  identity; a rename or category move preserves it. Use a known UID for updates.
+- **Collections:** arbitrary nested collections organize campaign knowledge.
+  Inspect the current outline and conventions with `knowledge`; do not assume
+  every record belongs to a fixed entity category.
+- **References:** typed `{ "$ref": "<UID>" }` values link records. Prose mentions
+  alone are not dependency records. `Party/The Party` stores its roster as a
+  typed `members` array of character references.
+- **Sheets:** typed `type` records PC/NPC role; `config.players` defines player
+  control. Sheet body text holds mechanics and explanation.
+- **Privacy:** private knowledge stays DM-only. Player Knowledge holds approved
+  summaries; direct player-facing character sheets can be shown to players.
+  Choose the visibility on every Scribe update deliberately.
 
 ## Runtime gotchas
 
 - **`config.dm_personality` is read live every DM turn** — a `swap_dm_personality`
   takes effect on the next turn, no reload.
 - **PC character sheets are snapshotted at session start** (`pcSheets`) and not
-  refreshed mid-session. Sheet edits via `entity` are correct on disk and visible
+  refreshed mid-session. Sheet edits via `scribe` are committed to knowledge and visible
   in the conversation, but the cached prompt copy stays stale until the next
   session load. The same holds for the rules appendix.
 - **Persistence is per-tool and write-through.** A tool that owns a file persists
@@ -111,5 +112,5 @@ only in-session mutations are `players[]` (via `swap_pc`) and `dm_personality`
 ## The exhaustive spec
 
 For full JSON shapes, null semantics, versioning, transcript/recap formats, git
-layout, and migration rules, the canonical reference is `docs/format-spec.md`
+layout, and format rejection rules, the canonical reference is `docs/format-spec.md`
 (maintainer-facing). This guide is the in-play operator's summary of it.

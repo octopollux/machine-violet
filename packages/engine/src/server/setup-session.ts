@@ -17,8 +17,7 @@ import { buildCampaignWorld } from "../agents/world-builder.js";
 import { createBaseFileIO } from "./fileio.js";
 import type { FileIO } from "../agents/scene-manager.js";
 import { norm, configDir } from "../utils/paths.js";
-import { slugify } from "../agents/world-builder.js";
-import { campaignPaths, machinePaths } from "../tools/filesystem/scaffold.js";
+import { machinePaths } from "../tools/filesystem/scaffold.js";
 import { parseFrontMatter, serializeEntity } from "../tools/filesystem/frontmatter.js";
 import { promoteCharacter } from "../agents/subagents/character-promotion.js";
 import { processingPaths } from "../config/processing-paths.js";
@@ -33,6 +32,8 @@ import type { CampaignConfig } from "@machine-violet/shared/types/config.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CampaignRepo } from "../tools/git/campaign-repo.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import type { KnowledgeValue } from "@machine-violet/shared/types/knowledge.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { logEvent } from "../context/engine-log.js";
 
@@ -365,12 +366,12 @@ export class SetupSession {
   }
 
   private async buildInitialSheet(campaignRoot: string, result: SetupResult): Promise<void> {
-    const charSlug = slugify(result.characterName);
-    const charPath = norm(campaignPaths(campaignRoot).character(charSlug));
+    const knowledge = await getCampaignKnowledge(campaignRoot,this.fileIO);
 
     let stub: string;
     try {
-      stub = await this.fileIO.readFile(charPath);
+      const node=await knowledge.read(result.characterName,{textLimit:100000,logLimit:1000});
+      stub = serializeEntity(node.name,node.fields,node.body,[]);
     } catch {
       return;
     }
@@ -400,8 +401,7 @@ export class SetupSession {
         const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
         frontMatter.sheet_status = "complete";
         const title = String(frontMatter._title ?? result.characterName);
-        const tagged = serializeEntity(title, frontMatter, body, changelog);
-        await this.fileIO.writeFile(charPath, tagged);
+        await knowledge.mutate([{op:"patch",uid:result.characterName,name:title,fields:frontMatter as Record<string,KnowledgeValue>,body},...changelog.map(entry=>({op:"append_log" as const,uid:result.characterName,body:entry}))],{source:"setup-sheet"});
       }
     } catch {
       // Best-effort — stub is still valid

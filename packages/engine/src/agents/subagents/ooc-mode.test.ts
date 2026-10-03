@@ -1,3 +1,4 @@
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, SystemBlock } from "../../providers/types.js";
 import {
@@ -398,8 +399,8 @@ describe("enterOOC with gameState + DM registry", () => {
     expect(names).toContain("howto_swap_dm_personality");
     expect(names).toContain("howto_campaign_state");
     // Entity surface replaces raw read_file in OOC.
-    expect(names).toContain("entity");
-    expect(names).toContain("describe_entity_type");
+    expect(names).toContain("knowledge");
+    expect(names).toContain("remember");
     expect(names).toContain("find_references");
     expect(names).toContain("validate_campaign");
     expect(names).not.toContain("read_file");
@@ -431,7 +432,7 @@ describe("buildOOCTools", () => {
     expect(names).toContain("scribe");
     expect(names).toContain("rollback");
     // Structured entity surface replaces the old read_file extra.
-    expect(names).toContain("entity");
+    expect(names).toContain("knowledge");
     expect(names).not.toContain("read_file");
     expect(names).toContain("get_commit_log");
   });
@@ -456,21 +457,14 @@ describe("buildOOCToolHandler — OOC-only extras", () => {
   // `entity` tool dispatched by GameEngine.handleAsyncTool. See
   // packages/engine/src/entities/tools.test.ts for the structured surface.
 
-  it("find_references finds wikilinks", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael\n**Type:** PC",
-        "/camp/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
-      },
-      { "/camp/characters": ["kael.md"] },
-    );
+  it("find_references inspects canonical graph references", async () => {
+    const fio = mockFileIO(); const store = await getCampaignKnowledge("/camp", fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael" }, { op: "upsert", collection: "Lore", name: "Promise", fields: { owedTo: { $ref: "Kael" } } }]);
     const handler = buildOOCToolHandler(singletonRegistry, mockGameState(), undefined, undefined, "/camp", fio);
-
-    const result = await handler("find_references", { path: "characters/kael.md" });
-    expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.references).toHaveLength(1);
+    const result = await handler("find_references", { path: "Kael" });
+    expect(result.is_error).toBeUndefined(); expect(JSON.parse(result.content).references).toHaveLength(1);
   });
+
 });
 
 describe("buildOOCToolHandler — DM tool dispatch via singleton registry", () => {

@@ -23,123 +23,15 @@ function mockFileIO(
   };
 }
 
-describe("walkCampaignFiles", () => {
-  it("walks character files", async () => {
-    const fio = mockFileIO(
-      { "/camp/characters/kael.md": "# Kael" },
-      { "/camp/characters": ["kael.md"] },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("characters/kael.md");
-    expect(result[0].content).toBe("# Kael");
+describe("walkCampaignFiles narrative boundary",()=>{
+  it("walks JSON log, rules, transcripts, scene notes and recaps",async()=>{
+    const io=mockFileIO({"/camp/campaign/log.json":"[]","/camp/rules/core.md":"Rules","/camp/campaign/scenes/001-gate/transcript.md":"Transcript","/camp/campaign/scenes/001-gate/dm-notes.md":"Notes","/camp/campaign/session-recaps/session-001.md":"Recap"},{"/camp/rules":["core.md","asset.png"],"/camp/campaign/scenes":["001-gate"],"/camp/campaign/session-recaps":["session-001.md"]});
+    expect((await walkCampaignFiles("/camp",io)).map(file=>file.relativePath).sort()).toEqual(["campaign/log.json","campaign/scenes/001-gate/dm-notes.md","campaign/scenes/001-gate/transcript.md","campaign/session-recaps/session-001.md","rules/core.md"]);
   });
-
-  it("walks multiple entity directories", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael",
-        "/camp/factions/guild.md": "# Guild",
-        "/camp/lore/history.md": "# History",
-      },
-      {
-        "/camp/characters": ["kael.md"],
-        "/camp/factions": ["guild.md"],
-        "/camp/lore": ["history.md"],
-      },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    const paths = result.map((f) => f.relativePath).sort();
-    expect(paths).toEqual([
-      "characters/kael.md",
-      "factions/guild.md",
-      "lore/history.md",
-    ]);
+  it("never scans old entity directories or a legacy log fallback",async()=>{
+    const io=mockFileIO({"/camp/characters/bob.md":"Bob","/camp/locations/gate/index.md":"Gate","/camp/campaign/log.md":"Legacy log"},{"/camp/characters":["bob.md"],"/camp/locations":["gate"]});
+    expect(await walkCampaignFiles("/camp",io)).toEqual([]);
+    expect(io.readFile).not.toHaveBeenCalledWith("/camp/campaign/log.md");expect(io.listDir).not.toHaveBeenCalledWith("/camp/characters");
   });
-
-  it("walks location subdirectories", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/locations/tavern/index.md": "# Tavern",
-        "/camp/locations/forest/index.md": "# Forest",
-      },
-      {
-        "/camp/locations": ["tavern", "forest"],
-        "/camp/locations/tavern": ["index.md"],
-        "/camp/locations/forest": ["index.md"],
-      },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    const paths = result.map((f) => f.relativePath).sort();
-    expect(paths).toEqual([
-      "locations/forest/index.md",
-      "locations/tavern/index.md",
-    ]);
-  });
-
-  it("walks campaign log (JSON)", async () => {
-    const fio = mockFileIO(
-      { "/camp/campaign/log.json": '{"campaignName":"Test","entries":[]}' },
-      {},
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("campaign/log.json");
-  });
-
-  it("falls back to legacy log.md when log.json missing", async () => {
-    const fio = mockFileIO(
-      { "/camp/campaign/log.md": "# Campaign Log" },
-      {},
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("campaign/log.md");
-  });
-
-  it("walks scene transcripts and dm-notes", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/campaign/scenes/001-tavern/transcript.md": "scene 1 transcript",
-        "/camp/campaign/scenes/001-tavern/dm-notes.md": "scene 1 notes",
-        "/camp/campaign/scenes/002-forest/transcript.md": "scene 2 transcript",
-      },
-      {
-        "/camp/campaign/scenes": ["001-tavern", "002-forest"],
-      },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    const paths = result.map((f) => f.relativePath).sort();
-    expect(paths).toEqual([
-      "campaign/scenes/001-tavern/dm-notes.md",
-      "campaign/scenes/001-tavern/transcript.md",
-      "campaign/scenes/002-forest/transcript.md",
-    ]);
-  });
-
-  it("walks session recaps", async () => {
-    const fio = mockFileIO(
-      { "/camp/campaign/session-recaps/session-01.md": "recap 1" },
-      { "/camp/campaign/session-recaps": ["session-01.md"] },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("campaign/session-recaps/session-01.md");
-  });
-
-  it("skips missing directories gracefully", async () => {
-    const fio = mockFileIO({}, {});
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(0);
-  });
-
-  it("skips non-md files in entity directories", async () => {
-    const fio = mockFileIO(
-      { "/camp/characters/kael.md": "# Kael" },
-      { "/camp/characters": ["kael.md", "notes.txt", ".DS_Store"] },
-    );
-    const result = await walkCampaignFiles("/camp", fio);
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("characters/kael.md");
-  });
+  it("tolerates absent narrative files",async()=>{expect(await walkCampaignFiles("/camp",mockFileIO())).toEqual([]);});
 });

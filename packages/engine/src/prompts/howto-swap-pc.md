@@ -11,7 +11,7 @@ next load).
 
 A "PC" is just a roster slot in `config.json` → `players[]` whose `character`
 field names a character. The active slot is chosen by `activePlayerIndex`. The
-character's *sheet* (`characters/<slug>.md`), the *party* (`characters/party.md`),
+character's *sheet* (a stable UID in campaign knowledge), the *party* (`Party/The Party`),
 the top-frame *resources*, the *modeline*, and the *theme color* all key off
 that character's name. A swap means pointing the slot at a new character **and**
 bringing all of those satellites along.
@@ -25,24 +25,19 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
    character brand-new, or already an entity in the campaign? If the player is
    present, make sure this is what they want — a swap is a big narrative move.
 
-2. **Make sure the incoming character has a PC sheet.**
-   - *Existing character* (e.g. an NPC being promoted): `entity` with
-     `op: "update"`, `type: "character"`, `id: "<name>"`, and a `frontMatter`
-     patch setting `Type: PC`, `Player: <player name>`, `Display Resources`
-     (the keys to show in the top frame, e.g. `HP, Memory`), and a
-     `Theme Color`. Fill out stats/skills/abilities in the body if the sheet was
-     a thin NPC stub. Add a `changelogEntry` noting the promotion.
-   - *Brand-new character*: `entity` with `op: "create"`, `type: "character"`,
-     and a full sheet (same PC frontMatter as above). If the player should help
-     build it, you can route the build through the normal character-creation
-     flow first, then come back here.
+2. **Read and prepare the incoming character's PC sheet.** Use `knowledge`
+   (`action: "read"`, `handle: "<UID or known name>"`) to inspect an existing
+   character. Record the promotion through `scribe`, tagged `player-facing`:
+   identify the character UID and set typed fields `type: "PC"`, `player` to
+   the player name, `display_resources` to the display keys, and `theme_color`.
+   Include the stats, skills, abilities, and promotion history. For a new
+   character, ask the Scribe to create the full sheet in `Characters` first;
+   read back its committed UID before referencing it elsewhere.
 
-3. **Demote the outgoing PC to a character/NPC.** `entity` `op: "update"`,
-   `type: "character"`, `id: "<old PC>"`, `frontMatter` setting `Type: character`
-   (and clearing `Player` by setting it to `null`). In the body, note that they
-   were retired from player control and may recur at DM discretion, and update
-   any relationship lines that referred to them as "the PC". Add a changelog
-   entry. The outgoing character is NOT deleted — they stay in the world.
+3. **Demote the outgoing PC.** Send a `scribe` update identifying their UID,
+   setting `type: "character"` and `player: null`, and recording retirement
+   from player control. Update relationships that described them as the PC.
+   Preserve the character and their existing facts; they may recur in the world.
 
 4. **Swap the roster pointer.** Call `swap_pc({ character: "<new PC>",
    replaces: "<old PC>", color: "#hex" })`. Omit `replaces` to hand off the
@@ -51,9 +46,10 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
    reload. (`switch_player` will NOT work here: it only passes the turn between
    characters already in the roster and rejects an unknown name.)
 
-5. **Update the party roster.** Edit `characters/party.md` so the Members list
-   links the new PC (`- [[new-slug]]`) instead of the old one. Move the old PC
-   out of Members (you can mention them elsewhere as a retired character).
+5. **Update the party roster.** Read `Party/The Party` through `knowledge`.
+   Ask `scribe` to replace the outgoing PC's reference in its typed `members`
+   array with `{ "$ref": "<incoming UID>" }`, preserving the other members.
+   Record the old PC's retirement separately if useful.
 
 6. **Bring the top-frame resources across.**
    - `set_display_resources({ character: "<new PC>", resources: [...] })` — which
@@ -76,18 +72,12 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
 
 ## Notes
 
-- The character sheet's `**Type:**` field holds the role — `PC`, `NPC`, or
-  `character` — and the `entity` tool accepts those values (it only blocks
-  relabeling a sheet as a *different* entity category like `location`). This
-  field is documentary: the functional PC roster is `config.json` → `players[]`,
-  changed by `swap_pc`. Keep them consistent, but `swap_pc` is what actually
-  hands off control.
-- The DM's in-context PC sheet block (`pcSheets`) is loaded once at session
-  start and is intentionally not refreshed mid-session. After a swap it will
-  still show the old sheet until the next reload — that's expected. You can see
-  the new sheet via the conversation and `entity`/`show_character_sheet`. The
-  on-disk state is correct, which is what matters for the next load.
-- Do the file edits (steps 2, 3, 5) and the `swap_pc` call (step 4) together in
-  one pass. A swap that updates the sheets but never calls `swap_pc` looks done
-  on screen but reverts to the old PC on reload; a `swap_pc` with no sheet work
-  leaves a PC with no real sheet.
+- The character's typed `type` field records the role (`PC`, `NPC`, or
+  `character`). The functional roster remains `config.players`, changed by
+  `swap_pc`. Keep the role and roster consistent.
+- Use `knowledge` or `show_character_sheet` to inspect committed sheets after
+  the swap. A session-start prompt copy may still describe the outgoing PC;
+  committed knowledge and the persisted roster govern future loads.
+- Complete the sheet and Party updates with `scribe` and call `swap_pc` in
+  one pass. Sheet updates alone do not reassign player control; a roster swap
+  without the sheet work leaves the incoming PC without their mechanics.

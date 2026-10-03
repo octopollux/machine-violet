@@ -1,9 +1,8 @@
 import type { FileIO } from "../../agents/scene-manager.js";
 import { extractWikilinks } from "../filesystem/wikilinks.js";
 import { resolveRelativePath } from "../filesystem/validation.js";
-import { norm } from "../../utils/paths.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 import { computeRelativePath } from "./relative-path.js";
-import { walkCampaignFiles } from "./walk-campaign.js";
 
 export interface RenameResult {
   oldPath: string;
@@ -69,99 +68,11 @@ export async function renameEntity(
   newPath: string,
   dryRun: boolean,
 ): Promise<RenameResult> {
-  const normalizedRoot = norm(root);
-  const absOld = normalizedRoot + "/" + oldPath;
-  const absNew = normalizedRoot + "/" + newPath;
-
-  // Verify old file exists
-  if (!(await fileIO.exists(absOld))) {
-    throw new Error(`Source file does not exist: ${oldPath}`);
-  }
-
-  // Verify new file does not exist
-  if (await fileIO.exists(absNew)) {
-    throw new Error(`Destination file already exists: ${newPath}`);
-  }
-
-  // Walk all campaign files
-  const campaignFiles = await walkCampaignFiles(root, fileIO);
-
-  const filesUpdated: string[] = [];
-  let totalLinksUpdated = 0;
-  const fileWrites: { absPath: string; content: string }[] = [];
-
-  // Rewrite links in each file
-  for (const file of campaignFiles) {
-    const { content: updatedContent, count } = rewriteLinks(
-      file.content,
-      file.relativePath,
-      oldPath,
-      newPath,
-    );
-    if (count > 0) {
-      filesUpdated.push(file.relativePath);
-      totalLinksUpdated += count;
-      fileWrites.push({
-        absPath: normalizedRoot + "/" + file.relativePath,
-        content: updatedContent,
-      });
-    }
-  }
-
-  // Perform writes if not dry-run
-  if (!dryRun) {
-    // Write all updated files
-    for (const { absPath, content } of fileWrites) {
-      await fileIO.writeFile(absPath, content);
-    }
-
-    // Move entity file: read → mkdir if needed → write new → delete old
-    const entityContent = await fileIO.readFile(absOld);
-    const newDir = absNew.split("/").slice(0, -1).join("/");
-    await fileIO.mkdir(newDir);
-    await fileIO.writeFile(absNew, entityContent);
-    if (fileIO.deleteFile) {
-      await fileIO.deleteFile(absOld);
-    }
-
-    // Prune now-empty source directories. Walk up from the old file's parent,
-    // removing empty dirs, but never touch the top-level category dir (e.g.
-    // "locations/", "characters/") — only nested placeholder dirs created by
-    // an earlier mkdir during scene/entity bootstrap.
-    if (fileIO.rmdir) {
-      // Normalize: strip leading/trailing slashes, convert backslashes, drop
-      // empty segments. Prevents a stray leading "/" or "\" from producing an
-      // empty first segment that would slip past the `length > 1` guard.
-      const oldSegments = oldPath
-        .replace(/\\/g, "/")
-        .split("/")
-        .filter(Boolean)
-        .slice(0, -1); // drop filename
-      // Stop walking once we reach the first segment (the category dir).
-      while (oldSegments.length > 1) {
-        const dirPath = normalizedRoot + "/" + oldSegments.join("/");
-        let entries: string[];
-        try {
-          entries = await fileIO.listDir(dirPath);
-        } catch {
-          break;
-        }
-        if (entries.length > 0) break;
-        try {
-          await fileIO.rmdir(dirPath);
-        } catch {
-          break;
-        }
-        oldSegments.pop();
-      }
-    }
-  }
-
-  return {
-    oldPath,
-    newPath,
-    filesUpdated,
-    linksUpdated: totalLinksUpdated,
-    dryRun,
-  };
+  const store=await getCampaignKnowledge(root,fileIO);
+  const uid=await store.resolve(oldPath);if(!uid) throw new Error(`Unknown knowledge identity: ${oldPath}`);
+  const occupied=await store.resolve(newPath);if(occupied && occupied!==uid) throw new Error(`Destination identity already exists: ${newPath}`);
+  const parts=newPath.replace(/^knowledge:/,"").split("/");
+  const name=(parts.at(-1)==="index.md" ? parts.at(-2) : parts.at(-1))?.replace(/\.md$/,"").replace(/-/g," ") ?? newPath;
+  if(!dryRun) await store.mutate([{op:"patch",uid,name,history:`Renamed to ${name}`},{op:"remove_fields",uid,keys:["placeholder"]}],{source:"rename"});
+  return {oldPath:`knowledge:${uid}`,newPath:`knowledge:${uid}`,filesUpdated:[],linksUpdated:0,dryRun};
 }

@@ -53,8 +53,8 @@ export function TreeCategory({
         onClick={() => setExpanded(!expanded)}
       >
         <span className={`chevron${expanded ? " open" : ""}`}>&#9654;</span>
-        <span style={{ color: CATEGORY_COLORS[category] }}>
-          {CATEGORY_LABELS[category]}
+        <span style={{ color: CATEGORY_COLORS[category] ?? CATEGORY_COLORS.other }}>
+          {CATEGORY_LABELS[category] ?? category}
         </span>
         <span className="tree-category-count">({entries.length})</span>
         <UpdateDot visible={hasUpdates} />
@@ -74,6 +74,7 @@ export function TreeCategory({
           <TreeItem
             key={entry.relativePath}
             relativePath={entry.relativePath}
+            displayName={entry.displayName}
             selected={selectedFile === entry.relativePath}
             updated={updatedItems.has(`${campaignSlug}:${entry.relativePath}`)}
             onClick={() => onSelectFile(entry.relativePath)}

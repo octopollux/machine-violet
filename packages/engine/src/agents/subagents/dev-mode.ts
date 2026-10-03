@@ -16,7 +16,7 @@ import { RollbackCompleteError } from "@machine-violet/shared/types/errors.js";
 import { registry as singletonRegistry } from "../tool-registry.js";
 import { findReferences, renameEntity, mergeEntities, resolveDeadLinks } from "../../tools/campaign-ops/index.js";
 import { EntityStore } from "../../entities/store.js";
-import { buildEntityToolHandler, RAW_ENTITY_IO_TOOL } from "../../entities/tools.js";
+import { buildEntityToolHandler } from "../../entities/tools.js";
 import type { ModeSession } from "@machine-violet/shared/types/engine.js";
 import type { TuiCommand } from "../agent-loop.js";
 import { styleTheme } from "./theme-styler.js";
@@ -197,23 +197,23 @@ export function buildDevTools(): NormalizedTool[] {
     },
     {
       name: "find_references",
-      description: "Find all wikilinks pointing to an entity. Returns file, display text, and line number for each reference.",
+      description: "Find explicit incoming dependencies for a canonical campaign UID, name, or alias. Returns source UIDs and labels.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          path: { type: "string", description: "Entity path relative to campaign root (e.g. 'characters/kael.md')" },
+          path: { type: "string", description: "Canonical UID, name, or alias" },
         },
         required: ["path"],
       },
     },
     {
       name: "rename_entity",
-      description: "Rename an entity file and update all wikilinks across the campaign. Always dry-run first.",
+      description: "Rename a canonical campaign identity, retaining its UID and old aliases. Dry-run is available.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          old_path: { type: "string", description: "Current entity path relative to campaign root" },
-          new_path: { type: "string", description: "New entity path relative to campaign root" },
+          old_path: { type: "string", description: "Current canonical UID, name, or alias" },
+          new_path: { type: "string", description: "New display name" },
           dry_run: { type: "boolean", description: "If true, report changes without writing. Default: true." },
         },
         required: ["old_path", "new_path"],
@@ -221,7 +221,7 @@ export function buildDevTools(): NormalizedTool[] {
     },
     {
       name: "merge_entities",
-      description: "Merge two entity files into the winner, repoint all loser wikilinks. Always dry-run first.",
+      description: "Consolidate two campaign identities into the winner. References and old UID redirects remain canonical. Dry-run is available.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -249,7 +249,6 @@ export function buildDevTools(): NormalizedTool[] {
   // Dev-only escape hatch — explicitly named so its appearance in transcripts
   // stands out. The structured `entity` tool (inherited from the registry
   // below) is the right surface for normal entity work.
-  devTools.push(RAW_ENTITY_IO_TOOL);
 
   // Append all DM tools, skipping any names already defined above
   const devNames = new Set(devTools.map((t) => t.name));
@@ -295,7 +294,7 @@ export function buildDevToolHandler(
   // engine via this handler — Dev gets structured CRUD on entities for free.
   const entityStore = new EntityStore(root, fileIO);
   const entityDispatch = buildEntityToolHandler(entityStore, {
-    sceneNumber: sceneManager?.getScene().sceneNumber ?? 0,
+    sceneNumber: () => sceneManager?.getScene().sceneNumber ?? 0, source: "dev",
   });
 
   return async (name: string, input: Record<string, unknown>) => {
@@ -305,41 +304,19 @@ export function buildDevToolHandler(
 
     try {
       switch (name) {
-        case "raw_entity_io": {
-          const path = input.path as string | undefined;
-          const op = input.op as string | undefined;
-          if (!path || !op) {
-            return { content: "raw_entity_io requires `path` and `op`", is_error: true };
-          }
-          const abs = resolveDevPath(root, path);
-          switch (op) {
-            case "read": {
-              const content = await fileIO.readFile(abs);
-              return { content };
-            }
-            case "write": {
-              const body = input.body as string | undefined;
-              if (body === undefined) return { content: "raw_entity_io write requires `body`", is_error: true };
-              await fileIO.writeFile(abs, body);
-              return { content: `[raw_entity_io] wrote ${path}` };
-            }
-            case "delete": {
-              if (!fileIO.deleteFile) return { content: "Delete not supported", is_error: true };
-              await fileIO.deleteFile(abs);
-              return { content: `[raw_entity_io] deleted ${path}` };
-            }
-            default:
-              return { content: `Unknown op: ${op}. Use read | write | delete.`, is_error: true };
-          }
-        }
+        case "raw_entity_io":
+          return { content: "Raw campaign memory writes are unsupported. Use knowledge/remember; every change must commit identities, references, and feedback together.", is_error: true };
 
         case "read_file": {
+          if (String(input.path).startsWith("knowledge:")) return (await entityDispatch("knowledge", { action: "read", handle: input.path })) ?? { content: "Knowledge handler unavailable", is_error: true };
+          if (/^(knowledge\.sqlite|characters\/|locations\/|factions\/|lore\/|items\/)/i.test(String(input.path).replace(/\\/g, "/"))) return { content: "Campaign memory is SQLite-backed; inspect it with knowledge.", is_error: true };
           const abs = resolveDevPath(root, input.path as string);
           const content = await fileIO.readFile(abs);
           return { content };
         }
 
         case "write_file": {
+          if (isCampaignMemoryPath(root, String(input.path))) return { content: "Use remember for campaign memory writes.", is_error: true };
           const abs = resolveDevPath(root, input.path as string);
           await fileIO.writeFile(abs, input.content as string);
           return { content: `Wrote ${input.path}` };
@@ -418,6 +395,7 @@ export function buildDevToolHandler(
         }
 
         case "delete_file": {
+          if (isCampaignMemoryPath(root, String(input.path))) return { content: "Use remember for campaign memory deletes.", is_error: true };
           const abs = resolveDevPath(root, input.path as string);
           if (!fileIO.deleteFile) {
             return { content: "Delete not supported", is_error: true };
@@ -629,6 +607,7 @@ export async function enterDevMode(
       maxTokens: getMaxOutput(options.model),
       ...(tools ? { tools, cacheTools: true } : {}),
       ...(toolHandler ? { toolHandler } : {}),
+      toolInputPolicies: singletonRegistry.getInputPolicies(),
       maxToolRounds: hasTools ? 10 : undefined,
     },
     playerMessage,
@@ -653,10 +632,8 @@ export function summarizeGameState(gs: GameState): string {
   lines.push(`Campaign root: ${gs.campaignRoot}`);
   lines.push("Key paths:");
   lines.push(`  Config: ${gs.campaignRoot}/config.json`);
-  lines.push(`  Characters: ${gs.campaignRoot}/characters/`);
-  lines.push(`  Party: ${gs.campaignRoot}/characters/party.md`);
-  lines.push(`  Players: ${gs.campaignRoot}/players/`);
-  lines.push(`  Locations: ${gs.campaignRoot}/locations/`);
+  lines.push(`  Campaign memory: ${gs.campaignRoot}/knowledge.sqlite (use knowledge/remember)`);
+  lines.push(`  Machine player profiles: ${gs.homeDir}/players/`);
   lines.push(`  Campaign log: ${gs.campaignRoot}/campaign/log.json`);
   lines.push(`  Scenes: ${gs.campaignRoot}/campaign/scenes/`);
 
@@ -739,4 +716,11 @@ export function createDevSession(
     tier: "medium",
     send: (text, onDelta) => enterDevMode(provider, text, options, onDelta),
   };
+}
+
+/** Prevent raw file tools from bypassing the campaign mutation boundary. */
+function isCampaignMemoryPath(root: string, path: string): boolean {
+  const absolute = norm(resolveDevPath(root, path));
+  const relative = absolute.slice(norm(root).length + 1);
+  return /^(knowledge\.sqlite(?:-|$)|characters\/|locations\/|factions\/|lore\/|items\/)/i.test(relative);
 }

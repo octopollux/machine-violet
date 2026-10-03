@@ -7,6 +7,7 @@ import { extractWikilinks, uniqueTargets } from "../../tools/filesystem/index.js
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { accUsage } from "../../context/usage-helpers.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 import { norm } from "../../utils/paths.js";
 
 export interface RepairResult {
@@ -101,41 +102,6 @@ async function scanTranscripts(
 }
 
 /**
- * Inventory existing entity files.
- */
-async function inventoryEntities(
-  root: string,
-  fileIO: FileIO,
-): Promise<Set<string>> {
-  const existing = new Set<string>();
-  const dirs = ["characters", "locations", "factions", "lore", "items"];
-
-  for (const dir of dirs) {
-    const dirPath = norm(root) + "/" + dir;
-    let entries: string[];
-    try {
-      entries = await fileIO.listDir(dirPath);
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (entry.endsWith(".md")) {
-        existing.add(`${dir}/${entry}`);
-      } else {
-        // Could be a location subdirectory — check for index.md
-        const indexPath = norm(dirPath) + "/" + entry + "/index.md";
-        if (await fileIO.exists(indexPath)) {
-          existing.add(`${dir}/${entry}/index.md`);
-        }
-      }
-    }
-  }
-
-  return existing;
-}
-
-/**
  * Parse the ===filename=== delimited output from the generation prompt.
  */
 export function parseGeneratedEntities(output: string): { filePath: string; content: string }[] {
@@ -155,8 +121,8 @@ export function parseGeneratedEntities(output: string): { filePath: string; cont
 }
 
 /**
- * Repair missing entity files by scanning transcripts for wikilinks,
- * identifying entities without files, and generating stubs via Haiku.
+ * Repair unresolved transcript identities using only transcript evidence.
+ * Generated prose is transient; canonical records and notices commit together.
  */
 export async function repairState(
   provider: LLMProvider,
@@ -183,22 +149,19 @@ export async function repairState(
   // Step 1: Scan transcripts for wikilinks
   const { targets, excerpts } = await scanTranscripts(root, fileIO);
 
-  // Step 2: Classify targets into entity types
-  const classified = targets
-    .map((t) => ({ raw: t, ...classifyTarget(t) }))
-    .filter((c): c is { raw: string; type: string; name: string; filePath: string } => c.type !== undefined);
-
-  result.found = classified.map((c) => c.filePath);
-
-  // Step 3: Inventory existing files
-  const existingFiles = await inventoryEntities(root, fileIO);
-  result.existing = classified
-    .filter((c) => existingFiles.has(c.filePath))
-    .map((c) => c.filePath);
-
-  // Step 4: Diff — find missing
-  const missingEntities = classified.filter((c) => !existingFiles.has(c.filePath));
-  result.missing = missingEntities.map((c) => c.filePath);
+  const store = await getCampaignKnowledge(root, fileIO);
+  const classified = targets.map((raw) => {
+    const legacy = classifyTarget(raw);
+    return legacy ? { raw, ...legacy } : { raw, type: "Lore", name: raw, filePath: raw };
+  });
+  result.found = classified.map((entry) => entry.filePath);
+  const missingEntities: typeof classified = [];
+  for (const entry of classified) {
+    if (await store.resolve(entry.raw) || await store.resolve(entry.name)) result.existing.push(entry.filePath);
+    else if (/^(?:knowledge:|@)?k[0-9a-z]+$/i.test(entry.raw)) result.errors.push(`Unresolved UID ${entry.raw}; cannot infer an identity from its handle.`);
+    else missingEntities.push(entry);
+  }
+  result.missing = missingEntities.map((entry) => entry.filePath);
 
   if (missingEntities.length === 0) {
     return result;
@@ -212,9 +175,9 @@ export async function repairState(
     const batch = missingEntities.slice(i, i + batchSize);
 
     // Build user message with entity names and transcript excerpts
-    const lines: string[] = ["Generate entity files for the following:\n"];
+    const lines: string[] = ["Describe these unresolved campaign identities. Preserve each requested output key:\n"];
     for (const entity of batch) {
-      lines.push(`## ${entity.type}/${entity.name}`);
+      lines.push(`## ${entity.name} (collection: ${entity.type}; output key: ${entity.filePath})`);
       const entityExcerpts = excerpts.get(entity.raw) ?? [];
       if (entityExcerpts.length > 0) {
         lines.push("Transcript excerpts:");
@@ -243,22 +206,20 @@ export async function repairState(
       const entities = parseGeneratedEntities(genResult.text);
 
       for (const entity of entities) {
-        const absPath = norm(root) + "/" + entity.filePath;
-
-        if (dryRun) {
+        const requested = batch.find((entry) => entry.filePath === entity.filePath);
+        if (!requested) { result.errors.push(`Ignored unrequested identity ${entity.filePath}`); continue; }
+        if (dryRun) { result.generated.push(entity.filePath); continue; }
+        try {
+          const collection = requested.type.charAt(0).toUpperCase() + requested.type.slice(1);
+          const name = entity.content.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? requested.name;
+          await store.mutate([
+            ...(await store.resolve(collection) ? [] : [{ op: "create_collection" as const, name: collection }]),
+            { op: "upsert", collection, name, aliases: [requested.name, requested.raw],
+              body: entity.content, history: "Recovered transcript facts", visibility: "private" },
+          ], { source: "transcript-repair" });
           result.generated.push(entity.filePath);
-        } else {
-          try {
-            // Ensure parent directory exists for locations
-            if (entity.filePath.startsWith("locations/")) {
-              const parentDir = absPath.replace(/\/[^/]+$/, "");
-              await fileIO.mkdir(parentDir);
-            }
-            await fileIO.writeFile(absPath, entity.content);
-            result.generated.push(entity.filePath);
-          } catch (e) {
-            result.errors.push(`Failed to write ${entity.filePath}: ${e instanceof Error ? e.message : String(e)}`);
-          }
+        } catch (error) {
+          result.errors.push(`Failed to record ${entity.filePath}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     } catch (e) {

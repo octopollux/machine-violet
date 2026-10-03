@@ -1,3 +1,5 @@
+import { prepareKnowledgeNotices } from "../knowledge/notices.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
 import { coerceResourceKeys } from "@machine-violet/shared";
@@ -59,7 +61,7 @@ import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manag
 import { aiPlayerTurn } from "./subagents/ai-player.js";
 import { createChoiceGeneratorSession, shouldGenerateChoices } from "./subagents/choice-generator.js";
 import type { ChoiceGeneratorSession } from "./subagents/choice-generator.js";
-import { campaignPaths, parseFrontMatter, serializeEntity, formatChangelogEntry } from "../tools/filesystem/index.js";
+import { parseFrontMatter } from "../tools/filesystem/index.js";
 import { handleImageGenerated } from "./image-handler.js";
 import { normalizeImageEffort, normalizeImageAspect } from "../providers/image-coerce.js";
 import { loadDmPortraitMessage, loadCharacterReferences, commitPortraitRevision, downscalePortraitForContext, buildPortraitRevisionPrompt } from "./dm-portraits.js";
@@ -296,12 +298,14 @@ export class GameEngine {
     );
     if (this.repo) {
       const persister = this.persister;
+      this.repo.snapshotHook = async (capture) => (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).withSnapshot(capture);
+      this.repo.restoreHook = async (capture) => (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).withSnapshot(capture);
       this.repo.preCommitHook = async () => {
         // Snapshot current scene + transcript to disk so the commit
         // captures the true in-memory state.
         this.persistCurrentScene();
         await this.sceneManager.flushTranscript();
-        await persister.flush();
+        await persister.flushDurable();
       };
     }
 
@@ -398,6 +402,8 @@ export class GameEngine {
       activePlayerIndex: this.gameState.activePlayerIndex,
       sessionRecapPending: scene.sessionRecapPending,
       turnsSinceImage: this.gameState.turnsSinceImage ?? 0,
+      knowledgeSnapshot: scene.knowledgeSnapshot ?? null,
+      knowledgeSnapshotScene: scene.knowledgeSnapshotScene ?? null,
     });
     this.persister.persistConversation(this.conversation.getExchanges());
   }
@@ -661,7 +667,22 @@ export class GameEngine {
     // for that write-back lane. Placed AFTER `setState("dm_thinking")` so the
     // re-entrancy guard above is already armed before we yield on the await;
     // usually a no-op, since the player's think-time dwarfs the work.
-    await this.deferred.settle("next-turn", this.campaignId);
+    try {
+      await this.deferred.settle("next-turn", this.campaignId);
+      await this.sceneManager.prepareKnowledgeContext();
+      // Preserve the exact scene tree before the provider can observe it,
+      // including interrupted first turns and resumes after a failed call.
+      this.persistCurrentScene();
+      await this.persister?.flushDurable();
+    } catch (error) {
+      this.lastFailedInput = { characterName, text, opts };
+      this.callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+      this.setState("waiting_input");
+      return;
+    }
+    const knowledge = await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO);
+    const noticeDelivery = prepareKnowledgeNotices(await knowledge.pendingNotices());
+    const consumedKnowledgeNotices = noticeDelivery.notices;
 
     const turnStartTime = Date.now();
     this.dmProvidedChoicesThisTurn = false;
@@ -671,6 +692,9 @@ export class GameEngine {
     // Tag the input with character name; prepend OOC summary if pending
     // (persisted in conversation history so the DM retains OOC context)
     let taggedInput = `[${characterName}] ${text}`;
+    if (consumedKnowledgeNotices.length) {
+      taggedInput = `<memory_changes>\n${noticeDelivery.text}\n</memory_changes>\n\n${taggedInput}`;
+    }
     const consumedOOCSummary = this.pendingOOCSummary;
     if (consumedOOCSummary) {
       taggedInput = `<ooc_summary>\n${consumedOOCSummary}\n</ooc_summary>\n\n${taggedInput}`;
@@ -917,6 +941,8 @@ export class GameEngine {
           activePlayerIndex: this.gameState.activePlayerIndex,
           sessionRecapPending: scene.sessionRecapPending,
           turnsSinceImage: this.gameState.turnsSinceImage ?? 0,
+          knowledgeSnapshot: scene.knowledgeSnapshot ?? null,
+          knowledgeSnapshotScene: scene.knowledgeSnapshotScene ?? null,
         });
         this.persister.persistConversation(this.conversation.getExchanges());
       }
@@ -925,6 +951,12 @@ export class GameEngine {
       // completed DM turn. Without this, transcript.md is only written
       // during scene transitions, leaving it stale during normal play.
       await this.sceneManager.flushTranscript();
+      // Acknowledge only after the exchange carrying feedback is durable. A
+      // crash before here retains notices; replaying them is harmless.
+      if (consumedKnowledgeNotices.length && this.persister) {
+        await this.persister.flushDurable();
+        await knowledge.acknowledgeNotices(consumedKnowledgeNotices.map((notice) => notice.id));
+      }
 
       // Track exchange for git auto-commit. Use the raw player message as the
       // commit subject so the savestate log is browsable; synthetic system
@@ -1156,8 +1188,7 @@ export class GameEngine {
     for (const player of this.gameState.config.players) {
       const name = player.character;
       try {
-        const sheetPath = campaignPaths(this.gameState.campaignRoot).character(name);
-        const content = await this.fileIO.readFile(sheetPath);
+        const content = (await this.getEntityStore().read("character", name)).raw;
         if (content && content.trim().length > 0) {
           sheets.push(content);
         }
@@ -1238,6 +1269,7 @@ export class GameEngine {
 
       // Refresh context so the DM sees the updated campaign log
       await this.sceneManager.contextRefresh();
+      this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
 
       // Auto-apply theme from location entity if it has theme metadata
       await this.applyLocationTheme(title);
@@ -1293,6 +1325,8 @@ export class GameEngine {
     // (they can take minutes); their bytes are on disk regardless.
     this.flushPendingImageDisplaysToLog();
 
+    await this.persister?.flush();
+    await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).close();
     this.setState("idle");
   }
 
@@ -1446,7 +1480,7 @@ export class GameEngine {
       // re-fetches the active sheet on demand. Gate on an actual character/player
       // write — the pane only shows character sheets, so a location/item/faction
       // edit shouldn't invalidate its cache.
-      const touchedSheet = result.entityDeltas.some(
+      const touchedSheet = result.updated.length > 0 || result.entityDeltas.some(
         (d) => d.type === "character" || d.type === "player",
       );
       if (touchedSheet) {
@@ -1470,8 +1504,7 @@ export class GameEngine {
     // first or the read tears / the writes clobber (last-writer-wins).
     await this.deferred.settle("promote-character", this.campaignId);
 
-    const paths = campaignPaths(this.gameState.campaignRoot);
-    const filePath = norm(paths.character(characterName));
+    const entityStore = this.getEntityStore();
     const subStart = Date.now();
     logEvent("subagent:start", { name: "promote_character", character: characterName });
 
@@ -1479,7 +1512,7 @@ export class GameEngine {
       // Read current sheet (may not exist for initial creation)
       let currentSheet = "";
       try {
-        currentSheet = await this.fileIO.readFile(filePath);
+        currentSheet = (await entityStore.read("character", characterName)).raw;
       } catch {
         // New character — start from minimal template
         currentSheet = `# ${characterName}\n\n**Type:** character\n`;
@@ -1487,14 +1520,11 @@ export class GameEngine {
 
       // Skip if sheet was just built by post-setup (prevents duplicate sections).
       // Clear the flag so future level-ups still work.
-      const { frontMatter: fm, body: fmBody, changelog: fmChangelog } = parseFrontMatter(currentSheet);
+      const { frontMatter: fm } = parseFrontMatter(currentSheet);
       if (fm.sheet_status === "complete") {
         delete fm.sheet_status;
         const title = String(fm._title ?? characterName);
-        await this.fileIO.writeFile(filePath, serializeEntity(title, fm, fmBody, fmChangelog));
-        const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-        const relativePath = norm(filePath).replace(norm(this.gameState.campaignRoot) + "/", "");
-        this.sceneManager.upsertEntity({ slug, name: characterName, aliases: [], type: "character", path: relativePath });
+        await entityStore.update("character", characterName, { displayName: title, frontMatter: { sheet_status: null } }, this.sceneManager.getScene().sceneNumber);
         this.callbacks.onDevLog?.(`[dev] promote_character: ${characterName} — skipped, sheet already complete`);
         return;
       }
@@ -1510,15 +1540,13 @@ export class GameEngine {
         systemRules: ruleCard !== "No rule card available." ? ruleCard : undefined,
       }, undefined, small.model);
 
-      // Write the updated sheet
       if (result.updatedSheet) {
-        await this.fileIO.writeFile(filePath, result.updatedSheet);
+        const parsed = parseFrontMatter(result.updatedSheet);
+        const patch = { displayName: String(parsed.frontMatter._title ?? characterName), frontMatter: parsed.frontMatter, body: parsed.body, changelogEntry: result.changelogEntry };
+        if (await entityStore.exists("character", characterName)) await entityStore.update("character", characterName, patch, this.sceneManager.getScene().sceneNumber);
+        else await entityStore.create("character", patch, this.sceneManager.getScene().sceneNumber);
+        this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
       }
-
-      // Update entity tree
-      const slug = characterName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-      const relativePath = norm(filePath).replace(norm(this.gameState.campaignRoot) + "/", "");
-      this.sceneManager.upsertEntity({ slug, name: characterName, aliases: [], type: "character", path: relativePath });
 
       logEvent("subagent:end", { name: "promote_character", durationMs: Date.now() - subStart });
       accUsage(this.sessionUsage, result.usage);
@@ -1533,9 +1561,6 @@ export class GameEngine {
 
   /** Handle dm_notes tool (read/write campaign-scope DM notes) */
   private async handleDmNotes(cmd: TuiCommand): Promise<void> {
-    const paths = campaignPaths(this.gameState.campaignRoot);
-    const filePath = norm(paths.dmNotes);
-
     if (cmd.action === "read") {
       // Read is a no-op for the engine — notes are already in the prefix.
       // The tool result from the registry returns the TUI command; the actual
@@ -1547,9 +1572,9 @@ export class GameEngine {
     // Write
     const notes = (cmd.notes as string).trim();
     try {
-      await this.fileIO.writeFile(filePath, notes);
+      await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).mutate([{ op: "upsert", collection: "Lore", name: "DM Notes", body: notes, visibility: "private" }], { sceneNumber: this.sceneManager.getScene().sceneNumber, source: "dm-notes" });
       this.sessionState.dmNotes = notes;
-      this.callbacks.onDevLog?.(`[dev] dm_notes: wrote ${notes.length} chars → ${filePath}`);
+      this.callbacks.onDevLog?.(`[dev] dm_notes: committed ${notes.length} chars`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] dm_notes: write failed — ${msg}`);
@@ -1953,33 +1978,13 @@ export class GameEngine {
       return;
     }
 
-    const slugified = location.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    const paths = campaignPaths(this.gameState.campaignRoot);
-    const filePath = norm(paths.location(slugified));
-
     try {
-      if (!(await this.fileIO.exists(filePath))) {
-        this.callbacks.onDevLog?.(`[dev] set_theme: location "${location}" not found at ${filePath}`);
-        return;
-      }
-
-      const raw = await this.fileIO.readFile(filePath);
-      const { frontMatter, body, changelog } = parseFrontMatter(raw);
-      const title = frontMatter._title ?? location;
-
-      if (themeName) frontMatter.theme = themeName;
-      if (keyColor) frontMatter.key_color = keyColor;
-
-      const sceneNumber = this.sceneManager.getScene().sceneNumber;
-      const newChangelog = [...changelog];
-      const parts: string[] = [];
-      if (themeName) parts.push(`theme=${themeName}`);
-      if (keyColor) parts.push(`key_color=${keyColor}`);
-      newChangelog.push(formatChangelogEntry(sceneNumber, `Theme updated: ${parts.join(", ")}`));
-
-      const updated = serializeEntity(title as string, frontMatter, body, newChangelog);
-      await this.fileIO.writeFile(filePath, updated);
-      this.callbacks.onDevLog?.(`[dev] set_theme: saved ${parts.join(", ")} to location "${location}"`);
+      const store = this.getEntityStore();
+      if (!(await store.exists("location", location))) return;
+      const fields: Record<string, unknown> = {};
+      if (themeName) fields.theme = themeName;
+      if (keyColor) fields.key_color = keyColor;
+      await store.update("location", location, { frontMatter: fields, changelogEntry: `Theme updated: ${Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(", ")}` }, this.sceneManager.getScene().sceneNumber);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] set_theme: failed to save to location "${location}" — ${msg}`);
@@ -1991,15 +1996,8 @@ export class GameEngine {
    * Called after scene transitions with the scene title as a location hint.
    */
   async applyLocationTheme(locationHint: string): Promise<void> {
-    const slugified = locationHint.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    const paths = campaignPaths(this.gameState.campaignRoot);
-    const filePath = norm(paths.location(slugified));
-
     try {
-      if (!(await this.fileIO.exists(filePath))) return;
-
-      const raw = await this.fileIO.readFile(filePath);
-      const { frontMatter } = parseFrontMatter(raw);
+      const { frontMatter } = await this.getEntityStore().read("location", locationHint);
       const themeName = frontMatter.theme as string | undefined;
       const keyColor = frontMatter.key_color as string | undefined;
 
@@ -2049,8 +2047,7 @@ export class GameEngine {
     // Load character sheet (best-effort)
     let characterSheet = `Character: ${characterName}`;
     try {
-      const sheetPath = campaignPaths(this.gameState.campaignRoot).character(characterName);
-      const content = await this.fileIO.readFile(sheetPath);
+      const content = (await this.getEntityStore().read("character", characterName)).raw;
       if (content) characterSheet = content;
     } catch (e) {
       // Missing sheet is fine — systemless or freshly-created characters.
@@ -2207,7 +2204,8 @@ export class GameEngine {
     if (!this.entityToolDispatcher) {
       this.entityStore = new EntityStore(this.gameState.campaignRoot, this.fileIO);
       this.entityToolDispatcher = buildEntityToolHandler(this.entityStore, {
-        sceneNumber: this.sceneManager.getScene().sceneNumber,
+        sceneNumber: () => this.sceneManager.getScene().sceneNumber,
+        source: "dm",
       });
     }
     return this.entityToolDispatcher;
@@ -2377,9 +2375,8 @@ export class GameEngine {
   private async loadCombatantSheets(state: GameState): Promise<string> {
     const sheets: string[] = [];
     for (const entry of state.combat.order) {
-      const paths = campaignPaths(state.campaignRoot);
       try {
-        const content = await this.fileIO.readFile(norm(paths.character(entry.id)));
+        const content = (await this.getEntityStore().read("character", entry.id)).raw;
         if (content) {
           sheets.push(`### ${entry.id}\n${content}`);
           continue;

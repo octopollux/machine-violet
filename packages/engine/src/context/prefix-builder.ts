@@ -10,7 +10,7 @@ import { findSystem, effectiveMechanicsMode } from "../config/systems.js";
  *
  *   Tier 1 (campaign-stable): DM identity, personality, DM directives, game system, campaign setting, rules  [BP1]
  *   Tier 2 (session/scene-stable): session recap, campaign summary, scene precis, player read  [BP2]
- *   Tier 3 (volatile): active state, entity index, UI state — injected into conversation, NOT system
+ *   Tier 3 (volatile): active state, UI state — injected into conversation, NOT system
  *
  * BP1 on rules appendix (1h). BP2 on last emitted Tier 2 block (1h).
  * BP3 on tools (stamped in agent-loop-bridge via cacheHints). BP4 on
@@ -152,6 +152,12 @@ export function buildCachedPrefix(
     blocks.push({ text: `\n\n## Player Characters\n${sections.pcSheets}` });
   }
 
+  // Complete campaign tree, captured once per scene. Bulk text/history stay
+  // discoverable through bounded tools; writes never invalidate this block.
+  if (sections.entityIndex) {
+    blocks.push({ text: `\n\n## Campaign Memory (scene snapshot)\n${sections.entityIndex}` });
+  }
+
   // Session recap
   if (sections.sessionRecap) {
     blocks.push({ text: `\n\n## Last Session\n${sections.sessionRecap}` });
@@ -199,10 +205,6 @@ export function buildCachedPrefix(
 
   if (sections.activeState) {
     volatileParts.push(`## Current State\n${sections.activeState}`);
-  }
-
-  if (sections.entityIndex) {
-    volatileParts.push(`## Entity Registry\n${sections.entityIndex}`);
   }
 
   if (sections.uiState) {

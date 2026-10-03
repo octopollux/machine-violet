@@ -615,7 +615,7 @@ describe("new Phase 8 tools", () => {
     expect(registry.has("promote_character")).toBe(true);
   });
 
-  it("registry has 41 tools total", () => {
+  it("registry has 37 tools total", () => {
     const registry = createTestRegistry();
     // Bumped from 29 → 35 by the entity-tool rework: entity, describe_entity_type,
     // list_entity_types, validate_entity, find_schema_drift, detect_orphans.
@@ -623,6 +623,6 @@ describe("new Phase 8 tools", () => {
     // 37 → 40 by the DM-personality work: list_dm_personalities,
     // swap_dm_personality, howto_swap_dm_personality.
     // 40 → 41 by the catch-all: howto_campaign_state.
-    expect(registry.size).toBe(41);
+    expect(registry.size).toBe(37);
   });
 });

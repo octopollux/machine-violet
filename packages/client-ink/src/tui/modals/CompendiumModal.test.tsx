@@ -63,6 +63,13 @@ function emptyCompendium(): Compendium {
 }
 
 describe("CompendiumModal", () => {
+  it("shows an arbitrary nested collection instead of assuming fixed categories", () => {
+    const data = emptyCompendium();
+    data.collections = { "Rituals/Arcane": [entry({ uid: "k9", name: "Blue Flame", slug: "k9" })] };
+    const { lastFrame } = render(<Box width={100} height={30}><CompendiumModal theme={theme} width={100} height={30} data={data} onClose={() => {}} /></Box>);
+    expect(lastFrame()).toContain("Rituals/Arcane");
+    expect(lastFrame()).not.toContain("Characters");
+  });
   it("renders empty state message", () => {
     const { lastFrame } = render(
       <Box width={60} height={24}>

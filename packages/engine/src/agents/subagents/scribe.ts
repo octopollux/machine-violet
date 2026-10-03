@@ -1,20 +1,16 @@
-import type { LLMProvider, NormalizedTool } from "../../providers/types.js";
+import type { LLMProvider } from "../../providers/types.js";
 import { spawnSubagent, cacheSystemPrompt } from "../subagent.js";
-import type { SubagentResult } from "../subagent.js";
 import type { UsageStats } from "../agent-loop.js";
 import { getMaxOutput } from "../../config/model-registry.js";
 import { loadPrompt } from "../../prompts/load-prompt.js";
 import { dirname } from "node:path";
 import { machinePaths } from "../../tools/filesystem/index.js";
 import { parseFrontMatter, serializeEntity } from "../../tools/filesystem/index.js";
-import { formatChangelogEntry } from "../../tools/filesystem/index.js";
-import type { EntityFrontMatter, EntityTree } from "@machine-violet/shared/types/entities.js";
-import { renderEntityTree } from "../../tools/filesystem/index.js";
-import { norm } from "../../utils/paths.js";
-import { renameEntity as renameEntityOp } from "../../tools/campaign-ops/rename-entity.js";
-import { EntityStore } from "../../entities/store.js";
-import { isFileBackedEntityType } from "@machine-violet/shared/schemas/entities/index.js";
-import type { FileIO } from "../scene-manager.js";
+import type { EntityTree } from "@machine-violet/shared/types/entities.js";
+import { Type } from "@sinclair/typebox";
+import { getCampaignKnowledge, type KnowledgeFileIO } from "../../knowledge/store.js";
+import { ENTITY_TOOLS, ENTITY_INPUT_POLICIES, buildKnowledgeToolHandler } from "../../entities/tools.js";
+import { defineToolContract, validateToolInput, type ToolInputPolicy } from "../tool-contract.js";
 
 import { slugify } from "../world-builder.js";
 
@@ -60,7 +56,7 @@ export interface ScribeResult {
 }
 
 /** Abstraction for file I/O so tests can inject mocks */
-export interface ScribeFileIO {
+export interface ScribeFileIO extends KnowledgeFileIO {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   exists(path: string): Promise<boolean>;
@@ -72,118 +68,6 @@ export interface ScribeFileIO {
   rmdir?(path: string): Promise<void>;
 }
 
-// --- Scribe Tools (given to the subagent) ---
-
-const SCRIBE_TOOLS: NormalizedTool[] = [
-  {
-    name: "list_entities",
-    description: "List all entity files of a given type. Returns filenames (without extension).",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        entity_type: {
-          type: "string",
-          enum: ["character", "location", "faction", "lore", "item", "player"],
-          description: "Entity type to list",
-        },
-      },
-      required: ["entity_type"],
-    },
-  },
-  {
-    name: "read_entity",
-    description: "Read an entity file's current contents. Returns the full markdown.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        entity_type: {
-          type: "string",
-          enum: ["character", "location", "faction", "lore", "item", "player"],
-          description: "Entity type",
-        },
-        slug: {
-          type: "string",
-          description: "Entity slug (lowercase, hyphenated)",
-        },
-      },
-      required: ["entity_type", "slug"],
-    },
-  },
-  {
-    name: "write_entity",
-    description: "Create or update an entity file.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        mode: {
-          type: "string",
-          enum: ["create", "update"],
-          description: "Create a new entity or update an existing one",
-        },
-        entity_type: {
-          type: "string",
-          enum: ["character", "location", "faction", "lore", "item", "player"],
-          description: "Entity type",
-        },
-        name: {
-          type: "string",
-          description: "Entity display name",
-        },
-        front_matter: {
-          type: "object",
-          description: "Front matter key-value pairs (for create: full set; for update: only changed keys, null deletes)",
-        },
-        body: {
-          type: "string",
-          description: "For create: full body. For update: sections to add or replace. If the text contains ## headings that already exist in the file, those sections are replaced in-place; new sections are appended. Omit to leave body unchanged.",
-        },
-        changelog_entry: {
-          type: "string",
-          description: "Changelog entry to add (terse, one line). Scene number added automatically.",
-        },
-      },
-      required: ["mode", "entity_type", "name"],
-    },
-  },
-  {
-    name: "rename_entity",
-    description:
-      "Rename an existing entity. Moves the file to the new slug, updates its H1 to the new display name, and rewrites every wikilink across the campaign that pointed to the old entity. Use this when an entity is renamed in fiction (e.g. a tavern reveals its real name) — and especially to replace the placeholder `Starting Location` once the opening locale has a real name. Player entities are machine-scope and not renamable through this tool.",
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        entity_type: {
-          type: "string",
-          enum: ["character", "location", "faction", "lore", "item"],
-          description: "Entity type. `player` is intentionally excluded — player files are machine-scope.",
-        },
-        old_name: {
-          type: "string",
-          description: "Current display name of the entity (e.g. \"Starting Location\"). Used to derive the existing slug.",
-        },
-        new_name: {
-          type: "string",
-          description: "New display name (e.g. \"The Crooked Coin Tavern\"). The new slug is derived from this name.",
-        },
-        changelog_entry: {
-          type: "string",
-          description: "Optional changelog entry. If omitted, a default \"Renamed from X to Y\" entry is added.",
-        },
-      },
-      required: ["entity_type", "old_name", "new_name"],
-    },
-  },
-];
-
-/**
- * Fix literal `\n` sequences that LLMs sometimes produce in JSON string values.
- * JSON parsers handle real `\n` escapes, but models occasionally double-escape
- * them, producing literal backslash-n in the parsed string.
- */
-function unescapeNewlines(s: string): string {
-  return s.replace(/\\n/g, "\n");
-}
-
 /**
  * Re-export sanitizeFrontMatter from its canonical home. EntityStore.create
  * /update use the same repair, so the implementation moved to the shared
@@ -191,7 +75,6 @@ function unescapeNewlines(s: string): string {
  * stable.
  */
 export { sanitizeFrontMatter } from "../../tools/filesystem/frontmatter.js";
-import { sanitizeFrontMatter } from "../../tools/filesystem/frontmatter.js";
 
 /** Heading pattern: a `## ` at the start of a line (not `###` or deeper). */
 const H2_RE = /^## (?!#)/m;
@@ -297,444 +180,88 @@ export function mergeSectionBodies(existing: string, incoming: string): string {
   return parts.join("\n\n");
 }
 
-// --- Entity path resolution (shared by the tool handler and prefetch) ---
+// --- Campaign and machine-profile tools ---
 
-/**
- * Resolve the on-disk file path for an entity. File-backed types route through
- * the campaign-rooted EntityStore; `player` is machine-scope (homeDir); unknown
- * types fall back to lore for back-compat. Single source of truth so the
- * prefetch reads the exact file the `read_entity` tool would.
- */
-function resolveEntityFilePath(
-  store: EntityStore,
-  mPaths: ReturnType<typeof machinePaths> | undefined,
-  entityType: string,
-  slug: string,
-): string {
-  if (isFileBackedEntityType(entityType)) return store.pathFor(entityType, slug).abs;
-  if (entityType === "player") {
-    if (!mPaths) throw new Error("player entity type requires homeDir");
-    return mPaths.player(slug);
-  }
-  return store.pathFor("lore", slug).abs;
-}
-
-// --- Tool Handler Factory ---
+export const PLAYER_PROFILE_CONTRACT = defineToolContract({
+  name: "player_profile", criticality: "durable",
+  description: "Read a real-world player's machine profile or append a factual private note. Campaign characters belong in campaign memory. Content Boundaries may only be appended, never removed.",
+  schema: Type.Object({ action: Type.Union([Type.Literal("read"), Type.Literal("append")]), player: Type.String({ minLength: 1 }), text: Type.Optional(Type.String()), section: Type.Optional(Type.String()) }, { additionalProperties: false }),
+  refine: (input) => input.action === "append" && !input.text?.trim()
+    ? [{ path: "/text", code: "required", expected: "nonempty note", actual: "absent", message: "append requires text" }] : [],
+});
 
 export function buildScribeToolHandler(
-  fileIO: ScribeFileIO,
-  campaignRoot: string,
-  sceneNumber: number,
-  created: string[],
-  updated: string[],
-  entityDeltas: ScribeEntityDelta[],
-  removedSlugs: string[] = [],
-  homeDir?: string,
+  fileIO: ScribeFileIO, campaignRoot: string, sceneNumber: number,
+  _created: string[], updated: string[], _entityDeltas: ScribeEntityDelta[],
+  _removedSlugs: string[] = [], homeDir?: string,
 ) {
-  const mPaths = homeDir ? machinePaths(homeDir) : undefined;
-  // EntityStore owns disk I/O for the five file-backed types. Scribe still
-  // handles `player` itself because players are machine-scope, not
-  // campaign-scope, and don't fit the store's campaign-rooted model.
-  const store = new EntityStore(campaignRoot, fileIO);
-
-  const entityPath = (entityType: string, slug: string): string =>
-    resolveEntityFilePath(store, mPaths, entityType, slug);
-
-  function entityDir(entityType: string): string {
-    if (isFileBackedEntityType(entityType)) return store.dirFor(entityType);
-    if (entityType === "player") {
-      if (!mPaths) throw new Error("player entity type requires homeDir");
-      return mPaths.playersDir;
-    }
-    return store.dirFor("lore");
-  }
-
   return async (name: string, input: Record<string, unknown>): Promise<{ content: string; is_error?: boolean }> => {
-    switch (name) {
-      case "list_entities": {
-        const entityType = input.entity_type as string;
-        const dir = entityDir(entityType);
-        // Probe the directory directly so we can distinguish "no entities of
-        // this type yet" (dir doesn't exist) from "dir exists but is empty"
-        // — the prompt relies on the wording. For file-backed types, route
-        // the actual enumeration through the store so the location-subdir
-        // quirk + skip-files behaviour is unified.
-        try {
-          await fileIO.listDir(dir);
-        } catch {
-          return { content: "(directory not found — no entities of this type yet)" };
-        }
-        if (isFileBackedEntityType(entityType)) {
-          const entries = await store.list(entityType);
-          return { content: entries.length > 0 ? entries.map(e => e.id).join("\n") : "(none)" };
-        }
-        // Player (machine-scope) — flat .md listing.
-        const entries = await fileIO.listDir(dir);
-        const names = entries
-          .filter(e => e.endsWith(".md"))
-          .map(e => e.replace(/\.md$/, ""));
-        return { content: names.length > 0 ? names.join("\n") : "(none)" };
-      }
-
-      case "read_entity": {
-        const entityType = input.entity_type as string;
-        const slug = input.slug as string;
-        const filePath = norm(entityPath(entityType, slug));
-        try {
-          const content = await fileIO.readFile(filePath);
-          return { content };
-        } catch {
-          return { content: `Entity not found: ${entityType}/${slug}`, is_error: true };
-        }
-      }
-
-      case "write_entity": {
-        const mode = input.mode as string;
-        const entityType = input.entity_type as string;
-        const entityName = input.name as string | undefined;
-        if (!entityName) {
-          return { content: "write_entity requires a 'name' field", is_error: true };
-        }
-        const slug = slugify(entityName);
-        const filePath = norm(entityPath(entityType, slug));
-
-        try {
-          if (mode === "create") {
-            // Check for duplicates
-            if (await fileIO.exists(filePath)) {
-              return { content: `Entity already exists at ${filePath}. Use mode: "update" instead.`, is_error: true };
-            }
-
-            // Ensure parent directory exists
-            await fileIO.mkdir(dirname(filePath));
-
-            const fm: EntityFrontMatter = {
-              type: entityType,
-              ...sanitizeFrontMatter((input.front_matter as Record<string, unknown> | undefined) ?? {}),
-            };
-            const body = input.body ? unescapeNewlines(input.body as string) : "";
-            const changelog: string[] = [];
-            if (input.changelog_entry) {
-              changelog.push(formatChangelogEntry(sceneNumber, unescapeNewlines(input.changelog_entry as string)));
-            }
-            const content = serializeEntity(entityName, fm, body, changelog);
-            await fileIO.writeFile(filePath, content);
-            created.push(filePath);
-            const aliasRaw = fm.additional_names as string | undefined;
-            const aliases = aliasRaw ? aliasRaw.split(",").map((a) => a.trim()).filter(Boolean) : [];
-            const relativePath = norm(filePath).replace(norm(campaignRoot) + "/", "");
-            entityDeltas.push({ slug, name: entityName, aliases, type: entityType, path: relativePath });
-            return { content: `Created ${entityType} "${entityName}" at ${filePath}` };
-          } else {
-            // Update mode
-            if (!(await fileIO.exists(filePath))) {
-              return { content: `Entity not found at ${filePath}. Use mode: "create" instead.`, is_error: true };
-            }
-
-            const raw = await fileIO.readFile(filePath);
-            const { frontMatter, body, changelog } = parseFrontMatter(raw);
-            const title = (frontMatter._title ?? entityName) as string;
-
-            // Merge front matter (sanitize first to catch small-model
-            // mistakes that pass full `**Key:** Value` markdown lines as
-            // JSON keys — see sanitizeFrontMatter).
-            const fmUpdates = input.front_matter as Record<string, unknown> | undefined;
-            if (fmUpdates) {
-              for (const [key, value] of Object.entries(sanitizeFrontMatter(fmUpdates))) {
-                if (value === null) {
-                  // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-                  delete frontMatter[key];
-                } else {
-                  frontMatter[key] = value;
-                }
-              }
-            }
-
-            // Merge body with section-aware replacement
-            let newBody = body;
-            if (input.body) {
-              const incoming = unescapeNewlines(input.body as string);
-              newBody = body ? mergeSectionBodies(body, incoming) : incoming;
-            }
-
-            // Add changelog
-            const newChangelog = [...changelog];
-            if (input.changelog_entry) {
-              newChangelog.push(formatChangelogEntry(sceneNumber, unescapeNewlines(input.changelog_entry as string)));
-            }
-
-            const content = serializeEntity(title, frontMatter, newBody, newChangelog);
-            await fileIO.writeFile(filePath, content);
-            updated.push(filePath);
-            const aliasRaw = frontMatter.additional_names as string | undefined;
-            const aliases = aliasRaw ? aliasRaw.split(",").map((a) => a.trim()).filter(Boolean) : [];
-            const relativePath = norm(filePath).replace(norm(campaignRoot) + "/", "");
-            entityDeltas.push({ slug, name: title, aliases, type: entityType, path: relativePath });
-            return { content: `Updated "${title}" at ${filePath}` };
-          }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          return { content: `write_entity failed: ${msg}`, is_error: true };
-        }
-      }
-
-      case "rename_entity": {
-        const entityType = input.entity_type as string;
-        const oldName = input.old_name as string;
-        const newName = input.new_name as string;
-        if (!oldName || !newName) {
-          return { content: "rename_entity requires 'old_name' and 'new_name'", is_error: true };
-        }
-        // Player entities live under homeDir, not campaignRoot — renaming them
-        // would mean retargeting every campaign that knows the player.
-        // Out of scope for an in-campaign Scribe.
-        if (entityType === "player") {
-          return { content: "rename_entity does not support player entities (machine-scope, not campaign-scope)", is_error: true };
-        }
-        const oldSlug = slugify(oldName);
-        const newSlug = slugify(newName);
-        if (oldSlug === newSlug) {
-          return { content: `Old and new names slugify to the same value (${oldSlug}); nothing to rename`, is_error: true };
-        }
-        if (!fileIO.deleteFile) {
-          return { content: "rename_entity requires file deletion support, which is unavailable in this environment", is_error: true };
-        }
-
-        const oldFilePath = norm(entityPath(entityType, oldSlug));
-        const newFilePath = norm(entityPath(entityType, newSlug));
-        // Defense in depth: refuse anything that didn't resolve under campaignRoot.
-        // Catches future bugs where a new entity type lands outside the campaign tree.
-        const normRoot = norm(campaignRoot);
-        if (!oldFilePath.startsWith(normRoot + "/") || !newFilePath.startsWith(normRoot + "/")) {
-          return { content: `rename_entity refused: ${entityType} resolves outside the campaign root`, is_error: true };
-        }
-        if (!(await fileIO.exists(oldFilePath))) {
-          return { content: `Entity not found: ${entityType}/${oldSlug}`, is_error: true };
-        }
-        if (await fileIO.exists(newFilePath)) {
-          return { content: `Cannot rename: ${entityType}/${newSlug} already exists`, is_error: true };
-        }
-
-        const oldRelative = oldFilePath.slice(normRoot.length + 1);
-        const newRelative = newFilePath.slice(normRoot.length + 1);
-
-        try {
-          // Move the file and rewrite incoming wikilinks campaign-wide.
-          // ScribeFileIO is a structural subset of the FileIO that
-          // renameEntity needs; deleteFile is the only optional method
-          // it touches and we already checked it above.
-          const renameResult = await renameEntityOp(
-            campaignRoot,
-            fileIO as FileIO,
-            oldRelative,
-            newRelative,
-            false,
-          );
-
-          // Update the H1 to the new display name and add a changelog entry.
-          const moved = await fileIO.readFile(newFilePath);
-          const { frontMatter, body, changelog } = parseFrontMatter(moved);
-          const entry = (input.changelog_entry as string | undefined)?.trim()
-            || `Renamed from ${oldName} to ${newName}`;
-          const updatedChangelog = [
-            ...changelog,
-            formatChangelogEntry(sceneNumber, unescapeNewlines(entry)),
-          ];
-          const finalContent = serializeEntity(newName, frontMatter, body, updatedChangelog);
-          await fileIO.writeFile(newFilePath, finalContent);
-
-          // Best-effort: remove the now-empty location subdirectory.
-          if (entityType === "location" && fileIO.rmdir) {
-            const oldDir = oldFilePath.replace(/\/index\.md$/, "");
-            try {
-              await fileIO.rmdir(oldDir);
-            } catch {
-              // Directory may still contain map JSONs — leave it.
-            }
-          }
-
-          // Track tree changes and updated-file list.
-          const aliasRaw = frontMatter.additional_names as string | undefined;
-          const aliases = aliasRaw ? aliasRaw.split(",").map(a => a.trim()).filter(Boolean) : [];
-          entityDeltas.push({ slug: newSlug, name: newName, aliases, type: entityType, path: newRelative });
-          removedSlugs.push(oldSlug);
-          updated.push(newFilePath);
-
-          const fileWord = renameResult.filesUpdated.length === 1 ? "file" : "files";
-          const linkWord = renameResult.linksUpdated === 1 ? "link" : "links";
-          return {
-            content: `Renamed ${entityType} "${oldName}" -> "${newName}". Rewrote ${renameResult.linksUpdated} ${linkWord} across ${renameResult.filesUpdated.length} ${fileWord}.`,
-          };
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          return { content: `rename_entity failed: ${msg}`, is_error: true };
-        }
-      }
-
-      default:
-        return { content: `Unknown tool: ${name}`, is_error: true };
+    if (name === "player_profile") {
+      const validation = validateToolInput(PLAYER_PROFILE_CONTRACT.definition, input, PLAYER_PROFILE_CONTRACT.policy);
+      if (!validation.ok) return { content: validation.content, is_error: true };
+      if (!homeDir) return { content: "Machine player profiles require homeDir", is_error: true };
+      const path = machinePaths(homeDir).player(slugify(input.player as string));
+      try {
+        let raw = "";
+        try { raw = await fileIO.readFile(path); } catch { /* new profile */ }
+        if (input.action === "read") return { content: raw || "(no profile)" };
+        const section = String(input.section ?? "Notes").replace(/[\r\n]/g, " ").trim();
+        if (!section) return { content: "section must not be empty", is_error: true };
+        const text = String(input.text).trim();
+        const { frontMatter, body, changelog } = parseFrontMatter(raw);
+        const heading = `## ${section}`;
+        const sections = splitSections(body);
+        const existing = sections.find((part) => part.heading === heading);
+        const addition = existing ? `${existing.content}\n- ${text}` : `${heading}\n- ${text}`;
+        const merged = mergeSectionBodies(body, addition);
+        await fileIO.mkdir(dirname(path));
+        await fileIO.writeFile(path, serializeEntity(String(frontMatter._title ?? input.player), { ...frontMatter, type: "player" }, merged, changelog));
+        updated.push(path);
+        return { content: `Appended private ${section} note for ${input.player}` };
+      } catch (error) { return { content: error instanceof Error ? error.message : String(error), is_error: true }; }
     }
+    const store = await getCampaignKnowledge(campaignRoot, fileIO);
+    const result = await buildKnowledgeToolHandler(store, { sceneNumber, source: "scribe" })(name, input);
+    if (!result) return { content: `Unknown tool: ${name}`, is_error: true };
+    if (name === "remember" && !result.is_error) {
+      const committed = JSON.parse(result.content) as { changed: string[] };
+      updated.push(...committed.changed);
+    }
+    return result;
   };
 }
 
-// --- Input prefetch ---
-
-/**
- * Word-boundary substring test (both args pre-lowercased). Avoids "kael"
- * matching inside "kaeldor" while still allowing "the kael" / "kael's".
- */
-function mentions(haystack: string, needle: string): boolean {
-  let idx = haystack.indexOf(needle);
-  while (idx !== -1) {
-    const before = idx === 0 ? "" : haystack[idx - 1];
-    const after = haystack[idx + needle.length] ?? "";
-    if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) return true;
-    idx = haystack.indexOf(needle, idx + 1);
-  }
-  return false;
-}
-
-/**
- * Prefetch the current on-disk content of entities the update batch references,
- * so the Scribe is handed them as canonical instead of spending a tool
- * round-trip pulling each via `read_entity` — that read burst is ~a third of
- * the Scribe's wall-clock. Matches a registry entry when its name or any alias
- * appears in the batch text (case-insensitive, word-boundary), so an aliased
- * mention still surfaces the canonical entity for dedup; reads the matched
- * files and returns a formatted block (empty string when nothing resolves).
- * Capped to bound context; overflow and any unmatched/created entity falls back
- * to the `read_entity` tool, so this is a pure latency optimization with
- * graceful degradation — never a correctness dependency.
- */
+/** Bounded canonical records supplement the complete latest organization. */
 export async function buildPrefetchedEntityBlock(
-  updates: ScribeUpdate[],
-  entityTree: EntityTree | undefined,
-  campaignRoot: string,
-  fileIO: ScribeFileIO,
-  homeDir?: string,
-  maxEntities = 16,
+  updates: ScribeUpdate[], _entityTree: EntityTree | undefined,
+  campaignRoot: string, fileIO: ScribeFileIO, _homeDir?: string, maxEntities = 8,
 ): Promise<string> {
-  if (!entityTree) return "";
-  const haystack = updates.map((u) => u.content).join("\n").toLowerCase();
-  if (!haystack.trim()) return "";
-
-  const store = new EntityStore(campaignRoot, fileIO);
-  const mPaths = homeDir ? machinePaths(homeDir) : undefined;
-
-  // Match phase (sync, cheap): registry entries whose name/alias appears in the
-  // batch text, resolved to a file path. Capped to bound context.
-  const matched: { entry: EntityTree[string]; path: string }[] = [];
-  for (const [slug, entry] of Object.entries(entityTree)) {
-    if (matched.length >= maxEntities) break;
-    const names = [entry.name, ...(entry.aliases ?? [])]
-      .filter((n) => n && n.trim().length >= 3)
-      .map((n) => n.toLowerCase());
-    if (!names.some((n) => mentions(haystack, n))) continue;
-    try {
-      matched.push({ entry, path: norm(resolveEntityFilePath(store, mPaths, entry.type, slug)) });
-    } catch {
-      // e.g. player entity with no homeDir — let the read_entity tool fetch it.
-    }
+  const store = await getCampaignKnowledge(campaignRoot, fileIO);
+  const text = updates.map((update) => update.content).join("\n").toLocaleLowerCase();
+  const blocks: string[] = [];
+  let remaining = 12000;
+  for (const entry of await store.outline()) {
+    if (entry.kind !== "entity" || blocks.length >= maxEntities || remaining <= 0) continue;
+    const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
+    if (![node.uid, node.name, ...node.aliases].some((name) => text.includes(name.toLocaleLowerCase()))) continue;
+    const record = await store.read(node.uid, { textLimit: Math.min(1500, remaining), logLimit: 2 });
+    const block = JSON.stringify(record);
+    if (block.length > remaining) continue;
+    blocks.push(block); remaining -= block.length;
   }
-  if (matched.length === 0) return "";
-
-  // Read phase (parallel — independent files, ≤ maxEntities): a stale/unreadable
-  // entry drops to null and is skipped (scribe falls back to read_entity).
-  const blocks = (
-    await Promise.all(
-      matched.map(async ({ entry, path }) => {
-        try {
-          const content = await fileIO.readFile(path);
-          return `### ${entry.name} (${entry.type})\n${content.trim()}`;
-        } catch {
-          return null;
-        }
-      }),
-    )
-  ).filter((b): b is string => b !== null);
-
-  if (blocks.length === 0) return "";
-  return (
-    "\n\nCurrent on-disk content of referenced entities " +
-    "(CANONICAL — do NOT call read_entity for these; update them directly):\n\n" +
-    `${blocks.join("\n\n")}\n`
-  );
+  return blocks.length ? `\n\nCanonical committed records (bulk text may be truncated; read more with knowledge):\n${blocks.join("\n")}` : "";
 }
 
-// --- Main Entry Point ---
-
-/**
- * Spawn the Scribe subagent to process batched entity updates.
- * The scribe has tools to list, read, and write entity files.
- */
-export async function runScribe(
-  provider: LLMProvider,
-  input: ScribeInput,
-  fileIO: ScribeFileIO,
-  model: string,
-): Promise<ScribeResult> {
-  const systemPrompt = cacheSystemPrompt(loadPrompt("scribe", model));
-  const created: string[] = [];
-  const updated: string[] = [];
-  const entityDeltas: ScribeEntityDelta[] = [];
-  const removedSlugs: string[] = [];
-
-  const toolHandler = buildScribeToolHandler(
-    fileIO,
-    input.campaignRoot,
-    input.sceneNumber,
-    created,
-    updated,
-    entityDeltas,
-    removedSlugs,
-    input.homeDir,
-  );
-
-  // Format the user message with all updates
-  const updateLines = input.updates.map((u, i) =>
-    `[${i + 1}] (${u.visibility}) ${u.content}`,
-  ).join("\n\n");
-
-  // Include entity tree so the Scribe can resolve existing entities before creating
-  const treeRendered = input.entityTree ? renderEntityTree(input.entityTree) : undefined;
-  const treeContext = treeRendered ? `\n\nEntity registry (use to find existing entities before creating):\n${treeRendered}\n` : "";
-
-  // Prefetch the content of entities the batch references, so the Scribe goes
-  // straight to write_entity instead of pulling each via read_entity first.
-  const prefetchBlock = await buildPrefetchedEntityBlock(
-    input.updates,
-    input.entityTree,
-    input.campaignRoot,
-    fileIO,
-    input.homeDir,
-  );
-
-  const userMessage = `Process these updates:${treeContext}${prefetchBlock}\n\n${updateLines}`;
-
-  const result: SubagentResult = await spawnSubagent(provider, {
-    name: "scribe",
-    model,
-    visibility: "silent",
-    systemPrompt,
-    maxTokens: getMaxOutput(model),
-    tools: SCRIBE_TOOLS,
-    toolHandler,
-    toolInputPolicies: {
-      list_entities: { criticality: "advisory" },
-      read_entity: { criticality: "advisory" },
-      write_entity: { criticality: "durable" },
-      rename_entity: { criticality: "durable" },
-    },
-    cacheTools: true,
-    maxToolRounds: 8,
-  }, userMessage);
-
-  return {
-    summary: result.text,
-    created,
-    updated,
-    entityDeltas,
-    removedSlugs,
-    usage: result.usage,
-  };
+export async function runScribe(provider: LLMProvider, input: ScribeInput, fileIO: ScribeFileIO, model: string): Promise<ScribeResult> {
+  const created: string[] = [], updated: string[] = [], entityDeltas: ScribeEntityDelta[] = [], removedSlugs: string[] = [];
+  const store = await getCampaignKnowledge(input.campaignRoot, fileIO);
+  const organization = (await store.outline()).filter((node) => node.kind === "collection");
+  const prefetched = await buildPrefetchedEntityBlock(input.updates, undefined, input.campaignRoot, fileIO, input.homeDir);
+  const result = await spawnSubagent(provider, {
+    name: "scribe", model, visibility: "silent", systemPrompt: cacheSystemPrompt(loadPrompt("scribe", model)),
+    maxTokens: getMaxOutput(model), tools: [...ENTITY_TOOLS, PLAYER_PROFILE_CONTRACT.definition],
+    toolHandler: buildScribeToolHandler(fileIO, input.campaignRoot, input.sceneNumber, created, updated, entityDeltas, removedSlugs, input.homeDir),
+    toolInputPolicies: { ...ENTITY_INPUT_POLICIES, player_profile: PLAYER_PROFILE_CONTRACT.policy as ToolInputPolicy }, cacheTools: true, maxToolRounds: 8,
+  }, `Latest committed campaign organization (including empty collections and conventions):\n${JSON.stringify(organization)}${prefetched}\n\nProcess these narrative updates:\n${input.updates.map((update, i) => `[${i + 1}] (${update.visibility}) ${update.content}`).join("\n\n")}`);
+  return { summary: result.text, created, updated, entityDeltas, removedSlugs, usage: result.usage };
 }

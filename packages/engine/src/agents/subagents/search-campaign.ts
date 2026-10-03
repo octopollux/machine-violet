@@ -7,7 +7,10 @@ import { loadPrompt } from "../../prompts/load-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import { walkCampaignFiles } from "../../tools/campaign-ops/walk-campaign.js";
 import type { CampaignFile } from "../../tools/campaign-ops/walk-campaign.js";
+import type { ToolInputPolicy } from "../tool-contract.js";
 import { norm } from "../../utils/paths.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
+import { KNOWLEDGE_CONTRACT, buildKnowledgeToolHandler } from "../../entities/tools.js";
 
 // --- Types ---
 
@@ -26,6 +29,7 @@ export interface SearchCampaignResult {
 // --- Search tools given to the subagent ---
 
 const SEARCH_TOOLS: NormalizedTool[] = [
+  KNOWLEDGE_CONTRACT.definition,
   {
     name: "grep_campaign",
     description: "Search all campaign files for a pattern (case-insensitive). Returns matching lines with file path and line number context. Use this first to find relevant content.",
@@ -53,7 +57,7 @@ const SEARCH_TOOLS: NormalizedTool[] = [
       properties: {
         path: {
           type: "string",
-          description: "Relative path within the campaign, e.g. 'characters/kael.md'",
+          description: "Narrative path (campaign/scenes/... or rules/...) or knowledge:UID",
         },
       },
       required: ["path"],
@@ -64,27 +68,19 @@ const SEARCH_TOOLS: NormalizedTool[] = [
 // --- Tool handler factory ---
 
 /** Allowlisted top-level directories — matches what walkCampaignFiles reads. */
-const ALLOWED_PREFIXES = [
-  "characters/",
-  "locations/",
-  "factions/",
-  "lore/",
-  "items/",
-  "campaign/",
-  "rules/",
-];
+const ALLOWED_PREFIXES = ["campaign/", "rules/"];
 
 function isAllowedPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, "/");
   // Block dotfile directories (.debug/, .dev-mode/) and state/
-  if (normalized.startsWith(".") || normalized.startsWith("state/")) return false;
+  if (normalized.split("/").some((part) => part === "." || part === "..") || normalized.startsWith(".") || normalized.startsWith("state/")) return false;
   return ALLOWED_PREFIXES.some((p) => normalized.startsWith(p));
 }
 
 function matchesFilter(relativePath: string, filter: string): boolean {
   switch (filter) {
     case "entities":
-      return /^(characters|locations|factions|lore|items)\//.test(relativePath);
+      return false; // Logical entities are searched through knowledge.
     case "scenes":
       return relativePath.startsWith("campaign/scenes/");
     case "recaps":
@@ -138,19 +134,25 @@ export function buildSearchToolHandler(
     name: string,
     input: Record<string, unknown>,
   ): Promise<{ content: string; is_error?: boolean }> => {
+    const store = await getCampaignKnowledge(campaignRoot, fileIO);
+    const knowledge = buildKnowledgeToolHandler(store);
+    if (name === "knowledge") return (await knowledge(name, input)) ?? { content: "Unknown knowledge tool", is_error: true };
     switch (name) {
       case "grep_campaign": {
         const pattern = input.pattern as string;
         const filter = (input.file_filter as string) || "all";
         const matches = grepFiles(files, pattern, filter);
+        const logical = filter === "all" || filter === "entities" ? await knowledge("knowledge", { action: "search", query: pattern }) : null;
+        const records = logical && !logical.is_error ? JSON.parse(logical.content) as { uid: string; name: string; owner?: { uid: string; name: string } }[] : [];
 
-        if (matches.length === 0) {
+        if (matches.length === 0 && records.length === 0) {
           return { content: "No matches found." };
         }
 
         const lines = matches.map(
           (m) => `${m.file}:${m.line}: ${m.text}`,
         );
+        lines.push(...records.slice(0, 30).map((record) => `knowledge:${record.uid}: ${record.owner ? `${record.owner.name} / ` : ""}${record.name}`));
         const suffix =
           matches.length >= 30 ? "\n(results truncated at 30 matches)" : "";
         return { content: lines.join("\n") + suffix };
@@ -158,6 +160,7 @@ export function buildSearchToolHandler(
 
       case "read_campaign_file": {
         const relPath = input.path as string;
+        if (relPath.startsWith("knowledge:")) return (await knowledge("knowledge", { action: "read", handle: relPath })) ?? { content: "Knowledge handler unavailable", is_error: true };
         if (!isAllowedPath(relPath)) {
           return {
             content: `Access denied: ${relPath} — only campaign content directories are searchable`,
@@ -215,6 +218,7 @@ export async function searchCampaign(
     tools: SEARCH_TOOLS,
     toolHandler,
     toolInputPolicies: {
+      knowledge: KNOWLEDGE_CONTRACT.policy as ToolInputPolicy,
       grep_campaign: { criticality: "advisory" },
       read_campaign_file: { criticality: "advisory" },
     },

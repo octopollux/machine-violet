@@ -7,18 +7,18 @@
  */
 import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import {
-  NameParams, CharacterResponse, CompendiumResponse,
+  NameParams, IdParams, CharacterResponse, CompendiumResponse,
   NotesResponse, NotesUpdateRequest, OkResponse,
   SettingsResponse, SettingsPatch, CostResponse, ErrorResponse,
   SavepointsResponse,
   TranscriptSaveRequest, TranscriptSaveResponse,
   DiagnosticsResponse,
 } from "@machine-violet/shared";
-import { campaignPaths, machinePaths } from "../../tools/filesystem/scaffold.js";
+import { campaignPaths } from "../../tools/filesystem/scaffold.js";
 import { createArchiveFileIO } from "../fileio.js";
 import { collectDiagnostics } from "../diagnostics.js";
-import { canonicalizeCompendium } from "../../agents/subagents/compendium-updater.js";
-import type { Compendium } from "@machine-violet/shared/types/compendium.js";
+import { projectCampaignCompendium, readPublicCampaignRecord } from "../../entities/public-knowledge.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 
 export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) => {
 
@@ -50,20 +50,26 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     const fileIO = engine.getSceneManager().getFileIO();
     const name = (request.params as { name: string }).name;
 
-    // Try characters/<name>.md first, then players/<name>.md
-    const paths = campaignPaths(gs.campaignRoot);
-    const mPaths = machinePaths(gs.homeDir);
-    for (const pathFn of [paths.character, mPaths.player]) {
-      const path = pathFn(name);
-      try {
-        if (await fileIO.exists(path)) {
-          const content = await fileIO.readFile(path);
-          return { name, content };
-        }
-      } catch { /* try next */ }
-    }
+    const store = await getCampaignKnowledge(gs.campaignRoot, fileIO, { create: false });
+    const record = await readPublicCampaignRecord(store, name);
+    if (record) return record;
 
     return reply.status(404).send({ error: `Character "${name}" not found.` });
+  });
+
+  /** Approved player-facing content by stable UID. Private identities are indistinguishable from missing. */
+  server.get("/knowledge/:id", {
+    schema: { tags: ["Data"], params: IdParams, response: { 200: CharacterResponse, 400: ErrorResponse, 404: ErrorResponse } },
+  }, async (request, reply) => {
+    const engine = server.sessionManager.getEngine();
+    const gs = server.sessionManager.getGameState();
+    if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
+    const handle = (request.params as { id: string }).id;
+    if (!/^k[0-9a-z]+$/i.test(handle)) return reply.status(404).send({ error: "Knowledge record not found." });
+    const store = await getCampaignKnowledge(gs.campaignRoot, engine.getSceneManager().getFileIO(), { create: false });
+    const record = await readPublicCampaignRecord(store, handle);
+    if (!record) return reply.status(404).send({ error: "Knowledge record not found." });
+    return record;
   });
 
   /** Get the campaign compendium. */
@@ -78,30 +84,8 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     if (!engine || !gs) return reply.status(400).send({ error: "No active engine." });
 
     const fileIO = engine.getSceneManager().getFileIO();
-    const path = campaignPaths(gs.campaignRoot).compendium;
-
-    try {
-      const raw = await fileIO.readFile(path);
-      // Migrate on read: rewrite slugs through canonical slugify() so old
-      // saves with article-retaining slugs (e.g. "the-city") line up with
-      // the renderer's wikilink resolution.
-      const data = canonicalizeCompendium(JSON.parse(raw) as Compendium);
-      return { data };
-    } catch {
-      // Return empty compendium if file doesn't exist
-      return {
-        data: {
-          version: 1,
-          lastUpdatedScene: 0,
-          characters: [],
-          places: [],
-          items: [],
-          storyline: [],
-          lore: [],
-          objectives: [],
-        },
-      };
-    }
+    const store = await getCampaignKnowledge(gs.campaignRoot, fileIO, { create: false });
+    return { data: await projectCampaignCompendium(store) };
   });
 
   /** Get player notes. */
@@ -267,7 +251,7 @@ export const dataRoutes: FastifyPluginAsync = async (server: FastifyInstance) =>
     const gs = server.sessionManager.getGameState();
     if (!gs) return reply.status(400).send({ error: "No game state." });
 
-    const io = createArchiveFileIO();
+    const io = createArchiveFileIO(server.sessionManager.getEngine()?.getSceneManager().getFileIO().campaignKnowledge);
     const result = await collectDiagnostics(gs.campaignRoot, gs.homeDir, io);
     if (!result.ok || !result.path) {
       return reply.status(500).send({ error: result.error ?? "Diagnostics collection failed." });

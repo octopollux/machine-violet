@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, NormalizedUsage } from "../../providers/types.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 import { repairState, parseGeneratedEntities } from "./repair-state.js";
 import type { GameState } from "../game-state.js";
 import type { FileIO } from "../scene-manager.js";
@@ -189,6 +190,8 @@ A dark forest.`,
 A hostile creature.`,
     );
 
+    const store = await getCampaignKnowledge("/campaigns/test", fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael", body: "Existing record" }]);
     const result = await repairState(provider, makeGameState(), fio, true, "claude-haiku-4-5-20251001");
 
     expect(result.existing).toContain("characters/kael.md");
@@ -222,7 +225,7 @@ A fighter.`,
     expect(fio.writeFile).not.toHaveBeenCalled();
   });
 
-  it("writes files when dry_run is false", async () => {
+  it("commits recovered records and identity notices without file writes", async () => {
     const transcript = `**DM:** [Kael](../characters/kael.md) attacks.`;
 
     const fio = mockFileIO(
@@ -245,10 +248,10 @@ A fighter.`,
 
     const result = await repairState(provider, makeGameState(), fio, false, "claude-haiku-4-5-20251001");
 
-    expect(fio.writeFile).toHaveBeenCalledWith(
-      "/campaigns/test/characters/kael.md",
-      expect.stringContaining("# Kael"),
-    );
+    expect(fio.writeFile).not.toHaveBeenCalled();
+    const store = await getCampaignKnowledge("/campaigns/test", fio);
+    expect((await store.read("Kael")).body).toContain("A fighter.");
+    expect(await store.pendingNotices()).toEqual(expect.arrayContaining([expect.objectContaining({ source: "transcript-repair" })]));
     expect(result.generated).toContain("characters/kael.md");
     expect(result.dryRun).toBe(false);
   });

@@ -1,229 +1,43 @@
-# Entity Filesystem Design
+# Campaign Knowledge Store
 
-The game world is stored as a filesystem structure optimized for tool and agent access. The DM interacts with it through tools and direct file reads/writes. The player never sees any of it — with one exception: **PC character sheets are player-facing.** The player may ask to see their character sheet at any time. The DM must not write secrets, hidden plot information, or meta-observations about the player on a PC character sheet. That information belongs elsewhere (scene dm-notes, lore files, the campaign log, etc.).
+Mutable campaign knowledge lives in `knowledge.sqlite`, accessed through an injected `CampaignKnowledgeStore`. Agents use `knowledge` for inspection and `remember` for atomic updates. Markdown remains a rendering format for specialized sheets and an unchanged authoring format in source seeds; it is not the campaign entity persistence format.
 
-## Core Principles
+## Tree and identity
 
-- **The campaign transcript is the knowledge backbone.** The DM discovers entities by following wikilinks in the campaign log and scene transcripts. The transcript isn't just a record — it's the DM's filesystem index.
-- **Every entity reference in a transcript or campaign log entry MUST be a wikilink.** This is how the DM finds things. Dead links (pointing to files that don't exist yet) are valid — they signal "this entity exists in the fiction but hasn't been fleshed out." The Haiku scene summarizer must preserve all wikilinks when writing campaign log entries.
-- **Entities are a spectrum, not categories.** A shopkeeper can start as a sentence in a transcript, become a three-line file, and later grow into a full character sheet. The file format supports the whole range. A three-line file is valid.
-- **Default file type is Markdown.** Structured data (maps, character sheet stats) can use JSON alongside the markdown file. Wiki-linking between entities is encouraged everywhere.
-- **Every entity file has room for a changelog.** An append-only, scene-referenced log of how the entity has changed over time. The DM can scan it to remember the full arc without re-reading transcripts.
+The tree has organizational collections, narrative entities, and typed value nodes. Collections may nest arbitrarily and may be empty. Characters, Locations, Factions, Items and Lore are useful initial collections, not a closed category schema. Additional collections can hold spells, quests, timelines, clues or encounter-specific records.
 
-## Entity Types
+Each node has a stable short UID such as `k000a`. Object properties, ordered-list instances and repeated cards also have their own UIDs; display names and list positions are not identity. Nested values support strings, finite numbers, booleans, null, objects, ordered lists and explicit `{$ref:"UID or known handle"}` relationships. Bulk description text and append-only history sit beside typed fields.
 
-| Type | Directory | What it stores |
-|---|---|---|
-| **players** | `~/.machine-violet/players/` | Real humans (machine-scope, persists across campaigns). Age group, content boundaries, play style, meta-observations. |
-| **characters** | `characters/` | Anyone inhabiting the world — PCs, NPCs, monsters, gods. No hard distinction between subtypes. Any character can be handed to a player to inhabit. |
-| **locations** | `locations/` | Places. Description, connections to other locations, associated tile maps. Locations get subdirectories (may contain maps, sub-location files). |
-| **factions** | `factions/` | Organizations, groups, armies. Goals, resources, members, relationships. |
-| **items** | `items/` | Weapons, artifacts, significant objects with narrative weight. Things characters carry, trade, or quest for. Mundane gear stays on the character sheet as plain text. |
-| **lore** | `lore/` | The grab-bag. History, prophecies, cultural notes, magic systems, recurring dreams, anything worth tracking that isn't a character, location, faction, item, or rules reference. |
-| **rules** | `rules/` | Game-system mechanics extracted from source materials during initialization. Feeds adjudication, not narration. |
-| **campaign** | `campaign/` | The running record. Campaign log, scene transcripts, session recaps. The knowledge backbone. |
+Entity names and aliases resolve globally after Unicode, whitespace and case normalization. The owner deliberately accepts same-name conflation: name-only upsert reuses an existing identity even if it has moved collections. This prevents a fresh scribe knowing only an old nickname from creating a duplicate. Renaming uses an explicit patch, preserves old aliases and retains the UID. A name-only upsert resolving an old alias preserves the current canonical display name. Consolidation redirects the old UID, aliases and incoming references to the surviving identity.
 
-## Folder Structure
+Collections are organizational: use their UID or exact path (`Spells/Arcane`) when names repeat beneath different parents. Handles may display as `@k000a`; both forms resolve. No identity ambiguity is escalated into an extra DM turn.
 
-The layout is deterministic. Tools and agents can find files by convention.
+## Writes, references and consequences
 
-```
-campaign-root/
-├── campaign/
-│   ├── log.md                          # THE knowledge backbone
-│   │                                   # Terse running summary, dense with wikilinks
-│   │                                   # Links out to scenes, entities, lore
-│   ├── session-recaps/
-│   │   ├── session-001.md
-│   │   └── session-002.md
-│   └── scenes/
-│       ├── 001-tavern-meeting/
-│       │   ├── transcript.md           # full gameplay transcript, wikilinked
-│       │   └── dm-notes.md             # DM-only context for this scene
-│       └── 002-road-to-caves/
-│           ├── transcript.md
-│           └── dm-notes.md
-├── characters/
-│   ├── aldric.md                       # PC, full character sheet
-│   ├── mayor-graves.md                 # significant NPC, personality + stats
-│   └── brennan-shopkeeper.md           # minor NPC, three lines — until it isn't
-├── locations/
-│   ├── thornfield-village/
-│   │   ├── index.md                    # description, wiki-links to NPCs/shops/etc
-│   │   └── map.json                    # tile map (see map-system.md)
-│   └── goblin-caves/
-│       ├── index.md
-│       ├── level-1.json
-│       └── level-2.json
-├── factions/
-│   └── iron-crown-guild.md
-├── items/
-│   └── staff-of-echoes.md              # notable item — owner, origin, properties
-├── lore/
-│   ├── prophecy-of-the-black-sun.md    # plot thread
-│   └── history-of-the-empire.md        # world-building
-├── rules/
-│   ├── core-mechanics.md
-│   └── combat.md
-└── config.json                         # game system, mood, settings, campaign metadata
-```
+Every operation batch runs in one serialized SQLite transaction. Typed state, explicit edges, history, aliases, canonical result identities and a durable pending notice commit together. A failed late operation rolls back earlier operations in the batch. Optional operation IDs make crash retries idempotent and reject reuse with a different payload.
 
-### Conventions
-- Locations get subdirectories (they may contain maps and sub-locations). Everything else is flat files unless it grows.
-- No filename prefixes for entity subtypes. A character's type (PC, NPC, creature) lives in the file's front matter, not the filename.
-- Scene directories are numbered sequentially with a short slug: `001-tavern-meeting/`.
-- A character's "importance" is just how much content is in the file, not a metadata flag.
+Object patches merge recursively; replacing a list is explicit. `create_node`, `set_value` and `move` address ordered instances directly. Field removal is explicit in the generic API; typed null is meaningful data. Dependencies target any node, including scalar leaves. Changes to a node, ancestor or subtree produce candidate dependent identities, following at most two reverse graph edges with cycle-safe deduplication. Updating a dependent in the same batch does not prove its consequence was handled; notices remain until acknowledged. These are candidate notifications, never inferred narrative outcomes.
 
-## Entity File Format
+Relationships are structural `{$ref:...}` values or explicit labeled edges. SQLite foreign keys reject dangling targets and deletion of referenced nodes. Text mentions and log metadata do not create edges. Consolidation rehomes missing fields with their descendant UIDs and rewires canonical identity references. Existing winner fields prevail; a conflicting losing field with an incoming leaf reference is rejected atomically with an instruction to reconcile or move it first. Moving a value between owners transfers its indexed source ownership.
 
-Every entity file follows the same pattern: a front-matter block, a core description, optional structured sections, and a changelog at the bottom.
+## Bounded inspection and scene context
 
-### Canonical character sheet sections
+`outline()` includes every UID, parent, kind, position and collection note. `snapshot()` renders the complete compact identity tree, including empty collections and ordered instances. It summarizes bulk strings and records text/history lengths rather than dumping full descriptions into the DM prefix.
 
-Character sheets (PCs and NPCs) use only these `##` headings, in this order:
+`read()` pages body/leaf text, children/typed object fields and history entries. Long history bodies have independent per-entry text offsets. Lengths and continuation offsets let callers retrieve the entire text. Wide nested objects/lists and long strings return UID descriptors; read those nodes to obtain their content. The exact response shapes `{$text:UID,length:n}`, `{$list:UID,length:n}` and `{$object:UID,length:n}` are reserved and cannot be authored back as state. Other ordinary object keys remain available. History metadata is inert typed JSON limited to 4096 serialized characters; bulk history belongs in the log body.
 
-1. `## Relationships` — links to other entities, disposition
-2. `## Stats` — ability scores, HP, AC, combat stats
-3. `## Skills` — proficiencies, special abilities, spells
-4. `## Inventory` — carried items (significant items as wikilinks, mundane as plain text)
-5. `## Conditions` — active status effects, injuries, curses
-6. `## Notes` — miscellaneous character notes
-7. `## Changelog` — append-only scene-referenced history
+A fresh full outline is available to DM tools. The DM context uses one frozen knowledge snapshot per scene, persisted in `state/scene.json`; reopening a scene reuses it. Mutation notices provide terse canonical identity and dependency feedback between scene boundaries.
 
-Not every section is required — include only what's relevant. But all agents (DM, scribe, character promotion) must use these exact headings. Never substitute alternatives like `## Abilities`, `## Equipment`, or `## Status`. The character pane and other downstream consumers extract sections by heading name.
+Player-facing sheets and the Player Knowledge projection must contain only disclosed information. The public projection has its own records and UID references to canonical private identities; a private source record must never be published wholesale. The specialized `EntityStore` facade renders sheets for existing mechanics/viewers without reading or writing entity Markdown files.
 
-### Minimal file (newly created minor NPC)
+## Storage and lifecycle
 
-```markdown
-# Brennan the Shopkeeper
+The production FileIO owns one store per canonical campaign root. Missing provider injection fails closed; isolated test doubles may use an in-memory provider. The built-in Node SQLite driver uses DELETE journaling and synchronous EXTRA. Committed database bytes are self-contained; no WAL sidecars need to enter Git or archives.
 
-**Type:** NPC
-**Location:** [Thornfield Village](../locations/thornfield-village/index.md)
+`withSnapshot()` drains the same mutation lane and closes the database while bytes are captured or restored. Git staging holds this boundary through actual staging. Rollback validates target config and database before reset, then closes/reopens the restored database. Archive holds the boundary through ZIP verification and source removal; backup reopens the surviving database. Read-only offline inspectors validate without writable pragmas or creating files.
 
-Retired soldier, runs a general store. Gruff but fair. Bad knee.
+Campaign format version 2 is mandatory. Unversioned, version 1, future-version and missing/unsupported database saves are rejected before providers, repair, startup writes or archive extraction. There is no Markdown-save migration. Open old campaigns in the release that created them or start a new campaign.
 
-## Changelog
-- **Scene 004**: Party bought supplies. Brennan warned them about the caves.
-```
+## Unchanged boundaries
 
-### Full file (significant NPC with history)
-
-```markdown
-# Mayor Graves
-
-**Type:** NPC
-**Location:** [Millhaven](../locations/millhaven/index.md)
-**Disposition:** Hostile (fled from the party)
-
-Graves is a Pecksniff — unctuous, self-righteous, performatively charitable.
-Secretly embezzling from the village reconstruction fund. Terrified of being
-found out. Will cooperate if threatened, but holds grudges forever.
-
-Speech: Formal, lots of "my dear friend", never uses contractions.
-
-## Relationships
-- [Aldric](aldric.md): Hostile. Aldric exposed his embezzlement.
-- [Iron Crown Guild](../factions/iron-crown-guild.md): Owes them money. Now that he's fled, they want it back urgently.
-
-## Stats
-*See [game system] character sheet format in [rules](../rules/core-mechanics.md).*
-
-STR 8 / DEX 10 / CON 11 / INT 14 / WIS 13 / CHA 16
-HP: 18  AC: 10
-Notable: Persuasion +6, Deception +6. No combat abilities.
-
-## Changelog
-- **Scene 003**: Met the party. Gave them the goblin-caves quest to get them out of town.
-- **Scene 007**: [Aldric](aldric.md) confronted him about the fund. Denied everything.
-- **Scene 012**: Party returned with evidence. Graves fled to [Millhaven](../locations/millhaven/index.md).
-- **Scene 015**: [Iron Crown Guild](../factions/iron-crown-guild.md) put a bounty on him.
-```
-
-### PC file
-
-```markdown
-# Aldric
-
-**Type:** PC
-**Player:** [Alex](../players/alex.md)
-**Class:** Paladin 5
-**Location:** [Goblin Caves, Level 2](../locations/goblin-caves/index.md)
-**Color:** #4488ff
-
-Half-elf, folk hero background. Earnest to a fault. Believes in justice
-but struggles with mercy vs. expedience.
-
-## Stats
-STR 16 / DEX 10 / CON 14 / INT 12 / WIS 13 / CHA 16
-HP: 42/42  AC: 18 (chain mail + shield)
-...
-
-## Inventory
-- Longsword (+5 to hit, 1d8+3 slashing)
-- [Staff of Echoes](../lore/staff-of-echoes.md) (attuned, properties unknown to Aldric)
-- 3x healing potions
-- 47 gold
-
-## Changelog
-- **Scene 001**: Created. Entered the Rusty Nail tavern in [Thornfield](../locations/thornfield-village/index.md).
-- **Scene 007**: Confronted [Mayor Graves](mayor-graves.md) about the reconstruction fund.
-- **Scene 010**: Found the [Staff of Echoes](../lore/staff-of-echoes.md) in the goblin hoard.
-- **Session 2 level-up**: Paladin 4 → 5. Took Extra Attack. +2 CHA (ASI).
-```
-
-## The Wikilink Contract
-
-Wikilinks are the connective tissue of the entire system. Rules:
-
-1. **Every entity mention in a transcript or campaign log entry is a wikilink.** No exceptions. This is how the DM discovers and rediscovers entities.
-2. **Dead links are valid.** A link to `characters/mysterious-stranger.md` that doesn't exist yet means "this entity is in the fiction but hasn't been fleshed out." The DM can create the file later, or never.
-3. **The Haiku scene summarizer preserves all wikilinks** when writing campaign log entries. If it drops a link, the DM loses its path to that entity.
-4. **Links use relative paths.** A character file links to a location as `../locations/thornfield-village/index.md`. This keeps the campaign directory portable.
-5. **Entities wikilink to each other.** A character's relationships section links to other characters and factions. A location links to characters found there. The filesystem becomes a navigable web.
-
-## Character Promotion
-
-Characters exist on a spectrum of detail. The DM can promote any character from minimal to full at any time using a tool:
-
-```
-promote_character({
-  name: "Brennan",
-  file: "characters/brennan-shopkeeper.md",   // or null to create new
-  level: "full_sheet",                         // "minimal" | "full_sheet"
-  context: "Player attacked him. Need combat stats. He's a retired soldier
-            running a shop, tough but out of practice."
-})
-```
-
-This is a Haiku subagent job:
-1. Read the game system's rules for character/NPC creation
-2. Read any existing notes on the character
-3. Generate an appropriate character sheet based on the DM's context hint
-4. Write or update the file, preserving existing content and changelog
-5. Return a confirmation to the DM
-
-**Sheet Status flag:** When the post-setup `buildInitialSheet` creates a PC's full sheet, it adds `**Sheet Status:** complete` to front matter. The engine checks this flag when `promote_character` is called — if present, it skips the redundant promotion (which would duplicate sections like Skills and Stats) and clears the flag. The DM can still call `promote_character` normally for level-ups; the flag only suppresses the first redundant attempt and then removes itself.
-
-**Placeholder flag:** Entities created during setup as bootstrap stubs (e.g., the starting location whose real name will only emerge in the DM's opening narration) carry `**Placeholder:** true` in their front matter. This signals to the DM and Scribe that the entity is name-of-convenience and should be renamed once the fiction settles. Once renamed via `rename_entity`, the flag is cleared.
-
-The reverse is also natural: a character who was important can fade into irrelevance. The file stays (the changelog is historical record), but the DM simply stops linking to it in new transcripts.
-
-## Renaming Entities
-
-The Scribe subagent can rename an entity mid-campaign via the `rename_entity` tool. A rename:
-
-1. Moves the file to its new slug (`characters/old-name.md` → `characters/new-name.md`)
-2. Updates the H1 heading to the new display name
-3. Rewrites every inbound wikilink across the campaign (transcripts, log entries, other entity files)
-4. Appends a `## Changelog` line recording the rename
-5. Clears the `Placeholder` flag if it was set
-
-This is the canonical way to settle a placeholder once the DM commits to a real name, and it's also useful when an NPC is renamed in fiction (false identities revealed, sobriquets adopted, etc.). Implementation: `packages/engine/src/tools/campaign-ops/rename-entity.ts`.
-
-## Changelog Automation
-
-The `scene_transition` tool should trigger changelog updates as part of its housekeeping cascade:
-
-**Tier 2 (Haiku):** Scan the completed scene transcript. Identify every entity that was meaningfully involved (not just mentioned in passing). Append a one-line changelog entry to each entity's file, scene-referenced and wikilinked.
-
-This keeps changelogs current without the DM having to manually update every file after every scene. The DM can always edit or amend changelogs directly if the automated entry is wrong or incomplete.
+Machine-scoped player profiles, source `.mvworld`/DM-seed formats and parsers, rules, maps, clocks, combat, mechanical decks, objectives, conversation, resources, transcripts, recaps, configuration and UI state retain their existing storage formats. Portrait/media files may still live in category directories. Source world entity titles/front matter/bodies materialize into SQLite; authored `additional_names` become aliases and exact known `[[Name]]` metadata declarations become explicit graph edges. Unknown links and arbitrary prose remain literal text.

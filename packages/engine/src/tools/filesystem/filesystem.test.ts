@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { CAMPAIGN_FORMAT_VERSION } from "@machine-violet/shared/types/config.js";
 import {
   parseFrontMatter,
   serializeEntity,
@@ -647,7 +648,7 @@ describe("createDefaultCampaignConfig", () => {
 
   it("includes version and createdAt", () => {
     const config = createDefaultCampaignConfig("Test", "Alex", "aldric");
-    expect(config.version).toBe(1);
+    expect(config.version).toBe(CAMPAIGN_FORMAT_VERSION);
     expect(config.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

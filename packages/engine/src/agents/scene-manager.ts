@@ -1,8 +1,11 @@
+import { projectCampaignCompendium } from "../entities/public-knowledge.js";
+import { getCampaignKnowledge, type KnowledgeFileIO } from "../knowledge/store.js";
+import { logEvent } from "../context/engine-log.js";
 import type { ContentPart, LLMProvider, NormalizedMessage, TierProvider } from "../providers/types.js";
 import { getModel, type ModelTier } from "../config/models.js";
 import type { GameState } from "./game-state.js";
 import type { ConversationManager, DroppedExchange } from "../context/index.js";
-import { renderCampaignLog, parseLegacyLog } from "../context/index.js";
+import { renderCampaignLog } from "../context/index.js";
 import type { CampaignLog, CampaignLogEntry } from "../context/index.js";
 import { buildDMPrefix, buildActiveState, buildHardStats } from "./dm-prompt.js";
 import type { DMSessionState } from "./dm-prompt.js";
@@ -13,7 +16,7 @@ import { updatePrecis } from "./subagents/precis-updater.js";
 import { trackScene } from "./subagents/scene-tracker.js";
 import type { PlayerRead } from "./subagents/precis-updater.js";
 import { updateChangelogs } from "./subagents/changelog-updater.js";
-import { updateCompendium, emptyCompendium, renderCompendiumForDM, canonicalizeCompendium } from "./subagents/compendium-updater.js";
+import { updateCompendium, renderCompendiumForDM, commitPublicCompendium } from "./subagents/compendium-updater.js";
 import type { Compendium } from "@machine-violet/shared/types/compendium.js";
 import { IMAGE_CADENCE_PER_100_DEFAULT, clampImageCadencePer100 } from "@machine-violet/shared/types/config.js";
 import { advanceCalendar, checkClocks } from "../tools/clocks/index.js";
@@ -21,7 +24,6 @@ import { validateCampaign } from "../tools/validation/index.js";
 import type { ValidationResult } from "../tools/validation/index.js";
 import { join } from "node:path";
 import { sceneDir, campaignPaths, machinePaths, parseFrontMatter, extractSection, renderEntityTree } from "../tools/filesystem/index.js";
-import { formatChangelogEntry, appendChangelog } from "../tools/filesystem/index.js";
 import type { EntityTree, EntityTreeEntry } from "@machine-violet/shared/types/entities.js";
 import { slugify } from "./world-builder.js";
 import { findSystem, effectiveMechanicsMode } from "../config/systems.js";
@@ -33,6 +35,9 @@ import type { CampaignRepo } from "../tools/git/index.js";
 // --- Types ---
 
 export interface SceneState {
+  /** Persisted complete tree snapshot: immutable until the next scene. */
+  knowledgeSnapshot?: string;
+  knowledgeSnapshotScene?: number;
   sceneNumber: number;
   slug: string;
   transcript: string[];
@@ -78,7 +83,7 @@ export interface TransitionResult {
  * File I/O interface — abstracts filesystem for testability.
  * In production, these map to fs.readFile/writeFile/mkdir.
  */
-export interface FileIO {
+export interface FileIO extends KnowledgeFileIO {
   readFile(path: string): Promise<string>;
   writeFile(path: string, content: string): Promise<void>;
   appendFile(path: string, content: string): Promise<void>;
@@ -142,7 +147,6 @@ export class SceneManager {
    * and re-render the whole registry per delta.
    */
   private entityTreeSnapshot: string | undefined;
-  private entityTreeDirty = false;
   /** Content boundaries snapshot — refreshed at scene transitions only. */
   private contentBoundariesSnapshot: string | undefined;
   /**
@@ -226,7 +230,7 @@ export class SceneManager {
     this.sessionState.hardStats = this.buildCurrentHardStats(opts?.turnHolder, opts?.turnsSinceImage);
     this.sessionState.scenePrecis = buildScenePrecis(this.scene);
     this.sessionState.playerRead = synthesizePlayerRead(this.scene.playerReads);
-    this.sessionState.entityIndex = this.entityRegistrySnapshot();
+    this.sessionState.entityIndex = this.scene.knowledgeSnapshot ?? this.entityTreeSnapshot;
     this.sessionState.contentBoundaries = this.contentBoundariesSnapshot;
     // Use the runtime tier-resolved model for prompt conditionals
     // (`<!--if:gpt-->` etc.) so the DM prompt branches match the provider
@@ -537,18 +541,10 @@ export class SceneManager {
       narrativeRecap = await this.fileIO.readFile(narrativePath);
     }
 
-    // Load campaign log — migrate from legacy log.md if needed
+    // Load the supported campaign log JSON
     this.sessionState.campaignSummary = await this.loadAndRenderCampaignLog();
 
-    // Load compendium for DM prefix (player knowledge)
-    try {
-      const compendiumPath = paths.compendium;
-      if (await this.fileIO.exists(compendiumPath)) {
-        const raw = await this.fileIO.readFile(compendiumPath);
-        const compendium = JSON.parse(raw) as Compendium;
-        this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
-      }
-    } catch { /* non-critical */ }
+    this.sessionState.compendiumSummary = renderCompendiumForDM(await projectCampaignCompendium(await getCampaignKnowledge(this.state.campaignRoot, this.fileIO)));
 
     if (recap) {
       this.sessionState.sessionRecap = recap;
@@ -579,6 +575,7 @@ export class SceneManager {
 
   /** Context refresh: re-read campaign log, session recap, rebuild active state */
   async contextRefresh(): Promise<void> {
+    await this.prepareKnowledgeContext();
     const root = this.state.campaignRoot;
     const paths = campaignPaths(root);
 
@@ -595,14 +592,7 @@ export class SceneManager {
       }
     } catch { /* non-critical */ }
 
-    // Load compendium for DM prefix (player knowledge)
-    try {
-      if (await this.fileIO.exists(paths.compendium)) {
-        const raw = await this.fileIO.readFile(paths.compendium);
-        const compendium = JSON.parse(raw) as Compendium;
-        this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
-      }
-    } catch { /* non-critical */ }
+    this.sessionState.compendiumSummary = renderCompendiumForDM(await projectCampaignCompendium(await getCampaignKnowledge(this.state.campaignRoot, this.fileIO)));
 
     // Refresh PC summaries with alias info and build alias context for subagents
     this.pcSummaries = await this.loadPCSummaries();
@@ -664,33 +654,22 @@ export class SceneManager {
       type: entry.type,
       path: entry.path,
     };
-    this.entityTreeDirty = true;
   }
 
   /** Remove an entry from the entity tree (e.g. after rename). */
   removeEntity(slug: string): void {
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete this.entityTree[slug];
-    this.entityTreeDirty = true;
   }
 
-  /**
-   * Current entity-registry snapshot string that feeds the DM's "Entity
-   * Registry" context (via `sessionState.entityIndex` in `getSystemPrompt`).
-   * Recomputes only when the tree changed since the last render. This has to
-   * pick up mid-scene mutations: a previous version rendered only at
-   * construction / scene reset, so entities the scribe created or renamed
-   * mid-scene never reached the DM — it kept seeing the stale placeholder and
-   * re-issued the same rename every turn, wasting a whole DM reasoning round
-   * each time. Marking dirty (rather than rendering per mutation) keeps a
-   * many-delta scribe turn to a single re-render; `renderEntityTree` sorts keys.
-   */
-  private entityRegistrySnapshot(): string {
-    if (this.entityTreeDirty || this.entityTreeSnapshot === undefined) {
-      this.entityTreeSnapshot = renderEntityTree(this.entityTree);
-      this.entityTreeDirty = false;
-    }
-    return this.entityTreeSnapshot ?? "";
+  /** Capture once per scene; live scribe organization comes directly from the store. */
+  async prepareKnowledgeContext(): Promise<void> {
+    if (this.scene.knowledgeSnapshotScene === this.scene.sceneNumber && this.scene.knowledgeSnapshot !== undefined) return;
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
+    this.scene.knowledgeSnapshot = await store.snapshot();
+    this.scene.knowledgeSnapshotScene = this.scene.sceneNumber;
+    this.sessionState.entityIndex = this.scene.knowledgeSnapshot;
+    logEvent("knowledge:snapshot", { scene: this.scene.sceneNumber, bytes: Buffer.byteLength(this.scene.knowledgeSnapshot), estimatedTokens: Math.ceil(this.scene.knowledgeSnapshot.length / 4), nodes: (await store.outline()).length });
   }
 
   /** Get the current entity tree (for passing to subagents). */
@@ -701,7 +680,7 @@ export class SceneManager {
   // --- Campaign log loading ---
 
   /**
-   * Load campaign log JSON, migrating from legacy log.md if needed,
+   * Load supported campaign log JSON,
    * and render with token budget for system prompt inclusion.
    */
   private async loadAndRenderCampaignLog(): Promise<string> {
@@ -714,19 +693,7 @@ export class SceneManager {
         const raw = await this.fileIO.readFile(paths.log);
         const log = JSON.parse(raw) as CampaignLog;
         return renderCampaignLog(log, budget);
-      } catch { /* corrupt JSON — try legacy */ }
-    }
-
-    // Migrate from legacy log.md
-    if (await this.fileIO.exists(paths.legacyLog)) {
-      try {
-        const md = await this.fileIO.readFile(paths.legacyLog);
-        const log = parseLegacyLog(md);
-        // Persist the migration
-        await this.fileIO.writeFile(paths.log, JSON.stringify(log, null, 2));
-        this.devLog?.("[dev] migrated campaign/log.md → campaign/log.json");
-        return renderCampaignLog(log, budget);
-      } catch { /* non-critical */ }
+      } catch { /* missing/corrupt narrative log is non-critical */ }
     }
 
     return "";
@@ -866,19 +833,8 @@ export class SceneManager {
     sceneSummary: string,
     result: TransitionResult,
   ): Promise<void> {
-    const paths = campaignPaths(this.state.campaignRoot);
-    let current: Compendium;
-    try {
-      if (await this.fileIO.exists(paths.compendium)) {
-        current = canonicalizeCompendium(
-          JSON.parse(await this.fileIO.readFile(paths.compendium)) as Compendium,
-        );
-      } else {
-        current = emptyCompendium();
-      }
-    } catch {
-      current = emptyCompendium();
-    }
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
+    const current: Compendium = await projectCampaignCompendium(store);
 
     this.devLog?.("[dev] subagent:compendium starting");
     const r = this.routeFor("small", provider);
@@ -893,10 +849,10 @@ export class SceneManager {
     accUsage(result.usage, usage);
     this.devLog?.("[dev] subagent:compendium done");
 
-    await this.fileIO.writeFile(paths.compendium, JSON.stringify(compendium, null, 2));
+    const committed = await commitPublicCompendium(store, compendium, this.scene.sceneNumber);
 
     // Update DM prefix with player knowledge
-    this.sessionState.compendiumSummary = renderCompendiumForDM(compendium);
+    this.sessionState.compendiumSummary = renderCompendiumForDM(committed);
   }
 
   private stepAdvanceCalendar(
@@ -937,7 +893,6 @@ export class SceneManager {
     this.scene.npcIntents = "";
     this.scene.playerReads = [];
     // Entity registry may have changed during the scene; refresh on next read.
-    this.entityTreeDirty = true;
     // Refresh content boundaries snapshot (picks up any Scribe updates)
     await this.refreshContentBoundaries();
   }
@@ -961,81 +916,28 @@ export class SceneManager {
 
   // --- Internal ---
 
-  /**
-   * Collect all entity file paths across entity directories.
-   * Handles both flat files (characters/, factions/, lore/) and
-   * subdirectory entries (locations/<slug>/index.md).
-   * Returns entries as `{ dir, file, fullPath }`.
-   */
-  private async collectEntityFiles(): Promise<{ dir: string; file: string; fullPath: string }[]> {
-    const dirs = ["characters", "locations", "factions", "lore", "items"];
-    const results: { dir: string; file: string; fullPath: string }[] = [];
-    for (const dir of dirs) {
-      const dirPath = `${this.state.campaignRoot}/${dir}`;
-      try {
-        if (!(await this.fileIO.exists(dirPath))) continue;
-        const entries = await this.fileIO.listDir(dirPath);
-        for (const entry of entries) {
-          if (entry.endsWith(".md")) {
-            results.push({ dir, file: entry, fullPath: `${dirPath}/${entry}` });
-          } else {
-            // Could be a subdirectory (locations use slug/index.md)
-            const indexPath = `${dirPath}/${entry}/index.md`;
-            if (await this.fileIO.exists(indexPath)) {
-              results.push({ dir, file: `${entry}/index.md`, fullPath: indexPath });
-            }
-          }
-        }
-      } catch { /* non-critical — skip dir */ }
-    }
-    return results;
-  }
-
   private async loadPCSummaries(): Promise<string[]> {
-    const root = this.state.campaignRoot;
-    const paths = campaignPaths(root);
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
     const summaries: string[] = [];
     for (const player of this.state.config.players) {
-      const slug = slugify(player.character);
-      const filePath = paths.character(slug);
-      let line = player.character;
-      try {
-        if (await this.fileIO.exists(filePath)) {
-          const raw = await this.fileIO.readFile(filePath);
-          const { frontMatter } = parseFrontMatter(raw);
-          const rawAliases = frontMatter.additional_names;
-          const aliases = Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined;
-          if (aliases?.trim()) {
-            line += ` (also: ${aliases.trim()})`;
-          }
-          const themeColor = typeof frontMatter.theme_color === "string" ? frontMatter.theme_color.trim() : "";
-          if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(themeColor)) {
-            line += ` [theme color: ${themeColor}]`;
-          }
-        }
-      } catch { /* non-critical — fall back to bare name */ }
-      summaries.push(line);
+      const uid = await store.resolve(player.character);
+      if (!uid) { summaries.push(player.character); continue; }
+      const node = await store.read(uid, { textLimit: 0, logLimit: 0 });
+      const aliases = node.aliases.filter((alias) => alias.toLocaleLowerCase() !== node.name.toLocaleLowerCase());
+      summaries.push(`${node.uid}: ${node.name}${aliases.length ? ` (also: ${aliases.join(", ")})` : ""}${typeof node.fields.theme_color === "string" && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(node.fields.theme_color) ? ` [theme color: ${node.fields.theme_color}]` : ""}`);
     }
     return summaries;
   }
 
   private async buildAliasContext(): Promise<string> {
-    const entityFiles = await this.collectEntityFiles();
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
     const lines: string[] = [];
-    for (const { file, fullPath } of entityFiles) {
-      try {
-        const raw = await this.fileIO.readFile(fullPath);
-        const { frontMatter } = parseFrontMatter(raw);
-        const rawAliases = frontMatter.additional_names;
-        const aliases = Array.isArray(rawAliases) ? rawAliases.join(", ") : typeof rawAliases === "string" ? rawAliases : undefined;
-        if (aliases?.trim()) {
-          lines.push(`${file}: also known as ${aliases.trim()}`);
-        }
-      } catch { /* non-critical */ }
+    for (const node of await store.outline()) {
+      if (node.kind !== "entity") continue;
+      const record = await store.read(node.uid, { textLimit: 0, logLimit: 0 });
+      lines.push(`${node.uid}: ${record.name}${record.aliases.length ? ` (also ${record.aliases.join(", ")})` : ""}`);
     }
-    return lines.length > 0
-      ? `\n\nEntity aliases (use canonical filename in wikilinks, not the alias):\n${lines.join("\n")}`
-      : "";
+    return lines.length ? `\n\nCanonical campaign identities (use UIDs):\n${lines.join("\n")}` : "";
   }
 
   private async finalizeTranscript(): Promise<void> {
@@ -1071,8 +973,14 @@ export class SceneManager {
   }
 
   private async listEntityFiles(): Promise<string[]> {
-    const entityFiles = await this.collectEntityFiles();
-    return entityFiles.map((e) => e.file);
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
+    const identities: string[] = [];
+    for (const entry of await store.outline()) {
+      if (entry.kind !== "entity") continue;
+      const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
+      identities.push(`${node.uid} = ${node.name}${node.aliases.length ? ` (aliases: ${node.aliases.join(", ")})` : ""}`);
+    }
+    return identities;
   }
 
   /** Get active objective summaries for the DM context. */
@@ -1083,37 +991,13 @@ export class SceneManager {
   }
 
 
-  private async appendEntityChangelog(
-    filename: string,
-    sceneNumber: number,
-    description: string,
-  ): Promise<void> {
-    // Find the entity file — check both flat path and subdirectory index.md
-    const dirs = ["characters", "locations", "factions", "lore", "items"];
-    for (const dir of dirs) {
-      const sceneTag = `Scene ${String(sceneNumber).padStart(3, "0")}`;
-      const flatPath = `${this.state.campaignRoot}/${dir}/${filename}`;
-      if (await this.fileIO.exists(flatPath)) {
-        const content = await this.fileIO.readFile(flatPath);
-        if (content.includes(sceneTag)) return; // idempotency guard
-        const entry = formatChangelogEntry(sceneNumber, description);
-        const updated = appendChangelog(content, entry);
-        await this.fileIO.writeFile(flatPath, updated);
-        return;
-      }
-      // Try subdirectory pattern (e.g. locations/slug/index.md)
-      const slug = filename.replace(/\.md$/, "");
-      const indexPath = `${this.state.campaignRoot}/${dir}/${slug}/index.md`;
-      if (await this.fileIO.exists(indexPath)) {
-        const content = await this.fileIO.readFile(indexPath);
-        if (content.includes(sceneTag)) return; // idempotency guard
-        const entry = formatChangelogEntry(sceneNumber, description);
-        const updated = appendChangelog(content, entry);
-        await this.fileIO.writeFile(indexPath, updated);
-        return;
-      }
-    }
+  private async appendEntityChangelog(filename: string, sceneNumber: number, description: string): Promise<void> {
+    const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
+    const uid = await store.resolve(filename);
+    if (!uid) return;
+    await store.mutate([{ op: "append_log", uid, body: description, metadata: { sceneNumber } }], { sceneNumber, source: "scene-changelog", operationId: `scene-changelog:${sceneNumber}:${uid}` });
   }
+
 }
 
 // --- Standalone detection (runs before SceneManager exists) ---

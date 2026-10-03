@@ -1,50 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { FileIO } from "../../agents/scene-manager.js";
+import { SqliteKnowledgeStore } from "../../knowledge/sqlite-store.js";
 import { renameEntity, rewriteLinks } from "./rename-entity.js";
-
-function mockFileIO(
-  files: Record<string, string> = {},
-  dirs: Record<string, string[]> = {},
-): FileIO {
-  // Mutable copies so deleteFile/rmdir actually update state during a test run.
-  const filesState = { ...files };
-  const dirsState: Record<string, string[]> = {};
-  for (const k of Object.keys(dirs)) dirsState[k] = [...dirs[k]];
-  return {
-    readFile: vi.fn(async (p: string) => {
-      if (p in filesState) return filesState[p];
-      throw new Error(`ENOENT: ${p}`);
-    }),
-    writeFile: vi.fn(async () => {}),
-    appendFile: vi.fn(async () => {}),
-    mkdir: vi.fn(async () => {}),
-    exists: vi.fn(async (p: string) => p in filesState || p in dirsState),
-    listDir: vi.fn(async (p: string) => {
-      if (p in dirsState) return dirsState[p];
-      throw new Error(`ENOENT: ${p}`);
-    }),
-    deleteFile: vi.fn(async (p: string) => {
-      Reflect.deleteProperty(filesState, p);
-      const parent = p.split("/").slice(0, -1).join("/");
-      const name = p.split("/").pop();
-      if (name && parent in dirsState) {
-        dirsState[parent] = dirsState[parent].filter((e) => e !== name);
-      }
-    }),
-    rmdir: vi.fn(async (p: string) => {
-      if ((dirsState[p] ?? []).length > 0) {
-        throw new Error(`ENOTEMPTY: ${p}`);
-      }
-      Reflect.deleteProperty(dirsState, p);
-      const parent = p.split("/").slice(0, -1).join("/");
-      const name = p.split("/").pop();
-      if (name && parent in dirsState) {
-        dirsState[parent] = dirsState[parent].filter((e) => e !== name);
-      }
-    }),
-  };
-}
-
 describe("rewriteLinks", () => {
   it("rewrites matching link targets", () => {
     const content = "Met [Kael](../characters/kael.md) at the tavern.";
@@ -99,147 +56,23 @@ describe("rewriteLinks", () => {
   });
 });
 
-describe("renameEntity", () => {
-  it("throws if source file does not exist", async () => {
-    const fio = mockFileIO({}, {});
-    await expect(
-      renameEntity("/camp", fio, "characters/ghost.md", "characters/phantom.md", false),
-    ).rejects.toThrow("Source file does not exist");
+describe("renameEntity SQLite identity", () => {
+  it("retains UID, old handles and incoming references without prose/file rewriting",async()=>{
+    const store=new SqliteKnowledgeStore(":memory:");const io={campaignKnowledge:async()=>store} as FileIO;
+    await store.mutate([{op:"upsert",collection:"Characters",name:"Kael",fields:{placeholder:true}},{op:"upsert",collection:"Lore",name:"Story",body:"Kael entered",fields:{hero:{$ref:"Kael"}}}]);
+    const uid=await store.resolve("Kael");
+    await renameEntity("/camp",io,"Kael","Kael the Ranger",true);
+    expect((await store.read("Kael")).name).toBe("Kael");
+    await renameEntity("/camp",io,"Kael","Kael the Ranger",false);
+    expect(await store.resolve("Kael the Ranger")).toBe(uid);
+    expect((await store.read("Kael")).fields.placeholder).toBeUndefined();
+    expect((await store.read("Story")).fields.hero).toEqual({$ref:uid});
+    expect((await store.read("Story")).body).toBe("Kael entered");
   });
-
-  it("throws if destination file already exists", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael",
-        "/camp/characters/duplicate.md": "# Dup",
-      },
-    );
-    await expect(
-      renameEntity("/camp", fio, "characters/kael.md", "characters/duplicate.md", false),
-    ).rejects.toThrow("Destination file already exists");
-  });
-
-  it("dry-run reports changes without writing", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael\n**Type:** PC",
-        "/camp/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
-      },
-      {
-        "/camp/characters": ["kael.md"],
-      },
-    );
-
-    const result = await renameEntity(
-      "/camp", fio, "characters/kael.md", "characters/kael-the-ranger.md", true,
-    );
-
-    expect(result.dryRun).toBe(true);
-    expect(result.filesUpdated).toContain("campaign/log.md");
-    expect(result.linksUpdated).toBe(1);
-    expect(fio.writeFile).not.toHaveBeenCalled();
-  });
-
-  it("writes changes when not dry-run", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael\n**Type:** PC",
-        "/camp/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
-      },
-      {
-        "/camp/characters": ["kael.md"],
-      },
-    );
-
-    const result = await renameEntity(
-      "/camp", fio, "characters/kael.md", "characters/kael-the-ranger.md", false,
-    );
-
-    expect(result.dryRun).toBe(false);
-    expect(result.filesUpdated).toContain("campaign/log.md");
-    expect(result.linksUpdated).toBe(1);
-
-    // Should write updated log
-    expect(fio.writeFile).toHaveBeenCalledWith(
-      "/camp/campaign/log.md",
-      "Met [Kael](../characters/kael-the-ranger.md) at the tavern.",
-    );
-
-    // Should write new entity file
-    expect(fio.writeFile).toHaveBeenCalledWith(
-      "/camp/characters/kael-the-ranger.md",
-      "# Kael\n**Type:** PC",
-    );
-
-    // Should delete old entity file
-    expect(fio.deleteFile).toHaveBeenCalledWith("/camp/characters/kael.md");
-  });
-
-  it("removes the now-empty source directory after renaming a nested entity", async () => {
-    // Repro: rename_entity moved locations/starting-location/index.md →
-    // locations/dovecote-relay-station/index.md but left
-    // locations/starting-location/ behind as an empty placeholder dir.
-    const fio = mockFileIO(
-      {
-        "/camp/locations/starting-location/index.md": "# Placeholder",
-      },
-      {
-        "/camp/locations": ["starting-location"],
-        "/camp/locations/starting-location": ["index.md"],
-      },
-    );
-
-    await renameEntity(
-      "/camp",
-      fio,
-      "locations/starting-location/index.md",
-      "locations/dovecote-relay-station/index.md",
-      false,
-    );
-
-    expect(fio.rmdir).toHaveBeenCalledWith("/camp/locations/starting-location");
-    // Top-level category dir must NEVER be removed.
-    expect(fio.rmdir).not.toHaveBeenCalledWith("/camp/locations");
-  });
-
-  it("does not call rmdir when renaming a top-level entity file", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael",
-      },
-      {
-        "/camp/characters": ["kael.md"],
-      },
-    );
-
-    await renameEntity(
-      "/camp", fio, "characters/kael.md", "characters/kael-ranger.md", false,
-    );
-
-    expect(fio.rmdir).not.toHaveBeenCalled();
-  });
-
-  it("updates links from multiple files", async () => {
-    const fio = mockFileIO(
-      {
-        "/camp/characters/kael.md": "# Kael",
-        "/camp/campaign/log.md": "Met [Kael](../characters/kael.md).",
-        "/camp/factions/guild.md": "Led by [Kael](../characters/kael.md).",
-      },
-      {
-        "/camp/characters": ["kael.md"],
-        "/camp/factions": ["guild.md"],
-      },
-    );
-
-    const result = await renameEntity(
-      "/camp", fio, "characters/kael.md", "characters/kael-ranger.md", true,
-    );
-
-    expect(result.filesUpdated.sort()).toEqual([
-      "campaign/log.md",
-      "factions/guild.md",
-    ]);
-    expect(result.linksUpdated).toBe(2);
+  it("rejects unknown sources and occupied identity handles",async()=>{
+    const store=new SqliteKnowledgeStore(":memory:");const io={campaignKnowledge:async()=>store} as FileIO;
+    await store.mutate([{op:"upsert",collection:"Characters",name:"Kael"},{op:"upsert",collection:"Characters",name:"Bob"}]);
+    await expect(renameEntity("/camp",io,"Missing","New",false)).rejects.toThrow("Unknown");
+    await expect(renameEntity("/camp",io,"Kael","Bob",false)).rejects.toThrow("already exists");
   });
 });

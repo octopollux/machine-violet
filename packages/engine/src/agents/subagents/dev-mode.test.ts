@@ -1,3 +1,4 @@
+import { getCampaignKnowledge } from "../../knowledge/store.js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult, SystemBlock } from "../../providers/types.js";
 import { buildDevPrompt, buildDevTools, buildDevToolHandler, resolveDevPath, enterDevMode, summarizeGameState } from "./dev-mode.js";
@@ -146,7 +147,7 @@ describe("summarizeGameState", () => {
   it("includes campaign root and key paths", () => {
     const summary = summarizeGameState(makeGameState());
     expect(summary).toContain("Campaign root: /campaigns/test-campaign");
-    expect(summary).toContain("characters/party.md");
+    expect(summary).toContain("knowledge.sqlite");
     expect(summary).toContain("campaign/log.json");
     expect(summary).toContain("campaign/scenes/");
   });
@@ -274,13 +275,13 @@ describe("resolveDevPath", () => {
 describe("buildDevToolHandler", () => {
   it("read_file reads from mocked FileIO", async () => {
     const gs = makeGameState();
-    const fio = mockFileIO({ "/campaigns/test-campaign/characters/kael.md": "# Kael\nHP: 20" });
+    const fio = mockFileIO({ "/campaigns/test-campaign/rules/test.md": "# Rule\nHP: 20" });
     const handler = buildDevToolHandler(gs, fio);
 
-    const result = await handler("read_file", { path: "characters/kael.md" });
-    expect(result.content).toBe("# Kael\nHP: 20");
+    const result = await handler("read_file", { path: "rules/test.md" });
+    expect(result.content).toBe("# Rule\nHP: 20");
     expect(result.is_error).toBeUndefined();
-    expect(fio.readFile).toHaveBeenCalledWith("/campaigns/test-campaign/characters/kael.md");
+    expect(fio.readFile).toHaveBeenCalledWith("/campaigns/test-campaign/rules/test.md");
   });
 
   it("read_file returns error for missing file", async () => {
@@ -482,9 +483,9 @@ describe("buildDevToolHandler", () => {
     const fio = mockFileIO();
     const handler = buildDevToolHandler(gs, fio);
 
-    const result = await handler("delete_file", { path: "characters/old.md" });
-    expect(result.content).toContain("Deleted characters/old.md");
-    expect(fio.deleteFile).toHaveBeenCalledWith("/campaigns/test-campaign/characters/old.md");
+    const result = await handler("delete_file", { path: "rules/old.md" });
+    expect(result.content).toContain("Deleted rules/old.md");
+    expect(fio.deleteFile).toHaveBeenCalledWith("/campaigns/test-campaign/rules/old.md");
   });
 
   it("delete_file errors when deleteFile not supported", async () => {
@@ -493,7 +494,7 @@ describe("buildDevToolHandler", () => {
     delete fio.deleteFile;
     const handler = buildDevToolHandler(gs, fio);
 
-    const result = await handler("delete_file", { path: "characters/old.md" });
+    const result = await handler("delete_file", { path: "rules/old.md" });
     expect(result.is_error).toBe(true);
     expect(result.content).toContain("Delete not supported");
   });
@@ -512,79 +513,38 @@ describe("buildDevToolHandler", () => {
     expect(result.content).toContain("No API client");
   });
 
-  it("find_references returns references for a target entity", async () => {
-    const gs = makeGameState();
-    const fio = mockFileIO(
-      {
-        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
-        "/campaigns/test-campaign/campaign/log.json": '{"campaignName":"Test","entries":[]}',
-        "/campaigns/test-campaign/campaign/log.md": "Met [Kael](../characters/kael.md) at the tavern.",
-      },
-      {
-        "/campaigns/test-campaign/characters": ["kael.md"],
-      },
-    );
-    const handler = buildDevToolHandler(gs, fio);
-
-    const result = await handler("find_references", { path: "characters/kael.md" });
+  it("find_references inspects canonical graph edges", async () => {
+    const gs = makeGameState(); const fio = mockFileIO();
+    const store = await getCampaignKnowledge(gs.campaignRoot, fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael" }, { op: "upsert", collection: "Lore", name: "Promise", fields: { character: { $ref: "Kael" } } }]);
+    const result = await buildDevToolHandler(gs, fio)("find_references", { path: "Kael" });
     expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.target).toBe("characters/kael.md");
-    // Reference is in legacy log.md (walkCampaign falls back since log.json has no wikilinks)
-    expect(parsed.references.length).toBeGreaterThanOrEqual(0);
+    expect(JSON.parse(result.content).references).toHaveLength(1);
+  });
+  it("rename_entity retains a canonical UID and creates feedback", async () => {
+    const gs = makeGameState(); const fio = mockFileIO(); const store = await getCampaignKnowledge(gs.campaignRoot, fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael" }]);
+    const uid = await store.resolve("Kael");
+    const result = await buildDevToolHandler(gs, fio)("rename_entity", { old_path: "Kael", new_path: "Kael the Ranger", dry_run: false });
+    expect(result.is_error).toBeUndefined(); expect(await store.resolve("Kael the Ranger")).toBe(uid);
+    expect(await store.pendingNotices()).toEqual(expect.arrayContaining([expect.objectContaining({ source: "rename" })]));
+    expect(fio.writeFile).not.toHaveBeenCalled();
+  });
+  it("merge_entities consolidates graph identities without touching raw files", async () => {
+    const gs = makeGameState(); const fio = mockFileIO(); const store = await getCampaignKnowledge(gs.campaignRoot, fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Kael" }, { op: "upsert", collection: "Characters", name: "Ranger", fields: { class: "Ranger" } }]);
+    const result = await buildDevToolHandler(gs, fio)("merge_entities", { winner_path: "Kael", loser_path: "Ranger", dry_run: false });
+    expect(result.is_error).toBeUndefined(); expect(await store.resolve("Ranger")).toBe(await store.resolve("Kael"));
+    expect((await store.read("Kael")).fields.class).toBe("Ranger"); expect(fio.writeFile).not.toHaveBeenCalled();
+  });
+  it("rejects campaign memory byte-level reads, writes and deletes", async () => {
+    const fio = mockFileIO(); const handler = buildDevToolHandler(makeGameState(), fio);
+    for (const name of ["read_file", "write_file", "delete_file"]) {
+      expect((await handler(name, { path: "knowledge.sqlite", content: "corrupt" })).is_error).toBe(true);
+    }
+    expect(fio.readFile).not.toHaveBeenCalled(); expect(fio.writeFile).not.toHaveBeenCalled(); expect(fio.deleteFile).not.toHaveBeenCalled();
   });
 
-  it("rename_entity delegates to operation and returns result", async () => {
-    const gs = makeGameState();
-    const fio = mockFileIO(
-      {
-        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
-        "/campaigns/test-campaign/campaign/log.json": 'Met [Kael](../characters/kael.md).',
-      },
-      {
-        "/campaigns/test-campaign/characters": ["kael.md"],
-      },
-    );
-    const handler = buildDevToolHandler(gs, fio);
-
-    const result = await handler("rename_entity", {
-      old_path: "characters/kael.md",
-      new_path: "characters/kael-ranger.md",
-      dry_run: true,
-    });
-    expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.oldPath).toBe("characters/kael.md");
-    expect(parsed.newPath).toBe("characters/kael-ranger.md");
-    expect(parsed.dryRun).toBe(true);
-    expect(parsed.linksUpdated).toBe(1);
-  });
-
-  it("merge_entities delegates to operation and returns result", async () => {
-    const gs = makeGameState();
-    const fio = mockFileIO(
-      {
-        "/campaigns/test-campaign/characters/kael.md": "# Kael\n**Type:** PC",
-        "/campaigns/test-campaign/characters/kael-dupe.md": "# Kael\n**Type:** PC\n**Class:** Ranger",
-      },
-      {
-        "/campaigns/test-campaign/characters": ["kael.md", "kael-dupe.md"],
-      },
-    );
-    const handler = buildDevToolHandler(gs, fio);
-
-    const result = await handler("merge_entities", {
-      winner_path: "characters/kael.md",
-      loser_path: "characters/kael-dupe.md",
-      dry_run: true,
-    });
-    expect(result.is_error).toBeUndefined();
-    const parsed = JSON.parse(result.content);
-    expect(parsed.winnerPath).toBe("characters/kael.md");
-    expect(parsed.loserPath).toBe("characters/kael-dupe.md");
-    expect(parsed.dryRun).toBe(true);
-    expect(parsed.keysAdded).toContain("class");
-  });
 });
 
 describe("buildDevToolHandler — resource tools mutate state and forward TUI command", () => {

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { vi, beforeEach, afterEach, describe, it, expect } from "vitest";
 import { norm } from "../../utils/paths.js";
 import { loadConnectionStore, saveConnectionStore } from "../../config/connections.js";
+import type { KnowledgeFileIO } from "../../knowledge/store.js";
 
 // The archive route's concurrency guard is the unit under test: a second
 // archive of the SAME campaign while the first is in flight must be rejected
@@ -83,6 +84,7 @@ async function buildApp(opts: {
   configDir?: string;
   gameState?: { campaignRoot: string; homeDir: string } | null;
   campaignsDir?: string;
+  campaignKnowledge?: KnowledgeFileIO["campaignKnowledge"];
 } = {}): Promise<FastifyInstance> {
   const app = Fastify();
   app.decorate("configDir", opts.configDir ?? "/tmp/config");
@@ -90,6 +92,9 @@ async function buildApp(opts: {
     isBusy: opts.isBusy ?? false,
     getCampaignsDir: () => opts.campaignsDir ?? "/tmp/campaigns",
     getGameState: () => opts.gameState ?? null,
+    getEngine: () => opts.campaignKnowledge ? {
+      getSceneManager: () => ({ getFileIO: () => ({ campaignKnowledge: opts.campaignKnowledge }) }),
+    } : null,
   } as never);
   await app.register(managementRoutes);
   await app.ready();
@@ -128,7 +133,9 @@ describe("PUT /diagnostics — pre-session export", () => {
   });
 
   it("includes the active campaign when a game state exists", async () => {
+    const campaignKnowledge = vi.fn<NonNullable<KnowledgeFileIO["campaignKnowledge"]>>();
     app = await buildApp({
+      campaignKnowledge,
       gameState: {
         campaignRoot: "/home/campaigns/test",
         homeDir: "/home",
@@ -140,7 +147,7 @@ describe("PUT /diagnostics — pre-session export", () => {
     expect(collectDiagnosticsMock).toHaveBeenCalledWith(
       "/home/campaigns/test",
       "/home",
-      expect.any(Object),
+      expect.objectContaining({ campaignKnowledge }),
     );
   });
 

@@ -1,3 +1,5 @@
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import { parseFrontMatter } from "../tools/filesystem/frontmatter.js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { LLMProvider, ChatResult } from "../providers/types.js";
 import { SceneManager, parseTranscriptEntries, classifyTranscriptEntry, buildScenePrecis, buildScenePacing, buildSceneAnchor, detectSceneState } from "./scene-manager.js";
@@ -126,6 +128,21 @@ function mockFileIO(): FileIO {
     listDir: vi.fn(async () => []),
     deleteFile: vi.fn(async (path: string) => { files[norm(path)] = undefined as unknown as string; }),
   };
+}
+
+/** Test-only narrative seed materialization; never a played-save compatibility path. */
+async function seedNarrativeFixtures(io: FileIO): Promise<void> {
+  const store = await getCampaignKnowledge("/tmp/test-campaign", io);
+  const collections: Record<string, string> = { characters: "Characters", locations: "Locations", factions: "Factions", lore: "Lore", items: "Items" };
+  for (const [path, raw] of Object.entries(files)) {
+    const match = /\/(characters|locations|factions|lore|items)\/.+\.md$/.exec(path);
+    if (!match || !raw) continue;
+    const parsed = parseFrontMatter(raw);
+    const name = String(parsed.frontMatter._title ?? "Fixture");
+    if (await store.resolve(name)) continue;
+    const aliases = String(parsed.frontMatter.additional_names ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+    await store.mutate([{ op: "upsert", collection: collections[match[1]], name, aliases, fields: parsed.frontMatter, body: parsed.body }], { source: "fixture" });
+  }
 }
 
 beforeEach(() => {
@@ -509,6 +526,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
 
     expect(sessionState.campaignSummary).toContain("Campaign Log: Test Campaign");
@@ -533,6 +551,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric (also: The Hooded Figure)");
   });
@@ -551,6 +570,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric");
     expect(sessionState.activeState).not.toContain("(also:");
@@ -570,6 +590,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric [theme color: #cc55aa]");
   });
@@ -588,6 +609,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric (also: The Hooded Figure) [theme color: #4488cc]");
   });
@@ -606,6 +628,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric");
     expect(sessionState.activeState).not.toContain("theme color:");
@@ -639,6 +662,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     // The alias context is private, but we can verify it's passed to subagents
     // by checking the summarizer call in a transition
@@ -648,9 +672,10 @@ describe("SceneManager", () => {
     ]);
     await mgr.sceneTransition(provider, "Test");
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(createCall.messages[0].content).toContain("Entity aliases");
-    expect(createCall.messages[0].content).toContain("mysterious-stranger.md: also known as Grimjaw, Captain Grimjaw");
-    expect(createCall.messages[0].content).toContain("old-tower/index.md: also known as Malachar's Prison");
+    expect(createCall.messages[0].content).toContain("Canonical campaign identities");
+    expect(createCall.messages[0].content).toContain("Mysterious Stranger");
+    expect(createCall.messages[0].content).toContain("Captain Grimjaw");
+    expect(createCall.messages[0].content).toContain("Malachar's Prison");
   });
 
   it("buildAliasContext returns empty when no aliases exist", async () => {
@@ -674,6 +699,7 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     // Verify no alias context in subagent calls
     const provider = transitionProvider([
@@ -707,7 +733,7 @@ describe("SceneManager", () => {
     // await scheduling (e.g. span instrumentation adding a microtask hop) can
     // swap which subagent receives which response. Route by request content
     // instead — the changelog updater's prompt is the only one that lists
-    // "Known entity files:". The summarizer is awaited before the race, so the
+    // "Known campaign identities:". The summarizer is awaited before the race, so the
     // remaining (non-changelog) calls stay positional: summary then compendium.
     const nonChangelog: ChatResult[] = [
       textResponse("- Scene summary\n---MINI---\nScene summary."),
@@ -715,8 +741,8 @@ describe("SceneManager", () => {
     ];
     let nonChangelogIdx = 0;
     const route = async (params: { messages?: unknown }): Promise<ChatResult> => {
-      if (JSON.stringify(params.messages ?? []).includes("Known entity files:")) {
-        return textResponse("tavern/index.md: Party entered and caused a brawl");
+      if (JSON.stringify(params.messages ?? []).includes("Known campaign identities:")) {
+        return textResponse(`${await (await getCampaignKnowledge("/tmp/test-campaign", fileIO)).resolve("The Rusty Nail")}: Party entered and caused a brawl`);
       }
       return nonChangelog[nonChangelogIdx++] ?? EMPTY_COMPENDIUM_RESPONSE;
     };
@@ -735,91 +761,47 @@ describe("SceneManager", () => {
       fileIO,
     );
 
+    await seedNarrativeFixtures(fileIO);
     const result = await mgr.sceneTransition(provider, "Tavern Brawl");
     expect(result.changelogEntries).toHaveLength(1);
 
     // Verify changelog was written to the location's index.md
-    const locationContent = files["/tmp/test-campaign/locations/tavern/index.md"];
-    expect(locationContent).toContain("## Changelog");
-    expect(locationContent).toContain("Party entered and caused a brawl");
+    const location = await (await getCampaignKnowledge("/tmp/test-campaign", fileIO)).read("The Rusty Nail");
+    expect(location.logs).toEqual(expect.arrayContaining([expect.objectContaining({ body: "Party entered and caused a brawl" })]));
+    expect(await (await getCampaignKnowledge("/tmp/test-campaign", fileIO)).pendingNotices()).toEqual(expect.arrayContaining([expect.objectContaining({ source: "scene-changelog" })]));
   });
 
-  it("entity tree from constructor appears in volatile context", () => {
-    const sessionState = mockSessionState();
-    const initialTree = {
-      "phone-booth-man": { name: "Phone Booth Man", aliases: [], type: "character", path: "characters/phone-booth-man.md" },
-    };
-    const mgr = new SceneManager(
-      mockState(),
-      mockScene(),
-      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
-      sessionState,
-      mockFileIO(),
-      undefined,
-      initialTree,
-    );
-
-    const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Entity Registry");
-    expect(volatile).toContain("characters/phone-booth-man.md");
-    expect(volatile).toContain("Phone Booth Man");
+  it("complete knowledge tree is captured in the system prefix", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/tmp/test-campaign", io);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Phone Booth Man" }, { op: "create_collection", name: "Spells", note: "Named spells" }]);
+    const mgr = new SceneManager(mockState(), mockScene(), new ConversationManager({}), mockSessionState(), io);
+    await mgr.prepareKnowledgeContext();
+    const { system, volatile } = mgr.getSystemPrompt();
+    const text = system.map((block) => block.text).join("");
+    expect(text).toContain("Campaign Memory (scene snapshot)"); expect(text).toContain("Phone Booth Man"); expect(text).toContain("Spells"); expect(text).toContain("Named spells");
+    expect(volatile).not.toContain("Phone Booth Man");
   });
 
-  it("entity tree snapshot includes aliases", () => {
-    const sessionState = mockSessionState();
-    const initialTree = {
-      "flood-street-watcher": { name: "Flood Street Watcher", aliases: ["The Watcher"], type: "character", path: "characters/flood-street-watcher.md" },
-    };
-    const mgr = new SceneManager(
-      mockState(),
-      mockScene(),
-      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
-      sessionState,
-      mockFileIO(),
-      undefined,
-      initialTree,
-    );
-
-    const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Flood Street Watcher (character) aka The Watcher");
+  it("scene snapshot includes known aliases", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/tmp/test-campaign", io);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Watcher", aliases: ["Flood Street Watcher"] }]);
+    const mgr = new SceneManager(mockState(), mockScene(), new ConversationManager({}), mockSessionState(), io);
+    await mgr.prepareKnowledgeContext();
+    expect(mgr.getSystemPrompt().system.map((block) => block.text).join("")).toContain("Flood Street Watcher");
   });
 
-  it("entity tree mutations mid-scene refresh the volatile registry (regression: stale snapshot)", () => {
-    // Regression: the DM re-issued the same location rename every turn because
-    // the registry snapshot stayed frozen at the per-scene render. Scribe
-    // renamed a location mid-scene (remove old slug + upsert new), but the
-    // snapshot wasn't re-rendered, so the DM kept seeing the deleted placeholder.
-    const sessionState = mockSessionState();
-    const initialTree = {
-      "starting-location": { name: "Starting Location", aliases: [], type: "location", path: "locations/starting-location/index.md" },
-    };
-    const mgr = new SceneManager(
-      mockState(),
-      mockScene(),
-      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
-      sessionState,
-      mockFileIO(),
-      undefined,
-      initialTree,
-    );
-
-    // Placeholder is present before the rename.
-    expect(mgr.getSystemPrompt().volatile).toContain("Starting Location");
-
-    // Scribe renames the location: remove the placeholder slug, add the real one.
-    mgr.removeEntity("starting-location");
-    mgr.upsertEntity({
-      slug: "foggy-bottom-annex",
-      name: "Foggy Bottom Annex",
-      aliases: [],
-      type: "location",
-      path: "locations/foggy-bottom-annex/index.md",
-    });
-
-    // The next turn's context reflects the rename: new entity in, placeholder out.
-    const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Foggy Bottom Annex");
-    expect(volatile).not.toContain("Starting Location");
+  it("tree snapshot remains byte-identical through 120 turns and collection creation", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/tmp/test-campaign", io);
+    await store.mutate([{ op: "upsert", collection: "Locations", name: "Starting Location" }]);
+    const scene = mockScene(); const mgr = new SceneManager(mockState(), scene, new ConversationManager({}), mockSessionState(), io);
+    await mgr.prepareKnowledgeContext(); const snapshot = scene.knowledgeSnapshot;
+    await store.mutate([{ op: "patch", uid: "Starting Location", name: "Foggy Bottom Annex" }, { op: "create_collection", name: "Spells" }]);
+    for (let turn = 0; turn < 120; turn++) {
+      await mgr.prepareKnowledgeContext(); mgr.getSystemPrompt({ turnHolder: "Aldric" }); expect(scene.knowledgeSnapshot).toBe(snapshot);
+    }
+    expect(scene.knowledgeSnapshot).toContain("Starting Location"); expect(scene.knowledgeSnapshot).not.toContain("Spells");
+    expect(await store.outline()).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Spells" })]));
+    expect(await store.pendingNotices()).toEqual(expect.arrayContaining([expect.objectContaining({ identities: expect.arrayContaining([expect.objectContaining({ name: "Foggy Bottom Annex" })]) })]));
   });
 
   it("getSystemPrompt omits entity registry when tree is empty", () => {
@@ -869,53 +851,23 @@ describe("SceneManager", () => {
     expect(hardStats).not.toContain("Turn:");
   });
 
-  it("mid-scene upserts update both the tree and the DM snapshot", () => {
-    const sessionState = mockSessionState();
-    const mgr = new SceneManager(
-      mockState(),
-      mockScene(),
-      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
-      sessionState,
-      mockFileIO(),
-    );
-
-    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
-
-    // In-memory tree has the entry
-    expect(mgr.getEntityTree()["grimjaw"]).toBeDefined();
-    // And the DM snapshot refreshes immediately, so the next turn's context
-    // surfaces it (previously the snapshot stayed frozen until scene reset).
-    const { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Grimjaw");
+  it("legacy tree deltas cannot invalidate the frozen scene snapshot", async () => {
+    const io = mockFileIO(); const scene = mockScene();
+    const mgr = new SceneManager(mockState(), scene, new ConversationManager({}), mockSessionState(), io);
+    await mgr.prepareKnowledgeContext(); const snapshot = scene.knowledgeSnapshot;
+    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "knowledge:grimjaw" });
+    expect(mgr.getEntityTree().grimjaw).toBeDefined(); expect(scene.knowledgeSnapshot).toBe(snapshot);
   });
 
-  it("entity tree snapshot refreshes after scene transition", async () => {
-    const provider = transitionProvider([
-      textResponse("- Summary\n---MINI---\nSummary."),
-      textResponse(""),
-    ]);
-
-    const sessionState = mockSessionState();
-    const mgr = new SceneManager(
-      mockState(),
-      mockScene(),
-      new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }),
-      sessionState,
-      mockFileIO(),
-    );
-
-    // Upsert mid-scene — now reflected immediately (previously the snapshot
-    // stayed stale until the next scene transition, which made the DM re-issue
-    // the same entity mutations every turn).
-    mgr.upsertEntity({ slug: "grimjaw", name: "Grimjaw", aliases: [], type: "character", path: "characters/grimjaw.md" });
-    let { volatile } = mgr.getSystemPrompt();
-    expect(volatile).toContain("Grimjaw");
-
-    await mgr.sceneTransition(provider, "End of scene");
-
-    // Still present after a transition refreshes the snapshot.
-    ({ volatile } = mgr.getSystemPrompt());
-    expect(volatile).toContain("Grimjaw");
+  it("next scene captures current identities while resume preserves the current snapshot", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/tmp/test-campaign", io);
+    const scene = mockScene(); const mgr = new SceneManager(mockState(), scene, new ConversationManager({}), mockSessionState(), io);
+    await mgr.prepareKnowledgeContext(); const original = scene.knowledgeSnapshot;
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Grimjaw" }]);
+    const resumed = new SceneManager(mockState(), { ...scene }, new ConversationManager({}), mockSessionState(), io);
+    await resumed.prepareKnowledgeContext(); expect(resumed.getScene().knowledgeSnapshot).toBe(original);
+    await mgr.sceneTransition(transitionProvider([textResponse("- Summary\n---MINI---\nSummary."), textResponse("")]), "End of scene");
+    await mgr.prepareKnowledgeContext(); expect(scene.knowledgeSnapshot).toContain("Grimjaw"); expect(scene.knowledgeSnapshot).not.toBe(original);
   });
 
   it("upsertEntity upserts — second call updates in-memory tree", () => {
@@ -951,6 +903,7 @@ describe("SceneManager", () => {
     );
 
     // Should not throw
+    await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
     expect(sessionState.activeState).toContain("Aldric");
   });

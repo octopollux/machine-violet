@@ -2,12 +2,13 @@ import { UpdateDot } from "./UpdateDot";
 
 interface TreeItemProps {
   relativePath: string;
+  displayName?: string;
   selected: boolean;
   updated: boolean;
   onClick: () => void;
 }
 
-export function TreeItem({ relativePath, selected, updated, onClick }: TreeItemProps) {
+export function TreeItem({ relativePath, displayName, selected, updated, onClick }: TreeItemProps) {
   // Show just the filename, with parent dir for context
   const parts = relativePath.split("/");
   const display = parts.length > 1
@@ -21,7 +22,7 @@ export function TreeItem({ relativePath, selected, updated, onClick }: TreeItemP
       title={relativePath}
     >
       <UpdateDot visible={updated} />
-      <span className="filename">{display}</span>
+      <span className="filename">{displayName ?? display}</span>
     </div>
   );
 }

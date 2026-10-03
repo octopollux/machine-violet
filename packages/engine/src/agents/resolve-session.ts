@@ -22,7 +22,8 @@ import { loadPrompt } from "../prompts/load-prompt.js";
 import { searchContent } from "./subagents/search-content.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { norm } from "../utils/paths.js";
-import { campaignPaths } from "../tools/filesystem/index.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
+import { materializeKnowledgeValue } from "../knowledge/materialize.js";
 
 // --- Session tools ---
 
@@ -41,7 +42,7 @@ const SESSION_TOOLS: NormalizedTool[] = [
   },
   {
     name: "read_character_sheet",
-    description: "Read a PC's character sheet file (modifiers, features, spell slots, HP).",
+    description: "Read a character's committed campaign sheet by UID or name (modifiers, features, spell slots, HP).",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -339,11 +340,12 @@ export class ResolveSession {
 
         case "read_character_sheet": {
           const character = input.character as string;
-          const paths = campaignPaths(this.gameState.campaignRoot);
-          const filePath = norm(paths.character(character));
           try {
-            const content = await this.fileIO.readFile(filePath);
-            return { content: content || `No character sheet found for ${character}.` };
+            const store = await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO);
+            const node = await store.read(character, { textLimit: 100_000, logLimit: 0 });
+            if (node.kind !== "entity") return { content: `Character sheet not found: ${character}`, is_error: true };
+            const fields = await materializeKnowledgeValue(store, node.fields, { rootUid: node.uid, textLimit: 16_000, listLimit: 1000 });
+            return { content: `# ${node.name} (${node.uid})\n${JSON.stringify(fields, null, 2)}\n\n${node.body}${node.textNextOffset !== undefined ? "\n[Sheet body limited to 100000 characters.]" : ""}` };
           } catch {
             return { content: `Character sheet not found: ${character}`, is_error: true };
           }

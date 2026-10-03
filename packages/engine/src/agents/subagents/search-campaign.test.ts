@@ -1,234 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildSearchToolHandler } from "./search-campaign.js";
-import type { CampaignFile } from "../../tools/campaign-ops/walk-campaign.js";
+import { describe, it, expect, vi } from "vitest";
 import type { FileIO } from "../scene-manager.js";
-import { resetPromptCache } from "../../prompts/load-prompt.js";
-import { norm } from "../../utils/paths.js";
-
-beforeEach(() => {
-  resetPromptCache();
-});
-
-function mockFileIO(files: Record<string, string> = {}): FileIO {
-  const store: Record<string, string> = {};
-  for (const [k, v] of Object.entries(files)) store[norm(k)] = v;
-  return {
-    readFile: vi.fn(async (path: string) => {
-      const p = norm(path);
-      if (store[p]) return store[p];
-      throw new Error(`ENOENT: ${p}`);
-    }),
-    writeFile: vi.fn(async () => {}),
-    appendFile: vi.fn(async () => {}),
-    exists: vi.fn(async (path: string) => norm(path) in store),
-    listDir: vi.fn(async () => []),
-    mkdir: vi.fn(async () => {}),
-  };
+import { buildSearchToolHandler } from "./search-campaign.js";
+import { getCampaignKnowledge } from "../../knowledge/store.js";
+function io(): FileIO {
+  return { readFile: vi.fn(async (path) => path === "/camp/campaign/scenes/001-test/transcript.md" ? "Kael found the door." : Promise.reject(new Error("ENOENT"))), writeFile: vi.fn(), appendFile: vi.fn(), mkdir: vi.fn(), exists: vi.fn(async () => false), listDir: vi.fn(async () => []) };
 }
-
-const SAMPLE_FILES: CampaignFile[] = [
-  {
-    relativePath: "characters/kael.md",
-    content: "# Kael\n\n**Type:** character\n**Class:** Ranger\n**Location:** [[Thornwood]]\n\nA half-elf ranger tracking the Shadow Guild.",
-  },
-  {
-    relativePath: "characters/grimjaw.md",
-    content: "# Grimjaw\n\n**Type:** character\n**Disposition:** hostile\n\nAn orc warlord threatening the eastern settlements.",
-  },
-  {
-    relativePath: "locations/thornwood/index.md",
-    content: "# Thornwood\n\n**Type:** location\n\nA dense forest east of the capital. Home to [[Kael]] and various forest creatures.",
-  },
-  {
-    relativePath: "factions/shadow-guild.md",
-    content: "# Shadow Guild\n\n**Type:** faction\n\nA secretive thieves' guild operating across the realm. [[Kael]] has been tracking them.",
-  },
-  {
-    relativePath: "campaign/scenes/001-arrival/transcript.md",
-    content: "## Scene 1: Arrival\n\n[[Kael]] arrived at [[Thornwood]] and met a mysterious stranger who mentioned the Shadow Guild.",
-  },
-  {
-    relativePath: "campaign/session-recaps/session-1.md",
-    content: "# Session 1 Recap\n\nThe party traveled through [[Thornwood]] and encountered [[Grimjaw]]'s scouts.",
-  },
-  {
-    relativePath: "campaign/log.json",
-    content: JSON.stringify({
-      campaignName: "Test Campaign",
-      entries: [{ sceneNumber: 1, title: "Arrival", full: "Party arrived at [[Thornwood]]", mini: "Arrived [[Thornwood]]" }],
-    }),
-  },
-];
-
-describe("buildSearchToolHandler", () => {
-  describe("grep_campaign", () => {
-    it("finds matches across all files", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", { pattern: "Kael" });
-
-      expect(result.content).toContain("characters/kael.md");
-      expect(result.content).toContain("locations/thornwood/index.md");
-      expect(result.content).toContain("factions/shadow-guild.md");
-    });
-
-    it("is case-insensitive", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", { pattern: "kael" });
-
-      expect(result.content).toContain("characters/kael.md");
-    });
-
-    it("filters by entity files", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", {
-        pattern: "Kael",
-        file_filter: "entities",
-      });
-
-      expect(result.content).toContain("characters/kael.md");
-      expect(result.content).not.toContain("campaign/scenes");
-    });
-
-    it("filters by scenes", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", {
-        pattern: "Shadow Guild",
-        file_filter: "scenes",
-      });
-
-      expect(result.content).toContain("campaign/scenes/001-arrival");
-      expect(result.content).not.toContain("factions/shadow-guild");
-    });
-
-    it("filters by recaps", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", {
-        pattern: "Grimjaw",
-        file_filter: "recaps",
-      });
-
-      expect(result.content).toContain("campaign/session-recaps/session-1.md");
-      expect(result.content).not.toContain("characters/grimjaw.md");
-    });
-
-    it("filters by log", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", {
-        pattern: "Thornwood",
-        file_filter: "log",
-      });
-
-      expect(result.content).toContain("campaign/log.json");
-      expect(result.content).not.toContain("characters/kael.md");
-    });
-
-    it("returns no matches message when nothing found", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", { pattern: "nonexistent-xyz" });
-
-      expect(result.content).toBe("No matches found.");
-    });
-
-    it("truncates at 30 matches", async () => {
-      // Create files with many matching lines
-      const manyFiles: CampaignFile[] = Array.from({ length: 35 }, (_, i) => ({
-        relativePath: `characters/char-${i}.md`,
-        content: "match-this-pattern",
-      }));
-      const handler = buildSearchToolHandler(manyFiles, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", { pattern: "match-this-pattern" });
-
-      expect(result.content).toContain("truncated at 30");
-      // Count lines (excluding the truncation notice)
-      const matchLines = result.content.split("\n").filter((l: string) => l.startsWith("characters/"));
-      expect(matchLines).toHaveLength(30);
-    });
-
-    it("includes line numbers in results", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("grep_campaign", { pattern: "Ranger" });
-
-      // "Ranger" appears on line 4 of kael.md
-      expect(result.content).toMatch(/characters\/kael\.md:\d+:/);
-    });
+const files = [{ relativePath: "campaign/scenes/001-test/transcript.md", content: "Kael found the door.\nThe door opened." }, { relativePath: "campaign/session-recaps/001.md", content: "Kael returned." }, { relativePath: "campaign/log.json", content: "Kael's arrival" }];
+describe("campaign search", () => {
+  it("searches narrative and arbitrary logical collections including long fields/logs", async () => {
+    const fileIO = io(); const store = await getCampaignKnowledge("/camp", fileIO);
+    await store.mutate([{ op: "create_collection", name: "Spells" }, { op: "create_collection", parent: "Spells", name: "Arcane" }, { op: "upsert", collection: "Spells/Arcane", name: "Firefly", fields: { description: "x".repeat(20000) + "door" }, history: "y".repeat(20000) + "distant beacon" }]);
+    const handler = buildSearchToolHandler(files, fileIO, "/camp");
+    const all = await handler("grep_campaign", { pattern: "DOOR" });
+    expect(all.content).toContain("campaign/scenes/"); expect(all.content).toContain("Firefly");
+    const entities = await handler("grep_campaign", { pattern: "door", file_filter: "entities" });
+    expect(entities.content).toContain("knowledge:"); expect(entities.content).not.toContain("transcript.md");
+    expect((await handler("knowledge", { action: "search", query: "distant beacon" })).content).toContain("Firefly");
+    const uid = await store.resolve("Firefly"); const record = await handler("read_campaign_file", { path: `knowledge:${uid}` });
+    expect(JSON.parse(record.content).uid).toBe(uid); expect(record.content.length).toBeLessThan(16000);
   });
-
-  describe("read_campaign_file", () => {
-    it("reads a file by relative path", async () => {
-      const fio = mockFileIO({
-        "/camp/characters/kael.md": "# Kael\nA ranger.",
-      });
-      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-      const result = await handler("read_campaign_file", { path: "characters/kael.md" });
-
-      expect(result.content).toBe("# Kael\nA ranger.");
-    });
-
-    it("returns error for missing files", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("read_campaign_file", { path: "characters/nobody.md" });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("not found");
-    });
-
-    it("blocks access to .debug/ directory", async () => {
-      const fio = mockFileIO({
-        "/camp/.debug/crash-2026.txt": "stack trace here",
-      });
-      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-      const result = await handler("read_campaign_file", { path: ".debug/crash-2026.txt" });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("Access denied");
-    });
-
-    it("blocks access to .debug/ directory", async () => {
-      const fio = mockFileIO({
-        "/camp/.debug/campaigns/context/dm.json": "{}",
-      });
-      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-      const result = await handler("read_campaign_file", { path: ".debug/campaigns/context/dm.json" });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("Access denied");
-    });
-
-    it("blocks access to state/ directory", async () => {
-      const fio = mockFileIO({
-        "/camp/state/conversation.json": '{"exchanges":[]}',
-      });
-      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-      const result = await handler("read_campaign_file", { path: "state/conversation.json" });
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("Access denied");
-    });
-
-    it("allows access to campaign content directories", async () => {
-      const fio = mockFileIO({
-        "/camp/campaign/scenes/001-test/transcript.md": "# Scene 1",
-        "/camp/rules/core.md": "# Rules",
-      });
-      const handler = buildSearchToolHandler(SAMPLE_FILES, fio, "/camp");
-
-      const r1 = await handler("read_campaign_file", { path: "campaign/scenes/001-test/transcript.md" });
-      expect(r1.is_error).toBeUndefined();
-      expect(r1.content).toBe("# Scene 1");
-
-      const r2 = await handler("read_campaign_file", { path: "rules/core.md" });
-      expect(r2.is_error).toBeUndefined();
-      expect(r2.content).toBe("# Rules");
-    });
+  it.each(["scenes", "recaps", "log"])("filters %s narrative paths", async (filter) => {
+    const result = await buildSearchToolHandler(files, io(), "/camp")("grep_campaign", { pattern: "kael", file_filter: filter });
+    expect(result.content.split("\n")).toHaveLength(1);
   });
-
-  describe("unknown tool", () => {
-    it("returns error for unknown tool names", async () => {
-      const handler = buildSearchToolHandler(SAMPLE_FILES, mockFileIO(), "/camp");
-      const result = await handler("bad_tool", {});
-
-      expect(result.is_error).toBe(true);
-      expect(result.content).toContain("Unknown tool");
-    });
+  it.each([".debug/context.md", "state/conversation.json", "campaign/../state/conversation.json", "characters/kael.md", "knowledge.sqlite"])("rejects raw private or unsupported file path %s", async (path) => {
+    const fileIO = io(); const result = await buildSearchToolHandler(files, fileIO, "/camp")("read_campaign_file", { path });
+    expect(result.is_error).toBe(true); expect(fileIO.readFile).not.toHaveBeenCalled();
+  });
+  it("reads narrative and reports missing or unknown requests", async () => {
+    const handler = buildSearchToolHandler(files, io(), "/camp");
+    expect((await handler("read_campaign_file", { path: "campaign/scenes/001-test/transcript.md" })).content).toContain("Kael found");
+    expect((await handler("read_campaign_file", { path: "rules/missing.md" })).is_error).toBe(true);
+    expect((await handler("unknown", {})).is_error).toBe(true);
+    expect((await handler("grep_campaign", { pattern: "no such thing" })).content).toBe("No matches found.");
   });
 });

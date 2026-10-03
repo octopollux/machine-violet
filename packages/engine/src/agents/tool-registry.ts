@@ -64,7 +64,7 @@ import {
 } from "../tools/combat/index.js";
 import { manageObjectives } from "../tools/objectives/index.js";
 import type { ManageObjectivesInput } from "../tools/objectives/index.js";
-import { ENTITY_TOOLS } from "../entities/tools.js";
+import { ENTITY_INPUT_POLICIES, ENTITY_TOOLS } from "../entities/tools.js";
 import { loadPrompt } from "../prompts/load-prompt.js";
 import { loadAllPersonalities, getPersonality } from "../config/personality-loader.js";
 import { join } from "node:path";
@@ -778,7 +778,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "swap_pc",
       description:
-        "Hand player control from the current PC to a different character (a 'PC swap'). Reassigns a player slot in the roster to `character` and makes it the active PC — this is the only tool that edits config.players, and it persists the change so the new PC survives a reload. Use for retiring a PC and continuing as an NPC/ally, or introducing a brand-new PC. Run howto_swap_pc first: this tool only moves the roster pointer — you must also create/locate the character sheet, demote the outgoing PC, and refresh party.md, resources, modeline, and theme.",
+        "Hand player control from the current PC to a different character (a 'PC swap'). Reassigns a player slot in the roster to `character` and makes it the active PC — this is the only tool that edits config.players, and it persists the change so the new PC survives a reload. Use for retiring a PC and continuing as an NPC/ally, or introducing a brand-new PC. Run howto_swap_pc first: this tool only moves the roster pointer — you must also create/locate the character sheet, demote the outgoing PC, and refresh party membership, resources, modeline, and theme.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -835,7 +835,7 @@ const TOOL_DEFS: RegisteredTool[] = [
       return ok(
         `PC swapped: '${slot.name}' now plays ${character} (was ${outgoing}). ` +
         `${outgoing} is no longer player-controlled. Active PC set to ${character}.${note} ` +
-        `Reminder: demote ${outgoing}'s sheet to a character/NPC, set up ${character}'s sheet + party.md + resources + modeline + theme (see howto_swap_pc).`,
+        `Reminder: demote ${outgoing}'s sheet to a character/NPC, set up ${character}'s sheet + party membership + resources + modeline + theme (see howto_swap_pc).`,
       );
     },
   },
@@ -843,7 +843,7 @@ const TOOL_DEFS: RegisteredTool[] = [
     definition: {
       name: "howto_swap_pc",
       description:
-        "Knowledge tool (a 'skill'): returns the step-by-step procedure for swapping the player character with a new or existing character. Takes no arguments and changes nothing — it just loads the playbook into context. Call this BEFORE doing a PC swap so you touch every piece of state (config roster, character sheets, party.md, resources, modeline, theme) and nothing loads stale.",
+        "Knowledge tool (a 'skill'): returns the step-by-step procedure for swapping the player character with a new or existing character. Takes no arguments and changes nothing — it just loads the playbook into context. Call this BEFORE doing a PC swap so you touch every piece of state (config roster, character sheets, party membership, resources, modeline, theme) and nothing loads stale.",
       inputSchema: {
         type: "object" as const,
         properties: {},
@@ -1073,7 +1073,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   {
     definition: {
       name: "scribe",
-      description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). A subagent handles all entity file mechanics.",
+      description: "Record game state changes — entity creation, updates, character sheet changes, changelogs. Batch multiple updates together. Each update is tagged private (DM-only: NPC secrets, plot notes, faction intel) or player-facing (PC sheets, public info the player can see). A storyteller subagent resolves canonical identities and commits facts to campaign memory.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -1195,6 +1195,7 @@ const TOOL_DEFS: RegisteredTool[] = [
   // through the sync registry path, the stub returns an explicit error.
   ...ENTITY_TOOLS.map((def): RegisteredTool => ({
     definition: def,
+    inputPolicy: ENTITY_INPUT_POLICIES[def.name],
     handler: () => err(`${def.name} requires async handler`),
   })),
 
@@ -1296,12 +1297,8 @@ export const TOOL_CRITICALITY: Record<string, ToolCriticality> = {
   dm_notes: "durable",
   resolve_turn: "expensive",
   promote_character: "durable",
-  entity: "durable",
-  describe_entity_type: "advisory",
-  list_entity_types: "advisory",
-  validate_entity: "advisory",
-  find_schema_drift: "advisory",
-  detect_orphans: "advisory",
+  knowledge: "advisory",
+  remember: "durable",
   manage_objectives: "durable",
 };
 

@@ -1,3 +1,5 @@
+import { EntityStore } from "../entities/store.js";
+import { getCampaignKnowledge } from "../knowledge/store.js";
 /**
  * Session manager — holds one active game session per process.
  *
@@ -40,7 +42,6 @@ import { configDir, norm } from "../utils/paths.js";
 import { processingPaths } from "../config/processing-paths.js";
 import { readBundledRuleCard } from "../config/systems.js";
 import { sandboxFileIO } from "../tools/filesystem/sandbox.js";
-import { campaignPaths } from "../tools/filesystem/scaffold.js";
 import { buildEntityTree, renderEntityTree } from "../tools/filesystem/entity-tree.js";
 import type { EntityTree } from "@machine-violet/shared/types/entities.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
@@ -59,6 +60,9 @@ import { TurnManager } from "./turn-manager.js";
 import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
 import { createBridge } from "./bridge.js";
 import { createBaseFileIO } from "./fileio.js";
+import { assertSupportedCampaign, validateConfig } from "../tools/filesystem/config.js";
+import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
+import { KNOWLEDGE_FILE } from "../knowledge/store.js";
 import { SetupSession } from "./setup-session.js";
 import { generateDiscordStatus } from "../agents/subagents/discord-status.js";
 import { classifyServerError, userMessageFor, performSessionFatalTeardown } from "./error-classify.js";
@@ -646,6 +650,13 @@ export class SessionManager {
       throw new Error(`Failed to load campaign config: ${err instanceof Error ? err.message : err}`, { cause: err });
     }
 
+    assertSupportedCampaign(config);
+    const configErrors = validateConfig(config);
+    if (configErrors.length) throw new Error(`Invalid campaign configuration: ${configErrors.join("; ")}`);
+    // Probe schema read-only before providers, debug directories, or repair start.
+    const knowledgeProbe = new SqliteKnowledgeStore(join(campaignRoot, KNOWLEDGE_FILE), { readOnly:true, create:false });
+    await knowledgeProbe.close();
+
     // --- Ensure API key is loaded ---
     loadEnv();
 
@@ -776,10 +787,9 @@ export class SessionManager {
     // --- Load DM session state ---
     const sessionState: DMSessionState = {};
     try {
-      const dmNotesPath = campaignPaths(campaignRoot).dmNotes;
-      if (await fileIO.exists(dmNotesPath)) {
-        sessionState.dmNotes = await fileIO.readFile(dmNotesPath);
-      }
+      const knowledge = await getCampaignKnowledge(campaignRoot, fileIO);
+      const notes = await knowledge.resolve("DM Notes");
+      if (notes) sessionState.dmNotes = (await knowledge.read(notes, { textLimit: 16000, logLimit: 0 })).body;
     } catch { /* ignore — may not exist yet */ }
 
     // Load the system's rule card so the DM sees core mechanics (dice notation,
@@ -807,12 +817,11 @@ export class SessionManager {
     // sees the change in conversation, so a stale cached block doesn't
     // matter until the next session reload.
     try {
-      const charPaths = campaignPaths(campaignRoot);
+      const entityStore = new EntityStore(campaignRoot, fileIO);
       const sheets: string[] = [];
       for (const player of config.players) {
-        const filePath = charPaths.character(player.character);
-        if (await fileIO.exists(filePath)) {
-          sheets.push(await fileIO.readFile(filePath));
+        if (await entityStore.exists("character", player.character)) {
+          sheets.push((await entityStore.read("character", player.character)).raw);
         }
       }
       if (sheets.length > 0) {
@@ -1239,6 +1248,8 @@ export class SessionManager {
       if (loaded.scene.npcIntents !== undefined) scene.npcIntents = loaded.scene.npcIntents ?? "";
       if (loaded.scene.playerReads != null) scene.playerReads = loaded.scene.playerReads;
       scene.sessionRecapPending = loaded.scene.sessionRecapPending === true;
+      scene.knowledgeSnapshot = loaded.scene.knowledgeSnapshot ?? undefined;
+      scene.knowledgeSnapshotScene = loaded.scene.knowledgeSnapshotScene ?? undefined;
     }
 
     // Capture persisted UI state (theme, modelines) for snapshots

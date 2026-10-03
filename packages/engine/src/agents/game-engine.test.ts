@@ -1,3 +1,4 @@
+import { getCampaignKnowledge } from "../knowledge/store.js";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import sharp from "sharp";
 import type { LLMProvider, ChatResult, TierProvider, NormalizedMessage } from "../providers/types.js";
@@ -313,6 +314,48 @@ describe("GameEngine", () => {
     expect(log.states).toContain("dm_thinking");
     expect(log.states[log.states.length - 1]).toBe("waiting_input");
     expect(engine.getState()).toBe("waiting_input");
+  });
+
+  it("retains committed identities after a failed turn and acknowledges only recoverable normal context", async () => {
+    const fio = mockFileIO(); const state = mockState();
+    const store = await getCampaignKnowledge(state.campaignRoot, fio);
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Shadowy Figure", aliases: ["Tall Hat"], fields: { alive: true } }], { source: "scribe" });
+    const uid = await store.resolve("Shadowy Figure");
+    const provider = mockProvider([textMessage("The figure tips his hat.")]);
+    vi.mocked(provider.chat).mockRejectedValue(new Error("interrupted"));
+    if (provider.stream) vi.mocked(provider.stream).mockRejectedValue(new Error("interrupted"));
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({ provider, gameState: state, scene: mockScene(), sessionState: mockSessionState(), fileIO: fio, callbacks });
+    await engine.processInput("Aldric", "I approach.");
+    expect(await store.pendingNotices()).toHaveLength(1);
+    const frozenScene = Object.entries(files).find(([path]) => path.endsWith("state/scene.json"))?.[1];
+    expect(frozenScene).toContain("knowledgeSnapshot"); expect(frozenScene).toContain("Shadowy Figure");
+    vi.mocked(provider.chat).mockResolvedValue(textMessage("The figure tips his hat."));
+    if (provider.stream) vi.mocked(provider.stream).mockResolvedValue(textMessage("The figure tips his hat."));
+    await engine.processInput("Aldric", "I approach again.");
+    const lastInput = JSON.stringify([vi.mocked(provider.chat).mock.calls, provider.stream ? vi.mocked(provider.stream).mock.calls : []]);
+    expect(lastInput).toContain("memory_changes"); expect(lastInput).toContain(`${uid}=Shadowy Figure`);
+    expect(lastInput).toContain("Tall Hat"); expect(await store.pendingNotices()).toHaveLength(0);
+    const conversation = Object.entries(files).find(([path]) => path.endsWith("state/conversation.json"))?.[1];
+    expect(conversation).toContain(`${uid}=Shadowy Figure`);
+  });
+  it("does not acknowledge identities if conversation persistence fails", async () => {
+    const fio = mockFileIO(); const state = mockState(); const store = await getCampaignKnowledge(state.campaignRoot, fio);
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Promise", body: "Return tomorrow" }], { source: "transcript-repair" });
+    await store.mutate([{ op: "patch", uid: "Promise", aliases: ["Debt"], body: "Return at dawn" }], { source: "scribe" });
+    vi.mocked(fio.writeFile).mockImplementation(async (path, content) => {
+      if (path.endsWith("state/conversation.json") && content.includes("Memory:")) throw new Error("disk full");
+      files[norm(path)] = content;
+    });
+    const { callbacks } = mockCallbacks();
+    const engine = makeEngine({ provider: mockProvider([textMessage("A promise remains."), textMessage("The debt remains.")]), gameState: state, scene: mockScene(), sessionState: mockSessionState(), fileIO: fio, callbacks });
+    await engine.processInput("Aldric", "I wait.");
+    expect(await store.pendingNotices()).toHaveLength(2);
+    vi.mocked(fio.writeFile).mockImplementation(async (path, content) => { files[norm(path)] = content; });
+    await engine.processInput("Aldric", "I wait again.");
+    expect(await store.pendingNotices()).toHaveLength(0);
+    const conversation = Object.entries(files).find(([path]) => path.endsWith("state/conversation.json"))?.[1];
+    expect(conversation).toContain("Promise (aka Debt)");
   });
 
   it("injects terse generated-choice provenance for one DM call only", async () => {
@@ -2492,8 +2535,6 @@ describe("content classifier refusal", () => {
   });
 
   it("skips promote_character when sheet_status is complete", async () => {
-    const charPath = norm("/tmp/test-campaign/characters/storm.md");
-    files[charPath] = "# Storm\n\n**Type:** PC\n**Sheet Status:** complete\n\n## Skills\n- Hack (d8)\n";
 
     const provider = mockProvider([
       ...toolAndTextMessages(
@@ -2504,6 +2545,8 @@ describe("content classifier refusal", () => {
     ]);
     const { callbacks, log } = mockCallbacks();
     const io = mockFileIO();
+    const knowledge = await getCampaignKnowledge("/tmp/test-campaign", io);
+    await knowledge.mutate([{ op: "upsert", collection: "Characters", name: "Storm", fields: { type: "PC", sheet_status: "complete" }, body: "## Skills\n- Hack (d8)" }]);
 
     const engine = makeEngine({
       provider,
@@ -2524,9 +2567,9 @@ describe("content classifier refusal", () => {
     expect(log.devLogs.some((m) => m.includes("skipped, sheet already complete"))).toBe(true);
 
     // The sheet_status flag should have been cleared for future level-ups
-    const updated = files[charPath];
-    expect(updated).not.toContain("Sheet Status");
+    const updated = await knowledge.read("Storm");
+    expect(updated.fields).not.toHaveProperty("sheet_status");
     // But the sheet content should be preserved
-    expect(updated).toContain("## Skills");
+    expect(updated.body).toContain("## Skills");
   });
 });

@@ -12,6 +12,8 @@
 
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
+import { SqliteKnowledgeStore } from "../packages/engine/src/knowledge/sqlite-store.js";
+import { assertSupportedCampaign } from "../packages/engine/src/tools/filesystem/config.js";
 import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/platform.js";
 
 // --- Resolve campaigns directory ---
@@ -91,6 +93,8 @@ if (!existsSync(join(campaignRoot, "config.json"))) {
   process.exit(1);
 }
 
+assertSupportedCampaign(JSON.parse(readFileSync(join(campaignRoot, "config.json"), "utf8")));
+
 console.log(`=== Campaign: ${requestedCampaign} ===`);
 console.log(`Root: ${campaignRoot}\n`);
 
@@ -98,6 +102,13 @@ console.log(`Root: ${campaignRoot}\n`);
 console.log(`--- config.json ---`);
 console.log(readJsonPretty(join(campaignRoot, "config.json")));
 console.log();
+
+// Campaign knowledge: inspection must not create a missing DB or modify a live save.
+const knowledge = new SqliteKnowledgeStore(join(campaignRoot, "knowledge.sqlite"), { create: false, readOnly: true });
+try {
+  console.log("--- knowledge.sqlite (read-only logical tree) ---");
+  console.log(await knowledge.snapshot());
+} finally { await knowledge.close(); }
 
 // State files
 const stateFiles = [

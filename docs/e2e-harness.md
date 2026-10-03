@@ -423,6 +423,14 @@ sidecar inside the client process. The sidecar:
 
 The sidecar tee MUST be installed before Ink first renders, and Ink MUST
 be told `interactive: true` in headless mode, or the vterm captures nothing.
+
+Headless Ink also receives a stdout proxy advertising the virtual terminal's TTY
+and dimensions. The underlying piped `process.stdout` remains unchanged. This
+lets Ink recognize a viewport-height frame and omit its trailing newline;
+otherwise the first row scrolls away and later incremental frames lose static
+title/menu lines. The sidecar enables xterm `convertEol` to model real TTY LF
+processing before capture. Regression tests exercise actual Ink incremental
+frames in xterm and the sidecar HTTP screen's newline alignment.
 Both gotchas are now wired into [`packages/client-ink/src/start-client.ts`](../packages/client-ink/src/start-client.ts).
 
 ## State-driven waiting (no naive sleeps)

@@ -1,20 +1,5 @@
 /** File categories for the tree sidebar. */
-export type FileCategory =
-  | "state"
-  | "characters"
-  | "players"
-  | "locations"
-  | "factions"
-  | "lore"
-  | "items"
-  | "rules"
-  | "transcript"
-  | "context-dump"
-  | "thinking"
-  | "map"
-  | "config"
-  | "logs"
-  | "other";
+export type FileCategory = string;
 
 /** Sentinel slug for machine-scope files (not tied to any campaign). */
 export const MACHINE_SLUG = "__machine__";
@@ -26,6 +11,7 @@ export interface FileChangeEvent {
   relativePath: string;
   category: FileCategory;
   changeType: "add" | "change" | "unlink";
+  entry?: TreeEntry;
 }
 
 /** SSE event: a campaign was added or removed. */
@@ -46,6 +32,8 @@ export interface CampaignInfo {
 
 /** API response: file tree entry. */
 export interface TreeEntry {
+  uid?: string;
+  displayName?: string;
   relativePath: string;
   category: FileCategory;
   size: number;

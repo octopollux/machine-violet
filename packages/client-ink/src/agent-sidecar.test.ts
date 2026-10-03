@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { KEY_MAP, startAgentSidecar, type SidecarHandle } from "./agent-sidecar.js";
 import { initialClientState } from "./event-handler.js";
 
@@ -60,6 +60,15 @@ describe("agent sidecar HTTP", () => {
     expect(res.headers.get("content-type")).toContain("text/plain");
     const text = await res.text();
     expect(typeof text).toBe("string");
+  });
+
+  it("models tty LF processing at column zero in the captured screen", async () => {
+    await start();
+    process.stdout.write("\x1b[2J\x1b[Hfirst line\nsecond line");
+    await vi.waitFor(async () => {
+      const screen = await (await fetch(`${baseUrl}/screen`)).text();
+      expect(screen.split("\n").slice(0, 2)).toEqual(["first line", "second line"]);
+    });
   });
 
   it("GET /screen?ansi=true returns 200", async () => {

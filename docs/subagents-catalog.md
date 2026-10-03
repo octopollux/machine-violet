@@ -62,7 +62,7 @@ Sandboxed conversation for out-of-character discussion. Receives the DM's curren
 
 **DM injection (player-initiated only)**: When OOC is entered via the `/ooc` slash command (not via DM's `enter_ooc` tool), accumulated summaries are injected as an `<ooc_summary>` XML tag prepended to the next player message. This persists in conversation history so the DM retains OOC context across turns. The DM-initiated path does not need this because the DM already sees the tool result.
 
-**Tools available**: every DM tool (so OOC is self-documenting from the same registry the DM uses) **minus `enter_ooc`**, plus three OOC-only extras pushed by `buildOOCTools`: `find_references`, `validate_campaign`, `get_commit_log`. `rollback` is already in the DM registry so OOC inherits it through `registry.getDefinitions()`, not as a manual push. The structured entity surface (`entity`, `describe_entity_type`, `list_entity_types`, `validate_entity`, `find_schema_drift`, `detect_orphans` — see [tools-catalog.md](tools-catalog.md)) is always advertised; tools that need capabilities not available at dispatch time (no `fileIO`, no `repo`) return recoverable errors. Capability-gating was dropped (#475) so the agent learns by trying.
+**Tools available**: every DM tool (so OOC is self-documenting from the same registry the DM uses) **minus `enter_ooc`**, plus three OOC-only extras pushed by `buildOOCTools`: `find_references`, `validate_campaign`, `get_commit_log`. `rollback` is already in the DM registry so OOC inherits it through `registry.getDefinitions()`, not as a manual push. The generic campaign surface (`knowledge`, `remember` — see [tools-catalog.md](tools-catalog.md)) is always advertised; tools that need capabilities not available at dispatch time (no `fileIO`, no `repo`) return recoverable errors. Capability-gating was dropped (#475) so the agent learns by trying.
 
 **Summary line**: on the turn OOC ends — and only that turn — the agent emits a one-line `<SUMMARY>...</SUMMARY>` immediately before `<END_OOC>`. The player never sees this; it is forwarded to the DM as the digest. For entity corrections it includes before/after values; for AI mistakes it leads with the reported error and the correction. If the tag is omitted, the DM falls back to the first substantive sentence of the reply.
 
@@ -199,11 +199,11 @@ One-shot subagent that generates a punchy ≤40-character status string for Disc
 | **Trigger** | `scene_transition` cascade |
 | **Source doc** | [entity-filesystem.md](entity-filesystem.md) |
 
-Scans the completed scene transcript. Identifies every entity meaningfully involved (not just mentioned). Appends a one-line changelog entry to each entity's file.
+Scans the completed scene transcript. Identifies every entity meaningfully involved (not just mentioned). Appends a one-line log entry through the shared knowledge store.
 
-**Context**: Scene transcript + list of entity files. Variable size.
+**Context**: Scene transcript + canonical entity UID/name list. Variable size.
 
-**Returns**: Changelog entries written directly to entity files. No return to DM.
+**Returns**: Atomic log commits enqueue canonical change notices for the next ordinary DM turn.
 
 ---
 
@@ -216,9 +216,9 @@ Scans the completed scene transcript. Identifies every entity meaningfully invol
 | **Trigger** | `scene_transition` cascade (parallel with summarizer + changelog) |
 | **Source** | `packages/engine/src/agents/subagents/compendium-updater.ts`, `packages/engine/src/prompts/compendium-updater.md` |
 
-Maintains the player-facing campaign compendium (`campaign/compendium.json`). Reads only the player-facing transcript (tool results filtered out), ensuring no DM secrets leak. Updates existing entries when new information is revealed; tracks identity shifts via `aliases` to prevent duplicates when NPCs are renamed.
+Maintains player-approved summary records under nested `Player Knowledge` collections in SQLite; HTTP/UI compendium JSON is a projection. Reads only the player-facing transcript (tool results filtered out), ensuring no DM secrets leak. Updates existing entries when new information is revealed; tracks identity shifts via `aliases` to prevent duplicates when NPCs are renamed.
 
-**Context**: Current compendium JSON + player-facing scene transcript + entity alias context. ~2-5k tokens.
+**Context**: Current approved compendium projection + player-facing scene transcript + canonical identity/alias context.
 
 **Returns**: Updated compendium JSON written to disk. Also populates `DMSessionState.compendiumSummary` for the DM's "Player Knowledge" prefix section.
 
@@ -233,19 +233,19 @@ Maintains the player-facing campaign compendium (`campaign/compendium.json`). Re
 | **Trigger** | DM calls `scribe` tool |
 | **Source doc** | [entity-filesystem.md](entity-filesystem.md) |
 
-Autonomous entity file manager. Receives batched natural-language updates tagged `private` or `player-facing`. Has its own tools (`list_entities`, `read_entity`, `write_entity`) to manage the campaign filesystem. Handles entity creation, updates, front matter merging, changelog entries, and deduplication. Replaces the old `create_entity` / `update_entity` DM tools.
+Receives the DM's batched natural-language updates tagged `private` or `player-facing`. It records narrative facts in arbitrary collections using the same generic tools as the DM. There are no automatic non-DM `runScribe` calls: scene changelog, compendium, promotion, theme, and repair are distinct maintenance writers that commit through the shared store and produce the same feedback.
 
-**Context**: The DM's update batch (natural language), the entity registry, and a **prefetched canonical block** (see below). ~200-500 tokens for the batch, plus the prefetched entity contents.
+**Context**: Each call reads the latest collection organization, including empty nested collections and brief conventions. A canonical prefetch matches names and aliases in the narrative batch, including one-letter aliases, and supplies at most eight records within 12k characters. Bulk records remain bounded; missing/overflow details are read explicitly. The DM's complete scene tree stays frozen independently.
 
-**Tools**: `list_entities(type)`, `read_entity(type, slug)`, `write_entity(mode, type, name, front_matter?, body?, changelog_entry?)`.
+**Tools**: Fixed `knowledge` and `remember` contracts, plus `player_profile` for separate machine-level reads and append-only profile updates. Content boundaries append rather than replace. No SQL or schema engineering is requested.
 
-**Input prefetch — push, don't pull.** The scribe's reads are predictable: the entities a batch touches are exactly the registry names/aliases that appear in the update text. So `runScribe` resolves and reads them up front (`buildPrefetchedEntityBlock`) and hands them to the subagent as a *"CANONICAL — do not `read_entity` these"* block — collapsing the decide-and-read reasoning burst (~a third of the scribe's wall-clock) so it goes straight to `write_entity`. Matching is case-insensitive and word-boundary on name/alias (so an aliased mention still surfaces the canonical entity for dedup), capped at 16; overflow / unmatched / newly-created entities fall back to the `read_entity` tool, so it's a pure latency optimization, never a correctness dependency. This mirrors the other subagents, which already push their inputs (`promote_character` pre-reads the sheet; scene-tracker gets the transcript).
+**Max tool rounds**: 8. Known UIDs/names/aliases resolve deterministically; duplicate narrative upserts converge without asking the DM to disambiguate.
 
-**Max tool rounds**: 8 (list → read → write), though with prefetch a typical update turn is write-only.
+**Returns**: Usage and a terse narrative summary for existing presentation. Canonical identities, aliases, changes, and candidate impacts come from committed mutation results/outbox records, so continuity does not depend on the model echoing a UID.
 
-**Returns**: Terse summary of entities created/updated. Usage stats accumulated to session total.
+**Execution**: Detached after the DM turn, serialized on one scribe lane. Independent scene tracking remains on its own lane. Next turn, promotion, scene transition, session end, and rollback settle relevant detached work before reading/snapshotting durable memory. Setting the non-input engine state before the barrier prevents a concurrent turn. SQLite transactions prevent half-written records. An actual committed scribe update triggers `character_sheet_changed` to refresh open public sheets; scene/public maintenance also refreshes this view.
 
-**Execution — detached, off the turn's critical path.** The DM never consumes the scribe's result, yet the scribe is ~half of an entity-heavy turn's wall-clock (its file I/O is sub-millisecond — the cost is the small-model round-trip). So `applyDeferredTuiCommands` does **not** await it: the turn ends, prose and choices land, and the player can act while the scribe persists entities in the background. It runs on the **scribe lane** of `GameEngine`'s deferred-work registry (`DeferredWork`, `deferred-work.ts`); consecutive scribes are **serialized within the lane, not parallelized**, so scribe N's entity-tree deltas land before scribe N+1 reads the tree for dedup. The registry's `settle()` barrier — exposed on the engine as `settleDeferredWork()` — flushes **every** lane at each point that reads or snapshots durable entity state: the **next turn's context build**, a **`promote_character`** subagent (it rewrites the same sheets), **scene transition**, **session end**, and **rollback**. (One `settle` per barrier covers every lane, so a newly added lane or barrier can't silently miss a flush.) Each barrier sets its non-input engine state *before* awaiting (e.g. `setState("dm_thinking")` / `setState("scene_transition")`), so the re-entrancy guard is armed before the await yields and a concurrent `processInput` can't slip in to tear a half-written sheet. On completion the scribe emits a bare `character_sheet_changed` TUI command — gated on an actual character/player write (not locations/items) — so an open character pane drops its cached sheet and refetches the late write. See `handleScribe` / `settleDeferredWork` in `game-engine.ts`.
+**Feedback durability**: Writes and outbox rows commit together. Whole notice rows are coalesced into terse normal-turn `Memory:` feedback; only successfully recoverable delivered rows are acknowledged. Failed turns or failed persistence keep feedback pending. Impact candidates identify possible dependent facts; agents decide consequences and make explicit subsequent updates.
 
 ---
 
@@ -414,7 +414,7 @@ Converts bullet-point session recap to narrative prose for the "Previously on...
 | **Trigger** | Campaign operations — scans for missing entities |
 | **Source** | `packages/engine/src/agents/subagents/repair-state.ts` |
 
-Scans scene transcripts for wikilink targets and generates missing entity files. Ensures the entity filesystem stays consistent with what's been narrated.
+Scans scene transcripts for unresolved campaign identities and generates brief factual prose from transcript evidence. Commits recovered records through SQLite with canonical identity feedback; generated text is never written as campaign entity files. Unresolved UIDs are reported rather than invented.
 
 **Context**: Transcript text + existing entity list. Variable size.
 

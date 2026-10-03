@@ -12,11 +12,10 @@ import { collectCompendiumSlugs, findCompendiumEntryBySlug } from "@machine-viol
 import type {
   Compendium,
   CompendiumEntry,
-  CompendiumCategory,
 } from "@machine-violet/shared/types/compendium.js";
-import { COMPENDIUM_CATEGORIES } from "@machine-violet/shared/types/compendium.js";
+import { compendiumCollections } from "@machine-violet/shared/utils/compendium-lookup.js";
 
-const CATEGORY_LABELS: Record<CompendiumCategory, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   characters: "Characters",
   places: "Places",
   items: "Items",
@@ -52,8 +51,8 @@ interface CompendiumModalProps {
 
 /** A row in the flattened visible tree list. */
 type TreeRow =
-  | { type: "category"; key: CompendiumCategory; label: string; count: number; expanded: boolean }
-  | { type: "entry"; entry: CompendiumEntry; category: CompendiumCategory };
+  | { type: "category"; key: string; label: string; count: number; expanded: boolean }
+  | { type: "entry"; entry: CompendiumEntry; category: string };
 
 /**
  * Campaign compendium modal — navigable tree of player knowledge.
@@ -75,23 +74,31 @@ export function CompendiumModal({
   onClose,
   topOffset,
 }: CompendiumModalProps) {
-  const [expanded, setExpanded] = useState<Set<CompendiumCategory>>(() => new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [cursor, setCursor] = useState(0);
   const [detail, setDetail] = useState<CompendiumEntry | null>(null);
   const [, setHistory] = useState<CompendiumEntry[]>([]);
   const [linkIndex, setLinkIndex] = useState(0);
   const modalRef = useRef<CenteredModalHandle>(null);
 
+  // Keep an open detail tied to identity when public projections refresh or move.
+  useEffect(() => {
+    setDetail((current) => current ? findCompendiumEntryBySlug(data, current.uid ?? current.slug)?.entry ?? null : null);
+    setHistory((history) => history.flatMap((entry) => {
+      const current = findCompendiumEntryBySlug(data, entry.uid ?? entry.slug)?.entry;
+      return current ? [current] : [];
+    }));
+  }, [data]);
+
   // Build the flat list of visible rows
   const rows: TreeRow[] = useMemo(() => {
     const result: TreeRow[] = [];
-    for (const cat of COMPENDIUM_CATEGORIES) {
-      const entries = data[cat] ?? [];
+    for (const [cat, entries] of compendiumCollections(data)) {
       const isExpanded = expanded.has(cat);
       result.push({
         type: "category",
         key: cat,
-        label: CATEGORY_LABELS[cat],
+        label: CATEGORY_LABELS[cat] ?? cat,
         count: entries.length,
         expanded: isExpanded,
       });
@@ -110,7 +117,7 @@ export function CompendiumModal({
     if (clampedCursor !== cursor) setCursor(clampedCursor);
   }, [clampedCursor, cursor]);
 
-  const toggleCategory = useCallback((cat: CompendiumCategory) => {
+  const toggleCategory = useCallback((cat: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
@@ -300,7 +307,7 @@ export function CompendiumModal({
   }
 
   // --- Tree view ---
-  const isEmpty = COMPENDIUM_CATEGORIES.every((cat) => (data[cat] ?? []).length === 0);
+  const isEmpty = compendiumCollections(data).every(([, entries]) => entries.length === 0);
 
   if (isEmpty) {
     return (

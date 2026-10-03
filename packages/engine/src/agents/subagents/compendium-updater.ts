@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { LLMProvider } from "../../providers/types.js";
 import { oneShot } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
@@ -9,6 +10,9 @@ import {
   type Compendium,
   type CompendiumEntry,
 } from "@machine-violet/shared/types/compendium.js";
+import type { CampaignKnowledgeStore } from "../../knowledge/store.js";
+import type { KnowledgeOperation } from "@machine-violet/shared/types/knowledge.js";
+import { collectionPath, projectCampaignCompendium } from "../../entities/public-knowledge.js";
 
 /**
  * Create an empty compendium with default structure.
@@ -23,6 +27,7 @@ export function emptyCompendium(): Compendium {
     storyline: [],
     lore: [],
     objectives: [],
+    collections: {},
   };
 }
 
@@ -83,18 +88,19 @@ export function parseCompendiumOutput(
     const parsed = JSON.parse(json) as Compendium;
 
     // Basic validation: must have the expected category arrays
-    if (
+    if (!parsed.collections && (
       !Array.isArray(parsed.characters) ||
       !Array.isArray(parsed.places) ||
       !Array.isArray(parsed.storyline) ||
       !Array.isArray(parsed.lore) ||
       !Array.isArray(parsed.objectives)
-    ) {
+    )) {
       return fallback;
     }
 
     // Backfill items array for compendiums created before this category existed
-    if (!Array.isArray(parsed.items)) parsed.items = [];
+    for (const category of COMPENDIUM_CATEGORIES) if (!Array.isArray(parsed[category])) parsed[category] = [];
+    if (parsed.collections && (typeof parsed.collections !== "object" || Object.values(parsed.collections).some((entries) => !Array.isArray(entries)))) return fallback;
 
     // Ensure version field
     parsed.version = 1;
@@ -134,7 +140,7 @@ export function canonicalizeCompendium(compendium: Compendium): Compendium {
     }
     const rewritten: CompendiumEntry[] = [];
     for (const entry of entries) {
-      const canonical = slugify(entry.name);
+      const canonical = entry.uid ?? slugify(entry.name);
       if (entry.slug !== canonical) renames.set(entry.slug, canonical);
       rewritten.push({ ...entry, slug: canonical });
     }
@@ -147,7 +153,7 @@ export function canonicalizeCompendium(compendium: Compendium): Compendium {
       const seen = new Set<string>();
       const next: string[] = [];
       for (const ref of entry.related) {
-        const mapped = renames.get(ref) ?? canonicalizeSlugRef(ref);
+        const mapped = renames.get(ref) ?? (/^k[0-9a-z]+$/i.test(ref) ? ref : canonicalizeSlugRef(ref));
         if (!seen.has(mapped)) {
           seen.add(mapped);
           next.push(mapped);
@@ -158,6 +164,69 @@ export function canonicalizeCompendium(compendium: Compendium): Compendium {
   }
 
   return result;
+}
+
+/** Publish only model-approved player summaries, separately from private source records. */
+export async function commitPublicCompendium(store: CampaignKnowledgeStore, compendium: Compendium, sceneNumber: number): Promise<Compendium> {
+  const outline = await store.outline();
+  const collections = new Map(outline.filter((entry) => entry.kind === "collection").map((entry) => [collectionPath(entry.uid, outline).toLocaleLowerCase(), entry.uid]));
+  const publicRecords = new Map<string, string>();
+  for (const entry of outline) {
+    if (entry.kind !== "entity") continue;
+    const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
+    const subject = node.fields.subject;
+    if (node.visibility === "player-facing" && subject && typeof subject === "object" && !Array.isArray(subject) && typeof subject.$ref === "string") publicRecords.set(subject.$ref, node.uid);
+  }
+  const operations: KnowledgeOperation[] = [];
+  const planned = new Set<string>();
+  const ensureCollection = (path: string): string => {
+    const parts = path.split("/").map((part) => part.trim()).filter(Boolean);
+    let parent = "root", current = "";
+    for (const name of parts) {
+      current = current ? `${current}/${name}` : name;
+      const existing = collections.get(current.toLocaleLowerCase());
+      if (existing) { parent = existing; continue; }
+      if (!planned.has(current.toLocaleLowerCase())) {
+        operations.push({ op: "create_collection", parent, name, note: current.startsWith("Player Knowledge") ? "Player-approved summaries only; source records may be private." : undefined });
+        planned.add(current.toLocaleLowerCase());
+      }
+      parent = current;
+    }
+    return parent;
+  };
+  const defaults: Record<string, string> = { characters: "Characters", places: "Locations", items: "Items", storyline: "Storyline", lore: "Lore", objectives: "Objectives" };
+  const groups = compendium.collections && Object.keys(compendium.collections).length ? compendium.collections : Object.fromEntries(COMPENDIUM_CATEGORIES.map((category) => [defaults[category], compendium[category]]));
+  const prepared: { collectionName: string; entry: CompendiumEntry; subject: string | null; handle: string }[] = [];
+  const subjects = new Map<string, string>();
+  for (const [collectionName, entries] of Object.entries(groups)) {
+    for (const entry of entries) {
+      if (!entry || typeof entry.name !== "string" || typeof entry.summary !== "string" || !entry.name.trim()) continue;
+      const subject = await store.resolve(entry.uid ?? entry.name);
+      const handle = subject ?? entry.name;
+      if (!subject) {
+        operations.push({ op: "upsert", collection: ensureCollection(collectionName), name: entry.name,
+          aliases: [...(entry.aliases ?? []), entry.slug].filter(Boolean), visibility: "private" });
+      }
+      for (const alias of [entry.uid, entry.slug, entry.name, ...(entry.aliases ?? [])]) if (alias) subjects.set(alias.normalize("NFKC").trim().toLocaleLowerCase(), handle);
+      prepared.push({ collectionName, entry, subject, handle });
+    }
+  }
+  // All canonical subjects precede references, including identities introduced
+  // in this very batch. The transaction resolves these handles to UIDs.
+  for (const { collectionName, entry, subject, handle } of prepared) {
+    const related: { $ref: string }[] = [];
+    for (const ref of entry.related ?? []) {
+      const target = await store.resolve(ref) ?? subjects.get(ref.normalize("NFKC").trim().toLocaleLowerCase());
+      if (target) related.push({ $ref: target });
+    }
+    operations.push({ op: "upsert", collection: ensureCollection(`Player Knowledge/${collectionName}`), uid: subject ? publicRecords.get(subject) : undefined,
+      name: `Player memory: ${handle}`, visibility: "player-facing",
+      fields: { subject: { $ref: handle }, display_name: entry.name, public_aliases: entry.aliases ?? [], summary: entry.summary,
+        firstScene: entry.firstScene ?? sceneNumber, lastScene: sceneNumber, public_related: related },
+      history: `Player learned: ${entry.summary}` });
+  }
+  if (operations.length) await store.mutate(operations, { sceneNumber, source: "compendium", operationId: `compendium:${sceneNumber}:${createHash("sha256").update(JSON.stringify(groups)).digest("hex")}` });
+  return projectCampaignCompendium(store);
 }
 
 /**
@@ -190,12 +259,16 @@ export function renderCompendiumForDM(compendium: Compendium): string {
     lines.push(`${label}: ${items.join(", ")}`);
   };
 
-  renderCategory("Characters", compendium.characters);
-  renderCategory("Places", compendium.places);
-  renderCategory("Items", compendium.items);
-  renderCategory("Storyline", compendium.storyline);
-  renderCategory("Lore", compendium.lore);
-  renderCategory("Objectives", compendium.objectives);
+  if (compendium.collections && Object.keys(compendium.collections).length) {
+    for (const [collection, entries] of Object.entries(compendium.collections)) renderCategory(collection, entries);
+  } else {
+    renderCategory("Characters", compendium.characters);
+    renderCategory("Places", compendium.places);
+    renderCategory("Items", compendium.items);
+    renderCategory("Storyline", compendium.storyline);
+    renderCategory("Lore", compendium.lore);
+    renderCategory("Objectives", compendium.objectives);
+  }
 
   return lines.join("\n");
 }

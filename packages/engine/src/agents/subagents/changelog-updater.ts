@@ -11,8 +11,8 @@ import { loadPrompt } from "../../prompts/load-prompt.js";
  * @param client - Anthropic client
  * @param transcript - The completed scene transcript
  * @param sceneNumber - Scene number for reference
- * @param entityFiles - List of known entity filenames for matching
- * @returns Lines of "filename: changelog entry" (~50-200 tokens)
+ * @param entityFiles - Canonical UID/name/alias list for matching
+ * @returns Lines of "UID: changelog entry" (~50-200 tokens)
  */
 export async function updateChangelogs(
   provider: LLMProvider,
@@ -22,7 +22,7 @@ export async function updateChangelogs(
   aliasContext: string | undefined,
   model: string,
 ): Promise<SubagentResult> {
-  const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown entity files:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
+  const prompt = `Scene ${sceneNumber} transcript:\n${transcript}\n\nKnown campaign identities:\n${entityFiles.join("\n")}${aliasContext ?? ""}\n\nList changelog entries for entities meaningfully involved.`;
 
   return oneShot(
     provider,
