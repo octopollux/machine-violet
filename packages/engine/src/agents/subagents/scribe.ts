@@ -240,12 +240,35 @@ export async function buildPrefetchedEntityBlock(
   const text = updates.map((update) => update.content).join("\n").toLocaleLowerCase();
   const blocks: string[] = [];
   let remaining = 12000;
-  for (const entry of await store.outline()) {
+  const outline = await store.outline();
+  const byUid = new Map(outline.map((entry) => [entry.uid, entry]));
+  for (const entry of outline) {
     if (entry.kind !== "entity" || blocks.length >= maxEntities || remaining <= 0) continue;
     const node = await store.read(entry.uid, { textLimit: 0, logLimit: 0 });
-    if (![node.uid, node.name, ...node.aliases].some((name) => text.includes(name.toLocaleLowerCase()))) continue;
-    const record = await store.read(node.uid, { textLimit: Math.min(1500, remaining), logLimit: 2 });
-    const block = JSON.stringify(record);
+    if (![node.uid, node.name, ...node.aliases].some((name) => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?=$|[^\\p{L}\\p{N}_])`, "iu").test(text);
+    })) continue;
+    const record = await store.read(node.uid, { textLimit: Math.min(1500, remaining), logLimit: 0, childLimit: 32 });
+    // Current narrative facts matter here. Child-node inventories and derived
+    // value edges repeat the typed fields and can crowd out other identities.
+    const references = [];
+    for (const reference of record.references) {
+      const leafUid = reference.label.startsWith("value:") ? reference.label.slice(6) : "";
+      const leaf = byUid.get(leafUid);
+      let owner = leaf?.parent;
+      while (owner && byUid.get(owner)?.kind === "value") owner = byUid.get(owner)?.parent;
+      if (leaf?.kind === "value" && owner === record.uid && reference.source === record.uid) {
+        const value = (await store.read(leaf.uid, { textLimit: 0, logLimit: 0 })).value;
+        if (value && typeof value === "object" && !Array.isArray(value) && value.$ref === reference.target) continue;
+      }
+      references.push(reference);
+    }
+    const block = JSON.stringify({ uid: record.uid, name: record.name, aliases: record.aliases, parent: record.parent,
+      visibility: record.visibility, fields: record.fields, body: record.body, textLength: record.textLength,
+      ...(record.textNextOffset !== undefined ? { textNextOffset: record.textNextOffset } : {}),
+      fieldCount: record.childCount, references,
+    });
     if (block.length > remaining) continue;
     blocks.push(block); remaining -= block.length;
   }
@@ -255,7 +278,7 @@ export async function buildPrefetchedEntityBlock(
 export async function runScribe(provider: LLMProvider, input: ScribeInput, fileIO: ScribeFileIO, model: string): Promise<ScribeResult> {
   const created: string[] = [], updated: string[] = [], entityDeltas: ScribeEntityDelta[] = [], removedSlugs: string[] = [];
   const store = await getCampaignKnowledge(input.campaignRoot, fileIO);
-  const organization = (await store.outline()).filter((node) => node.kind === "collection");
+  const organization = (await store.outline()).filter((node) => node.kind === "collection").map(({ uid, parent, name, note }) => ({ uid, parent, name, ...(note ? { note } : {}) }));
   const prefetched = await buildPrefetchedEntityBlock(input.updates, undefined, input.campaignRoot, fileIO, input.homeDir);
   const result = await spawnSubagent(provider, {
     name: "scribe", model, visibility: "silent", systemPrompt: cacheSystemPrompt(loadPrompt("scribe", model)),

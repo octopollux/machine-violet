@@ -228,14 +228,14 @@ Maintains player-approved summary records under nested `Player Knowledge` collec
 
 | Property | Value |
 |---|---|
-| **Model** | Haiku |
+| **Model** | Small (configured) |
 | **Visibility** | Silent |
 | **Trigger** | DM calls `scribe` tool |
 | **Source doc** | [entity-filesystem.md](entity-filesystem.md) |
 
-Receives the DM's batched natural-language updates tagged `private` or `player-facing`. It records narrative facts in arbitrary collections using the same generic tools as the DM. There are no automatic non-DM `runScribe` calls: scene changelog, compendium, promotion, theme, and repair are distinct maintenance writers that commit through the shared store and produce the same feedback.
+Receives the DM's batched natural-language updates tagged `private` or `player-facing`. Its provider and model follow the configured Small slot, including Luna when selected; Scribe does not hardcode Haiku. It records narrative facts in arbitrary collections using the same generic tools as the DM. There are no automatic non-DM `runScribe` calls: scene changelog, compendium, promotion, theme, and repair are distinct maintenance writers that commit through the shared store and produce the same feedback.
 
-**Context**: Each call reads the latest collection organization, including empty nested collections and brief conventions. A canonical prefetch matches names and aliases in the narrative batch, including one-letter aliases, and supplies at most eight records within 12k characters. Bulk records remain bounded; missing/overflow details are read explicitly. The DM's complete scene tree stays frozen independently.
+**Context**: Each call reads the latest collection organization, including empty nested collections and brief conventions. A canonical prefetch matches complete names and aliases in the narrative batch, including one-letter aliases, and supplies at most eight records within 12k characters. It retains current facts and additional dependencies without duplicate child/field-edge inventories. Bulk records remain bounded; missing/overflow details are read explicitly before replacing prose. The DM must hand off changed whereabouts and established ability behavior because the scribe does not receive the whole conversation. The DM's complete scene tree stays frozen independently.
 
 **Tools**: Fixed `knowledge` and `remember` contracts, plus `player_profile` for separate machine-level reads and append-only profile updates. Content boundaries append rather than replace. No SQL or schema engineering is requested.
 
@@ -477,7 +477,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 5c | Discord Status | Haiku | Silent | Runtime — Discord Rich Presence update every 8 DM narratives |
 | 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
 | 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
-| 6b | Scribe | Haiku | Silent | Runtime — entity file management |
+| 6b | Scribe | Small (configured) | Silent | Runtime — campaign knowledge maintenance |
 | 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
 | 6d | Search Content | Haiku | Silent | Runtime — game system content lookup (DM tool + combat fallback) |
 | 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
@@ -489,7 +489,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 13 | Theme Styler | Haiku | Silent | Runtime — natural-language theme interpretation |
 | 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
 
-**Opus is never a subagent** — Opus IS the DM. All subagents are Haiku (cheap mechanical work) or Sonnet (personality/quality needed). The summary table above is the canonical list; model and visibility are columns, not separate counts to maintain.
+**Opus is never a subagent** — Opus IS the DM. Apart from Scribe's configured Small slot, the table lists Haiku (cheap mechanical work) or Sonnet (personality/quality needed). The summary table above is the canonical list; model and visibility are columns, not separate counts to maintain.
 
 ## Prompt Caching
 
@@ -504,4 +504,4 @@ Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt incl
 
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 
-**Multi-turn Haiku agents** with tools (scribe, search-campaign, search-content) set `cacheTools: true` so tool definitions are also cached across rounds.
+**Multi-turn agents** with tools (scribe, search-campaign, search-content) set `cacheTools: true` so tool definitions are also cached across rounds. Scribe uses the configured Small slot.

@@ -33,7 +33,7 @@ const Operation = Type.Union([
 
 export const KNOWLEDGE_CONTRACT = defineToolContract({
   name: "knowledge", criticality: "advisory",
-  description: "Inspect campaign memory. outline includes all collections, including empty nested collections and conventions. read accepts a stable UID or known name/alias, with bounded text and history. search checks every collection.",
+  description: "Inspect campaign memory. outline includes all collections, including empty nested collections and conventions. read accepts a stable UID or known name/alias, with bounded text and history. search checks every collection for a single literal name or phrase.",
   schema: Type.Object({
     action: Type.Union([Type.Literal("outline"), Type.Literal("read"), Type.Literal("search")]),
     handle: Type.Optional(Handle), query: Type.Optional(Type.String()),
@@ -50,7 +50,7 @@ export const KNOWLEDGE_CONTRACT = defineToolContract({
 });
 export const REMEMBER_CONTRACT = defineToolContract({
   name: "remember", criticality: "durable",
-  description: "Commit campaign memory changes atomically. Resolve UIDs/names/aliases before creating; same names resolve deterministically. Partial fields preserve unrelated values and references; remove_fields explicitly deletes fields. Collections may be nested with brief conventions. Use explicit references and update current facts with history in one batch. Returns canonical UIDs and potential impact candidates; interpret consequences yourself. Never author SQL or database schemas.",
+  description: "Commit campaign memory changes atomically. Resolve UIDs/names/aliases before creating; same names resolve deterministically. Partial fields preserve unrelated values and references; remove_fields explicitly deletes fields. Collections may be nested with brief conventions. Use explicit references and update current facts with history in one batch. Returns canonical UIDs and potential impact candidates; interpret consequences yourself. Never author SQL or database schemas. Omit operationId unless an exact retry ID was supplied.",
   schema: Type.Object({ operations: Type.Array(Operation, { minItems: 1, maxItems: 100 }), operationId: Type.Optional(Handle) }, { additionalProperties: false, $defs: { CampaignKnowledgeValue: Value } }),
   refine: (input) => input.operations.flatMap((op, index) => op.op === "upsert" && !op.uid && !op.name
     ? [{ path: `/operations/${index}/name`, code: "required", expected: "name or UID", actual: "absent", message: "upsert requires name or uid" }] : []),

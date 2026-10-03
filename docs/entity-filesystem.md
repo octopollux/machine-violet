@@ -10,7 +10,7 @@ Each node has a stable short UID such as `k000a`. Object properties, ordered-lis
 
 Entity names and aliases resolve globally after Unicode, whitespace and case normalization. The owner deliberately accepts same-name conflation: name-only upsert reuses an existing identity even if it has moved collections. This prevents a fresh scribe knowing only an old nickname from creating a duplicate. Renaming uses an explicit patch, preserves old aliases and retains the UID. A name-only upsert resolving an old alias preserves the current canonical display name. Consolidation redirects the old UID, aliases and incoming references to the surviving identity.
 
-Collections are organizational: use their UID or exact path (`Spells/Arcane`) when names repeat beneath different parents. Handles may display as `@k000a`; both forms resolve. No identity ambiguity is escalated into an extra DM turn.
+Collections are organizational: use their UID or exact path (`Spells/Arcane`) when names repeat beneath different parents. Handles may display as `@k000a`; both forms resolve. No identity ambiguity is escalated into an extra DM turn. Public lookup follows historical UID redirects through an exact UID-only resolver; it never sends unknown public names to the private alias index, even when a name resembles a UID.
 
 ## Writes, references and consequences
 
@@ -22,13 +22,15 @@ Relationships are structural `{$ref:...}` values or explicit labeled edges. SQLi
 
 ## Bounded inspection and scene context
 
-`outline()` includes every UID, parent, kind, position and collection note. `snapshot()` renders the complete compact identity tree, including empty collections and ordered instances. It summarizes bulk strings and records text/history lengths rather than dumping full descriptions into the DM prefix.
+`outline()` includes every UID, parent, kind, position and collection note. `snapshot()` renders every node, including the root, empty collections and ordered instances. Indentation preserves structure; collections end in `/`, objects use `{}`, lists use `[]`, scalar leaves use `= value`, and reference leaves use `-> targetUID`. Ordered children retain their `[position]` and optional name. Small strings, numbers, booleans and null remain visible; bulk strings and bodies show character counts, and history shows its entry count. No relevance selection omits nodes or fields.
+
+Canonical names appear once, with only other aliases shown as `aka`. Explicit graph edges appear as `links: label -> targetUID` on their source node, so the source UID is implicit. Indexed `value:leafUID` edges are omitted only when their source and target match the typed reference leaf already shown in the tree. Other edges, including explicit edges with similar labels, remain visible. This removes duplicated reference metadata and schema labels without changing the stored tree or its relationships.
 
 `read()` pages body/leaf text, children/typed object fields and history entries. Long history bodies have independent per-entry text offsets. Lengths and continuation offsets let callers retrieve the entire text. Wide nested objects/lists and long strings return UID descriptors; read those nodes to obtain their content. The exact response shapes `{$text:UID,length:n}`, `{$list:UID,length:n}` and `{$object:UID,length:n}` are reserved and cannot be authored back as state. Other ordinary object keys remain available. History metadata is inert typed JSON limited to 4096 serialized characters; bulk history belongs in the log body.
 
 A fresh full outline is available to DM tools. The DM context uses one frozen knowledge snapshot per scene, persisted in `state/scene.json`; reopening a scene reuses it. Mutation notices provide terse canonical identity and dependency feedback between scene boundaries.
 
-Player-facing sheets and the Player Knowledge projection must contain only disclosed information. The public projection has its own records and UID references to canonical private identities; a private source record must never be published wholesale. The specialized `EntityStore` facade renders sheets for existing mechanics/viewers without reading or writing entity Markdown files.
+Player-facing sheets and the Player Knowledge projection must contain only disclosed information. The public projection has its own records and UID references to canonical private identities; a private source record must never be published wholesale. When an existing player-facing identity becomes private, the mutation transaction preserves its pre-batch disclosed name, aliases and prose under `Player Knowledge/<original collection path>`, referencing the same canonical UID. An existing approved view takes priority and is never refreshed from newly private facts. Earlier secret edits in the same batch cannot change this preserved view; rollback removes preservation too. Repeated private updates do not create extra people or publish hidden aliases. Consolidating public and private identities is rejected: make both private first to preserve their disclosed views, then consolidate. Approved views follow the surviving UID; their previously disclosed aliases remain public, while canonical private aliases remain private. The specialized `EntityStore` facade renders sheets for existing mechanics/viewers without reading or writing entity Markdown files.
 
 ## Storage and lifecycle
 

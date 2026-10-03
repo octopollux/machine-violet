@@ -20,6 +20,23 @@ describe("SQLite campaign knowledge",()=>{
     expect((await store.read(uid)).fields).toMatchObject({alive:true,hp:8,nothing:null,traits:{hat:"blue",coat:"red"}});
     expect((await store.outline()).some(n=>n.name==="Arcane")).toBe(true);
   });
+  it("resolves exact current and historical UIDs without alias or collection-path lookup", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Pansy", aliases: ["King", "Knight", "k123456789"] },
+      { op: "upsert", collection: "Characters", name: "Tall Hat" },
+    ]);
+    const oldUid = (await store.resolve("Pansy"))!;
+    const target = (await store.resolve("Tall Hat"))!;
+    for (const alias of ["Pansy", "King", "Knight", "k123456789", "Characters", "Characters/Pansy"]) {
+      expect(await store.resolve(alias)).not.toBeNull();
+      expect(await store.resolveUid(alias)).toBeNull();
+    }
+    expect(await store.resolveUid(oldUid)).toBe(oldUid);
+    await store.mutate([{ op: "consolidate", uid: oldUid, target }]);
+    for (const handle of [oldUid, `@${oldUid}`, `knowledge:${oldUid}`, `@knowledge:${oldUid}`]) expect(await store.resolveUid(handle)).toBe(target);
+    for (const alias of ["King", "Knight", "k123456789"]) expect(await store.resolveUid(alias)).toBeNull();
+    expect(await store.resolveUid(target)).toBe(target);
+  });
   it("rejects forged read descriptors atomically while retaining ordinary key names",async()=>{
     await store.mutate([{op:"upsert",collection:"Lore",name:"Secret",fields:{secret:"x".repeat(500)}}]);
     const field=(await store.read("Secret")).children!.find(child=>child.name==="secret")!;
@@ -132,6 +149,168 @@ describe("SQLite campaign knowledge",()=>{
   });
 });
 
+describe("compact complete knowledge projection", () => {
+  it("keeps every UID, nested/empty structure, ordered instance and meaningful scalar while bounding bulk", async () => {
+    const store = new SqliteKnowledgeStore(":memory:");
+    const bulk = "private bulk ".repeat(5000);
+    await store.mutate([
+      { op: "create_collection", name: "Quests", note: "Named quests and dependencies" },
+      { op: "create_collection", parent: "Quests", name: "Archived" },
+      { op: "upsert", collection: "Characters", name: "Shadow", fields: { zero: 0, falseValue: false, empty: null, quote: "A \"name\"\nnew line", stats: { hp: 7 }, cards: [{ face: "AS" }, { face: "AS" }], biography: bulk }, body: bulk, history: bulk },
+      { op: "patch", uid: "Shadow", name: "Bob" },
+    ]);
+    const bob = await store.read("Bob");
+    const cards = bob.children!.find(child => child.name === "cards")!.uid;
+    await store.mutate([{ op: "create_node", parent: cards, name: "Named Card", value: { face: "AS" }, index: 0 }]);
+    const cardNodes = (await store.read(cards)).children!;
+    const outline = await store.outline();
+    const snapshot = await store.snapshot();
+    const lines = snapshot.split("\n");
+    const projectedUIDs = lines.map(line => line.trimStart().split(" ")[0]);
+    expect(projectedUIDs).toHaveLength(outline.length);
+    expect(new Set(projectedUIDs)).toEqual(new Set(outline.map(node => node.uid)));
+    expect(snapshot).toBe(await store.snapshot());
+    expect(lines[0]).toBe("root Campaign/");
+    const quest = outline.find(node => node.name === "Quests")!;
+    const archived = outline.find(node => node.name === "Archived")!;
+    expect(lines.find(line => line.trimStart().startsWith(`${quest.uid} `))).toContain("Quests/ — Named quests and dependencies");
+    expect(lines.find(line => line.trimStart().startsWith(`${archived.uid} `))).toBe(`    ${archived.uid} Archived/`);
+    expect(snapshot).toContain(`${bob.uid} Bob aka "Shadow"`);
+    expect(snapshot).not.toContain('aka "Bob"');
+    expect(snapshot).toContain('zero = 0');
+    expect(snapshot).toContain('falseValue = false');
+    expect(snapshot).toContain('empty = null');
+    expect(snapshot).toContain(`quote = ${JSON.stringify('A "name"\nnew line')}`);
+    expect(snapshot).toContain('stats {}');
+    expect(snapshot).toContain('hp = 7');
+    expect(snapshot).toContain('cards []');
+    expect(snapshot).toContain(`${cardNodes[0].uid} [0] Named Card {}`);
+    for (let index = 1; index < cardNodes.length; index++) expect(snapshot).toContain(`${cardNodes[index].uid} [${index}] {}`);
+    expect(cardNodes.map(node => snapshot.indexOf(`${node.uid} `))).toEqual(cardNodes.map(node => snapshot.indexOf(`${node.uid} `)).sort((a, b) => a - b));
+    expect(snapshot).toContain(`biography = (text ${bulk.length} chars)`);
+    expect(snapshot).toContain(`(body ${bulk.length} chars, 1 log)`);
+    expect(snapshot).not.toContain("private bulk");
+    expect(snapshot).not.toMatch(/\[(collection|entity|scalar|reference)\]/);
+  });
+  it("shows typed reference leaves once and preserves every explicit edge with an implicit source", async () => {
+    const store = new SqliteKnowledgeStore(":memory:");
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Bob" },
+      { op: "upsert", collection: "Locations", name: "Castle" },
+      { op: "upsert", collection: "Lore", name: "Quest", fields: { actor: { $ref: "Bob" }, site: { $ref: "Castle" } } },
+    ]);
+    const quest = await store.read("Quest");
+    const actor = quest.children!.find(child => child.name === "actor")!;
+    const bob = (await store.resolve("Bob"))!;
+    const castle = (await store.resolve("Castle"))!;
+    await store.mutate([
+      { op: "add_reference", source: quest.uid, target: bob, label: "depends_on" },
+      { op: "add_reference", source: quest.uid, target: castle, label: `value:${actor.uid}` },
+      { op: "add_reference", source: actor.uid, target: bob, label: `value:${actor.uid}` },
+      { op: "add_reference", source: "Castle", target: quest.uid, label: "knows;\nwhy -> then" },
+    ]);
+    const snapshot = await store.snapshot();
+    const questLine = snapshot.split("\n").find(line => line.trimStart().startsWith(`${quest.uid} `))!;
+    const actorLine = snapshot.split("\n").find(line => line.trimStart().startsWith(`${actor.uid} `))!;
+    expect(questLine).toContain(`links: depends_on -> ${bob}; value:${actor.uid} -> ${castle}`);
+    expect(questLine).not.toContain(`value:${actor.uid} -> ${bob}`);
+    expect(actorLine).toContain(`actor -> ${bob}; links: value:${actor.uid} -> ${bob}`);
+    expect(snapshot).toContain(`site -> ${castle}`);
+    expect(snapshot).toContain(`${JSON.stringify("knows;\nwhy -> then")} -> ${quest.uid}`);
+    expect(snapshot).not.toContain('"source":');
+    expect(snapshot).not.toContain('"$ref":');
+  });
+  it("projects all children beyond read page limits without selecting relevant fields", async () => {
+    const store = new SqliteKnowledgeStore(":memory:");
+    const fields = Object.fromEntries(Array.from({ length: 120 }, (_, index) => [`field${index}`, index]));
+    await store.mutate([{ op: "upsert", collection: "Lore", name: "Complete Record", fields }]);
+    const snapshot = await store.snapshot();
+    for (const node of await store.outline()) expect(snapshot.split("\n").some(line => line.trimStart().startsWith(`${node.uid} `))).toBe(true);
+    for (const [name, value] of Object.entries(fields)) expect(snapshot).toContain(`${name} = ${value}`);
+  });
+});
+
+describe("atomic disclosed identity preservation", () => {
+  let store: SqliteKnowledgeStore;
+  beforeEach(() => { store = new SqliteKnowledgeStore(":memory:"); });
+  afterEach(async () => { await store.close(); });
+  const memories = async () => Promise.all((await store.outline()).filter(node => node.kind === "entity" && node.name.startsWith("Player memory:")).map(node => store.read(node.uid)));
+  it("preserves the pre-batch name, aliases, prose and nested collection before earlier operations add secrets", async () => {
+    await store.mutate([
+      { op: "create_collection", parent: "Characters", name: "Visitors" },
+      { op: "upsert", collection: "Characters/Visitors", name: "Pansy", aliases: ["Flower Seller"], body: "A cheerful florist.", visibility: "player-facing", fields: { firstScene: 1, lastScene: 2 } },
+    ]);
+    const uid = (await store.resolve("Pansy"))!;
+    await store.mutate([
+      { op: "patch", uid, name: "Lady Seraphine", aliases: ["Secret Queen"], body: "Secret ruler of the dead." },
+      { op: "patch", uid, visibility: "private" },
+    ], { sceneNumber: 3 });
+    expect(await store.resolve("Secret Queen")).toBe(uid);
+    expect((await store.read(uid)).visibility).toBe("private");
+    const [memory] = await memories();
+    expect(memory.fields).toMatchObject({ subject: { $ref: uid }, display_name: "Pansy", public_aliases: ["Flower Seller", "Pansy"], summary: "A cheerful florist.", firstScene: 1, lastScene: 2 });
+    const outline = await store.outline();
+    const parent = outline.find(node => node.uid === memory.parent)!;
+    expect(parent.name).toBe("Visitors");
+    expect(outline.find(node => node.uid === parent.parent)!.name).toBe("Characters");
+    expect(outline.find(node => node.uid === outline.find(node => node.uid === parent.parent)!.parent)!.name).toBe("Player Knowledge");
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Pansy", body: "Even more secrets", visibility: "private" }]);
+    expect(await memories()).toHaveLength(1);
+    expect((await memories())[0].fields.summary).toBe("A cheerful florist.");
+  });
+  it("rolls preservation, aliases, notices and newly created collections back after a late failure", async () => {
+    await store.mutate([{ op: "upsert", collection: "Characters", name: "Pansy", body: "Known florist", visibility: "player-facing" }]);
+    const before = await store.snapshot();
+    const notices = await store.pendingNotices();
+    await expect(store.mutate([
+      { op: "patch", uid: "Pansy", name: "Secret Queen", visibility: "private" },
+      { op: "patch", uid: "Missing", body: "invalid" },
+    ])).rejects.toThrow("Unknown knowledge identity");
+    expect(await store.snapshot()).toBe(before);
+    expect(await store.pendingNotices()).toEqual(notices);
+    expect(await store.resolve("Secret Queen")).toBeNull();
+    expect(await memories()).toHaveLength(0);
+  });
+  it("does not trust a similarly named record for another subject or a summary outside Player Knowledge", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Pansy", body: "Known florist", visibility: "player-facing" },
+      { op: "upsert", collection: "Characters", name: "Other" },
+      { op: "create_collection", name: "Player Knowledge" },
+      { op: "create_collection", parent: "Player Knowledge", name: "Characters" },
+    ]);
+    const uid = (await store.resolve("Pansy"))!;
+    await store.mutate([
+      { op: "upsert", collection: "Player Knowledge/Characters", name: `Player memory: ${uid}`, visibility: "player-facing", fields: { subject: { $ref: "Other" }, display_name: "Other", summary: "Unrelated approval" } },
+      { op: "upsert", collection: "Lore", name: "Misplaced approval", visibility: "player-facing", fields: { subject: { $ref: uid }, display_name: "Wrong", summary: "Outside approved owner" } },
+      { op: "patch", uid, visibility: "private" },
+    ]);
+    const records = await memories();
+    expect(records).toHaveLength(2);
+    expect(records.find(record => (record.fields.subject as { $ref: string }).$ref === uid)!.fields.summary).toBe("Known florist");
+    expect(records.find(record => (record.fields.subject as { $ref: string }).$ref !== uid)!.fields.summary).toBe("Unrelated approval");
+    expect(await store.resolve("Player memory: " + uid)).toBe(records.find(record => (record.fields.subject as { $ref: string }).$ref !== uid)!.uid);
+  });
+  it("does not preserve a newly introduced identity or recursively preserve an approved summary", async () => {
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "New", visibility: "player-facing", body: "Never disclosed before this batch" },
+      { op: "patch", uid: "New", visibility: "private" },
+      { op: "create_collection", name: "Player Knowledge" },
+      { op: "upsert", collection: "Player Knowledge", name: "Approved New", visibility: "player-facing", fields: { subject: { $ref: "New" }, display_name: "New", summary: "Approved view" } },
+    ]);
+    await store.mutate([{ op: "patch", uid: "Approved New", visibility: "private" }]);
+    expect(await memories()).toHaveLength(0);
+  });
+  it.each([false, true])("rejects mixed-visibility consolidation in either direction (%s) without leaking private content", async reverse => {
+    await store.mutate([
+      { op: "upsert", collection: "Characters", name: "Public", body: "Known", visibility: "player-facing" },
+      { op: "upsert", collection: "Characters", name: "Secret", body: "Hidden" },
+    ]);
+    const before = await store.snapshot();
+    await expect(store.mutate([{ op: "consolidate", uid: reverse ? "Public" : "Secret", target: reverse ? "Secret" : "Public" }])).rejects.toThrow("make both private first");
+    expect(await store.snapshot()).toBe(before);
+  });
+});
+
 describe("SQLite campaign recovery boundaries",()=>{
   let root:string;
   beforeEach(async()=>{root=await mkdtemp(join(tmpdir(),"mv-knowledge-"));});
@@ -146,6 +325,22 @@ describe("SQLite campaign recovery boundaries",()=>{
     expect(await store.resolve("Robert")).toBeNull();
     expect(await store.pendingNotices()).toHaveLength(1);
     await store.close();
+  });
+  it("resolves generated UIDs after they grow beyond the initial four-digit width", async () => {
+    const path = join(root, "knowledge.sqlite");
+    const initial = new SqliteKnowledgeStore(path, { create: true });
+    await initial.close();
+    const database = new DatabaseSync(path);
+    database.prepare("UPDATE metadata SET value=? WHERE key='next_uid'").run(String(36 ** 6));
+    database.close();
+    const store = new SqliteKnowledgeStore(path, { create: false });
+    try {
+      await store.mutate([{ op: "upsert", collection: "Characters", name: "Long-lived identity" }]);
+      const uid = (await store.resolve("Long-lived identity"))!;
+      expect(uid).toBe("k1000000");
+      expect(await store.resolveUid(uid)).toBe(uid);
+      expect(await store.resolveUid("Long-lived identity")).toBeNull();
+    } finally { await store.close(); }
   });
   it("rejects missing/future databases without creating or modifying bytes",async()=>{
     const path=join(root,"missing.sqlite"); expect(()=>new SqliteKnowledgeStore(path,{create:false})).toThrow("missing");

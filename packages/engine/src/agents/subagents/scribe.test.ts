@@ -109,6 +109,25 @@ describe("scribe committed memory", () => {
     expect(block).toContain("Canonical committed"); expect(block).toContain("Bob"); expect(block.length).toBeLessThan(12000);
   });
 
+  it("prefetch matches complete aliases and preserves current facts without duplicate child/edge inventories", async () => {
+    const io = mockFileIO(); const store = await getCampaignKnowledge("/camp", io);
+    await store.mutate([
+      { op: "upsert", collection: "Locations", name: "Archive" },
+      { op: "upsert", collection: "Characters", name: "Bob", aliases: ["B"], body: "Bob waits.", fields: { location: { $ref: "Archive" }, title: "Keeper" } },
+      { op: "upsert", collection: "Characters", name: "Ada", aliases: ["A"] },
+      { op: "add_reference", source: "Bob", target: "Archive", label: "guards sealed archive" },
+      { op: "add_reference", source: "Bob", target: "Archive", label: "value:watchtower" },
+      { op: "append_log", uid: "Bob", body: "Unneeded history. ".repeat(1000) },
+    ]);
+    const bob = await store.resolve("Bob"); const archive = await store.resolve("Archive"); const ada = await store.resolve("Ada");
+    const unrelated = await buildPrefetchedEntityBlock([{ visibility: "private", content: "The borrowing ritual changed" }], undefined, "/camp", io);
+    expect(unrelated).not.toContain(`"uid":"${bob}"`); expect(unrelated).not.toContain(`"uid":"${ada}"`);
+    const block = await buildPrefetchedEntityBlock([{ visibility: "private", content: "B guards the Archive" }], undefined, "/camp", io);
+    expect(block).toContain(`"uid":"${bob}"`); expect(block).not.toContain(`"uid":"${ada}"`);
+    expect(block).toContain(`"location":{"$ref":"${archive}"}`); expect(block).toContain("guards sealed archive");
+    expect(block).toContain("Bob waits."); expect(block).not.toContain('"children"'); expect(block).toContain("value:watchtower"); expect(block).not.toMatch(/"label":"value:k[0-9a-z]+"/); expect(block).not.toContain("Unneeded history");
+  });
+
   it("appends machine profile boundaries without creating campaign nodes", async () => {
     const io = mockFileIO({ "/home/players/alice.md": "# Alice\n\n**Type:** player\n\n## Content Boundaries\n- No spiders\n" });
     const handler = buildScribeToolHandler(io, "/camp", 2, [], [], [], [], "/home");

@@ -53,6 +53,12 @@ export async function projectCampaignCompendium(store: CampaignKnowledgeStore): 
     const related = Array.isArray(node.fields.public_related) ? node.fields.public_related.flatMap((value) => typeof value === "string" ? [value] : value && typeof value === "object" && !Array.isArray(value) && typeof value.$ref === "string" ? [value.$ref] : []) : [];
     const entry: CompendiumEntry = { uid: subject, slug: subject, name, aliases, summary, firstScene: number(node.fields.firstScene), lastScene: number(node.fields.lastScene), related };
     const prior = bySubject.get(subject);
+    if (prior?.approvedSummary && approvedSummary) {
+      // Several approved views can survive consolidation onto one canonical
+      // UID. Keep their public handles without borrowing private aliases.
+      entry.aliases = [...new Set([...(entry.aliases ?? []), prior.entry.name, ...(prior.entry.aliases ?? [])])].filter((alias) => alias !== entry.name);
+      entry.related = [...new Set([...entry.related, ...prior.entry.related])];
+    }
     if (!prior || approvedSummary || !prior.approvedSummary) bySubject.set(subject, { collection, entry, approvedSummary });
   }
   for (const { collection, entry } of bySubject.values()) {
@@ -73,7 +79,7 @@ export async function readPublicCampaignRecord(store: CampaignKnowledgeStore, ha
   const normalized = handle.normalize("NFKC").trim().toLocaleLowerCase();
   // Old UID redirects can resolve a public identity, but a private alias must
   // never act as a lookup oracle for an otherwise hidden record.
-  const uid = /^k[0-9a-z]+$/i.test(handle) ? await store.resolve(handle) : null;
+  const uid = await store.resolveUid(handle);
   for (const [collection, entries] of Object.entries(compendium.collections ?? {})) {
     const entry = entries.find((candidate) => candidate.uid === handle || candidate.uid === uid || [candidate.name, ...(candidate.aliases ?? [])].some((name) => name.normalize("NFKC").trim().toLocaleLowerCase() === normalized));
     if (entry?.uid) return { uid: entry.uid, name: entry.name, content: `# ${entry.name}\n\n${entry.summary}`, collection };

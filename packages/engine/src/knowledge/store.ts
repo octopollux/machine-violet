@@ -5,6 +5,8 @@ export interface CampaignKnowledgeStore {
   outline(): Promise<KnowledgeOutlineEntry[]>;
   snapshot(): Promise<string>;
   resolve(handle: string): Promise<string | null>;
+  /** Resolve an exact current or historical UID; never consult names or aliases. */
+  resolveUid(handle: string): Promise<string | null>;
   read(handle: string, options?: KnowledgeReadOptions): Promise<KnowledgeNode>;
   mutate(operations: KnowledgeOperation[], options?: KnowledgeMutationOptions): Promise<KnowledgeMutationResult>;
   pendingNotices(): Promise<KnowledgeNotice[]>;

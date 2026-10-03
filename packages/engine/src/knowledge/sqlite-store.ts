@@ -15,6 +15,10 @@ interface Row {
   value_kind: string;
   scalar: string | null;
 }
+interface DisclosedView {
+  collectionPath: string[];
+  fields: Record<string, KnowledgeValue>;
+}
 const DEFAULT_COLLECTIONS = ["Characters", "Locations", "Factions", "Items", "Lore"];
 export class KnowledgeIntegrityError extends Error {
 }
@@ -149,15 +153,16 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       throw new KnowledgeIntegrityError(`Knowledge node not found: ${uid}`);
     return row;
   }
-  private lookup(handle: string): string | null {
+  private lookupUid(handle: string): string | null {
     handle = handle.replace(/^@/, "").replace(/^knowledge:/, "");
-    if (this.statement("SELECT uid FROM nodes WHERE uid=?").get(handle))
-      return handle;
-    const redirect = this.statement("SELECT uid FROM redirects WHERE handle=?").get(handle) as {
-      uid: string;
-    } | undefined;
-    if (redirect)
-      return redirect.uid;
+    if (this.statement("SELECT uid FROM nodes WHERE uid=?").get(handle)) return handle;
+    const redirect = this.statement("SELECT uid FROM redirects WHERE handle=?").get(handle) as { uid: string } | undefined;
+    return redirect?.uid ?? null;
+  }
+  private lookup(handle: string): string | null {
+    const uid = this.lookupUid(handle);
+    if (uid) return uid;
+    handle = handle.replace(/^@/, "").replace(/^knowledge:/, "");
     const alias = this.statement("SELECT uid FROM aliases WHERE handle=?").get(normalized(handle)) as {
       uid: string;
     } | undefined;
@@ -304,6 +309,75 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       this.statement("DELETE FROM nodes WHERE uid=?").run(child.uid);
     }
   }
+  private collectionNames(uid: string): string[] {
+    const names: string[] = [];
+    let parent = this.row(uid).parent;
+    while (parent && parent !== "root") {
+      const row = this.row(parent);
+      if (row.kind === "collection") names.unshift(row.name);
+      parent = row.parent;
+    }
+    return names;
+  }
+  private disclosedFields(uid: string): Record<string, KnowledgeValue> {
+    const wanted = new Set(["subject", "display_name", "summary", "public_aliases", "public_related", "firstScene", "lastScene"]);
+    return Object.fromEntries(this.children(uid).filter(child => child.kind === "value" && wanted.has(child.slot)).map(child => [child.slot, this.decode(child.uid)]));
+  }
+  private approvedViewSubject(row: Row, fields: Record<string, KnowledgeValue>): string | null {
+    const subject = fields.subject;
+    const path = this.collectionNames(row.uid);
+    if (row.visibility !== "player-facing" || normalized(path[0] ?? "") !== normalized("Player Knowledge") ||
+      typeof fields.display_name !== "string" || typeof fields.summary !== "string" ||
+      !subject || typeof subject !== "object" || Array.isArray(subject) || typeof subject.$ref !== "string") return null;
+    return subject.$ref;
+  }
+  /** Capture disclosed content before any operation can introduce private facts. */
+  private disclosedViews(sceneNumber: number): Map<string, DisclosedView> {
+    const views = new Map<string, DisclosedView>();
+    const rows = this.statement("SELECT * FROM nodes WHERE kind='entity' AND visibility='player-facing' ORDER BY uid").all() as unknown as Row[];
+    for (const row of rows) {
+      const fields = this.disclosedFields(row.uid);
+      // Approved summaries are already projections; never recursively preserve them.
+      if (fields.subject && typeof fields.display_name === "string" && typeof fields.summary === "string") continue;
+      views.set(row.uid, {
+        collectionPath: this.collectionNames(row.uid),
+        fields: {
+          subject: { $ref: row.uid }, display_name: row.name, summary: row.body,
+          public_aliases: this.identity(row.uid).aliases,
+          public_related: Array.isArray(fields.public_related) ? fields.public_related : [],
+          firstScene: typeof fields.firstScene === "number" ? fields.firstScene : sceneNumber,
+          lastScene: typeof fields.lastScene === "number" ? fields.lastScene : sceneNumber,
+        },
+      });
+    }
+    // If a view already existed, its explicitly approved content takes priority
+    // over raw canonical content, including when that view is removed this batch.
+    for (const row of rows) {
+      const fields = this.disclosedFields(row.uid);
+      const subject = this.approvedViewSubject(row, fields);
+      if (subject && views.has(subject)) views.set(subject, { collectionPath: this.collectionNames(row.uid).slice(1), fields });
+    }
+    return views;
+  }
+  private preserveDisclosedView(uid: string, baseline: DisclosedView | undefined): string[] {
+    if (!baseline || this.row(uid).visibility !== "player-facing") return [];
+    const views = this.statement("SELECT * FROM nodes WHERE kind='entity' AND visibility='player-facing'").all() as unknown as Row[];
+    if (views.some(row => this.approvedViewSubject(row, this.disclosedFields(row.uid)) === uid)) return [];
+    const changed: string[] = [];
+    let parent = this.createCollection("root", "Player Knowledge", "");
+    changed.push(parent);
+    for (const name of baseline.collectionPath) {
+      parent = this.createCollection(parent, name, "");
+      changed.push(parent);
+    }
+    // Insert directly: an unrelated alias or similarly named projection must
+    // never redirect this preservation into a different subject's record.
+    const view = this.insert(parent, `Player memory: ${uid}`, "entity");
+    this.setValue(view, baseline.fields);
+    this.statement("UPDATE nodes SET visibility='player-facing' WHERE uid=?").run(view);
+    changed.push(view);
+    return changed;
+  }
   private patch(uid: string, op: Extract<KnowledgeOperation, {
     op: "patch" | "upsert";
   }>, sceneNumber?: number): void {
@@ -334,6 +408,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       display: string;
     }[]).map(a => a.display) }; }
   resolve(handle: string): Promise<string | null> { return this.serialized(() => this.lookup(handle)); }
+  resolveUid(handle: string): Promise<string | null> { return this.serialized(() => this.lookupUid(handle)); }
   outline(): Promise<KnowledgeOutlineEntry[]> {
     return this.serialized(() => (this.statement("SELECT uid,parent,name,kind,note,position FROM nodes ORDER BY parent,position,uid").all() as unknown as KnowledgeOutlineEntry[]));
   }
@@ -371,17 +446,74 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
   read(handle: string, options?: KnowledgeReadOptions): Promise<KnowledgeNode> { return this.serialized(() => this.readNode(handle, options)); }
   snapshot(): Promise<string> {
     return this.serialized(() => {
-      const lines: string[] = [];
-      const walk = (uid: string, depth: number) => {
-        for (const row of this.children(uid)) {
-          const rec = this.readNode(row.uid, { textLimit: 0, logLimit: 0 });
-          const scalar = row.kind === "value" && !["object", "list"].includes(row.value_kind) ? JSON.parse(row.scalar ?? "null") as KnowledgeValue : undefined;
-          const small = typeof scalar === "string" && scalar.length > 160 ? `(text:${scalar.length}; read by UID)` : scalar === undefined ? "" : JSON.stringify(scalar);
-          lines.push(`${"  ".repeat(depth)}${row.uid} ${row.name || `[${row.position}]`} [${row.kind === "value" ? row.value_kind : row.kind}]${row.note ? ` — ${row.note.slice(0, 180)}` : ""}${rec.aliases.length > 1 ? ` aliases=${JSON.stringify(rec.aliases)}` : ""}${small ? ` ${small}` : ""}${rec.references.length ? ` refs=${JSON.stringify(rec.references)}` : ""}${row.kind !== "value" && (rec.textLength || rec.logCount) ? ` (text:${rec.textLength}, logs:${rec.logCount}; read by UID)` : ""}`);
-          walk(row.uid, depth + 1);
+      const rows = this.statement("SELECT * FROM nodes ORDER BY parent,position,uid").all() as unknown as Row[];
+      const byUid = new Map(rows.map(row => [row.uid, row]));
+      const children = new Map<string, Row[]>();
+      for (const row of rows) {
+        if (!row.parent) continue;
+        const siblings = children.get(row.parent) ?? [];
+        siblings.push(row);
+        children.set(row.parent, siblings);
+      }
+      const aliases = new Map<string, string[]>();
+      for (const alias of this.statement("SELECT uid,display FROM aliases ORDER BY uid,handle").all() as { uid: string; display: string }[]) {
+        const names = aliases.get(alias.uid) ?? [];
+        names.push(alias.display);
+        aliases.set(alias.uid, names);
+      }
+      const logCounts = new Map((this.statement("SELECT uid,count(*) AS n FROM logs GROUP BY uid").all() as { uid: string; n: number }[]).map(row => [row.uid, row.n]));
+      const links = new Map<string, KnowledgeReference[]>();
+      for (const reference of this.statement("SELECT source,target,label FROM refs ORDER BY source,label,target").all() as unknown as KnowledgeReference[]) {
+        // A structural edge is already visible on its typed reference leaf.
+        // Keep every explicit edge, even a value:* label that does not match
+        // the indexed source/target of an actual typed reference node.
+        if (reference.label.startsWith("value:")) {
+          const leaf = byUid.get(reference.label.slice("value:".length));
+          if (leaf?.kind === "value" && leaf.value_kind === "reference") {
+            let owner = leaf;
+            while (owner.kind === "value" && owner.parent) {
+              const parent = byUid.get(owner.parent);
+              if (!parent) throw new KnowledgeIntegrityError("Knowledge snapshot has an orphaned reference node");
+              owner = parent;
+            }
+            const target = (JSON.parse(leaf.scalar ?? "null") as { $ref: string } | null)?.$ref;
+            if (owner.uid === reference.source && target === reference.target) continue;
+          }
         }
+        const outgoing = links.get(reference.source) ?? [];
+        outgoing.push(reference);
+        links.set(reference.source, outgoing);
+      }
+      const inlineName = (name: string) => /[\r\n\t]/.test(name) ? JSON.stringify(name) : name;
+      const inlineLabel = (label: string) => !label || /[\r\n\t;]|->/.test(label) ? JSON.stringify(label) : label;
+      const lines: string[] = [];
+      const walk = (row: Row, depth: number) => {
+        const parent = row.parent ? byUid.get(row.parent) : undefined;
+        const name = inlineName(row.name || row.slot);
+        const address = parent?.value_kind === "list" ? `[${row.position}]${row.name ? ` ${inlineName(row.name)}` : ""}` : name;
+        let detail = "";
+        if (row.kind === "collection") detail = "/";
+        else if (row.kind === "value") {
+          if (row.value_kind === "object") detail = " {}";
+          else if (row.value_kind === "list") detail = " []";
+          else {
+            const scalar = JSON.parse(row.scalar ?? "null") as KnowledgeValue;
+            if (row.value_kind === "reference") detail = ` -> ${(scalar as { $ref: string }).$ref}`;
+            else detail = typeof scalar === "string" && scalar.length > 160 ? ` = (text ${scalar.length} chars)` : ` = ${JSON.stringify(scalar)}`;
+          }
+        }
+        const otherNames = (aliases.get(row.uid) ?? []).filter(alias => normalized(alias) !== normalized(row.name));
+        const aka = otherNames.length ? ` aka ${otherNames.map(alias => JSON.stringify(alias)).join(", ")}` : "";
+        const bulk = [row.body.length ? `body ${row.body.length} chars` : "", logCounts.get(row.uid) ? `${logCounts.get(row.uid)} log${logCounts.get(row.uid) === 1 ? "" : "s"}` : ""].filter(Boolean);
+        const note = row.note ? ` — ${inlineName(row.note.slice(0, 180))}${row.note.length > 180 ? "…" : ""}` : "";
+        const outgoing = links.get(row.uid) ?? [];
+        const edges = outgoing.length ? `; links: ${outgoing.map(reference => `${inlineLabel(reference.label)} -> ${reference.target}`).join("; ")}` : "";
+        lines.push(`${"  ".repeat(depth)}${row.uid} ${address}${detail}${aka}${bulk.length ? ` (${bulk.join(", ")})` : ""}${note}${edges}`);
+        for (const child of children.get(row.uid) ?? []) walk(child, depth + 1);
       };
-      walk("root", 0);
+      const root = byUid.get("root");
+      if (!root) throw new KnowledgeIntegrityError("Campaign knowledge root is missing");
+      walk(root, 0);
       return lines.join("\n");
     });
   }
@@ -404,6 +536,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       }
       db.exec("BEGIN IMMEDIATE");
       try {
+        const disclosed = this.disclosedViews(options.sceneNumber ?? 0);
         const changed = new Set<string>();
         const identityUids = new Set<string>();
         const candidates = new Set<string>();
@@ -462,12 +595,18 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
               else if (this.row(uid).kind !== "entity")
                 throw new KnowledgeIntegrityError("Name resolves to a collection or value; supply a different identity name");
               touch(uid);
+              if (op.visibility === "private") {
+                for (const preserved of this.preserveDisclosedView(uid, disclosed.get(uid))) touch(preserved);
+              }
               this.patch(uid, op, options.sceneNumber);
               break;
             }
             case "patch": {
               const uid = this.require(op.uid);
               touch(uid);
+              if (op.visibility === "private") {
+                for (const preserved of this.preserveDisclosedView(uid, disclosed.get(uid))) touch(preserved);
+              }
               this.patch(uid, op, options.sceneNumber);
               break;
             }
@@ -555,6 +694,8 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
                 break;
               if (this.row(uid).kind !== "entity" || this.row(target).kind !== "entity")
                 throw new KnowledgeIntegrityError("Only narrative identities can be consolidated");
+              if (this.row(uid).visibility !== this.row(target).visibility)
+                throw new KnowledgeIntegrityError("Cannot consolidate public and private identities: make both private first to preserve their disclosed views, then consolidate");
               touch(uid);
               touch(target);
               const targetSlots = new Set(this.children(target).map(child => child.slot));
