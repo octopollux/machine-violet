@@ -1,0 +1,240 @@
+{
+  "fixtureVersion": 1,
+  "execution": "synthetic protocol fault schedules, separate from gameplay",
+  "cases": [
+    {
+      "id": "stream-splits",
+      "actions": [
+        {
+          "stream": "A public sentence.<co_dm>SECRET: Bob serves dead-drop network.</co_dm> Another public sentence.",
+          "chunking": "For every single UTF-8 byte split position, then one-byte chunks; include splits inside opening/closing delimiters."
+        }
+      ],
+      "expected": [
+        "Public output exactly A public sentence. Another public sentence.",
+        "One private annotation, once, in order.",
+        "No extra DM request/tool roundtrip.",
+        "Public logs exclude private bytes."
+      ]
+    },
+    {
+      "id": "malformed-fail-closed",
+      "actions": [
+        {
+          "streams": [
+            "Public.<co_dm>SECRET without closing tag",
+            "Public.<co_dm>SECRET<co_dm>nested</co_dm> tail",
+            "Public.<co_dm attribute=\"x\">SECRET</co_dm>",
+            "Public.<co_dm>SECRET</co_d",
+            "Public.<co_dm>SECRET</co_dm></co_dm>"
+          ]
+        }
+      ],
+      "expected": [
+        "Once reserved private-block intent begins, quarantine suspect bytes; malformed payload not dispatched.",
+        "Private fragment never restored into public output on EOF/error; diagnostic contains code/offset only.",
+        "Exactly supported grammar and explicit escaping for literal reserved tags must be settled before implementation; quarantine is the proposed policy."
+      ]
+    },
+    {
+      "id": "wake-batching",
+      "actions": [
+        {
+          "schedule": "Worker busy after stage 1; accumulate stages 2-4; idle wake consumes all pending COMPLETE exchanges in ONE user message."
+        }
+      ],
+      "expected": [
+        "History retains exchange and intermediate event order.",
+        "Incomplete current DM exchange stays pending.",
+        "Single worker; no concurrent second consumer; own accepted writes do not schedule a wake."
+      ]
+    },
+    {
+      "id": "stale-field-write",
+      "actions": [
+        {
+          "read": {
+            "modelineRevision": 1,
+            "archiveRevision": 1
+          }
+        },
+        {
+          "dmWrite": {
+            "modeline": "BENEATH THE PLATFORM",
+            "modelineRevision": 2
+          }
+        },
+        {
+          "coDmBatch": {
+            "modeline": "HOLDING BREATH",
+            "archiveObservedNote": "label unchanged",
+            "preconditions": {
+              "modeline": 1,
+              "archive": 1
+            }
+          }
+        }
+      ],
+      "expected": [
+        "Reject stale modeline field; preserve unrelated valid archive note using per-target/field revisions or explicit fresh-read rebase.",
+        "No globally dropping all unrelated work merely because batch watermark is older."
+      ]
+    },
+    {
+      "id": "duplicate-retry",
+      "actions": [
+        {
+          "deliver": [
+            "spend-ok",
+            "spend-ok",
+            "custody-1",
+            "custody-1"
+          ]
+        },
+        {
+          "retry": "same original operation ID after lost response"
+        }
+      ],
+      "expected": [
+        "Coin=3 rather than 1; one custody/history application.",
+        "Rejected operation not represented as success; errors observable to worker.",
+        "No duplicate portrait or feedback ID."
+      ]
+    },
+    {
+      "id": "crash-before-commit",
+      "actions": [
+        {
+          "cut": "after provider result, before atomic tool commit"
+        },
+        {
+          "restart": "replay from durable cursor using same IDs"
+        }
+      ],
+      "expected": [
+        "One eventual commit; durable cursor never skips uncommitted required work."
+      ]
+    },
+    {
+      "id": "crash-after-commit",
+      "actions": [
+        {
+          "cut": "after accepted tool commit, before cursor advance"
+        },
+        {
+          "restart": "re-deliver original events and operation IDs"
+        }
+      ],
+      "expected": [
+        "Idempotent ledger returns committed result; one mutation/history/image request; cursor advances once."
+      ]
+    },
+    {
+      "id": "crash-feedback",
+      "actions": [
+        {
+          "syntheticFeedback": {
+            "feedbackId": "transport-only-1",
+            "origin": "co-dm",
+            "text": "Synthetic private transport message.",
+            "replyRequired": false
+          },
+          "purpose": "Delivery semantics only; does not score live feedback usefulness."
+        },
+        {
+          "cut": "after durable feedback creation, before DM injection acknowledgment"
+        },
+        {
+          "restart": "recover delivery ledger"
+        }
+      ],
+      "expected": [
+        "Feedback injected at most once logically; durable ID de-duplicates repeated transport.",
+        "Feedback remains volatile DM context; canonical state/notes not changed merely by delivery.",
+        "Delivery acknowledgment is engine bookkeeping, not a model reply."
+      ]
+    },
+    {
+      "id": "rollback-fence",
+      "actions": [
+        {
+          "pause": "co-DM result for epoch-1 at stage 8 before commit"
+        },
+        {
+          "rollback": {
+            "epoch": "epoch-2",
+            "targetStage": 6
+          }
+        },
+        {
+          "release": "old epoch-1 result"
+        },
+        {
+          "deliver": "new epoch-2 stream"
+        }
+      ],
+      "expected": [
+        "Old epoch write, portrait request, theme and feedback rejected.",
+        "Cursor/snapshot tied to epoch-2; reverted scar remains absent until re-established.",
+        "Work for new epoch proceeds independently of old completion."
+      ]
+    },
+    {
+      "id": "freshness-barriers",
+      "actions": [
+        {
+          "ordinaryTurn": "worker remains busy; submit next action"
+        },
+        {
+          "mechanicalRead": "request current Coin requiring latest authoritative result"
+        },
+        {
+          "transition": "stage 9"
+        },
+        {
+          "endReload": "stage 12"
+        }
+      ],
+      "expected": [
+        "Ordinary turn accepted without unconditional helper flush.",
+        "Necessary mechanical read awaits relevant current state.",
+        "Transition and session end drain both queues, persist final snapshot/cursor, then refresh/reload.",
+        "Frozen prefix hash unchanged inside scene, changed only at barrier."
+      ]
+    },
+    {
+      "id": "optional-card-identity",
+      "actions": [
+        {
+          "successfulDraw": {
+            "operationId": "draw-card-b",
+            "cardId": "card-b",
+            "face": "Flame",
+            "remaining": [],
+            "drawn": [
+              "card-a",
+              "card-b"
+            ]
+          }
+        },
+        {
+          "failedReturn": {
+            "ok": false,
+            "cardId": "card-b",
+            "authoritative": {
+              "remaining": [],
+              "drawn": [
+                "card-a",
+                "card-b"
+              ]
+            }
+          }
+        }
+      ],
+      "expected": [
+        "Track card-b rather than card-a despite identical face; no fabricated successful return.",
+        "Optional stress case, excluded from main quality denominator unless predeclared."
+      ]
+    }
+  ]
+}

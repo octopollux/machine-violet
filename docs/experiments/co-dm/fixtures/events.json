@@ -1,0 +1,645 @@
+{
+  "fixtureVersion": 1,
+  "delivery": "ascending seq; preserve each exchange and intervening outcomes inside one wake user message",
+  "stages": [
+    {
+      "stage": 1,
+      "events": [
+        {
+          "id": "e001",
+          "seq": 1,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I watch the shadowy figure."
+          }
+        },
+        {
+          "id": "e002",
+          "seq": 2,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The figure keeps still beside the clock."
+          }
+        },
+        {
+          "id": "e003",
+          "seq": 3,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.private_annotation",
+          "origin": "dm",
+          "visibility": "private",
+          "payload": {
+            "text": "Keep figure private; canonical secret allegiance must stay undisclosed. He is not yet publicly named."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "figure: waits at platform clock. Private: secretly courier Bob of dead-drop network; do not disclose identity yet."
+      }
+    },
+    {
+      "stage": 2,
+      "events": [
+        {
+          "id": "e004",
+          "seq": 4,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "What can I see now?"
+          }
+        },
+        {
+          "id": "e005",
+          "seq": 5,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The same figure adjusts a grey felt hat."
+          }
+        },
+        {
+          "id": "e006",
+          "seq": 6,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.notes_updated",
+          "origin": "dm",
+          "visibility": "private",
+          "payload": {
+            "text": "Bob is the figure; his allegiance remains secret. The hat is a public visual clue."
+          }
+        }
+      ],
+      "controls": [
+        "hold_worker_busy_until_stage_4_complete"
+      ],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "figure: same shadowy figure, grey felt hat; public hat clue. Private Bob/allegiance unchanged."
+      }
+    },
+    {
+      "stage": 3,
+      "events": [
+        {
+          "id": "e007",
+          "seq": 7,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I listen to the porter."
+          }
+        },
+        {
+          "id": "e008",
+          "seq": 8,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The porter says Bob died last winter. It is a rumor, not a confirmed death."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Porter claims Bob died last winter: attributed unconfirmed rumor, not established death."
+      }
+    },
+    {
+      "stage": 4,
+      "events": [
+        {
+          "id": "e009",
+          "seq": 9,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I ask the man his name and give him the packet."
+          }
+        },
+        {
+          "id": "e010",
+          "seq": 10,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The man in the grey hat says, \"Bob.\" He takes your sealed packet."
+          }
+        },
+        {
+          "id": "e011",
+          "seq": 11,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.private_annotation",
+          "origin": "dm",
+          "visibility": "private",
+          "payload": {
+            "text": "figure is Bob; converge bob-old into figure deterministically; keep all prior handles and biography. Publicly disclose name and hat, never allegiance."
+          }
+        },
+        {
+          "id": "e012",
+          "seq": 12,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "engine",
+          "visibility": "private",
+          "payload": {
+            "operationId": "custody-1",
+            "tool": "transfer_item",
+            "ok": true,
+            "authoritative": {
+              "packet": {
+                "holder": {
+                  "$ref": "figure"
+                },
+                "location": {
+                  "$ref": "platform"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "controls": [
+        "release_worker",
+        "expect_one_wake_message_for_pending_complete_exchanges"
+      ],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "figure identifies publicly as Bob; converge bob-old fragment into figure, retain handles/tea biography. Public hat/name allowed; allegiance private. Successful custody outcome: packet holder figure, location platform."
+      }
+    },
+    {
+      "stage": 5,
+      "events": [
+        {
+          "id": "e013",
+          "seq": 13,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I try to pay ten coins and draw again."
+          }
+        },
+        {
+          "id": "e014",
+          "seq": 14,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "engine",
+          "visibility": "private",
+          "payload": {
+            "operationId": "spend-failed",
+            "tool": "spend_resource",
+            "ok": false,
+            "error": "insufficient funds",
+            "authoritative": {
+              "Coin": 5
+            }
+          }
+        },
+        {
+          "id": "e015",
+          "seq": 15,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "engine",
+          "visibility": "private",
+          "payload": {
+            "operationId": "draw-failed",
+            "tool": "draw_card",
+            "ok": false,
+            "error": "draw not permitted",
+            "authoritative": {
+              "remaining": [
+                "card-b"
+              ],
+              "drawn": [
+                "card-a"
+              ]
+            }
+          }
+        },
+        {
+          "id": "e016",
+          "seq": 16,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The ticket seller refuses the unaffordable fare."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Failed spend ten coins: authoritative Coin remains 5. Failed draw: remaining card-b, drawn card-a; unchanged deck."
+      }
+    },
+    {
+      "stage": 6,
+      "events": [
+        {
+          "id": "e017",
+          "seq": 17,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I pay two coins, then swear softly."
+          }
+        },
+        {
+          "id": "e018",
+          "seq": 18,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "engine",
+          "visibility": "private",
+          "payload": {
+            "operationId": "spend-ok",
+            "tool": "spend_resource",
+            "ok": true,
+            "authoritative": {
+              "Coin": 3
+            }
+          }
+        },
+        {
+          "id": "e019",
+          "seq": 19,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "operationId": "expressive-1",
+            "tool": "set_resource_values",
+            "ok": true,
+            "authoritative": {
+              "swear jar funds remaining": 2
+            }
+          }
+        },
+        {
+          "id": "e020",
+          "seq": 20,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "operationId": "modeline-1",
+            "tool": "set_modeline",
+            "ok": true,
+            "authoritative": {
+              "modeline": "HOLDING BREATH"
+            }
+          }
+        },
+        {
+          "id": "e021",
+          "seq": 21,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The smaller payment buys a platform pass."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Successful spend two coins: Coin=3. DM expressly sets swear jar funds remaining=2, modeline HOLDING BREATH."
+      }
+    },
+    {
+      "stage": 7,
+      "events": [
+        {
+          "id": "e022",
+          "seq": 22,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I use Prism Recall on the paper. I ignore the missing violinist poster."
+          }
+        },
+        {
+          "id": "e023",
+          "seq": 23,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "Through your prism, the faded writing becomes legible. A poster nearby mentions a missing violinist."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Lore/Spells Prism Recall observed to recover faded writing through prism; no cost/range/universal rule established. Violinist poster ignored, dormant clue. Preserve archive."
+      }
+    },
+    {
+      "stage": 8,
+      "events": [
+        {
+          "id": "e024",
+          "seq": 24,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I duck past the broken glass."
+          }
+        },
+        {
+          "id": "e025",
+          "seq": 25,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "A glass shard leaves a permanent narrow scar across your left eyebrow."
+          }
+        },
+        {
+          "id": "e026",
+          "seq": 26,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "dm",
+          "visibility": "private",
+          "payload": {
+            "operationId": "scene-image-1",
+            "tool": "generate_image",
+            "ok": true,
+            "authoritative": {
+              "imageId": "platform-image"
+            },
+            "prompt": "Grey-hatted Bob beside the platform clock; Mara in foreground; cold blue station light."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "pc Mara gains permanent left-eyebrow scar; preserve dark cropped hair. Appearance revision 1, portrait once. DM already generated platform-image with specified composition; no helper scene image."
+      }
+    },
+    {
+      "stage": 9,
+      "events": [
+        {
+          "id": "e027",
+          "seq": 27,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I steady myself and follow Bob downstairs."
+          }
+        },
+        {
+          "id": "e028",
+          "seq": 28,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "Bob carries the packet down into the cellar."
+          }
+        },
+        {
+          "id": "e029",
+          "seq": 29,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "tool.outcome",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "operationId": "modeline-2",
+            "tool": "set_modeline",
+            "ok": true,
+            "authoritative": {
+              "modeline": "BENEATH THE PLATFORM"
+            }
+          }
+        },
+        {
+          "id": "e030",
+          "seq": 30,
+          "epoch": "epoch-1",
+          "scene": "platform",
+          "type": "dm.private_annotation",
+          "origin": "dm",
+          "visibility": "private",
+          "payload": {
+            "text": "Cut to cellar. I want an amber cellar theme."
+          }
+        }
+      ],
+      "controls": [
+        "scene_transition:drain_both_queues",
+        "freeze_final_snapshot_and_cursor",
+        "refresh_prefix:cellar"
+      ],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Bob/figure carries packet into cellar. DM latest modeline BENEATH THE PLATFORM; swear jar funds remaining still 2. Theme amber requested. Scene cut, persist final state."
+      }
+    },
+    {
+      "stage": 10,
+      "events": [
+        {
+          "id": "e031",
+          "seq": 31,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I ask whether Bob is alive."
+          }
+        },
+        {
+          "id": "e032",
+          "seq": 32,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "Bob answers you in person and pours black tea."
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Bob alive in person, pours black tea; death rumor remains unconfirmed history. Identity feedback available privately, no reply required."
+      }
+    },
+    {
+      "stage": 11,
+      "events": [
+        {
+          "id": "e033",
+          "seq": 33,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I inspect the archive label."
+          }
+        },
+        {
+          "id": "e034",
+          "seq": 34,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "The radio archive label is unchanged."
+          }
+        },
+        {
+          "id": "e035",
+          "seq": 35,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "tool.outcome",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "operationId": "expressive-2",
+            "tool": "set_resource_values",
+            "ok": true,
+            "authoritative": {
+              "swear jar funds remaining": 1
+            }
+          }
+        }
+      ],
+      "controls": [],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Archive unchanged. DM successful expressive resource set: swear jar funds remaining=1."
+      }
+    },
+    {
+      "stage": 12,
+      "events": [
+        {
+          "id": "e036",
+          "seq": 36,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "player.input",
+          "origin": "player",
+          "visibility": "public",
+          "payload": {
+            "text": "I wait while Bob listens at the door."
+          }
+        },
+        {
+          "id": "e037",
+          "seq": 37,
+          "epoch": "epoch-1",
+          "scene": "cellar",
+          "type": "dm.narration",
+          "origin": "dm",
+          "visibility": "public",
+          "payload": {
+            "text": "Bob raises one finger. Footsteps pass above."
+          }
+        }
+      ],
+      "controls": [
+        "session_end:drain_both_queues",
+        "persist",
+        "reload",
+        "assert_snapshot_and_no_duplicate_actions"
+      ],
+      "baselineHandoff": {
+        "source": "fixture-authored, not captured live DM output",
+        "text": "Bob listens at cellar door; session ends after third ordinary post-transition turn; persist and reload unchanged."
+      }
+    }
+  ],
+  "baselineHandoffPolicy": "Fixture-authored baseline scribe receives explicit handoffs for its existing contract. Candidate receives passive narration/player/tool event feed with annotations only for otherwise unobservable DM secrets or intent. Access differences are deliberate design variables."
+}

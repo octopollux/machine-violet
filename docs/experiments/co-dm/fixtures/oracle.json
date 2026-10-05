@@ -1,0 +1,203 @@
+{
+  "fixtureVersion": 1,
+  "visibility": "evaluator-only; never agent context",
+  "scoring": "Score output against its consumed event watermark, not unseen future stages. After barrier score final watermark. Allowed lag is not a false assertion.",
+  "identityMerge": "fixture policy accepts same-name convergence: canonical figure, bob-old retained as redirect/handle",
+  "checkpoints": [
+    {
+      "stage": 1,
+      "watermark": 3,
+      "invariant": "Private identity exists only in DM/private canonical context; public figure unchanged."
+    },
+    {
+      "stage": 2,
+      "watermark": 6,
+      "invariant": "Same figure UID, grey hat public; no new NPC."
+    },
+    {
+      "stage": 3,
+      "watermark": 8,
+      "invariant": "Death stored as attributed unconfirmed rumor, no dead=true."
+    },
+    {
+      "stage": 4,
+      "watermark": 12,
+      "invariant": "One canonical figure/Bob identity; bob-old handle resolves to figure; tea biography retained; packet held by figure; secret absent from approvedPublic.",
+      "expectedValues": {
+        "refs": [
+          {
+            "uid": "packet",
+            "field": "holder",
+            "equals": {
+              "$ref": "figure"
+            }
+          }
+        ],
+        "redirects": {
+          "bob-old": "figure"
+        },
+        "retainedBodyIncludes": {
+          "figure": "black tea"
+        }
+      }
+    },
+    {
+      "stage": 5,
+      "watermark": 16,
+      "invariant": "Coin=5; deck exactly unchanged after both failed outcomes.",
+      "expectedValues": {
+        "resources": {
+          "Coin": 5
+        },
+        "deck": {
+          "remaining": [
+            "card-b"
+          ],
+          "drawn": [
+            "card-a"
+          ]
+        }
+      }
+    },
+    {
+      "stage": 6,
+      "watermark": 21,
+      "invariant": "Coin=3; expressive key exact spelling value=2; HOLDING BREATH remains latest accepted modeline.",
+      "expectedValues": {
+        "resources": {
+          "Coin": 3,
+          "swear jar funds remaining": 2
+        },
+        "modeline": "HOLDING BREATH"
+      }
+    },
+    {
+      "stage": 7,
+      "watermark": 23,
+      "invariant": "Existing spell stays Lore/Spells; observed prism recovery recorded; no invented mechanics; violinist hook inactive; archive body/types exact unchanged.",
+      "expectedValues": {
+        "collectionOf": {
+          "spell": "Lore/Spells"
+        },
+        "exactPreservation": [
+          {
+            "uid": "archive",
+            "field": "body",
+            "source": "initial-state.json#/records/4/body"
+          },
+          {
+            "uid": "archive",
+            "field": "data",
+            "source": "initial-state.json#/records/4/data"
+          }
+        ]
+      }
+    },
+    {
+      "stage": 8,
+      "watermark": 26,
+      "invariant": "From persistent scar narration, infer appearance update preserving hair; one portrait request for the new lasting appearance (revision numbering is engine-defined). Exactly one scene image owned and prompted by DM; do not duplicate.",
+      "expectedValues": {
+        "actionCounts": {
+          "co-dm.portraitRequestForLastingScar": 1,
+          "dm.sceneImage": 1,
+          "co-dm.sceneImage": 0
+        }
+      }
+    },
+    {
+      "stage": 9,
+      "watermark": 30,
+      "invariant": "Both queues drained before snapshot; theme amber; modeline BENEATH THE PLATFORM; figure and packet location cellar; expressive key=2; new frozen prefix includes committed state.",
+      "expectedValues": {
+        "resources": {
+          "Coin": 3,
+          "swear jar funds remaining": 2
+        },
+        "modeline": "BENEATH THE PLATFORM",
+        "theme": "amber",
+        "refs": [
+          {
+            "uid": "figure",
+            "field": "location",
+            "equals": {
+              "$ref": "cellar"
+            }
+          },
+          {
+            "uid": "packet",
+            "field": "location",
+            "equals": {
+              "$ref": "cellar"
+            }
+          },
+          {
+            "uid": "packet",
+            "field": "holder",
+            "equals": {
+              "$ref": "figure"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "stage": 10,
+      "watermark": 32,
+      "invariant": "Bob alive from observation; rumor history remains qualified. Assess any spontaneously generated co-DM feedback for usefulness and no acknowledgment storm; fixture supplies no candidate feedback answer."
+    },
+    {
+      "stage": 11,
+      "watermark": 35,
+      "invariant": "Expressive key=1 supersedes value 2; archive body exact unchanged.",
+      "expectedValues": {
+        "resources": {
+          "Coin": 3,
+          "swear jar funds remaining": 1
+        }
+      }
+    },
+    {
+      "stage": 12,
+      "watermark": 37,
+      "invariant": "Three ordinary turns after transition complete; reload identical canonical/public/resource/notes state and durable cursor; zero repeated portrait or image requests.",
+      "expectedValues": {
+        "reloadEquals": "persisted stage-12 snapshot",
+        "actionCounts": {
+          "co-dm.portraitRequestForLastingScar": 1,
+          "dm.sceneImage": 1,
+          "co-dm.sceneImage": 0
+        }
+      }
+    }
+  ],
+  "globalInvariants": [
+    "No private annotation, secret allegiance, DM notes, tool-only IDs or private feedback leaks to public text/logs.",
+    "Long unrelated archive body remains byte-for-byte equal; typed arrays and booleans preserved.",
+    "No co-DM dice/draw/current-decision calls or scene-image generation.",
+    "No own-write feedback wake; no mandatory ordinary-turn maintenance drain.",
+    "A blocked field does not discard unrelated legitimate patches in the same old batch; validate per-field preconditions or explicitly rebase."
+  ],
+  "predicateStatus": "Prose invariants and structured expectedValues describe evaluator requirements; no executable predicates or runner exist yet.",
+  "scoreGroups": {
+    "sharedMemory": [
+      "identity convergence and handles",
+      "private/public safety",
+      "rumor qualification",
+      "custody and location",
+      "authoritative failed/successful state values",
+      "spell observed behavior without invented rules",
+      "unrelated long-body and typed-data preservation",
+      "ignored hook not accepted quest",
+      "snapshot/reload fidelity"
+    ],
+    "coDmOnly": [
+      "portrait inference and exactly-once request",
+      "theme maintenance",
+      "routine UI preservation and newest intent",
+      "passive event observation",
+      "spontaneous useful freeform feedback"
+    ],
+    "policy": "Baseline scribe is evaluated on shared memory only; absence of portrait/theme capabilities is not a baseline defect. Overall paired campaign cost includes whichever baseline roles currently fulfill those duties. Candidate-only scores are separate, not folded into an unfair shared denominator."
+  }
+}

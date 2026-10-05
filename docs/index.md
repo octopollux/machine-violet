@@ -51,10 +51,11 @@ This project has three documentation layers. Each has a distinct purpose:
 
 **[CLAUDE.md](../CLAUDE.md)** — Conventions. Rules for writing code in this project: imports, testing, state management, formatting. The canonical reference for "how should I do X?"
 
-All docs describe only what is implemented. Planned features live in GitHub issues, not in documentation.
+Production docs describe only what is implemented. Planned features normally live in GitHub issues. The Experiments section also contains explicitly requested design drafts and exploratory evidence; these are clearly marked and are not production specifications.
 
 ## Experiments
 
+- [Continuing co-DM lane](experiments/co-dm/README.md) — **design draft / not implemented**; proposed foreground/background responsibilities, ordered observation feed, lifecycle invariants, and a controlled test plan.
 - [Narrative dependency bookkeeping](experiments/metadata-dependencies/README.md) — isolated exploratory Luna screen, fixtures, raw results, and limitations; not a production contract.
 
 ## Running the Project

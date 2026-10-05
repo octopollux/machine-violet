@@ -1,0 +1,85 @@
+# Continuing co-DM lane
+
+**DESIGN DRAFT / NOT IMPLEMENTED — 2026-10-05.** This experiment records a proposed architecture and its [test plan](test-plan.md), at the user's explicit request. It is not a production specification. No game behavior, prompts, model configuration, or persistence formats change through this document. No cost or latency improvement has been measured.
+
+## Purpose and boundary
+
+Keep the foreground DM immersed in running the world while a continuing background co-DM observes completed exchanges and maintains campaign memory and routine presentation. The co-DM replaces/evolves the existing small-context scribe lane; it does not add an obligatory third storyteller or another mandatory scribe pass. Other existing helpers remain independently scoped and must be included in any accounting.
+
+Today the [scribe prompt](../../../packages/engine/src/prompts/scribe.md) receives explicit narrative handoffs and bounded current records in a fresh invocation ([implementation](../../../packages/engine/src/agents/subagents/scribe.ts)). The [DM directives](../../../packages/engine/src/prompts/dm-directives.md) consequently require the DM to spell out updates and identity handles. The proposed co-DM instead has a persistent scene conversation and an ordered observation feed. The foreground DM knows it observes both the transcript and authoritative state events, including private notes, and communicates only what observation cannot supply.
+
+## Agreed division of responsibility
+
+| Responsibility | Foreground DM | Continuing co-DM |
+|---|---|---|
+| World, NPC behavior, narrative outcomes | Authoritative; commits what actually happens | Records established facts; cannot invent outcomes |
+| Player character authorship | Preserves the player's words, actions, thoughts, feelings, and interpretations | Never fills gaps by deciding for the player |
+| Mechanics needed for narration | Keeps dice, resolution, and authoritative resource tools; awaits dependent results | Observes results and maintains their records/display |
+| Campaign memory | Supplies hidden intent, identity binds, corrections, and staging requests when needed; retains explicit correction ability | Maintains typed current facts, history, identities, custody, and player-safe disclosures |
+| Private `dm_notes` | Owns the scratchpad and narrative planning | Can observe authoritative note events; cannot assume unexpressed private reasoning |
+| Scene cuts | Decides cuts for narrative reasons | Completes maintenance through the closing exchange watermark |
+| Scene images | Keeps **all** generation and prompt composition | Does not compose or request scene images |
+| Portraits and theme | Establishes fictional changes and relevant artistic intent | Updates lasting PC portrait changes and applies theme changes |
+| Modeline and resource display | Retains expressive/artistic use | Handles routine maintenance |
+
+The image boundary is deliberate: the DM's creative inner intent cannot reliably transfer through a transcript or a short handoff. All existing scene-image discipline stays with the DM: cadence, once-per-subject introductions, illustrated-subject notes, art direction, composition/renderer constraints, reference-character selection and expressions, character frequency, fire-and-forget narration, and the immediate requested-image exception. Portrait updates transfer with their existing lasting-change, silent-update, and likeness-preservation guidance.
+
+The engine must retain authoritative mechanical state separately from presentation, even when a displayed field uses a playful name or value. A joke or dramatic label cannot replace the resource state used to resolve an action.
+
+Both agents may use modeline/resource presentation. Routine updates must preserve custom keys and their intended meaning: “swear jar funds remaining” and “HOLDING BREATH” are legitimate artistic choices. The co-DM must not normalize these into generic mechanics or replace a newer DM choice with stale queued work. Protection is field-specific and causal, not a permanent foreground lock: later established events can legitimately update or retire “HOLDING BREATH” and other custom keys while retaining their meaning. Mechanical resource resolution remains authoritative **before** dependent narration; a display mirror may lag. The co-DM cannot retroactively resolve an action or spend currency. Engine-owned mechanical writes/results remain authoritative, and stale background writes to the same resource must be rejected rather than overwrite them. These are separate consistency requirements, even if existing tools expose both concerns together.
+
+## Observation and communication
+
+The engine supplies a typed, durable, ordered feed containing player inputs, completed DM narration, successful **and failed** tool outcomes, authoritative state changes (including private DM notes), explicit annotations, and lifecycle events. Source and ordering must distinguish an attempted action from a committed result, a rumor from a fact, and a character's claim from authoritative narration. Neither transcript access nor a personality's unreliable narration grants access to private reasoning or makes a false claim canonical truth.
+
+The DM embeds optional private communication in its main assistant response. This communication path and the role split are agreed; a `<co_dm>` block is only a tentative encoding, and the precise framing/parser design is a prototype choice. This is **not a communication tool call**, and receiving communication does not force a result-driven DM continuation. The engine separates the private annotation before any player output, including streamed output, while preserving it in the durable feed. A malformed, partial, or interrupted private block must not leak into prose; framing and failure handling require deterministic tests before a live prototype.
+
+For example, an annotation could bind “the cloaked visitor” to an existing UID, preserve an unspoken agenda, correct an earlier assertion, or request preparation of a future record. Ordinary visible actions need no duplicate maintenance handoff. A staging request is intent until its specified outcome actually becomes established. The engine owns delivery identifiers, causal provenance, retry identity, and ordering; the model writes meaningful freeform content rather than inventing protocol IDs.
+
+The co-DM can return a freeform mailbox message to the DM. The engine injects pending messages into **VOLATILE** per-turn context, outside the stable scene prefix. Delivery bookkeeping is engine-owned, not an acknowledgement conversation: the DM need not reply or acknowledge each message. Durable mailbox records and delivery state must survive interruption without silently losing useful corrections, while rollback must invalidate messages from abandoned history. The exact replay/delivery policy remains to be selected.
+
+## Scheduling and consistency
+
+There is one serialized co-DM lane. While it runs, events accumulate. When it is ready, the engine batches **all pending completed exchanges into one co-DM user message**, preserving intermediate event order. It does not invoke once per event or rely on a timer. A busy lane may therefore receive several exchanges together; batching must retain intermediate custody changes, tool failures, corrections, and reveals rather than reduce them to final prose alone. The co-DM can batch independent maintenance actions and retains its conversation within the scene. Its own writes/results remain in that conversation and may inform later input, but must not independently wake its own lane: no self-triggering feedback loop or acknowledgement ping-pong.
+
+Each agent begins the scene with a frozen compact campaign tree and stable identity handles. Metadata refers to the same canonical UID through a rename or secret reveal. New facts and corrections arrive through conversation/feed/volatile feedback; the stable scene prefix is never rewritten midscene for these updates. Fresh canonical facts require an explicit read rather than the assumption that the snapshot refreshed.
+
+The current engine [settles deferred lanes at ordinary turn boundaries](../../../packages/engine/src/agents/game-engine.ts), as well as lifecycle barriers. Ordinary turns in this proposal must stop globally draining the co-DM lane or the foreground path still waits on bookkeeping. This introduces a real unresolved dependency: a DM `knowledge` read may require a fact whose observation the lane has not yet committed. The prototype must choose and document a freshness policy, such as a targeted watermark barrier for dependent reads, or an explicit response exposing committed state plus pending observations. It must never silently return stale state as fresh or bypass authoritative mechanics. Presentation writes also need a revision/causal guard so an older co-DM result cannot overwrite newer foreground intent; the exact guard is open.
+
+## Lifecycle and recovery requirements
+
+On scene transition, close the current exchange and establish a watermark. Drain both the foreground work queue and co-DM queue through that watermark before capturing an atomic, recovery-safe snapshot. Only then clear/rebuild the two scene contexts and capture the next frozen tree. Events created during closure must belong to a defined side of the cut. Scene summaries and other existing helpers are part of the barrier/accounting rather than assumed free work.
+
+Rollback must invalidate abandoned queued events, in-flight writes, mailbox messages, and asynchronous presentation results before they can mutate restored state. A generation/epoch guard or equivalent is needed even if waiting is used. Save/reload must retain pending events, the consumed cursor, delivery state, and enough continuing context to resume deterministically, or explicitly drain before saving. An in-memory queue alone is insufficient. Crash/retry handling must prevent duplicate history, repeated portrait work, lost observations, and partially closed scenes. These are requirements for the experiment; no new storage schema is specified here.
+
+## Prompt migration preserves earned guidance
+
+Migration is an obligation audit against the **effective** prompts, not a generic shorter rewrite. Preserve seed/personality top-level overrides and model conditionals. [Prompt loading](../../../packages/engine/src/prompts/load-prompt.ts) resolves includes/conditionals and strips `%%` and HTML comments; commented-out rules must not accidentally become active again. Co-DM factual maintenance must remain reliable when the DM personality intentionally distorts narration.
+
+| Existing guidance | Proposed destination |
+|---|---|
+| [DM identity](../../../packages/engine/src/prompts/dm-identity.md): authorial presence and enjoyment; [DM directives](../../../packages/engine/src/prompts/dm-directives.md) `<roles>`: player/DM authorship split | Foreground DM, substantially intact |
+| World autonomy, honest consequences, secrets/NPC knowledge limits, private oracle rolls, pacing, personality, prose and formatting | Foreground DM |
+| Narrative scene-cut craft and raw pacing cues | Foreground DM; never replace with pressure to cut for compaction |
+| Scribe identity/UID resolution, aliases/consolidation, typed current facts versus history, custody/location consistency | Co-DM |
+| Reading complete existing bodies/public summaries before replacement; preserve unrelated biography, inventory, and secrets | Co-DM |
+| Explicit visibility/disclosure; one canonical identity through a secret reveal; safe public names/summaries | Co-DM |
+| Dependency notices are candidates, not automatic deaths/quest failures; observed spell behavior is not invented mechanics | Co-DM, with DM retaining consequence decisions |
+| Machine-scope player profiles and append-only Content Boundaries | Preserve existing scope and factual append-only protections |
+| Portrait persistence/silence and theme maintenance | Co-DM |
+| All scene-image obligations and campaign/seed art-direction overrides | Foreground DM |
+| Routine display maintenance plus expressive custom keys | Shared capability with the ownership/ordering rule above |
+
+Repository history explains why this audit matters: `d9b468a3` (#527) removed the obsolete `docs/dm-prompt.md`; `cfa1d3bf` tried outcome-style directives, followed by `4e2d3c8a` (#443) restoring the authorship anchor; `844f7292` (#764) reduced standing obligations; `b2582fe7` (#744) separated scene cuts from compaction pressure. These are historical context, not an invitation to revive older rules. Current prompt files are the source of truth.
+
+## Bounded experiment and open decisions
+
+The datafeed concept is model-independent. The first intended real test uses a **Sol 6.1 DM at medium reasoning effort**, with the co-DM initially **Sol 6.1, explicitly configured**. Compare against the current Sol DM + Luna scribe arrangement; freeze both configurations and effective prompts in the evidence. This document does not run that test or authorize production adoption. See the [test plan](test-plan.md) for fixtures, failure gates, and measurement.
+
+The proposed portable fixtures are [initial state](fixtures/initial-state.json), [ordered events](fixtures/events.json), [withheld oracle](fixtures/oracle.json), and [protocol cases](fixtures/protocol-cases.json). These are experiment inputs and expectations, not existing production API formats or completed test results.
+
+Count total uncached input, cache reads/writes, output including reasoning, retries, and **all helpers** across the full workload. Two roles do not imply lower cost, and asynchronous response delivery does not imply less total work. Measure player-visible latency separately from queue completion and lifecycle drain latency. Preserve narrative quality, authorship, identity/privacy correctness, recovery, and freshness before interpreting savings.
+
+Before implementation, resolve four bounded choices: private annotation framing and streaming recovery; dependent-read freshness policy; presentation revision guards; and durable continuing-context/mailbox/cursor behavior across save, crash, and rollback. The experiment should settle these through concrete cases rather than grow into a speculative general agent framework.
+
+Related current references: [context management](../../context-management.md), [subagent contracts](../../subagents-catalog.md), [image generation](../../image-generation.md), [tool contracts](../../tool-input-contracts.md), [recovery](../../error-recovery.md), and the earlier [dependency bookkeeping screen](../metadata-dependencies/README.md).
