@@ -213,6 +213,19 @@ describe("SceneManager", () => {
     expect(mgr.getScene().precis).toContain("Aldric entered the tavern");
   });
 
+  it.each(["engine", "operator"] as const)("preserves %s provenance when compacting an aged exchange", async inputKind => {
+    const provider = mockProvider([textResponse("The opening describes a tavern.")]);
+    const mgr = new SceneManager(mockState(), mockScene(), new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }), mockSessionState(), mockFileIO());
+    await mgr.handleDroppedExchange(provider, { exchange: {
+      inputKind, user: { role: "user", content: "Prepare an opening; do not choose a player action." },
+      assistant: { role: "assistant", content: "A tavern waits." }, toolResults: [], estimatedTokens: 20,
+    }, reason: "exchange_count" });
+    const params = vi.mocked(provider.chat).mock.calls[0][0];
+    const sent = JSON.stringify(params.messages);
+    expect(sent).toContain(`${inputKind === 'engine' ? 'Engine' : 'Operator'} instructions (not player actions)`);
+    expect(sent).not.toContain("Player: Prepare an opening");
+  });
+
   it("passes PC identification to precis updater", async () => {
     const provider = mockProvider([
       textResponse("Aldric entered the tavern."),

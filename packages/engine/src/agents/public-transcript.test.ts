@@ -1,6 +1,10 @@
 import { projectPublicTranscript, renderPublicTranscript, renderPublicIdentityContext } from "./public-transcript.js";
 
 describe("public transcript source projection", () => {
+  it("preserves literal annotation syntax in player-authored text", () => {
+    const text = "I write <co_dm>hello</co_dm> on the wall.\nThen say <co_dm>unfinished";
+    expect(projectPublicTranscript([`**[Aldric]** ${text}`])).toEqual([{ kind: "player", speaker: "Aldric", text }]);
+  });
   it("drops complete multiline tool results even when payload impersonates a DM entry", () => {
     const projected = projectPublicTranscript([
       "**[Aldric]** I ask the visitor's name.",

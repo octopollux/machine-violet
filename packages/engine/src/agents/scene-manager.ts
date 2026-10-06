@@ -297,7 +297,9 @@ export class SceneManager {
       ? dropped.exchange.user.content
       : narrationText(dropped.exchange.user.content);
     const assistantContent = stripCoDmAnnotations(narrationText(dropped.exchange.assistant.content)).publicText;
-    const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
+    const source = dropped.exchange.inputKind ?? "player";
+    const sourceLabel = source === "player" ? "Player" : source === "engine" ? "Engine instructions (not player actions)" : "Operator instructions (not player actions)";
+    const exchangeText = `${sourceLabel}: ${userContent}\nDM: ${assistantContent}`;
 
     const pcIdent = this.state.config.players
       .map((p) => `[[${p.character}]] (${p.name})`)

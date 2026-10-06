@@ -15,7 +15,7 @@ export function projectPublicTranscript(entries: readonly string[]): PublicTrans
     }
     const player = /^\*\*\[([^\]\r\n]+)\]\*\*\s*/.exec(entry);
     if (player) {
-      const text = stripCoDmAnnotations(entry.slice(player[0].length)).publicText;
+      const text = entry.slice(player[0].length);
       if (text) result.push({ kind: "player", speaker: player[1], text });
     }
     // Tools, operator diagnostics and unknown entry kinds fail closed.
