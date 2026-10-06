@@ -84,6 +84,9 @@ export interface AgentLoopConfig {
    * flipping this on — the agent loop trusts the flag verbatim.
    */
   imageGenEnabled?: boolean;
+  /** Isolated experiments may narrow the foreground role without changing defaults. */
+  excludedTools?: Set<string>;
+  portraitEnabled?: boolean;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -178,7 +181,8 @@ async function runAgentLoopInternal(
   // The DM's asyncToolHandler (GameEngine.dispatchGenerateImage) routes
   // the call through provider.generateImage and emits the display_image
   // TUI command + bytes-on-disk side effects.
-  const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
+  const excludedTools = new Set([...DM_EXCLUDED_TOOLS, ...(config.excludedTools ?? [])]);
+  const tools: NormalizedTool[] = registry.getDefinitions(excludedTools);
   if (config.imageGenEnabled) {
     tools.push({
       name: GENERATE_IMAGE_TOOL_NAME,
@@ -232,7 +236,7 @@ async function runAgentLoopInternal(
         required: ["prompt", "effort", "aspect"],
       },
     });
-    tools.push({
+    if (config.portraitEnabled !== false) tools.push({
       name: UPDATE_PORTRAIT_TOOL_NAME,
       description:
         "Silently revise a player character's saved portrait when the fiction has " +
@@ -266,7 +270,7 @@ async function runAgentLoopInternal(
     });
   }
   const toolInputPolicies = {
-    ...registry.getInputPolicies(DM_EXCLUDED_TOOLS),
+    ...registry.getInputPolicies(excludedTools),
     ...(config.imageGenEnabled
       ? {
           [GENERATE_IMAGE_TOOL_NAME]: { criticality: "expensive" as const },

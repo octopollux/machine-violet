@@ -1,4 +1,10 @@
 import { prepareKnowledgeNotices } from "../knowledge/notices.js";
+import { CoDmStreamFilter, stripCoDmAnnotations } from "./co-dm-protocol.js";
+import { CoDmCoordinator, type CoDmExchange, type CoDmDurableState } from "./co-dm-coordinator.js";
+import { ContinuingCoDmAgent } from "./experiments/co-dm-agent.js";
+import { migrateForegroundPrompt } from "./experiments/co-dm-prompt.js";
+import { ENTITY_TOOLS, ENTITY_INPUT_POLICIES } from "../entities/tools.js";
+import { buildScribeToolHandler, PLAYER_PROFILE_CONTRACT } from "./subagents/scribe.js";
 import { getCampaignKnowledge } from "../knowledge/store.js";
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
@@ -55,6 +61,7 @@ import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
 import { withSpan, setSpanAttrs } from "../context/trace.js";
 import { basename } from "node:path";
+import { randomUUID } from "node:crypto";
 import { getMaxOutput } from "../config/model-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
@@ -89,12 +96,189 @@ export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/sha
 
 /** Cap on an `update_portrait` change description — keeps the prompt, ack, and context marker bounded. */
 const MAX_PORTRAIT_CHANGE_CHARS = 280;
+export interface CoDmExperimentEvent { kind: "enqueue" | "start" | "finish" | "commit" | "error"; epoch: number; cursor?: number; batchSize?: number; eventIds?: string[] }
 
 /**
  * The game engine — orchestrates the DM agent, tools, TUI, and scene management.
  * This is the master state machine that drives gameplay.
  */
 export class GameEngine {
+  private coDm: CoDmCoordinator | null = null;
+  private coDmReady: Promise<void> = Promise.resolve();
+  private presentationRevisions = new Map<string, number>();
+  private coDmOnEvent?: (event: CoDmExperimentEvent) => void;
+  private coDmUI: import("../context/state-persistence.js").PersistedUIState = { styleName: "clean", variant: "exploration", modelines: {} };
+  private observeCoDmUI(command: TuiCommand): void {
+    if (command.type === "update_modeline") this.coDmUI.modelines = { ...this.coDmUI.modelines, [String(command.character)]: String(command.text) };
+    if (command.type === "set_theme") {
+      if (typeof command.theme === "string") this.coDmUI.styleName = command.theme;
+      if (typeof command.key_color === "string") this.coDmUI.keyColor = command.key_color;
+      if (typeof command.variant === "string") this.coDmUI.variant = command.variant as import("@machine-violet/shared/types/tui.js").StyleVariant;
+    }
+  }
+  private async publishCoDmUI(command: TuiCommand, assertCurrent: () => void): Promise<void> {
+    assertCurrent();
+    if (command.type === "set_theme" && command.save_to_location) { await this.saveThemeToLocation(command, assertCurrent); assertCurrent(); }
+    this.observeCoDmUI(command);
+    this.callbacks.onTuiCommand(command);
+    if (command.type === "update_modeline" || command.type === "set_theme") {
+      this.persister?.persistUI(this.coDmUI);
+      await this.persister?.flushDurable();
+      assertCurrent();
+    }
+  }
+  private coDmCompletionPath(): string { return norm(`${this.gameState.campaignRoot}/state/co-dm-completion.json`); }
+  private async writeCoDmPrivate(path: string, content: string): Promise<void> {
+    await this.fileIO.mkdir(norm(`${this.gameState.campaignRoot}/state`));
+    await (this.fileIO.writeFileAtomic?.(path, content) ?? this.fileIO.writeFile(path, content));
+  }
+
+  private presentationKeys(name: string, input: Record<string, unknown>): string[] {
+    if (name === "set_theme" || name === "style_scene") {
+      const fields = new Set(["theme", "key_color", "variant"].filter(field => input[field] !== undefined));
+      if (name === "style_scene" && input.description) { fields.add("theme"); fields.add("key_color"); }
+      return [...fields].map(field => `theme:${field}`);
+    }
+    const character = String(input.character ?? this.gameState.config.players[this.gameState.activePlayerIndex]?.character ?? "");
+    if (name === "set_resource_values") return Object.keys((input.values ?? {}) as object).map(key => `${name}:${character}:${key}`);
+    return [`${name}:${character}`];
+  }
+
+  private async initializeCoDm(options: { provider?: LLMProvider; model?: string; onEvent?: (event: CoDmExperimentEvent) => void }): Promise<void> {
+    this.coDmOnEvent = options.onEvent;
+    const loadedUI = (await this.persister?.loadAll())?.ui;
+    if (loadedUI) this.coDmUI = loadedUI;
+    const path = norm(`${this.gameState.campaignRoot}/state/co-dm-experiment.json`);
+    let initialState: CoDmDurableState | undefined;
+    if (await this.fileIO.exists(path)) initialState = JSON.parse(await this.fileIO.readFile(path)) as CoDmDurableState;
+    const presentation = ["update_modeline", "set_display_resources", "set_resource_values", "set_theme", "style_scene"];
+    const tools = [...ENTITY_TOOLS, PLAYER_PROFILE_CONTRACT.definition, ...this.registry.getDefinitionsFor(presentation)];
+    if (this.provider.getCapabilities?.(this.model).imageGeneration && this.gameState.config.image_generation !== "off") tools.push({
+      name: UPDATE_PORTRAIT_TOOL_NAME, description: "Silently revise a saved PC portrait for an established lasting appearance change. No scene images.",
+      inputSchema: { type: "object", properties: { character: { type: "string" }, change: { type: "string" } }, required: ["character", "change"] },
+    });
+    this.coDm = new CoDmCoordinator({
+      initialState,
+      onCommitted: (state, batch) => this.coDmOnEvent?.({ kind: "commit", epoch: state.epoch, cursor: state.cursor, batchSize: batch.length, eventIds: batch.map(exchange => exchange.id) }),
+      persist: async state => { await this.fileIO.mkdir(norm(`${this.gameState.campaignRoot}/state`)); await (this.fileIO.writeFileAtomic?.(path, JSON.stringify(state)) ?? this.fileIO.writeFile(path, JSON.stringify(state))); },
+      worker: async (batch, state, fence) => {
+        const batchInfo = { epoch: state.epoch, cursor: state.cursor, batchSize: batch.length, eventIds: batch.map(exchange => exchange.id) };
+        this.coDmOnEvent?.({ kind: "start", ...batchInfo });
+        const revisions = new Map(this.presentationRevisions);
+        const maintenance = buildScribeToolHandler(this.fileIO, this.gameState.campaignRoot, this.sceneManager.getScene().sceneNumber, [], [], [], [], this.gameState.homeDir);
+        let operation = 0;
+        const journalPath = norm(`${this.gameState.campaignRoot}/state/co-dm-operations.json`);
+        const journal: Record<string, { name: string; input: Record<string, unknown>; result?: import("./tool-registry.js").ToolResult }> = await this.fileIO.exists(journalPath) ? JSON.parse(await this.fileIO.readFile(journalPath)) : {};
+        const saveJournal = async () => { await (this.fileIO.writeFileAtomic?.(journalPath, JSON.stringify(journal)) ?? this.fileIO.writeFile(journalPath, JSON.stringify(journal))); };
+        const agent = new ContinuingCoDmAgent({
+          provider: options.provider ?? this.provider, model: options.model ?? "gpt-6.1-sol",
+          frozenContext: state.frozenContext, messages: state.messages, tools,
+          toolInputPolicies: { ...ENTITY_INPUT_POLICIES, ...this.registry.getInputPolicies(), player_profile: PLAYER_PROFILE_CONTRACT.policy as import("./tool-contract.js").ToolInputPolicy, update_portrait: { criticality: "expensive" } },
+          onUsage: usage => { accUsage(this.sessionUsage, usage); this.callbacks.onUsageUpdate(usage, "large"); },
+          toolHandler: async (name, input, context) => {
+            fence.assertCurrent();
+            if (name === "knowledge" || name === "remember" || name === "player_profile") {
+              if (name !== "remember") return maintenance(name, input);
+              const id = `co-dm:${state.epoch}:${batch.map(exchange => exchange.id).join(",")}:${operation++}`;
+              if (journal[id]) {
+                if (JSON.stringify(journal[id].input.operations) !== JSON.stringify(input.operations)) return { content: "This retried batch already proposed different operations at this position. Read canonical state and retry without changing committed intent.", is_error: true };
+                const receipt = journal[id].result;
+                if (receipt) return receipt;
+              } else {
+                journal[id] = { name, input: { ...input, operationId: id } };
+                await saveJournal();
+              }
+              fence.assertCurrent();
+              const result = await maintenance(name, journal[id].input);
+              fence.assertCurrent();
+              journal[id].result = result;
+              await saveJournal();
+              return result;
+            }
+            if (name === UPDATE_PORTRAIT_TOOL_NAME) return this.dispatchUpdatePortrait(input, () => fence.assertCurrent());
+            let guardedInput = input;
+            const changed = (key: string) => (this.presentationRevisions.get(key) ?? 0) !== (revisions.get(key) ?? 0);
+            if (name === "set_resource_values") {
+              const character = String(input.character);
+              const values = Object.fromEntries(Object.entries(input.values as Record<string, string>).filter(([key]) => !changed(`${name}:${character}:${key}`)));
+              if (!Object.keys(values).length) return { content: "All proposed resource fields conflict with newer foreground writes; preserve them and rebase a later batch.", is_error: true };
+              guardedInput = { ...input, values };
+            } else if (this.presentationKeys(name, input).some(changed)) return { content: "Foreground presentation changed after this batch began. Preserve it; omit conflicting fields or rebase a later batch.", is_error: true };
+            const result = this.registry.dispatch(this.gameState, name, guardedInput, context);
+            if (!result.is_error) {
+              if (name === "set_resource_values" || name === "set_display_resources") {
+                let persistedRevisions: string;
+                const resourceRevisions = () => JSON.stringify([...this.presentationRevisions].filter(([key]) => key.startsWith("set_resource_values:") || key.startsWith("set_display_resources:")));
+                do {
+                  persistedRevisions = resourceRevisions();
+                  this.persister?.persistResources({ displayResources: this.gameState.displayResources, resourceValues: this.gameState.resourceValues });
+                  await this.persister?.flushDurable();
+                  fence.assertCurrent();
+                  // A foreground write during the disk await must also reach
+                  // this lane's durable endpoint, rather than leaving an older
+                  // resource snapshot as the worker's acknowledged state.
+                } while (persistedRevisions !== resourceRevisions());
+              }
+              const command = JSON.parse(result.content) as TuiCommand;
+              // Persistence yields to the foreground. Recheck publication at
+              // this boundary so an older accepted write never redraws over
+              // newer foreground intent; independent fields still publish.
+              if (name === "set_resource_values") {
+                const character = String(command.character);
+                const values = Object.fromEntries(Object.entries(command.values as Record<string, string>).filter(([key]) => !changed(`${name}:${character}:${key}`)));
+                if (!Object.keys(values).length) return { content: "Foreground resource writes superseded this update during persistence; current values remain authoritative.", is_error: true };
+                command.values = values;
+                result.content = JSON.stringify(command);
+              } else if (this.presentationKeys(name, input).some(changed)) return { content: "Foreground presentation superseded this update during persistence; preserve current intent.", is_error: true };
+              const assertPresentationCurrent = () => {
+                fence.assertCurrent();
+                if (this.presentationKeys(name, input).some(changed)) throw new Error("Foreground presentation superseded this asynchronous update");
+              };
+              if (command.type === "style_scene") {
+                const styled = await this.handleStyleSceneTool(command, assertPresentationCurrent);
+                assertPresentationCurrent();
+                if (styled._tui) await this.publishCoDmUI(styled._tui as TuiCommand, assertPresentationCurrent);
+              }
+              else await this.publishCoDmUI(command, name === "set_resource_values" ? () => fence.assertCurrent() : assertPresentationCurrent);
+            }
+            return result;
+          },
+        });
+        let result: Awaited<ReturnType<ContinuingCoDmAgent["run"]>>;
+        try { result = await agent.run(batch); }
+        catch (error) { this.coDmOnEvent?.({ kind: "error", ...batchInfo }); throw error; }
+        fence.assertCurrent();
+        this.coDmOnEvent?.({ kind: "finish", ...batchInfo });
+        return { feedback: result.feedback, messages: agent.getMessages() };
+      },
+    });
+    await this.sceneManager.prepareKnowledgeContext();
+    let recoveredExchange: CoDmExchange | undefined;
+    if (await this.fileIO.exists(this.coDmCompletionPath())) {
+      const recovery = JSON.parse(await this.fileIO.readFile(this.coDmCompletionPath())) as {
+        exchange: CoDmExchange; scene: SceneState; conversation: import("../context/conversation.js").ConversationExchange[]; displayLog: string;
+      } | null;
+      if (recovery) {
+        Object.assign(this.sceneManager.getScene(), recovery.scene);
+        this.conversation.seedExchanges(recovery.conversation);
+        await this.sceneManager.flushTranscript();
+        this.persistCurrentScene();
+        await this.persister?.flushDurable();
+        await this.writeCoDmPrivate(norm(`${this.gameState.campaignRoot}/state/display-log.md`), recovery.displayLog);
+        recoveredExchange = recovery.exchange;
+      }
+    }
+    const prefix = this.sceneManager.getSystemPrompt({}).system.map(block => block.text).join("\n");
+    await this.coDm.initialize(prefix);
+    if (recoveredExchange) {
+      await this.coDm.enqueue(recoveredExchange);
+      await this.writeCoDmPrivate(this.coDmCompletionPath(), "null");
+    }
+  }
+
+  /** Experiment observability and explicit catch-up boundary for harnesses. */
+  async settleCoDm(): Promise<void> { await this.coDmReady; await this.coDm?.drain(); }
+  getCoDmState(): CoDmDurableState | undefined { return this.coDm?.getState(); }
   private provider: LLMProvider;
   /**
    * Per-tier resolved {provider, model} pairs. The DM uses `large`; subagents
@@ -270,6 +454,8 @@ export class GameEngine {
     imageModel?: string;
     gitIO?: GitIO;
     entityTree?: EntityTree;
+    /** Explicit isolated-campaign experiment; never enabled by normal launch. */
+    coDmExperiment?: { isolatedCampaign: true; provider?: LLMProvider; model?: string; onEvent?: (event: CoDmExperimentEvent) => void };
   }) {
     this.provider = params.provider;
     this.tierProviders = params.tierProviders;
@@ -329,6 +515,10 @@ export class GameEngine {
     );
     this.callbacks = params.callbacks;
     this.model = params.tierProviders.large.model;
+    if (params.coDmExperiment) {
+      if (params.coDmExperiment.isolatedCampaign !== true) throw new Error("Co-DM requires an isolated campaign copy");
+      this.coDmReady = this.initializeCoDm(params.coDmExperiment);
+    }
 
     // Set up injection registry
     this.injectionRegistry = new InjectionRegistry();
@@ -492,6 +682,10 @@ export class GameEngine {
    */
   dispatchImmediateTuiCommand(cmd: TuiCommand): void {
     if (this.closing) return;
+    if (this.coDm) {
+      this.observeCoDmUI(cmd);
+      if (cmd.type === "set_theme" || cmd.type === "update_modeline") this.persister?.persistUI(this.coDmUI);
+    }
     this.callbacks.onTuiCommand(cmd);
   }
 
@@ -697,6 +891,7 @@ export class GameEngine {
     // usually a no-op, since the player's think-time dwarfs the work.
     try {
       await this.deferred.settle("next-turn", this.campaignId);
+      await this.coDmReady;
       if (this.closing) return;
       await this.sceneManager.prepareKnowledgeContext();
       // Preserve the exact scene tree before the provider can observe it,
@@ -768,6 +963,10 @@ export class GameEngine {
     // length steering) are prepended as a <context> block to the single user
     // message rather than using separate synthetic turns.
     const preambleParts: string[] = [];
+    const coDmFeedback = this.coDm?.peekFeedback() ?? [];
+    if (this.coDm) {
+      if (coDmFeedback.length) preambleParts.push(`<co_dm_feedback>${coDmFeedback.map(item => item.text).join("\n")}</co_dm_feedback>`);
+    }
 
     // Volatile context (Tier 3: activeState, entityIndex, uiState)
     if (volatileContext) {
@@ -834,11 +1033,38 @@ export class GameEngine {
 
     // Wrap config to track tool calls this turn
     let toolCallCount = 0;
+    let privateFilter = this.coDm ? new CoDmStreamFilter() : null;
+    const coDmEvents: CoDmExchange["events"] = [{ kind: "player", payload: { characterName, text } }];
+    const coDmExchangeId = randomUUID();
+    const recordPublicFragment = (fragment: string) => {
+      const previous = coDmEvents[coDmEvents.length - 1];
+      if (previous?.kind === "narration" && typeof previous.payload === "string") previous.payload += fragment;
+      else coDmEvents.push({ kind: "narration", payload: fragment });
+    };
     const baseConfig = this.buildAgentConfig();
     const config: AgentLoopConfig = {
       ...baseConfig,
+      ...(this.coDm ? { excludedTools: new Set(["scribe", "set_theme", "style_scene"]), portraitEnabled: false, effort: "medium" as const } : {}),
+      onTextDelta: delta => {
+        const publicDelta = privateFilter ? privateFilter.push(delta) : delta;
+        if (privateFilter) {
+          for (const segment of privateFilter.drainSegments()) {
+            if (segment.kind === "narration") recordPublicFragment(segment.payload);
+            else coDmEvents.push(segment);
+          }
+        }
+        if (publicDelta) baseConfig.onTextDelta?.(publicDelta);
+      },
+      onRollback: () => {
+        privateFilter = this.coDm ? new CoDmStreamFilter() : null;
+        let lastTool = -1;
+        for (let index = coDmEvents.length - 1; index >= 0; index--) if (coDmEvents[index].kind === "tool") { lastTool = index; break; }
+        coDmEvents.splice(Math.max(1, lastTool + 1));
+        baseConfig.onRollback?.();
+      },
       onToolEnd: (name, result) => {
         toolCallCount++;
+        if (this.coDm) coDmEvents.push({ kind: "tool", payload: { name, result, ...(name === "dm_notes" && !result.is_error ? { committedPrivateNotes: this.sessionState.dmNotes ?? "" } : {}) } });
         baseConfig.onToolEnd?.(name, result);
       },
     };
@@ -860,7 +1086,7 @@ export class GameEngine {
       // Run the agent loop with streaming
       const result = await agentLoopStreaming(
         this.provider,
-        systemPrompt,
+        this.coDm ? migrateForegroundPrompt(systemPrompt) : systemPrompt,
         messages,
         this.registry,
         this.gameState,
@@ -868,6 +1094,17 @@ export class GameEngine {
       );
 
       if (this.closing) return;
+      if (this.coDm) {
+        const tail = privateFilter?.finish();
+        if (tail) this.callbacks.onNarrativeDelta(tail);
+        const stripped = stripCoDmAnnotations(result.text);
+        result.text = stripped.publicText;
+        if (privateFilter?.diagnostics.length) {
+          for (let index = coDmEvents.length - 1; index >= 0; index--) if (coDmEvents[index].kind === "annotation") coDmEvents.splice(index, 1);
+        }
+        if (!privateFilter) for (const annotation of stripped.annotations) coDmEvents.push({ kind: "annotation", payload: annotation.content });
+        if (!coDmEvents.some(event => event.kind === "narration")) coDmEvents.push({ kind: "narration", payload: result.text });
+      }
       // Count wrapped lines for length steering, then update all injection counters
       let wrappedLineCount = 0;
       if (result.text && this.terminalDims) {
@@ -897,6 +1134,9 @@ export class GameEngine {
       // sniffing. The final assistant message is the DM response; everything
       // before it is the tool interaction context.
       const turn = result.turnMessages;
+      // Canonical conversation is private DM memory (including tool secrets).
+      // Keep its own annotations; public transcript/display/export use the
+      // filtered result.text above, never these private provider messages.
       const assistantMessage: NormalizedMessage = turn.length > 0
         ? turn[turn.length - 1]
         : { role: "assistant", content: result.text };
@@ -960,7 +1200,16 @@ export class GameEngine {
           logLines.push({ kind: "dm", text: "" }); // paragraph separator
           // Pass campaignRoot so image paths land relative — keeps the
           // display-log portable across machines if the campaign is moved.
-          this.persister.appendDisplayLog(narrativeLinesToMarkdown(logLines, this.gameState.campaignRoot));
+          const appendedLog = narrativeLinesToMarkdown(logLines, this.gameState.campaignRoot);
+          if (this.coDm) {
+            const displayPath = norm(`${this.gameState.campaignRoot}/state/display-log.md`);
+            const previousLog = await this.fileIO.exists(displayPath) ? await this.fileIO.readFile(displayPath) : "";
+            await this.writeCoDmPrivate(this.coDmCompletionPath(), JSON.stringify({
+              exchange: { id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents },
+              scene: this.sceneManager.getScene(), conversation: this.conversation.getExchanges(), displayLog: previousLog + appendedLog,
+            }));
+          }
+          this.persister.appendDisplayLog(appendedLog);
         }
         const scene = this.sceneManager.getScene();
         this.persister.persistScene({
@@ -987,6 +1236,10 @@ export class GameEngine {
       if (consumedKnowledgeNotices.length && this.persister) {
         await this.persister.flushDurable();
         await knowledge.acknowledgeNotices(consumedKnowledgeNotices.map((notice) => notice.id));
+      }
+      if (coDmFeedback.length) {
+        await this.persister?.flushDurable();
+        await this.coDm?.acknowledgeFeedback(coDmFeedback.map(item => item.id));
       }
 
       // Track exchange for git auto-commit. Use the raw player message as the
@@ -1040,6 +1293,15 @@ export class GameEngine {
         }
       }
 
+      if (this.coDm) {
+        await this.sceneManager.flushTranscript();
+        this.persistCurrentScene();
+        await this.persister?.flushDurable();
+        const queue = this.coDm.getState();
+        this.coDmOnEvent?.({ kind: "enqueue", epoch: queue.epoch, cursor: queue.cursor, batchSize: 1, eventIds: [coDmExchangeId] });
+        await this.coDm.enqueue({ id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents });
+        await this.writeCoDmPrivate(this.coDmCompletionPath(), "null");
+      }
       // Process deferred TUI commands — engine-side work (scene transitions,
       // subagent spawns, file I/O) plus any visual commands we explicitly
       // deferred for ordering reasons (currently `present_choices`, so the
@@ -1277,6 +1539,8 @@ export class GameEngine {
     // every detached write (scribe + scene-tracker) must land first (non-blocking
     // within a scene, flushed before it advances).
     this.setState("scene_transition");
+    await this.settleCoDm();
+    if (this.coDm) await this.awaitPendingPortraitRenders();
     await this.deferred.settle("scene-transition", this.campaignId);
 
     // The conversation is cleared on transition (sceneManager.stepPruneContext),
@@ -1300,6 +1564,7 @@ export class GameEngine {
 
       // Refresh context after the next identity/tree were durably advanced.
       await this.sceneManager.contextRefresh();
+      if (this.coDm) await this.coDm.resetScene(this.sceneManager.getSystemPrompt({}).system.map(block => block.text).join("\n"));
       this.persistCurrentScene();
       await this.persister?.flushDurable();
       this.callbacks.onTuiCommand?.({ type: "character_sheet_changed" });
@@ -1331,7 +1596,10 @@ export class GameEngine {
     // `waiting_input` too): set the non-input state, THEN flush detached work so
     // we don't snapshot/close the session over a half-written write.
     this.setState("session_ending");
+    await this.settleCoDm();
+    if (this.coDm) await this.awaitPendingPortraitRenders();
     await this.deferred.settle("session-end", this.campaignId);
+    const closingSceneNumber = this.sceneManager.getScene().sceneNumber;
 
     try {
       const result = await this.sceneManager.sessionEnd(
@@ -1350,6 +1618,15 @@ export class GameEngine {
       const error = e instanceof Error ? e : new Error(String(e));
       await this.dumpDebugInfo(error);
       this.callbacks.onError(error);
+    }
+
+    // sessionEnd advances the scene before writing its recap. Even a recap
+    // failure must not leave the continuing agent attached to the old scene.
+    if (this.coDm && this.sceneManager.getScene().sceneNumber !== closingSceneNumber) {
+      await this.sceneManager.contextRefresh();
+      await this.coDm.resetScene(this.sceneManager.getSystemPrompt({}).system.map(block => block.text).join("\n"));
+      this.persistCurrentScene();
+      await this.persister?.flushDurable();
     }
 
     // Best-effort: flush any background images that finished but never got a
@@ -1386,6 +1663,7 @@ export class GameEngine {
    * Resume a session.
    */
   async resumeSession(): Promise<string> {
+    await this.coDmReady;
     const recap = await this.sceneManager.sessionResume();
     // sessionResume clears sessionRecapPending whenever it was set, regardless
     // of whether the recap files existed. Persist and await the flush so a
@@ -1405,6 +1683,8 @@ export class GameEngine {
    */
   async resumePendingTransition(pendingOp: import("./scene-manager.js").PendingOperation): Promise<void> {
     this.setState("scene_transition");
+    await this.settleCoDm();
+    const closingSceneNumber = this.sceneManager.getScene().sceneNumber;
 
     try {
       const result = await this.sceneManager.resumePendingTransition(
@@ -1426,6 +1706,13 @@ export class GameEngine {
       this.callbacks.onError(error);
     }
 
+    if (this.coDm && this.sceneManager.getScene().sceneNumber !== closingSceneNumber) {
+      await this.sceneManager.contextRefresh();
+      await this.coDm.resetScene(this.sceneManager.getSystemPrompt({}).system.map(block => block.text).join("\n"));
+      this.persistCurrentScene();
+      await this.persister?.flushDurable();
+    }
+
     this.setState("waiting_input");
   }
 
@@ -1441,6 +1728,7 @@ export class GameEngine {
     // finish first so its writes are part of the snapshot being reverted (not
     // racing the checkout).
     await this.deferred.settle("rollback", this.campaignId);
+    if (this.coDm) { await this.coDm.invalidate(); await this.coDm.settleAll(); await this.awaitPendingPortraitRenders(); }
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1465,6 +1753,8 @@ export class GameEngine {
    * tests can settle it (mirrors `awaitPendingPortraitRenders`).
    */
   async settleDeferredWork(): Promise<void> {
+    await this.settleCoDm();
+    await this.coDm?.settleAll();
     await this.deferred.settle("teardown", this.campaignId);
   }
 
@@ -1817,6 +2107,7 @@ export class GameEngine {
    */
   private async dispatchUpdatePortrait(
     input: Record<string, unknown>,
+    assertCurrent?: () => void,
   ): Promise<import("./tool-registry.js").ToolResult> {
     if (!this.provider.generateImage) {
       return { content: "Image generation is not available on the configured provider.", is_error: true };
@@ -1841,6 +2132,7 @@ export class GameEngine {
     // forward — change one thing, keep the rest. No existing portrait → nothing
     // to revise (e.g. an NPC, or a campaign where image-gen was off at setup).
     const referenceImages = await loadCharacterReferences([name], fileIO, root);
+    assertCurrent?.();
     if (referenceImages.length === 0) {
       return {
         content: `No saved portrait for "${name}" to revise — update_portrait only works on a character who already has one.`,
@@ -1872,7 +2164,9 @@ export class GameEngine {
         // version and clobber history. The chain swallows errors so one failure
         // can't poison later commits; `commit` re-throws into the catch below.
         const commit = this.portraitCommitChain.then(async () => {
+          assertCurrent?.();
           const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
+          assertCurrent?.();
           this.pendingPortraitInjections.push({
             name,
             change,
@@ -1944,6 +2238,7 @@ export class GameEngine {
    */
   private async handleStyleSceneTool(
     input: Record<string, unknown>,
+    assertCurrent?: () => void,
   ): Promise<import("./tool-registry.js").ToolResult> {
     const description = input.description as string | undefined;
     const directKeyColor = input.key_color as string | undefined;
@@ -1985,11 +2280,12 @@ export class GameEngine {
     }
 
     // Apply variant if specified (mechanical, no subagent needed)
+    assertCurrent?.();
     if (variant) themeCmd.variant = variant;
 
     // Persist to location entity if requested
     if (input.save_to_location) {
-      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location });
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location }, assertCurrent);
     }
 
     // Return set_theme as _tui so agent-loop-bridge broadcasts immediately
@@ -2000,7 +2296,7 @@ export class GameEngine {
   // --- Theme <-> Location persistence ---
 
   /** Save theme + key_color to a location entity's front matter. */
-  private async saveThemeToLocation(cmd: TuiCommand): Promise<void> {
+  private async saveThemeToLocation(cmd: TuiCommand, assertCurrent?: () => void): Promise<void> {
     const location = cmd.location as string | undefined;
     const themeName = cmd.theme as string | undefined;
     const keyColor = cmd.key_color as string | undefined;
@@ -2018,11 +2314,15 @@ export class GameEngine {
     try {
       const store = this.getEntityStore();
       if (!(await store.exists("location", location))) return;
+      assertCurrent?.();
       const fields: Record<string, unknown> = {};
       if (themeName) fields.theme = themeName;
       if (keyColor) fields.key_color = keyColor;
       await store.update("location", location, { frontMatter: fields, changelogEntry: `Theme updated: ${Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(", ")}` }, this.sceneManager.getScene().sceneNumber);
     } catch (e) {
+      // A rejected experiment precondition must reach the tool result; it is
+      // not a successful optional location save.
+      if (assertCurrent) throw e;
       const msg = e instanceof Error ? e.message : String(e);
       this.callbacks.onDevLog?.(`[dev] set_theme: failed to save to location "${location}" — ${msg}`);
     }
@@ -2205,6 +2505,7 @@ export class GameEngine {
         this.callbacks.onToolEnd(name, result);
       },
       onTuiCommand: (cmd) => {
+        if (this.coDm) this.observeCoDmUI(cmd);
         // Immediate TUI commands (modeline, resources, choices, etc.)
         // are broadcast to the client as soon as the tool fires, so
         // visual updates appear mid-narration instead of after the turn.
@@ -2260,6 +2561,19 @@ export class GameEngine {
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {
+    if (this.coDm && name === "dm_notes") {
+      if (input.action === "read") return { content: this.sessionState.dmNotes ?? "(no DM notes)" };
+      const notes = String(input.notes ?? "").trim();
+      try {
+        await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).mutate([{ op: "upsert", collection: "Lore", name: "DM Notes", body: notes, visibility: "private" }], { sceneNumber: this.sceneManager.getScene().sceneNumber, source: "dm-notes" });
+        this.sessionState.dmNotes = notes;
+        return { content: "DM notes committed." };
+      } catch (error) { return { content: error instanceof Error ? error.message : String(error), is_error: true }; }
+    }
+    if (this.coDm && (name === "knowledge" || name === "search_campaign")) await this.settleCoDm();
+    if (this.coDm && ["update_modeline", "set_display_resources", "set_resource_values", "set_theme", "style_scene"].includes(name)) {
+      for (const key of this.presentationKeys(name, input)) this.presentationRevisions.set(key, (this.presentationRevisions.get(key) ?? 0) + 1);
+    }
     // Entity tools — encapsulated dispatcher, owns the store, cache lives
     // for the GameEngine's lifetime.
     if (ENTITY_TOOL_NAME_SET.has(name)) {

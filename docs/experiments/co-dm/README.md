@@ -1,6 +1,20 @@
 # Continuing co-DM lane
 
-**DESIGN DRAFT / NOT IMPLEMENTED — 2026-10-05.** This experiment records a proposed architecture and its [test plan](test-plan.md), at the user's explicit request. It is not a production specification. No game behavior, prompts, model configuration, or persistence formats change through this document. No cost or latency improvement has been measured.
+**ARCHITECTURE ADOPTED; IMPLEMENTATION STILL ISOLATED — 2026-10-05.** Following the latency results, the project owner selected the continuing co-DM as the direction for MV. Cost parity is an optimization objective, not an adoption gate; it has not yet been demonstrated. Correctness and production integration remain release gates. The current implementation uses an explicit `GameEngine.coDmExperiment` constructor option for isolated campaign copies; normal launches retain the existing scribe behavior until that work is complete. The [test plan](test-plan.md) distinguishes intended evaluation from measured coverage, and the [pilot report](pilot-2026-10-05.md) records evidence and limitations.
+
+## Implemented experiment boundary
+
+The foreground prompt is migrated after normal include/conditional/seed resolution. It retains fiction, player agency, mechanics, and scene-image guidance; the continuing co-DM receives the inherited factual-maintenance rules and a frozen, explicitly non-authoritative foreground reference snapshot. Both prototype agents use Sol 6.1 at medium effort. The baseline retains Sol 6.1 medium plus its normal Luna scribe.
+
+Exact, case-sensitive `<co_dm>…</co_dm>` frames travel inside ordinary DM prose. The incremental parser withholds private bytes, preserves public/annotation order across arbitrary streaming chunks, and quarantines malformed or unfinished frames. Public narration, display logs, and transcripts are filtered. **The DM's own conversation file remains private and retains its annotations**, just as it retains private tool context; it is not a public export. The observation queue and completion/operation journals are also private.
+
+Only complete exchanges wake the serialized co-DM. A busy worker collects subsequent exchanges into its next batch; its own writes do not wake another batch. `knowledge` and `search_campaign` wait for previously completed observations. Ordinary narration does not impose that drain. Scene transitions and session end drain maintenance; rollback fences old work and waits for abandoned effects before restoring files. UID notices use the canonical store's existing durable notice path. Optional freeform feedback enters volatile DM context and is acknowledged only after the successful consuming DM exchange is durable.
+
+The prototype persists a continuing context, pending exchanges, cursor, feedback mailbox, and accepted exchange IDs. A completion journal recovers a completed public exchange and its private observation after an interrupted foreground save or queue enqueue. Background resource and UI changes are persisted before cursor acknowledgment. Foreground presentation revisions protect newer values, with independent resource fields filtered separately.
+
+This is **not general exactly-once recovery**. Tests cover selected crash points and stable receipt retries, but regenerated provider calls or changed batch membership can change positional operation identity. Append-only player-profile writes and paid render requests also need stronger recovery semantics before production. Completion journaling is not an atomic transaction over every gameplay tool effect. Real filesystem runs use atomic replacement; injected FileIO implementations without that capability cannot claim the same durability. These limitations remain production blockers even if a normal-play pilot is successful.
+
+Theme revision guards reject stale styling and recheck after location lookup before dispatching a canonical update. An already-dispatched location update still lacks a transactional revision precondition inside the store, so a conflict during that update can commit an older location value. The prototype does not claim cancellation at that boundary; production hardening needs a storage-level precondition or serialized write ownership.
 
 ## Purpose and boundary
 
@@ -74,12 +88,12 @@ Repository history explains why this audit matters: `d9b468a3` (#527) removed th
 
 ## Bounded experiment and open decisions
 
-The datafeed concept is model-independent. The first intended real test uses a **Sol 6.1 DM at medium reasoning effort**, with the co-DM initially **Sol 6.1, explicitly configured**. Compare against the current Sol DM + Luna scribe arrangement; freeze both configurations and effective prompts in the evidence. This document does not run that test or authorize production adoption. See the [test plan](test-plan.md) for fixtures, failure gates, and measurement.
+The datafeed concept is model-independent. The first real test uses a **Sol 6.1 DM at medium reasoning effort**, with the co-DM initially **Sol 6.1, explicitly configured**. Compare against the current Sol DM + Luna scribe arrangement; freeze both configurations and effective prompts in the evidence. The architecture is now selected; further experiments guide hardening and optimization rather than reopening that decision. See the [test plan](test-plan.md) for fixtures, failure gates, and measurement.
 
 The proposed portable fixtures are [initial state](fixtures/initial-state.json), [ordered events](fixtures/events.json), [withheld oracle](fixtures/oracle.json), and [protocol cases](fixtures/protocol-cases.json). These are experiment inputs and expectations, not existing production API formats or completed test results.
 
 Count total uncached input, cache reads/writes, output including reasoning, retries, and **all helpers** across the full workload. Two roles do not imply lower cost, and asynchronous response delivery does not imply less total work. Measure player-visible latency separately from queue completion and lifecycle drain latency. Preserve narrative quality, authorship, identity/privacy correctness, recovery, and freshness before interpreting savings.
 
-Before implementation, resolve four bounded choices: private annotation framing and streaming recovery; dependent-read freshness policy; presentation revision guards; and durable continuing-context/mailbox/cursor behavior across save, crash, and rollback. The experiment should settle these through concrete cases rather than grow into a speculative general agent framework.
+The prototype makes concrete choices for private framing, dependent-read freshness, presentation revision guards, and durable context/mailbox/cursor behavior. The tested boundaries and remaining recovery gaps are described above; the intended evaluation remains broader than a first pilot.
 
 Related current references: [context management](../../context-management.md), [subagent contracts](../../subagents-catalog.md), [image generation](../../image-generation.md), [tool contracts](../../tool-input-contracts.md), [recovery](../../error-recovery.md), and the earlier [dependency bookkeeping screen](../metadata-dependencies/README.md).
