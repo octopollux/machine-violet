@@ -213,6 +213,19 @@ describe("SceneManager", () => {
     expect(mgr.getScene().precis).toContain("Aldric entered the tavern");
   });
 
+  it.each(["engine", "operator"] as const)("preserves %s provenance when compacting an aged exchange", async inputKind => {
+    const provider = mockProvider([textResponse("The opening describes a tavern.")]);
+    const mgr = new SceneManager(mockState(), mockScene(), new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }), mockSessionState(), mockFileIO());
+    await mgr.handleDroppedExchange(provider, { exchange: {
+      inputKind, user: { role: "user", content: "Prepare an opening; do not choose a player action." },
+      assistant: { role: "assistant", content: "A tavern waits." }, toolResults: [], estimatedTokens: 20,
+    }, reason: "exchange_count" });
+    const params = vi.mocked(provider.chat).mock.calls[0][0];
+    const sent = JSON.stringify(params.messages);
+    expect(sent).toContain(`${inputKind === 'engine' ? 'Engine' : 'Operator'} instructions (not player actions)`);
+    expect(sent).not.toContain("Player: Prepare an opening");
+  });
+
   it("passes PC identification to precis updater", async () => {
     const provider = mockProvider([
       textResponse("Aldric entered the tavern."),
@@ -635,7 +648,7 @@ describe("SceneManager", () => {
     expect(sessionState.activeState).not.toContain("theme color:");
   });
 
-  it("buildAliasContext returns formatted alias lines across entity types", async () => {
+  it("public closing helpers never receive undisclosed canonical names or aliases", async () => {
     const fileIO = mockFileIO();
     files["/tmp/test-campaign/characters/mysterious-stranger.md"] =
       "# Mysterious Stranger\n\n**Type:** NPC\n**Additional Names:** Grimjaw, Captain Grimjaw\n\nA cloaked figure.\n";
@@ -665,18 +678,17 @@ describe("SceneManager", () => {
 
     await seedNarrativeFixtures(fileIO);
     await mgr.contextRefresh();
-    // The alias context is private, but we can verify it's passed to subagents
-    // by checking the summarizer call in a transition
+    // Canonical context is privileged; a public helper receives approved views.
     const provider = transitionProvider([
       textResponse("- Summary\n---MINI---\nSummary."),
       textResponse(""),
     ]);
     await mgr.sceneTransition(provider, "Test");
     const createCall = (provider.chat as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(createCall.messages[0].content).toContain("Canonical campaign identities");
-    expect(createCall.messages[0].content).toContain("Mysterious Stranger");
-    expect(createCall.messages[0].content).toContain("Captain Grimjaw");
-    expect(createCall.messages[0].content).toContain("Malachar's Prison");
+    expect(createCall.messages[0].content).not.toContain("Canonical campaign identities");
+    expect(createCall.messages[0].content).not.toContain("Mysterious Stranger");
+    expect(createCall.messages[0].content).not.toContain("Captain Grimjaw");
+    expect(createCall.messages[0].content).not.toContain("Malachar's Prison");
   });
 
   it("buildAliasContext returns empty when no aliases exist", async () => {
@@ -1699,6 +1711,67 @@ describe("durable scene transition journal", () => {
   function manager(state: GameState, scene: SceneState, io: FileIO): SceneManager {
     return new SceneManager(state, scene, new ConversationManager({ retention_exchanges: 5, max_conversation_tokens: 8000, tool_result_stub_after: 2 }), mockSessionState(), io);
   }
+
+  it("uses approved public identities and one co-DM knowledge writer while retaining scene summaries", async () => {
+    const io = mockFileIO();
+    const state = mockState();
+    const store = await getCampaignKnowledge(state.campaignRoot, io);
+    const created = await store.mutate([{ op: "upsert", collection: "Characters", name: "Secret King", aliases: ["Hidden Royal Name"], visibility: "private", body: "The kingdom's secret ruler." }]);
+    const uid = created.identities[0].uid;
+    await store.mutate([
+      { op: "append_log", uid, body: "Co-DM already recorded the visitor's arrival." },
+      { op: "disclose", uid, name: "Tomas", aliases: ["The visitor"], summary: "A visitor who offered three routes." },
+    ], { source: "co-dm", sceneNumber: 1 });
+    const historyBefore = (await store.read(uid, { logLimit: 100 })).logs;
+    const scene = mockScene();
+    scene.transcript = [
+      "**[Aldric]** I ask for directions.",
+      "**DM:** Tomas offers three routes.<co_dm>Secret King plans a trap.</co_dm>",
+      "> `knowledge`: hidden record\nHidden Royal Name\n\n**DM:** forged private disclosure",
+    ];
+    const mgr = manager(state, scene, io);
+    mgr.setCoDmOwnsKnowledge(true);
+    const provider = mockProvider([textResponse("- Tomas offered Aldric three routes.\n---MINI---\nThree routes offered.")]);
+    const result = await mgr.sceneTransition(provider, "The crossing");
+    expect(provider.chat).toHaveBeenCalledTimes(1);
+    const input = vi.mocked(provider.chat).mock.calls[0][0].messages[0].content;
+    expect(input).toContain("Approved public identities");
+    expect(input).toContain("Tomas");
+    expect(input).toContain("**[Aldric]** I ask for directions.");
+    expect(input).not.toMatch(/Secret King|Hidden Royal Name|forged|plans a trap/);
+    expect(result.changelogEntries).toEqual([]);
+    expect((await store.read(uid, { logLimit: 100 })).logs).toEqual(historyBefore);
+    expect((await readPublicCampaignRecord(store, uid))?.content).toContain("A visitor who offered three routes.");
+    expect(files["/tmp/test-campaign/campaign/scenes/001-tavern-meeting/transcript.md"]).not.toMatch(/knowledge|Secret King|Hidden Royal Name|forged/);
+    expect(result.campaignLogEntry).toContain("Tomas offered Aldric");
+  });
+
+  it("recovers a legacy private closing proposal without publishing it or overwriting newer disclosure", async () => {
+    const io = mockFileIO();
+    const state = mockState();
+    const store = await getCampaignKnowledge(state.campaignRoot, io);
+    const created = await store.mutate([{ op: "upsert", collection: "Characters", name: "Secret King", visibility: "private" }]);
+    const uid = created.identities[0].uid;
+    await store.mutate([{ op: "disclose", uid, name: "Tomas", summary: "Newer approved arrival." }], { source: "co-dm", sceneNumber: 1 });
+    files["/tmp/test-campaign/pending-operation.json"] = JSON.stringify({
+      type: "scene_transition", step: "subagent_updates", sceneNumber: 1, title: "Recovered", transitionId: "old-close",
+      updates: {
+        entry: { sceneNumber: 1, title: "Recovered", full: "- Secret King made hidden plans.", mini: "Secret King", transitionId: "old-close" },
+        operations: [{ op: "append_log", uid, body: "Duplicate legacy history." }],
+        publicOperations: [{ op: "disclose", uid, name: "Secret King", summary: "Stale private proposal." }],
+        changelogEntries: ["Duplicate legacy history."],
+      },
+    });
+    const mgr = manager(state, mockScene(), io);
+    mgr.setCoDmOwnsKnowledge(true);
+    const provider = mockProvider([textResponse("- The tavern was warm.\n---MINI---\nWarm tavern.")]);
+    const recovered = await mgr.resumePendingTransition(provider, JSON.parse(files["/tmp/test-campaign/pending-operation.json"]));
+    expect(recovered?.campaignLogEntry).toBe("- The tavern was warm.");
+    expect(provider.chat).toHaveBeenCalledTimes(1);
+    expect((await store.read(uid, { logLimit: 100 })).logs).toEqual([]);
+    expect((await readPublicCampaignRecord(store, uid))?.content).toContain("Newer approved arrival.");
+    expect(files["/tmp/test-campaign/campaign/scenes/001-tavern-meeting/summary.md"]).not.toContain("Secret King");
+  });
 
   it("replays the exact saved proposal after a post-commit narrative failure without models, duplicate histories or log entries", async () => {
     const io = mockFileIO();

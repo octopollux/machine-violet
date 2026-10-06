@@ -632,3 +632,26 @@ describe("SQLite campaign recovery boundaries",()=>{
     await expect(store.outline()).rejects.toThrow("missing");
   });
 });
+
+
+describe('engine supplied knowledge ownership', () => {
+  it('protects concrete notes and mechanics while allowing arbitrary same-named facts', async () => {
+    const store = new SqliteKnowledgeStore(':memory:');
+    await store.mutate([{ op: 'create_collection', name: 'Spells' }, { op: 'upsert', collection: 'Lore', name: 'DM Notes', body: 'private plan' }, { op: 'upsert', collection: 'Characters', name: 'PC', fields: { hp: 7, biography: 'old' } }, { op: 'upsert', collection: 'Spells', name: 'Spell', fields: { hp: 3, stats: 'observed effects' } }]);
+    const ownership = { protectedRoots: ['Lore/DM Notes'], protectedFields: { PC: ['hp'] }, source: 'co-dm' };
+    await expect(store.mutate([{ op: 'patch', uid: 'DM Notes', body: 'overwritten' }], ownership)).rejects.toThrow('protected');
+    await expect(store.mutate([{ op: 'patch', uid: 'PC', fields: { hp: 8 } }], ownership)).rejects.toThrow('engine-owned');
+    const hp = (await store.read('PC')).children!.find(child => child.name === 'hp')!;
+    await expect(store.mutate([{ op: 'set_value', uid: hp.uid, value: 8 }], ownership)).rejects.toThrow('protected');
+    await expect(store.mutate([{ op: 'delete', uid: 'PC' }], ownership)).rejects.toThrow('owner');
+    await store.mutate([{ op: 'patch', uid: 'PC', fields: { biography: 'new' } }, { op: 'patch', uid: 'Spell', fields: { hp: 9, stats: 'new observations' } }], ownership);
+    expect((await store.read('PC')).fields).toMatchObject({ hp: 7, biography: 'new' });
+    expect((await store.read('Spell')).fields.hp).toBe(9);
+    store.close();
+  });
+  it('checks epoch inside serialized writes before any effect', async () => {
+    const store = new SqliteKnowledgeStore(':memory:');
+    await expect(store.mutate([{ op: 'upsert', collection: 'Lore', name: 'late' }], { assertCurrent: () => { throw new Error('abandoned'); } })).rejects.toThrow('abandoned');
+    expect(await store.resolve('late')).toBeNull(); store.close();
+  });
+});

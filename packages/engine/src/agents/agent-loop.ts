@@ -61,6 +61,8 @@ export interface AgentLoopConfig {
   maxToolRounds: number;
   /** Effort level. Omit to auto-resolve from agent name. */
   effort?: import("../config/models.js").EffortLevel | null;
+  operationScope?: string;
+  afterTool?: (name: string) => Promise<void>;
   /** Async tool handler override. Called before registry dispatch.
    *  Return a ToolResult to handle the tool, or null to fall through to registry. */
   asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
@@ -84,6 +86,9 @@ export interface AgentLoopConfig {
    * flipping this on — the agent loop trusts the flag verbatim.
    */
   imageGenEnabled?: boolean;
+  /** Isolated experiments may narrow the foreground role without changing defaults. */
+  excludedTools?: Set<string>;
+  portraitEnabled?: boolean;
   /** Called on error */
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait */
@@ -160,25 +165,20 @@ async function runAgentLoopInternal(
   stream: boolean,
 ): Promise<AgentLoopResult> {
   const asyncHandler = config.asyncToolHandler;
-  const toolHandler = asyncHandler
-    ? async (
-        name: string,
-        input: Record<string, unknown>,
-        context: ToolExecutionContext,
-      ) => (await asyncHandler(name, input))
-        ?? registry.dispatch(gameState, name, input, context)
-    : (
-        name: string,
-        input: Record<string, unknown>,
-        context: ToolExecutionContext,
-      ) => registry.dispatch(gameState, name, input, context);
+  const toolHandler = async (name: string, input: Record<string, unknown>, context: ToolExecutionContext) => {
+    const trustedContext = { ...context, operationScope: config.operationScope };
+    const result = (await asyncHandler?.(name, input)) ?? registry.dispatch(gameState, name, input, trustedContext);
+    await config.afterTool?.(name);
+    return result;
+  };
 
   // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
   // `generate_image` function tool when image generation is gated on.
   // The DM's asyncToolHandler (GameEngine.dispatchGenerateImage) routes
   // the call through provider.generateImage and emits the display_image
   // TUI command + bytes-on-disk side effects.
-  const tools: NormalizedTool[] = registry.getDefinitions(DM_EXCLUDED_TOOLS);
+  const excludedTools = new Set([...DM_EXCLUDED_TOOLS, ...(config.excludedTools ?? [])]);
+  const tools: NormalizedTool[] = registry.getDefinitions(excludedTools);
   if (config.imageGenEnabled) {
     tools.push({
       name: GENERATE_IMAGE_TOOL_NAME,
@@ -232,7 +232,7 @@ async function runAgentLoopInternal(
         required: ["prompt", "effort", "aspect"],
       },
     });
-    tools.push({
+    if (config.portraitEnabled !== false) tools.push({
       name: UPDATE_PORTRAIT_TOOL_NAME,
       description:
         "Silently revise a player character's saved portrait when the fiction has " +
@@ -266,7 +266,7 @@ async function runAgentLoopInternal(
     });
   }
   const toolInputPolicies = {
-    ...registry.getInputPolicies(DM_EXCLUDED_TOOLS),
+    ...registry.getInputPolicies(excludedTools),
     ...(config.imageGenEnabled
       ? {
           [GENERATE_IMAGE_TOOL_NAME]: { criticality: "expensive" as const },

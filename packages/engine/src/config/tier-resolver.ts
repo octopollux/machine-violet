@@ -16,7 +16,8 @@ import type { LLMProvider, TierProvider } from "../providers/types.js";
 import type { ModelTier } from "@machine-violet/shared/types/engine.js";
 import type { ConnectionStore } from "./connections.js";
 import { getTierProvider } from "./connections.js";
-import { getModel } from "./models.js";
+import { getModel, getEffortConfig } from "./models.js";
+import type { EffortLevel } from "./models.js";
 
 /**
  * Build a {provider, model} pair for each tier from the connection store.
@@ -37,6 +38,8 @@ import { getModel } from "./models.js";
  */
 export interface TierProviderResolution {
   tiers: Record<ModelTier, TierProvider>;
+  coDm: TierProvider;
+  coDmEffort: EffortLevel | null;
   /** Explicit image-model override paired to the Large-tier connection. */
   imageModel?: string;
   /**
@@ -98,12 +101,30 @@ export function buildTierProvidersWithCache(
     return { provider: getFallback(), model: getModel(tier) };
   };
 
-  return {
-    tiers: {
+  const tiers = {
       large: resolveTier("large"),
       medium: resolveTier("medium"),
       small: resolveTier("small"),
-    },
+  };
+  const assignment = connStore.coDmAssignment;
+  const selected = assignment ?? connStore.tierAssignments.large;
+  const discovered = selected ? connStore.connections.find(c => c.id === selected.connectionId)?.models
+    .find(m => m.id === selected.modelId || m.aliases?.includes(selected.modelId)) : undefined;
+  const coDm = assignment
+    ? { provider: getProviderForConnId(assignment.connectionId), model: discovered?.id ?? assignment.modelId }
+    : discovered && discovered.id !== tiers.large.model ? { ...tiers.large, model: discovered.id } : tiers.large;
+  let effort = assignment && Object.hasOwn(assignment, "effort")
+    ? assignment.effort ?? null : getEffortConfig("co-dm", coDm.model).effort;
+  const supported = discovered?.supportedReasoningEfforts;
+  if (effort && supported && !supported.includes(effort)) {
+    if (assignment && Object.hasOwn(assignment, "effort")) throw new Error("Co-DM effort is not supported by its assigned model");
+    const candidate = discovered?.defaultReasoningEffort ?? supported[0];
+    effort = ["low", "medium", "high", "xhigh", "max"].includes(candidate ?? "") ? candidate as EffortLevel : null;
+  }
+  return {
+    tiers,
+    coDm,
+    coDmEffort: discovered?.supportedReasoningEfforts?.length === 0 ? null : effort,
     ...(connStore.imageAssignment
       && connStore.imageAssignment.connectionId === connStore.tierAssignments.large?.connectionId
       ? { imageModel: connStore.imageAssignment.modelId }

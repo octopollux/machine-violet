@@ -3,6 +3,19 @@ import type { ServerEvent } from "@machine-violet/shared";
 import { createBridge } from "./bridge.js";
 import { CodexTurnFailedError } from "../providers/openai-chatgpt/provider.js";
 
+it("forwards separate public tool identities without exposing private results or changing state", () => {
+  const events: ServerEvent[] = [];
+  const cb = createBridge({ broadcast: e => events.push(e) });
+  cb.onToolStart("remember", { role: "dm", callId: "dm-1" });
+  cb.onToolStart("remember", { role: "co-dm", callId: "co-1" });
+  cb.onToolEnd("remember", { content: "private secret" }, { role: "co-dm", callId: "co-1" });
+  expect(events.map(e => e.data)).toEqual([
+    { toolStarted: "remember", toolRole: "dm", toolCallId: "dm-1" },
+    { toolStarted: "remember", toolRole: "co-dm", toolCallId: "co-1" },
+    { toolEnded: "remember", toolRole: "co-dm", toolCallId: "co-1" },
+  ]);
+});
+
 describe("createBridge onRollback", () => {
   // Issue #431: a streaming retry leaves partial deltas accumulated on the
   // client. The bridge needs to drop its own un-flushed buffer (so a stale

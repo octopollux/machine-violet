@@ -9,6 +9,12 @@ export function classifyPath(relPath: string): FileCategory {
   const normalized = relPath.replace(/\\/g, "/");
 
   if (normalized === "config.json") return "config";
+  if (/^state\/co-dm[^/]*\.json$/.test(normalized)
+    || normalized === "state/startup.json"
+    || normalized === "state/foreground-pending.json"
+    || normalized === "state/portrait-jobs.json"
+    || normalized.startsWith("state/image-jobs/")
+    || normalized.startsWith("state/provider-journals/")) return "co-dm-private";
   if (normalized.startsWith("state/")) return "state";
   // Context dumps: .debug/**/context/* or context-dump/* (legacy)
   const isContextPath = normalized.includes(".debug/") && normalized.includes("/context/");

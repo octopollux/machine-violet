@@ -68,6 +68,35 @@ function defaultProps(overrides?: Partial<ModelAssignmentsProps>): ModelAssignme
 }
 
 describe("ModelAssignments", () => {
+  it("does not describe mandatory adaptive thinking as off", () => {
+    const props = defaultProps({ coDmAssignment: { connectionId: "a-1", modelId: "claude-large", effort: null } });
+    props.knownModels["claude-large"].capabilities.alwaysAdaptiveThinking = true;
+    const rendered = render(<ModelAssignments {...props} />);
+    expect(rendered.lastFrame()).toContain("provider default");
+    expect(rendered.lastFrame()).not.toContain("reasoning off");
+  });
+  it.each(["a-1", "x-1"])("round-trips explicit null effort independently of auto on %s", async connectionId => {
+    const modelId = connectionId === "a-1" ? "claude-large" : "grok-4.5";
+    const props = defaultProps({ coDmAssignment: { connectionId, modelId, effort: null } });
+    const rendered = render(<ModelAssignments {...props} />);
+    expect(rendered.lastFrame()).toContain(connectionId === "a-1" ? "reasoning off" : "provider default");
+    for (let i = 0; i < 3; i++) { rendered.stdin.write("\u001b[B"); await new Promise(resolve => setImmediate(resolve)); }
+    rendered.stdin.write(ENTER);
+    await new Promise(resolve => setImmediate(resolve));
+    rendered.stdin.write(ENTER);
+    await vi.waitFor(() => expect(props.onSetTiers).toHaveBeenCalledWith({ coDmAssignment: { connectionId, modelId, effort: null } }));
+  });
+  it("exposes co-DM as an independent principal role with provider and effort", async () => {
+    const rendered = render(<ModelAssignments {...defaultProps({ coDmAssignment: { connectionId: "x-1", modelId: "grok-4.5", effort: "medium" } })} />);
+    expect(rendered.lastFrame()).toContain("Continuing co-DM");
+    expect(rendered.lastFrame()).toContain("xAI: grok-4.5 (medium effort)");
+    for (let i = 0; i < 3; i++) { rendered.stdin.write("\u001b[B"); await new Promise(resolve => setImmediate(resolve)); }
+    rendered.stdin.write(ENTER);
+    await vi.waitFor(() => {
+      expect(rendered.lastFrame()).toContain("Anthropic: Claude Large (medium effort)");
+      expect(rendered.lastFrame()).toContain("xAI: Grok 4.5 (medium effort)");
+    });
+  });
   it("shows discovered future-model names and excludes hidden account models from choices", async () => {
     const rendered = render(<ModelAssignments {...defaultProps({connections:[{
       id:"a-1",provider:"anthropic",label:"Account",masked:"",source:"manual",addedAt:"",

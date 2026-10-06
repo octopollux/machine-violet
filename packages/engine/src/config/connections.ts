@@ -103,6 +103,8 @@ export interface AIConnection {
 
 export interface ConnectionStore {
   connections: AIConnection[];
+  /** Independent continuing co-DM route; absent follows Large, never Small. */
+  coDmAssignment?: TierAssignment & { effort?: import("./models.js").EffortLevel | null };
   /** Model → connection mapping for each tier. */
   tierAssignments: TierAssignments;
   /**
@@ -122,6 +124,24 @@ export interface TierAssignments {
 export interface TierAssignment {
   connectionId: string;
   modelId: string;
+}
+
+/** Persist an independent principal-agent route using the normal connection catalog. */
+export function assignCoDm(
+  store: ConnectionStore,
+  assignment: ConnectionStore["coDmAssignment"],
+): ConnectionStore {
+  if (assignment) {
+    const connection = store.connections.find(c => c.id === assignment.connectionId);
+    if (!connection) throw new Error("Co-DM connection not found");
+    const model = connection.models.find(m => m.id === assignment.modelId || m.aliases?.includes(assignment.modelId));
+    if (!model?.available) throw new Error("Co-DM model is not available on this connection");
+    if (assignment.effort != null && model.supportedReasoningEfforts
+      && !model.supportedReasoningEfforts.includes(assignment.effort)) {
+      throw new Error("Co-DM effort is not supported by this model");
+    }
+  }
+  return { ...store, coDmAssignment: assignment };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +190,7 @@ export function loadConnectionStore(appDir: string): ConnectionStore {
       connections: migrated,
       tierAssignments: parsed.tierAssignments ?? { large: null, medium: null, small: null },
       imageAssignment: parsed.imageAssignment ?? null,
+      coDmAssignment: parsed.coDmAssignment,
     };
   } catch {
     return {
@@ -185,6 +206,7 @@ export function saveConnectionStore(appDir: string, store: ConnectionStore): voi
     connections: store.connections.filter((c) => c.source !== "env"),
     tierAssignments: store.tierAssignments,
     imageAssignment: store.imageAssignment,
+    coDmAssignment: store.coDmAssignment,
   };
   const target = join(appDir, STORE_FILENAME);
   // The config dir is not guaranteed to exist. On a fresh install the first
@@ -392,7 +414,12 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
     if (!imageModels[imageAssignment.modelId]) imageAssignment = null;
   }
 
-  return { connections, tierAssignments, imageAssignment };
+  const coDmAssignment = stored.coDmAssignment
+    && connections.some(c => c.id === stored.coDmAssignment?.connectionId
+      && c.models.some(m => m.available && (m.id === stored.coDmAssignment?.modelId
+        || m.aliases?.includes(stored.coDmAssignment?.modelId ?? ""))))
+    ? stored.coDmAssignment : undefined;
+  return { connections, tierAssignments, imageAssignment, coDmAssignment };
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +477,9 @@ export function removeConnection(store: ConnectionStore, connectionId: string): 
   }
   const imageAssignment =
     store.imageAssignment?.connectionId === connectionId ? null : store.imageAssignment;
-  return { connections, tierAssignments, imageAssignment };
+  const coDmAssignment = store.coDmAssignment?.connectionId === connectionId
+    ? undefined : store.coDmAssignment;
+  return { connections, tierAssignments, imageAssignment, coDmAssignment };
 }
 
 export function setTierAssignment(
@@ -665,6 +694,12 @@ export function upsertChatGptConnection(
     store.tierAssignments[tier] = hasModel
       ? { connectionId, modelId: assignment.modelId }
       : null;
+  }
+
+  const coDm = store.coDmAssignment;
+  if (coDm && removedIds.includes(coDm.connectionId)) {
+    store.coDmAssignment = keptModels.some(m => m.id === coDm.modelId || m.aliases?.includes(coDm.modelId))
+      ? { ...coDm, connectionId } : undefined;
   }
 
   return { connectionId, removedIds, replacedInPlace };

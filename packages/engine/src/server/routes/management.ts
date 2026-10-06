@@ -12,7 +12,7 @@ import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { randomBytes } from "node:crypto";
 import {
   loadConnectionStore, saveConnectionStore, buildEffectiveConnections,
-  addConnection, removeConnection, setImageAssignment, setTierAssignment, updateConnectionModels,
+  assignCoDm, addConnection, removeConnection, setImageAssignment, setTierAssignment, updateConnectionModels,
   updateConnectionKey, maskKey, upsertChatGptConnection,
 } from "../../config/connections.js";
 import type { ConnectionStore, TierAssignment, ProviderType } from "../../config/connections.js";
@@ -92,7 +92,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     ) {
       imageAssignment = priorImage;
     }
-    saveConnectionStore(server.configDir, { connections, tierAssignments, imageAssignment });
+    saveConnectionStore(server.configDir, { connections, tierAssignments, imageAssignment, coDmAssignment: store.coDmAssignment });
     return buildEffectiveConnections(loadConnectionStore(server.configDir), server.configDir);
   }
 
@@ -121,6 +121,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       connections: store.connections.map(serializeConnection),
       tierAssignments: store.tierAssignments,
       imageAssignment: store.imageAssignment,
+      coDmAssignment: store.coDmAssignment ?? null,
     };
   });
 
@@ -164,6 +165,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
       imageAssignment: effective.imageAssignment,
+      coDmAssignment: effective.coDmAssignment ?? null,
     });
   });
 
@@ -188,6 +190,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
       imageAssignment: effective.imageAssignment,
+      coDmAssignment: effective.coDmAssignment ?? null,
     };
   });
 
@@ -224,6 +227,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
       connections: effective.connections.map(serializeConnection),
       tierAssignments: effective.tierAssignments,
       imageAssignment: effective.imageAssignment,
+      coDmAssignment: effective.coDmAssignment ?? null,
     };
   });
 
@@ -595,6 +599,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       tierAssignments: store.tierAssignments,
       imageAssignment: store.imageAssignment,
+      coDmAssignment: store.coDmAssignment ?? null,
     };
   });
 
@@ -603,15 +608,16 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     schema: {
       tags: ["Management"],
       body: SetTiersRequest,
-      response: { 200: TiersResponse },
+      response: { 200: TiersResponse, 400: ErrorResponse },
     },
-  }, async (request) => {
+  }, async (request, reply) => {
     let store = getConnections();
     const body = (request.body as {
       large?: TierAssignment;
       medium?: TierAssignment;
       small?: TierAssignment;
       imageAssignment?: TierAssignment | null;
+      coDmAssignment?: ConnectionStore["coDmAssignment"] | null;
     }) ?? {};
     for (const tier of ["large", "medium", "small"] as const) {
       const assignment = body[tier];
@@ -621,6 +627,10 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     }
     if ("imageAssignment" in body) {
       store = setImageAssignment(store, body.imageAssignment ?? null, server.configDir);
+    }
+    if ("coDmAssignment" in body) {
+      try { store = assignCoDm(store, body.coDmAssignment ?? undefined); }
+      catch (error) { return reply.status(400).send({ error: error instanceof Error ? error.message : "Invalid co-DM assignment" }); }
     }
     const changedTiers = new Set(
       (["large", "medium", "small"] as const).filter((tier) => body[tier] !== undefined),
@@ -632,6 +642,7 @@ export const managementRoutes: FastifyPluginAsync = async (server: FastifyInstan
     return {
       tierAssignments: effective.tierAssignments,
       imageAssignment: effective.imageAssignment,
+      coDmAssignment: effective.coDmAssignment ?? null,
     };
   });
 

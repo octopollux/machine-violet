@@ -27,14 +27,16 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
 
 2. **Read and prepare the incoming character's PC sheet.** Use `knowledge`
    (`action: "read"`, `handle: "<UID or known name>"`) to inspect an existing
-   character. Record the promotion through `scribe`, tagged `player-facing`:
+   character. Use `promote_character` when new mechanical sheet generation is
+   needed, and read its accepted result before relying on the stats. Use
+   explicit atomic `remember` edits for approved sheet/role corrections:
    identify the character UID and set typed fields `type: "PC"`, `player` to
    the player name, `display_resources` to the display keys, and `theme_color`.
    Include the stats, skills, abilities, and promotion history. For a new
-   character, ask the Scribe to create the full sheet in `Characters` first;
+   character, establish the supplied character in `Characters` first;
    read back its committed UID before referencing it elsewhere.
 
-3. **Demote the outgoing PC.** Send a `scribe` update identifying their UID,
+3. **Demote the outgoing PC.** Apply a `remember` patch identifying their UID,
    setting `type: "character"` and `player: null`, and recording retirement
    from player control. Update relationships that described them as the PC.
    Preserve the character and their existing facts; they may recur in the world.
@@ -78,6 +80,6 @@ persists `config.json`. Everything else is ordinary sheet/UI editing.
 - Use `knowledge` or `show_character_sheet` to inspect committed sheets after
   the swap. A session-start prompt copy may still describe the outgoing PC;
   committed knowledge and the persisted roster govern future loads.
-- Complete the sheet and Party updates with `scribe` and call `swap_pc` in
+- Complete accepted sheet and Party updates before calling `swap_pc` in
   one pass. Sheet updates alone do not reassign player control; a roster swap
   without the sheet work leaves the incoming PC without their mechanics.

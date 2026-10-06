@@ -56,6 +56,8 @@ export interface TokenBreakdown {
   byTier: Record<ModelTier, TierTokens>;
   tokens: UsageStats;
   apiCalls: number;
+  /** Actual routed model and role; tier totals remain compatible projections. */
+  byModel?: Record<string, { role: string; model: string; tokens: UsageStats; apiCalls: number }>;
 }
 
 // --- From game-engine.ts ---
@@ -90,15 +92,15 @@ export interface EngineCallbacks {
   /** TUI command from a tool call */
   onTuiCommand: (command: TuiCommand) => void;
   /** Tool started executing */
-  onToolStart: (name: string) => void;
+  onToolStart: (name: string, origin?: { role: "dm" | "co-dm"; callId: string }) => void;
   /** Tool finished executing */
-  onToolEnd: (name: string, result?: ToolResult) => void;
+  onToolEnd: (name: string, result?: ToolResult, origin?: { role: "dm" | "co-dm"; callId: string }) => void;
   /** Dev mode log message */
   onDevLog?: (msg: string) => void;
   /** Exchange dropped from conversation (precis will update) */
   onExchangeDropped: () => void;
   /** Usage stats updated (delta from a single API call, with its model tier) */
-  onUsageUpdate: (delta: UsageStats, tier: ModelTier) => void;
+  onUsageUpdate: (delta: UsageStats, tier: ModelTier, origin?: { role: string; model: string }) => void;
   /** Content classifier refused the response — clear partial DM output */
   onRefusal?: () => void;
   /** Error occurred */

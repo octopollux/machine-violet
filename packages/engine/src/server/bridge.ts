@@ -99,17 +99,17 @@ export function createBridge(
       routeTuiCommand(command, broadcast);
     },
 
-    onToolStart(name: string): void {
+    onToolStart(name: string, origin): void {
       broadcast({
         type: "activity:update",
-        data: { toolStarted: name },
+        data: { toolStarted: name, ...(origin ? { toolRole: origin.role, toolCallId: origin.callId } : {}) },
       });
     },
 
-    onToolEnd(name: string, _result?: ToolResult): void {
+    onToolEnd(name: string, _result?: ToolResult, origin?): void {
       broadcast({
         type: "activity:update",
-        data: { toolEnded: name },
+        data: { toolEnded: name, ...(origin ? { toolRole: origin.role, toolCallId: origin.callId } : {}) },
       });
     },
 
@@ -117,9 +117,9 @@ export function createBridge(
       // No client-visible action needed — the engine handles precis updates internally
     },
 
-    onUsageUpdate(delta: UsageStats, tier: ModelTier): void {
+    onUsageUpdate(delta: UsageStats, tier: ModelTier, origin): void {
       if (costTracker) {
-        costTracker.record(delta, tier);
+        costTracker.record(delta, tier, origin);
       }
     },
 

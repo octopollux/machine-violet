@@ -178,16 +178,22 @@ export const sessionRoutes: FastifyPluginAsync = async (server: FastifyInstance)
     const playerCount = gs.config.players.length;
     if (playerCount <= 1) return { activePlayerIndex: 0 };
 
-    gs.activePlayerIndex = (gs.activePlayerIndex + 1) % playerCount;
-    const player = gs.config.players[gs.activePlayerIndex];
+    const engine = server.sessionManager.getEngine();
+    if (!engine) return reply.status(400).send({ error: 'No active engine.' });
+    return engine.runExternalMutation(async () => {
+      await engine.beforeExternalMutation();
+      gs.activePlayerIndex = (gs.activePlayerIndex + 1) % playerCount;
+      const player = gs.config.players[gs.activePlayerIndex];
+      await engine.recordCoDmEvent("operator", { tool: "switch_player", character: player.character, activePlayerIndex: gs.activePlayerIndex });
 
-    // Broadcast updated state
-    server.sessionManager.broadcast({
-      type: "state:snapshot",
-      data: server.sessionManager.buildStateSnapshot(),
+      // Broadcast updated state
+      server.sessionManager.broadcast({
+        type: "state:snapshot",
+        data: server.sessionManager.buildStateSnapshot(),
+      });
+
+      return { activePlayerIndex: gs.activePlayerIndex, character: player.character };
     });
-
-    return { activePlayerIndex: gs.activePlayerIndex, character: player.character };
   });
 
   /** End the current session. */

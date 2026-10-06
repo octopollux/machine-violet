@@ -269,6 +269,12 @@ export function resolveDevPath(campaignRoot: string, relative: string): string {
   return resolveCampaignPath(campaignRoot, relative);
 }
 
+export interface OperatorMutationHooks {
+  runMutation?: <T>(task: () => Promise<T>) => Promise<T>;
+  beforeMutation?: () => Promise<void>;
+  beforeRollback?: () => Promise<void>;
+  afterMutation?: (payload: unknown) => Promise<void>;
+}
 /** Build an async tool handler for dev mode tools. */
 /**
  * Build the Dev tool handler.
@@ -287,6 +293,7 @@ export function buildDevToolHandler(
   sceneManager?: SceneManager,
   repo?: CampaignRepo,
   onTuiCommand?: (cmd: TuiCommand) => void,
+  mutationHooks: OperatorMutationHooks = {},
 ): (name: string, input: Record<string, unknown>) => Promise<{ content: string; is_error?: boolean }> {
   const root = gameState.campaignRoot;
   const dmRegistry = singletonRegistry;
@@ -297,7 +304,7 @@ export function buildDevToolHandler(
     sceneNumber: () => sceneManager?.getScene().sceneNumber ?? 0, source: "dev",
   });
 
-  return async (name: string, input: Record<string, unknown>) => {
+  const dispatch = async (name: string, input: Record<string, unknown>) => {
     // Entity tools first — structured surface beats raw file I/O.
     const entityResult = await entityDispatch(name, input);
     if (entityResult !== null) return entityResult;
@@ -345,6 +352,7 @@ export function buildDevToolHandler(
         case "set_game_state": {
           const slice = input.slice as string;
           const patch = input.patch as Record<string, unknown>;
+          if ((slice === "decks" || slice === "objectives") && "operationReceipts" in patch) return { content: "Engine operation receipts cannot be changed through operator tools.", is_error: true };
           if (slice === "all") {
             return { content: "Cannot patch 'all' — specify a specific slice.", is_error: true };
           }
@@ -487,6 +495,7 @@ export function buildDevToolHandler(
                 if (!repo) {
                   return { content: "Rollback unavailable: git is disabled.", is_error: true };
                 }
+                await mutationHooks.beforeRollback?.();
                 const rb = await performRollback(repo, parsed.target as string, root, fileIO);
                 throw new RollbackCompleteError(rb.summary);
               }
@@ -495,7 +504,7 @@ export function buildDevToolHandler(
                 onTuiCommand(parsed as TuiCommand);
                 return { content: `Applied: ${name}` };
               }
-            } catch { /* not JSON — pass through */ }
+            } catch (error) { if (error instanceof RollbackCompleteError) throw error; }
           }
 
           return { content: result.content, is_error: result.is_error };
@@ -506,6 +515,17 @@ export function buildDevToolHandler(
       const msg = err instanceof Error ? err.message : String(err);
       return { content: msg, is_error: true };
     }
+  };
+  const readOnly = new Set(['knowledge', 'read_file', 'list_dir', 'get_game_state', 'get_scene_state', 'validate_campaign', 'search_files', 'get_commit_log', 'find_references', 'search_campaign', 'search_content']);
+  return async (name, input) => {
+    const mutating = !readOnly.has(name);
+    const run = async () => {
+      if (mutating) await mutationHooks.beforeMutation?.();
+      const result = await dispatch(name, input);
+      if (mutating && !result.is_error) await mutationHooks.afterMutation?.({ tool: name, outcome: ['scribe', 'promote_character', 'transition_scene', 'end_session', 'update_portrait'].includes(name) ? 'queued' : input.dry_run === true ? 'proposed' : 'committed', input, result: result.content });
+      return result;
+    };
+    return mutating && mutationHooks.runMutation ? mutationHooks.runMutation(run) : run();
   };
 }
 
@@ -582,6 +602,10 @@ export async function enterDevMode(
      * through OpenAI rather than the medium-tier provider.
      */
     smallTier?: TierProvider;
+    runMutation?: OperatorMutationHooks["runMutation"];
+    beforeMutation?: OperatorMutationHooks["beforeMutation"];
+    beforeRollback?: OperatorMutationHooks["beforeRollback"];
+    afterMutation?: OperatorMutationHooks["afterMutation"];
   },
   onStream?: SubagentStreamCallback,
 ): Promise<DevModeResult> {
@@ -594,7 +618,7 @@ export async function enterDevMode(
   const hasTools = !!(options.gameState && options.fileIO);
   const tools = hasTools ? buildDevTools() : undefined;
   const toolHandler = hasTools
-    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, provider, options.smallTier, options.sceneManager, options.repo, options.onTuiCommand)
+    ? buildDevToolHandler(options.gameState as NonNullable<typeof options.gameState>, options.fileIO as NonNullable<typeof options.fileIO>, provider, options.smallTier, options.sceneManager, options.repo, options.onTuiCommand, options)
     : undefined;
 
   const result = await spawnSubagent(
@@ -709,6 +733,10 @@ export function createDevSession(
     model: string;
     /** Small-tier {provider, model} for repair-state subagent dispatch. */
     smallTier?: TierProvider;
+    runMutation?: OperatorMutationHooks["runMutation"];
+    beforeMutation?: OperatorMutationHooks["beforeMutation"];
+    beforeRollback?: OperatorMutationHooks["beforeRollback"];
+    afterMutation?: OperatorMutationHooks["afterMutation"];
   },
 ): ModeSession {
   return {
@@ -722,5 +750,5 @@ export function createDevSession(
 function isCampaignMemoryPath(root: string, path: string): boolean {
   const absolute = norm(resolveDevPath(root, path));
   const relative = absolute.slice(norm(root).length + 1);
-  return /^(knowledge\.sqlite(?:-|$)|characters\/|locations\/|factions\/|lore\/|items\/)/i.test(relative);
+  return /^(knowledge\.sqlite(?:-|$)|state\/|characters\/|locations\/|factions\/|lore\/|items\/)/i.test(relative);
 }

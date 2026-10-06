@@ -158,6 +158,7 @@ const DEFAULTS: ModelConfig = {
   effort: {
     "default": null,
     "dm": "low",
+    "co-dm": "medium",
     "ooc": "high",
     "setup": "high",
     "dev-mode": "high",

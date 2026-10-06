@@ -194,7 +194,7 @@ export const PLAYER_PROFILE_CONTRACT = defineToolContract({
 export function buildScribeToolHandler(
   fileIO: ScribeFileIO, campaignRoot: string, sceneNumber: number,
   _created: string[], updated: string[], _entityDeltas: ScribeEntityDelta[],
-  _removedSlugs: string[] = [], homeDir?: string,
+  _removedSlugs: string[] = [], homeDir?: string, source = "scribe", ownership: { expectedRevision?: () => number; assertCurrent?: () => void; protectedRoots?: string[]; protectedFields?: Record<string, string[]> } = {},
 ) {
   return async (name: string, input: Record<string, unknown>): Promise<{ content: string; is_error?: boolean }> => {
     if (name === "player_profile") {
@@ -213,16 +213,18 @@ export function buildScribeToolHandler(
         const heading = `## ${section}`;
         const sections = splitSections(body);
         const existing = sections.find((part) => part.heading === heading);
+        if (existing?.content.split("\n").includes(`- ${text}`)) return { content: `Private ${section} note already recorded for ${input.player}` };
         const addition = existing ? `${existing.content}\n- ${text}` : `${heading}\n- ${text}`;
         const merged = mergeSectionBodies(body, addition);
         await fileIO.mkdir(dirname(path));
+        ownership.assertCurrent?.();
         await fileIO.writeFile(path, serializeEntity(String(frontMatter._title ?? input.player), { ...frontMatter, type: "player" }, merged, changelog));
         updated.push(path);
         return { content: `Appended private ${section} note for ${input.player}` };
       } catch (error) { return { content: error instanceof Error ? error.message : String(error), is_error: true }; }
     }
     const store = await getCampaignKnowledge(campaignRoot, fileIO);
-    const result = await buildKnowledgeToolHandler(store, { sceneNumber, source: "scribe" })(name, input);
+    const result = await buildKnowledgeToolHandler(store, { sceneNumber, source, ...ownership })(name, input);
     if (!result) return { content: `Unknown tool: ${name}`, is_error: true };
     if (name === "remember" && !result.is_error) {
       const committed = JSON.parse(result.content) as { changed: string[] };

@@ -23,6 +23,13 @@ export interface KnownModelEntry {
   maxOutput: number;
   defaultTier: "large" | "medium" | "small";
   pricing: ModelPricing;
+  /** Published Standard API pricing provenance; subscription usage is not a dollar bill. */
+  pricingDetails?: {
+    source: string;
+    checkedAt: string;
+    serviceTier: "standard";
+    longContext?: { aboveInputTokens: number; inputMultiplier: number; outputMultiplier: number };
+  };
   capabilities: ModelCapabilities;
   /** Agent-specific defaults used only when no explicit effort was configured. */
   effortDefaults?: Record<string, EffortLevel | null>;

@@ -29,6 +29,13 @@ export async function handleCommand(
   gameState: GameState,
   broadcast: (event: ServerEvent) => void,
 ): Promise<CommandResult> {
+  return engine.runExternalMutation(() => dispatchCommand(name, args, engine, gameState, broadcast));
+}
+
+async function dispatchCommand(
+  name: string, args: string, engine: GameEngine, gameState: GameState,
+  broadcast: (event: ServerEvent) => void,
+): Promise<CommandResult> {
   switch (name) {
     case "save":
       return handleSave(args, engine);
@@ -60,6 +67,8 @@ async function handleSave(args: string, engine: GameEngine): Promise<CommandResu
     return { message: "Save unavailable — git is disabled." };
   }
   const label = args.trim() || "manual save";
+  await engine.beforeExternalMutation();
+  await engine.getPersister()?.flush();
   const oid = await repo.checkpoint(label);
   if (oid) {
     return { message: `Saved: ${oid.slice(0, 7)} — ${label}` };
@@ -98,6 +107,7 @@ async function handleRollback(args: string, engine: GameEngine, gameState: GameS
   }
   const fileIO = engine.getSceneManager().getFileIO();
   const target = isOid ? trimmed : `exchanges_ago:${n}`;
+  await engine.invalidateCoDm();
   const result = await performRollback(repo, target, gameState.campaignRoot, fileIO);
   const what = isOid ? `to ${trimmed.slice(0, 7)}` : `${n} exchange(s)`;
   return {
@@ -107,7 +117,8 @@ async function handleRollback(args: string, engine: GameEngine, gameState: GameS
   };
 }
 
-function handleRetry(engine: GameEngine): CommandResult {
+async function handleRetry(engine: GameEngine): Promise<CommandResult> {
+  await engine.beforeExternalMutation();
   if (engine.hasPendingRetry()) {
     engine.retryLastTurn();
     return { message: "Retrying last failed turn..." };
@@ -132,12 +143,13 @@ async function handleScene(args: string, engine: GameEngine): Promise<CommandRes
  * Toggle a mode session (OOC or Dev). If already in that mode, exit it.
  * If in a different mode, exit first then enter the new one.
  */
-function handleModeToggle(
+async function handleModeToggle(
   target: "ooc" | "dev",
   engine: GameEngine,
   gameState: GameState,
   broadcast: (event: ServerEvent) => void,
-): CommandResult {
+): Promise<CommandResult> {
+  await engine.beforeExternalMutation();
   const current = engine.getModeSession();
 
   // If already in the target mode, toggle off
@@ -165,6 +177,7 @@ function handleModeToggle(
     const prefix = sm.getSystemPrompt({});
     const session = createOOCSession(medium.provider, {
       campaignName: gameState.config.name,
+      coDmEnabled: !!engine.getCoDmState(),
       previousVariant,
       config: gameState.config,
       sessionState: sm.getSessionState(),
@@ -190,6 +203,9 @@ function handleModeToggle(
       onDeferredTuiCommands: (cmds) => engine.applyDeferredTuiCommands(cmds),
       model: medium.model,
       smallTier: small,
+      beforeMutation: () => engine.beforeExternalMutation(),
+      runMutation: (task) => engine.runExternalMutation(task),
+      afterMutation: (payload) => engine.recordCoDmEvent("operator", payload),
     });
     engine.setModeSession(session);
   } else {
@@ -202,6 +218,11 @@ function handleModeToggle(
       repo: engine.getRepo() ?? undefined,
       model: medium.model,
       smallTier: small,
+      onTuiCommand: (cmd) => engine.dispatchImmediateTuiCommand(cmd),
+      beforeMutation: () => engine.beforeExternalMutation(),
+      runMutation: (task) => engine.runExternalMutation(task),
+      beforeRollback: () => engine.invalidateCoDm(),
+      afterMutation: (payload) => engine.recordCoDmEvent('operator', payload),
     });
     engine.setModeSession(session);
   }

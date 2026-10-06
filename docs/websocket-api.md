@@ -210,6 +210,10 @@ Engine state changes and tool lifecycle tracking. Also carries embedded TUI comm
 | `engineState`  | string? | New engine state (e.g. `"thinking"`, `"idle"`). |
 | `toolStarted`  | string? | Name of a tool that just started executing. |
 | `toolEnded`    | string? | Name of a tool that just finished executing. |
+| `toolRole`     | `dm` or `co-dm`? | Principal agent that owns this call. Background activity never changes foreground readiness. |
+| `toolCallId`   | string? | Engine-assigned execution identity, shared by start/end; overlapping calls may have the same tool name. |
+
+Co-DM tool calls accumulate the same public tool glyphs as DM calls. Completions preserve those glyphs; the normal foreground turn-end boundary clears them. Late background starts may display during player input without making the DM active. Activity metadata contains names and identities only, never private arguments or annotation content.
 
 The `data` payload may also include TUI command fields (forwarded from the engine's `onTuiCommand` callback):
 

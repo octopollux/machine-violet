@@ -137,8 +137,8 @@ describe("agentLoop", () => {
       mockConfig({ provider, onToolStart, onToolEnd }),
     );
 
-    expect(onToolStart).toHaveBeenCalledWith("roll_dice");
-    expect(onToolEnd).toHaveBeenCalledWith("roll_dice", expect.objectContaining({ content: expect.stringContaining("→") }));
+    expect(onToolStart).toHaveBeenCalledWith("roll_dice", "toolu_test");
+    expect(onToolEnd).toHaveBeenCalledWith("roll_dice", expect.objectContaining({ content: expect.stringContaining("→") }), "toolu_test");
     expect(result.text).toBe("You rolled a 17. The attack hits!");
   });
 
@@ -405,6 +405,7 @@ describe("agentLoop", () => {
     expect(onToolEnd).toHaveBeenCalledWith(
       "map",
       expect.objectContaining({ is_error: true }),
+      "toolu_test",
     );
     expect(result.text).toBe("I couldn't find that map.");
   });

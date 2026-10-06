@@ -16,4 +16,6 @@ export interface ObjectivesState {
   next_id: number;
   /** Current scene number — kept in sync by the scene manager. */
   current_scene: number;
+  /** Engine receipts commit atomically with the authoritative tracker mutation. */
+  operationReceipts?: Record<string, { content: string; is_error?: boolean }>;
 }

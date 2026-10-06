@@ -146,3 +146,19 @@ describe("CostTracker", () => {
     });
   });
 });
+
+
+describe('actual model and role accounting', () => {
+  it('attributes independently routed co-DM without recording its tokens twice', () => {
+    const tracker = new CostTracker();
+    tracker.record({ inputTokens: 10, outputTokens: 5, cacheReadTokens: 30, cacheCreationTokens: 2, reasoningTokens: 3 }, 'large', { role: 'co-dm', model: 'independent-maintainer' });
+    expect(tracker.getTotalTokens()).toBe(15);
+    const breakdown = tracker.getBreakdown();
+    expect(breakdown.apiCalls).toBe(1);
+    expect(Object.values(breakdown.byModel ?? {})).toEqual([{ role: 'co-dm', model: 'independent-maintainer', tokens: { inputTokens: 10, outputTokens: 5, cacheReadTokens: 30, cacheCreationTokens: 2, reasoningTokens: 3 }, apiCalls: 1 }]);
+    const resumed = new CostTracker(); resumed.seed(breakdown);
+    expect(resumed.getBreakdown()).toEqual(breakdown);
+    breakdown.byModel = {};
+    expect(Object.keys(resumed.getBreakdown().byModel ?? {})).toHaveLength(1);
+  });
+});

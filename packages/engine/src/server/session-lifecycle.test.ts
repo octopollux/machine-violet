@@ -25,7 +25,7 @@ async function fixture() {
   return { root, io, store, manager, internal };
 }
 function engine(methods?: Record<string, unknown>): GameEngine {
-  return { beginTeardown: vi.fn(), settleDeferredWork: vi.fn(async () => undefined), getPersister: () => ({ flush: vi.fn(async () => undefined) }), getRepo: () => null, ...methods } as unknown as GameEngine;
+  return { suspendCoDm: vi.fn(async () => {}), beginTeardown: vi.fn(), settleDeferredWork: vi.fn(async () => undefined), getPersister: () => ({ flush: vi.fn(async () => undefined) }), getRepo: () => null, ...methods } as unknown as GameEngine;
 }
 
 describe("session-owned SQLite lifecycle", () => {
@@ -63,10 +63,15 @@ describe("session-owned SQLite lifecycle", () => {
     await fresh.closeKnowledgeStores?.(); await rm(root, { recursive: true });
   });
 
-  it("bounds stalled deferred work and provider disposal, seals held handles, and permits immediate deletion", async () => {
+  it("bounds graceful wait and provider disposal, then fences and joins cancelled writers before closure", async () => {
     const { root, io, store, manager, internal } = await fixture();
     vi.useFakeTimers();
-    internal.engine = engine({ settleDeferredWork: vi.fn(() => new Promise(() => undefined)) });
+    let release!: () => void;
+    const abandoned = new Promise<void>(resolve => { release = resolve; });
+    internal.engine = engine({
+      settleDeferredWork: vi.fn(() => abandoned),
+      suspendCoDm: vi.fn(async () => { release(); }),
+    });
     internal.ownedFileIO = io; internal.status = "active";
     internal.sessionProviders.add({ providerId: "stalled", dispose: () => new Promise(() => undefined) } as unknown as LLMProvider);
     const ending = manager.endSession();

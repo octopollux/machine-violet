@@ -1,6 +1,8 @@
 # Subagents Catalog
 
-Every subagent pattern specified across the design docs. A subagent is a nested Claude API conversation with its own context window — the parent's context is not polluted by the subagent's intermediate work.
+Subagent patterns specified across the design docs. A subagent is a separate model conversation with its own context window; providers and models are resolved by the caller. Historical Haiku/Sonnet labels below describe intended size tiers, not guaranteed current vendors.
+
+For the source-verified 2026-10-05 inventory, including the isolated co-DM prototype, content-processing agents and proposed ownership changes, see the [agent/tool integration audit](experiments/co-dm/agent-tool-audit.md). That design audit distinguishes current behavior from planned changes; the older planned-role sections below are not a count of running agents.
 
 **Visibility key**: Silent = DM-only, player never sees it. Player-facing = takes over the TUI temporarily.
 
@@ -18,13 +20,13 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 | **Lifecycle** | Created at `start_combat`, torn down at `end_combat` |
 | **Source** | `packages/engine/src/agents/resolve-session.ts`, `packages/engine/src/prompts/resolve-session.md` |
 
-**Persistent** combat resolution engine. Unlike fire-and-forget subagents, the resolve session accumulates context across all turns and rounds within a combat encounter. Messages are never pruned — Sonnet's 1M context window handles even marathon combats.
+**Persistent** combat resolution engine. Unlike fire-and-forget subagents, the resolve session accumulates context across all turns and rounds within a combat encounter. Messages are currently not pruned; available context depends on the configured model.
 
 **Context**: System prompt with session identity + output format (BP1), rule card combat rules (BP2), all combatant stat blocks (BP3). Per-turn: combat state snapshot (round, initiative order, HP/conditions), action declaration.
 
 **Tools**: `roll_dice`, `read_character_sheet`, `read_stat_block`, `query_rules`, `search_content` (fallback).
 
-**Returns**: `ResolutionResult` with structured `StateDelta[]` (engine auto-applies HP/conditions/resources), `RollRecord[]`, and a narrative summary for the DM. Output format is XML (`<resolution>` block). Graceful fallback: if no XML block found, full text returned as narrative.
+**Returns**: `ResolutionResult` with structured `StateDelta[]`, `RollRecord[]`, and a narrative summary for the DM. The engine currently applies HP/resource deltas; condition and position deltas remain in the result for the DM rather than directly updating corresponding state. Output format is XML (`<resolution>` block). Graceful fallback: if no XML block found, full text returned as narrative.
 
 **Caching**: Turns 2-N read prior context at cache rate; the persistent session is the reason this stays cheap even for marathon combats.
 
@@ -37,7 +39,7 @@ Every subagent pattern specified across the design docs. A subagent is a nested 
 | **Trigger** | Internal (not directly DM-callable) |
 | **Source doc** | [randomization.md](randomization.md) |
 
-**Deprecated** — use Resolve Session for combat. This fire-and-forget subagent remains available for simple non-combat mechanical checks. No persistent context between calls.
+**Historical design, not a current executable role.** The 2026-10-05 source audit found no separate legacy resolution agent. Use Resolve Session for combat and `roll_dice` for simple checks; do not count this entry as an additional running helper.
 
 **Returns**: Terse structured result — summary, rolls breakdown, state changes. ~20-50 tokens.
 
@@ -356,31 +358,31 @@ Developer console for power users — inspects and manipulates the running game.
 
 ## Initialization Subagents (during setup)
 
-### 9. Setup Agent
+### 9. Setup Orchestration (code, not a separate model role)
 
 | Property | Value |
 |---|---|
-| **Model** | Sonnet |
+| **Model** | None; orchestration around the setup conversation below |
 | **Visibility** | Player-facing |
 | **Trigger** | App launch → "Start a new campaign" |
 | **Source doc** | [game-initialization.md](game-initialization.md) |
 
-Drives the entire game initialization conversation. Personality: dramatic, the opening act. Offers structured choices (3-5 options + freeform) at each step. Delegates mechanical work to Haiku subagents.
+`SetupSession` and `world-builder.ts` finalize accepted choices, commit the deterministic scaffold and approved portrait, and persist a private `state/startup.json` envelope. This includes the actual setup handoff, selected seed/fork detail, canonical handles, boundaries, portrait references, and scaffold/mechanics/opening stages. Setup providers are disposed before game providers start. The game Small tier prepares a required initial sheet concurrently with independent opening narration and the co-DM bootstrap; mechanical tools and input readiness await accepted stats. A canonical complete sheet survives a crash between acceptance and the final startup marker. A durable engine completion receipt for the stable startup opening ID takes precedence over an interrupted final marker on resume; a marker alone cannot claim success. Synthetic startup directions enter the private feed as bootstrap events. `setup-agent.ts` supplies configuration/types; it does not run a second setup model.
 
-**Handles**: Genre selection, system selection, campaign source, mood/difficulty, DM personality, player info, world building, and declaring the campaign's opening scene (`opening_scene`) for the DM's first turn. Creates the full campaign directory structure.
+The conversation collects genre/system/source, mood/difficulty, DM personality, player info and the opening directive. Code creates the campaign directory and assembles selected seed/fork data; the model does not have to reconstruct hidden seed prose.
 
 ---
 
-### 10. Setup Conversation Subagent
+### 10. Setup Conversation
 
 | Property | Value |
 |---|---|
-| **Model** | Sonnet |
+| **Model** | Configured `large` tier |
 | **Visibility** | Player-facing |
-| **Trigger** | Setup agent delegates interactive campaign generation |
+| **Trigger** | Start a new campaign |
 | **Source doc** | [game-initialization.md](game-initialization.md) |
 
-Multi-turn conversational subagent for interactive campaign setup. The setup agent (Sonnet) orchestrates the flow and delegates the actual conversation to this Haiku subagent for cost efficiency. Supports `present_choices` and `finalize_setup` tool calls.
+Multi-turn player-facing conversation implemented by `agents/subagents/setup-conversation.ts`. Supports `present_choices`, `finalize_setup`, `load_world`, `roll_dice`, and image/portrait tools when enabled. There is no separate model delegating this conversation.
 
 **Context**: System prompt with personality instructions + conversation history with player. Variable size.
 
@@ -439,9 +441,9 @@ Translates natural-language theme requests (e.g., "cyberpunk neon") into structu
 
 ---
 
-## Planned Subagents (Not Yet Implemented)
+## Historical Planned Roles
 
-> These subagents are designed but have no code. Each links to its tracking issue.
+> These are historical design entries, not a verified current issue-status list. The current content pipeline already implements classification, specialized extraction, merge comparison, cheat-sheet and rule-card generation; see the [source inventory](experiments/co-dm/agent-tool-audit.md#content-processing-agents). The issue references below preserve the original proposals without implying that each is an additional unimplemented agent.
 
 ### Character Creation Subagent (Crunchy) — [#69](https://github.com/octopollux/machine-violet/issues/69)
 
@@ -469,27 +471,27 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 
 | # | Subagent | Model | Visibility | When |
 |---|---|---|---|---|
-| 1 | Resolution | Haiku | Silent / Player-facing | Runtime — action resolution |
-| 2 | OOC | Sonnet | Player-facing | Runtime — out-of-character mode |
-| 3 | Choice Generation | Haiku | Silent | Runtime — player choice options |
-| 4 | Scene Summarizer | Haiku | Silent | Runtime — scene transition |
-| 5 | Precis Updater + PlayerRead | Haiku | Silent | Runtime — context pruning + lightweight player signals |
-| 5c | Discord Status | Haiku | Silent | Runtime — Discord Rich Presence update every 8 DM narratives |
-| 6 | Changelog Updater | Haiku | Silent | Runtime — scene transition |
-| 6a | Compendium Updater | Haiku | Silent | Runtime — scene transition |
+| 1 | Resolve Session | Medium | Silent specialist; engine displays results | Runtime — combat action resolution |
+| 2 | OOC | Medium | Player-facing | Runtime — out-of-character mode |
+| 3 | Choice Generation | Small | Silent generation; public suggestions | Runtime — player choice options |
+| 4 | Scene Summarizer | Small | Silent | Runtime — scene transition |
+| 5 | Precis Updater + PlayerRead | Small | Silent | Runtime — context pruning + lightweight player signals |
+| 5b | Scene Tracker | Small | Silent | Runtime — open threads and NPC intents |
+| 5c | Discord Status | Small | Silent generation; public presence | Runtime — Discord Rich Presence update every 8 DM narratives |
+| 6 | Changelog Updater | Small | Silent | Runtime — scene transition |
+| 6a | Compendium Updater | Small | Silent generation; public knowledge | Runtime — scene transition |
 | 6b | Scribe | Small (configured) | Silent | Runtime — campaign knowledge maintenance |
-| 6c | Campaign Search | Haiku | Silent | Runtime — agentic campaign search |
-| 6d | Search Content | Haiku | Silent | Runtime — game system content lookup (DM tool + combat fallback) |
-| 7 | Character Promotion | Haiku | Silent | Runtime — on demand |
-| 8 | AI Player | Haiku/Sonnet | Silent | Runtime — AI player turns |
-| 9 | Setup Agent | Sonnet | Player-facing | Init — game setup (orchestrator) |
-| 10 | Setup Conversation | Sonnet | Player-facing | Init — interactive campaign generation |
-| 11 | Narrative Recap | Haiku | Silent | Runtime — session resume prose |
-| 12 | Repair State | Haiku | Silent | Runtime — missing entity generation |
-| 13 | Theme Styler | Haiku | Silent | Runtime — natural-language theme interpretation |
-| 16 | Dev Mode | Sonnet | Player-facing | Runtime — developer console |
+| 6c | Campaign Search | Small | Silent | Runtime — agentic campaign search |
+| 6d | Search Content | Small | Silent | Runtime — game system content lookup (DM tool + combat fallback) |
+| 7 | Character Promotion | Small | Silent in current engine/setup callers | Init/runtime — sheet preparation and on demand |
+| 8 | AI Player | Small/Medium | Silent generation; player action | Runtime — AI player turns |
+| 10 | Setup Conversation | Large | Player-facing | Init — interactive campaign generation |
+| 11 | Narrative Recap | Small | Silent generation; player recap | Runtime — generated at session end, displayed on resume |
+| 12 | Repair State | Small | Silent | Runtime — missing entity generation |
+| 13 | Theme Styler | Small | Silent | Runtime — natural-language theme interpretation |
+| 16 | Dev Mode | Medium | Player-facing | Runtime — developer console |
 
-**Opus is never a subagent** — Opus IS the DM. Apart from Scribe's configured Small slot, the table lists Haiku (cheap mechanical work) or Sonnet (personality/quality needed). The summary table above is the canonical list; model and visibility are columns, not separate counts to maintain.
+These are caller-selected tiers, not fixed model families. The foreground DM uses Large; each helper receives the appropriate provider/model pair. The continuing co-DM is part of normal startup and gameplay, follows Large by default, and supports an independent provider/model/effort assignment. It owns routine maintenance in place of the explicit and automatic Scribe lane. Content-processing model stages are inventoried separately in the linked audit. Setup orchestration is code, so it is not counted as another model role here.
 
 ## Prompt Caching
 
@@ -505,3 +507,13 @@ Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt incl
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 
 **Multi-turn agents** with tools (scribe, search-campaign, search-content) set `cacheTools: true` so tool definitions are also cached across rounds. Scribe uses the configured Small slot.
+
+
+### Objective authority in the continuing co-DM lane
+
+`GameState.objectives`, persisted as `state/objectives.json`, is the authoritative objective tracker. Canonical knowledge can describe established objective context and history; it does not create a second competing acceptance/status list. Co-DM tracker mutations require established player/DM acceptance, use the observation's objective revision, and preserve newer explicit corrections. Engine operation receipts persist in the same atomic objectives state file as the actual mutation, so replaying an accepted provider response after an interrupted cursor write cannot create a duplicate objective.
+
+Session token breakdowns retain tier projections and optionally include `byModel` buckets with the actual routed model and role. A co-DM call enters total usage once, even when its dedicated model differs from Large. Reasoning token diagnostics remain separate metadata and are not added again to reported input-plus-output totals.
+
+
+Startup opening recovery freezes accepted provider requests/responses under the stable opening exchange ID. Trusted tool-call identity distinguishes intentionally separate dice rolls and draws; their accepted results and card effects commit together in `state/decks.json`. Retrying an accepted call returns its original result, while another call ID remains another action. Operators cannot patch engine receipts through raw state tools. Initial sheet acceptance rebases generated sections onto newer prose and uses canonical body/revision checks at the SQLite mutation boundary; unchanged copied metadata does not replace later biography or name corrections.

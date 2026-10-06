@@ -90,6 +90,9 @@ export const ActivityUpdateEvent = Type.Object({
     engineState: Type.Optional(Type.String()),
     toolStarted: Type.Optional(Type.String()),
     toolEnded: Type.Optional(Type.String()),
+    /** Public origin and identity only: never send private tool arguments. */
+    toolRole: Type.Optional(Type.Union([Type.Literal("dm"), Type.Literal("co-dm")])),
+    toolCallId: Type.Optional(Type.String()),
   }),
 });
 

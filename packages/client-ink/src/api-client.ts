@@ -53,6 +53,7 @@ export interface ConnectionsResponse {
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
   imageAssignment: TierAssignmentEntry | null;
+  coDmAssignment?: CoDmAssignmentEntry | null;
 }
 
 export interface ConnectionHealthResponse {
@@ -80,7 +81,7 @@ export interface KnownModelInfo {
   maxOutput: number;
   defaultTier: string;
   pricing: { input: number; output: number; cacheWrite: number; cacheRead: number };
-  capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean };
+  capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean; alwaysAdaptiveThinking?: boolean; minimumThinkingMode?: "between_tools" };
 }
 
 export interface KnownImageModelInfo {
@@ -274,6 +275,7 @@ export class ApiClient {
   async getTierAssignments(): Promise<{
     tierAssignments: TierAssignmentsResponse;
     imageAssignment: TierAssignmentEntry | null;
+  coDmAssignment?: CoDmAssignmentEntry | null;
   }> {
     return this.get("/manage/tiers");
   }
@@ -281,10 +283,12 @@ export class ApiClient {
   async setTierAssignments(
     assignments: Partial<TierAssignmentsResponse> & {
       imageAssignment?: TierAssignmentEntry | null;
+      coDmAssignment?: CoDmAssignmentEntry | null;
     },
   ): Promise<{
     tierAssignments: TierAssignmentsResponse;
     imageAssignment: TierAssignmentEntry | null;
+  coDmAssignment?: CoDmAssignmentEntry | null;
   }> {
     return this.fetch("/manage/tiers", { method: "PUT", body: assignments });
   }
@@ -377,3 +381,5 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+export type CoDmAssignmentEntry = TierAssignmentEntry & { effort?: "low" | "medium" | "high" | "xhigh" | "max" | null };

@@ -1,0 +1,131 @@
+{
+  "fixtureVersion": 1,
+  "contract": "proposed-co-dm-feed-v1",
+  "scenario": "cold-platform",
+  "epoch": "epoch-1",
+  "scene": "platform",
+  "cursor": 0,
+  "dmNotes": "The shadowy figure is secretly the courier Bob. Do not reveal his dead-drop allegiance.",
+  "collections": [
+    "Characters",
+    "Locations",
+    "Items",
+    "Lore",
+    "Lore/Spells"
+  ],
+  "records": [
+    {
+      "uid": "pc",
+      "name": "Mara",
+      "collection": "Characters",
+      "visibility": "public",
+      "data": {
+        "location": {
+          "$ref": "platform"
+        },
+        "appearance": "dark cropped hair; no scar"
+      }
+    },
+    {
+      "uid": "figure",
+      "name": "shadowy figure",
+      "aliases": [],
+      "collection": "Characters",
+      "visibility": "private",
+      "data": {
+        "location": {
+          "$ref": "platform"
+        },
+        "secretAllegiance": "dead-drop network"
+      },
+      "approvedPublic": {
+        "name": "shadowy figure",
+        "summary": "A figure waits beside the platform clock."
+      }
+    },
+    {
+      "uid": "bob-old",
+      "name": "Bob",
+      "collection": "Characters",
+      "visibility": "private",
+      "data": {
+        "oldHandle": true
+      },
+      "body": "Existing fragment: the courier Bob likes black tea."
+    },
+    {
+      "uid": "packet",
+      "name": "sealed packet",
+      "collection": "Items",
+      "visibility": "public",
+      "data": {
+        "holder": {
+          "$ref": "pc"
+        },
+        "location": {
+          "$ref": "platform"
+        }
+      }
+    },
+    {
+      "uid": "archive",
+      "name": "radio archive",
+      "collection": "Lore",
+      "visibility": "private",
+      "data": {
+        "frequencies": [
+          93.2,
+          104.1
+        ],
+        "active": true
+      },
+      "body": "Archive paragraph 001: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 002: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 003: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 004: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 005: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 006: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 007: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 008: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 009: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 010: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 011: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 012: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 013: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 014: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 015: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 016: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 017: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 018: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 019: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 020: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 021: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 022: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 023: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 024: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 025: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 026: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 027: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 028: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 029: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 030: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 031: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 032: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 033: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 034: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 035: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 036: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 037: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 038: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 039: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 040: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 041: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 042: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 043: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 044: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 045: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 046: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 047: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 048: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 049: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 050: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 051: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 052: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 053: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 054: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 055: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 056: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 057: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 058: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 059: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 060: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 061: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 062: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 063: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 064: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 065: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 066: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 067: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 068: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 069: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 070: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 071: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 072: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 073: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 074: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 075: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 076: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 077: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 078: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 079: The tram route and radio repair inventory remain unchanged.\nArchive paragraph 080: The tram route and radio repair inventory remain unchanged."
+    },
+    {
+      "uid": "spell",
+      "name": "Prism Recall",
+      "collection": "Lore/Spells",
+      "visibility": "public",
+      "data": {},
+      "body": "Known name only."
+    },
+    {
+      "uid": "platform",
+      "name": "station platform",
+      "collection": "Locations",
+      "visibility": "public",
+      "data": {}
+    },
+    {
+      "uid": "cellar",
+      "name": "station cellar",
+      "collection": "Locations",
+      "visibility": "public",
+      "data": {}
+    }
+  ],
+  "resources": {
+    "Coin": 5,
+    "swear jar funds remaining": 3
+  },
+  "modeline": "LAST TRAIN EAST",
+  "theme": "cold blue",
+  "deck": {
+    "remaining": [
+      "card-b"
+    ],
+    "drawn": [
+      "card-a"
+    ],
+    "faces": {
+      "card-a": "Flame",
+      "card-b": "Flame"
+    }
+  },
+  "portraits": {
+    "pc": {
+      "appearanceRevision": 0,
+      "requestedRevision": 0
+    }
+  }
+}

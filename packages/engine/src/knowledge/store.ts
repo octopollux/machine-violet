@@ -2,6 +2,7 @@ import type { KnowledgeMutationOptions, KnowledgeMutationResult, KnowledgeNode, 
 import { SqliteKnowledgeStore } from "./sqlite-store.js";
 export const KNOWLEDGE_FILE = "knowledge.sqlite";
 export interface CampaignKnowledgeStore {
+  revision?(): Promise<number>;
   outline(): Promise<KnowledgeOutlineEntry[]>;
   snapshot(): Promise<string>;
   resolve(handle: string): Promise<string | null>;

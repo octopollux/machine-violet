@@ -89,14 +89,22 @@ const TOOL_GLYPH_MAP: Record<string, ToolGlyph> = {
   modify_initiative:  { glyph: "⚔", color: "red" },
   // Entity / worldbuilding
   scribe:             { glyph: "✎", color: "green" },
+  remember:           { glyph: "✎", color: "green" },
+  knowledge:          { glyph: "⌕", color: "cyan" },
+  search_campaign:    { glyph: "⌕", color: "cyan" },
+  player_profile:     { glyph: "✎", color: "green" },
+  manage_objectives:  { glyph: "✓", color: "green" },
   dm_notes:           { glyph: "✎", color: "green" },
   // Image generation (single-width symbol so it aligns in the glyph row;
   // the long-form "creating an image" label lives in ACTIVITY_MAP)
   generate_image:     { glyph: "❖", color: "magenta" },
+  update_portrait:    { glyph: "❖", color: "magenta" },
   // TUI / presentation
   update_modeline:    { glyph: "◆", color: "magenta" },
   style_scene:        { glyph: "◆", color: "magenta" },
   set_display_resources: { glyph: "◆", color: "magenta" },
+  set_resource_values: { glyph: "◆", color: "magenta" },
+  set_theme:          { glyph: "◆", color: "magenta" },
   present_choices:    { glyph: "◆", color: "magenta" },
   show_character_sheet: { glyph: "◆", color: "magenta" },
   enter_ooc:          { glyph: "◆", color: "magenta" },

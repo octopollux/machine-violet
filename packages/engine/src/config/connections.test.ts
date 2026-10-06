@@ -153,6 +153,22 @@ describe("saveConnectionStore", () => {
 });
 
 describe("buildEffectiveConnections", () => {
+  it("drops unavailable co-DM routes but preserves discovered aliases and unknown available models", () => {
+    const connection: AIConnection = { id: "chat", provider: "openai-chatgpt", label: "Chat", apiKey: "", source: "manual", addedAt: "", models: [
+      { id: "current", aliases: ["saved-row"], displayName: "Current", available: true },
+      { id: "hidden", displayName: "Hidden", available: false },
+      { id: "future", displayName: "Future", available: true },
+    ] };
+    const store: ConnectionStore = { connections: [connection], tierAssignments: { large: null, medium: null, small: null } };
+    for (const modelId of ["removed", "hidden"]) {
+      store.coDmAssignment = { connectionId: "chat", modelId };
+      expect(buildEffectiveConnections(store, tempDir).coDmAssignment).toBeUndefined();
+    }
+    for (const modelId of ["saved-row", "future"]) {
+      store.coDmAssignment = { connectionId: "chat", modelId, effort: null };
+      expect(buildEffectiveConnections(store, tempDir).coDmAssignment).toEqual(store.coDmAssignment);
+    }
+  });
   it("preserves live ChatGPT availability/capabilities and chooses role-aware rollout fallbacks", () => {
     const models = [
       {id:"gpt-6-astra",displayName:"Astra",available:true,supportedReasoningEfforts:["low","max"]},

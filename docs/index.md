@@ -8,6 +8,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | I need to... | Go to |
 |---|---|
 | Understand the system architecture | [architecture.md](architecture.md) |
+| Configure the continuing co-DM and inspect its activity | [co-dm.md](co-dm.md) |
 | Find where code lives | [module-map.md](module-map.md) |
 | Look up a tool's signature or behavior | [tools-catalog.md](tools-catalog.md) |
 | Add or change a tool input contract | [tool-input-contracts.md](tool-input-contracts.md) |
@@ -51,10 +52,11 @@ This project has three documentation layers. Each has a distinct purpose:
 
 **[CLAUDE.md](../CLAUDE.md)** — Conventions. Rules for writing code in this project: imports, testing, state management, formatting. The canonical reference for "how should I do X?"
 
-All docs describe only what is implemented. Planned features live in GitHub issues, not in documentation.
+Production docs describe only what is implemented. Planned features normally live in GitHub issues. The Experiments section also contains explicitly requested design drafts and exploratory evidence; these are clearly marked and are not production specifications.
 
 ## Experiments
 
+- [Continuing co-DM lane](experiments/co-dm/README.md) — **architecture adopted; isolated prototype, not production**; responsibilities, ordered feed, lifecycle invariants, pilot evidence and test plan. The [agent/tool audit](experiments/co-dm/agent-tool-audit.md) covers startup, all model roles/tools and operator/developer integration.
 - [Narrative dependency bookkeeping](experiments/metadata-dependencies/README.md) — isolated exploratory Luna screen, fixtures, raw results, and limitations; not a production contract.
 
 ## Running the Project

@@ -36,6 +36,8 @@ import { getCampaignKnowledge } from "../knowledge/store.js";
 import type { KnowledgeValue } from "@machine-violet/shared/types/knowledge.js";
 import { createGitIO } from "../tools/git/isogit-adapter.js";
 import { logEvent } from "../context/engine-log.js";
+import { buildStartup, writeStartup, rebaseSheetBody } from "../agents/startup.js";
+import { loadContentBoundaries } from "../agents/scene-manager.js";
 
 export class SetupSession {
   private conversation: SetupConversation | null = null;
@@ -145,7 +147,7 @@ export class SetupSession {
         });
       }
     })), "providers");
-    await this.awaitDisposal(Promise.allSettled([...this.activeWork]), "active setup work");
+    await Promise.allSettled([...this.activeWork]);
     await this.fileIO.closeKnowledgeStores?.();
   }
 
@@ -347,10 +349,18 @@ export class SetupSession {
       this.homeDir,
     );
 
-    // Build initial character sheet (optional — needs system + characterDetails)
+    const config = JSON.parse(await this.fileIO.readFile(norm(`${campaignRoot}/config.json`))) as CampaignConfig;
+    const boundaries = await loadContentBoundaries(config.players, this.homeDir, this.fileIO);
+    const startup = await buildStartup(campaignRoot, this.fileIO, config, boundaries ?? "");
+    startup.seedProvenance = {
+      source: result.worldSlug ? 'seed' : 'custom', worldSlug: result.worldSlug,
+      selectedForks: { ...result.forkSelections },
+    };
     if (result.system && result.characterDetails) {
-      await this.buildInitialSheet(campaignRoot, result);
+      startup.initialSheet = { character: result.characterName, system: result.system, details: result.characterDetails, status: 'pending' };
+      startup.taskStatus.mechanics = 'pending';
     }
+    await writeStartup(campaignRoot, this.fileIO, startup);
 
     // Handoff commit — the campaign directory becomes a git repo and all
     // scaffolded files (config.json, character sheet, party.md, etc.) land
@@ -404,46 +414,77 @@ export class SetupSession {
     }
   }
 
-  private async buildInitialSheet(campaignRoot: string, result: SetupResult): Promise<void> {
-    const knowledge = await getCampaignKnowledge(campaignRoot,this.fileIO);
+}
+
+export async function buildInitialSheet(campaignRoot: string, result: Pick<SetupResult, "characterName" | "system" | "characterDetails">, fileIO: FileIO, homeDir: string, small: TierProvider, onUsage?: (usage: import("../agents/agent-loop.js").UsageStats) => void): Promise<void> {
+    const knowledge = await getCampaignKnowledge(campaignRoot,fileIO);
 
     let stub: string;
+    let acceptedName: string;
+    let acceptedUid: string;
+    let acceptedBody: string;
+    let originalFields: Record<string, KnowledgeValue>;
+    let acceptedFields: Record<string, KnowledgeValue>;
     try {
       const node=await knowledge.read(result.characterName,{textLimit:100000,logLimit:1000});
+      if (node.fields.sheet_status === "complete") return;
+      acceptedName = node.name;
+      acceptedUid = node.uid;
+      acceptedBody = node.body;
+      originalFields = structuredClone(node.fields);
       stub = serializeEntity(node.name,node.fields,node.body,[]);
-    } catch {
-      return;
+      acceptedFields = parseFrontMatter(stub).frontMatter as Record<string, KnowledgeValue>;
+    } catch (error) {
+      throw new Error("Accepted player character is missing from the canonical scaffold", { cause: error });
     }
 
     // Load rule card
     let ruleCard: string | null = null;
     if (result.system) {
-      const sysPaths = processingPaths(this.homeDir, result.system);
+      const sysPaths = processingPaths(homeDir, result.system);
       try {
-        ruleCard = await this.fileIO.readFile(norm(sysPaths.ruleCard));
+        ruleCard = await fileIO.readFile(norm(sysPaths.ruleCard));
       } catch {
         ruleCard = readBundledRuleCard(result.system);
       }
     }
 
-    if (!ruleCard) return;
+    if (!ruleCard) throw new Error("Required initial character sheet rules are unavailable");
 
     try {
-      const small = this.tierProviders.small;
-      const { updatedSheet } = await promoteCharacter(small.provider, {
+      const { updatedSheet, usage } = await promoteCharacter(small.provider, {
         characterSheet: stub,
         systemRules: ruleCard,
         context: `Build initial character sheet: ${result.characterDetails}`,
         characterName: result.characterName,
       }, undefined, small.model);
+      onUsage?.(usage);
+      if (!updatedSheet) throw new Error("Initial character sheet was not returned");
       if (updatedSheet) {
         const { frontMatter, body, changelog } = parseFrontMatter(updatedSheet);
         frontMatter.sheet_status = "complete";
-        const title = String(frontMatter._title ?? result.characterName);
-        await knowledge.mutate([{op:"patch",uid:result.characterName,name:title,fields:frontMatter as Record<string,KnowledgeValue>,body},...changelog.map(entry=>({op:"append_log" as const,uid:result.characterName,body:entry}))],{source:"setup-sheet"});
+        // A sheet specialist owns body/mechanics; unchanged copied metadata
+        // must not overwrite concurrent granular biography or identity updates.
+        const proposedTitle = String(frontMatter._title ?? acceptedName);
+        for (let attempt = 0; ; attempt++) {
+          const revision = await knowledge.revision?.();
+          const current = await knowledge.read(acceptedUid, { textLimit: 100000, logLimit: 0 });
+          const fields = Object.fromEntries(Object.entries(frontMatter).filter(([key, value]) => key !== '_title'
+            && JSON.stringify(value) !== JSON.stringify(acceptedFields[key])
+            && (key === 'sheet_status' || JSON.stringify(current.fields[key]) === JSON.stringify(originalFields[key])))) as Record<string, KnowledgeValue>;
+          const title = proposedTitle !== acceptedName && current.name === acceptedName ? proposedTitle : undefined;
+          try {
+            await knowledge.mutate([{ op: 'patch', uid: acceptedUid, ...(title ? { name: title } : {}), fields,
+              body: rebaseSheetBody(acceptedBody, body, current.body) },
+              ...changelog.map(entry => ({ op: 'append_log' as const, uid: acceptedUid, body: entry }))],
+              { source: 'setup-sheet', expectedBodies: { [acceptedUid]: current.body }, expectedRevision: revision });
+            break;
+          } catch (error) {
+            if (attempt >= 3 || !/Canonical (body|state) changed/.test(error instanceof Error ? error.message : '')) throw error;
+          }
+        }
       }
-    } catch {
-      // Best-effort — stub is still valid
+    } catch (error) {
+      throw new Error("Initial character sheet generation failed", { cause: error });
     }
   }
-}

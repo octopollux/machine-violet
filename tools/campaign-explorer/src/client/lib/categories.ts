@@ -3,6 +3,7 @@ import type { FileCategory } from "../../shared/protocol";
 /** Human-readable labels for file categories. */
 export const CATEGORY_LABELS: Record<FileCategory, string> = {
   state: "State",
+  "co-dm-private": "Co-DM (privileged)",
   characters: "Characters",
   players: "Players",
   locations: "Locations",
@@ -23,6 +24,7 @@ export const CATEGORY_LABELS: Record<FileCategory, string> = {
 export const CATEGORY_ORDER: FileCategory[] = [
   "config",
   "state",
+  "co-dm-private",
   "transcript",
   "characters",
   "players",
@@ -41,6 +43,7 @@ export const CATEGORY_ORDER: FileCategory[] = [
 /** CSS color for category labels. */
 export const CATEGORY_COLORS: Record<FileCategory, string> = {
   state: "#4fc3f7",
+  "co-dm-private": "#ba68c8",
   characters: "#81c784",
   players: "#a5d6a7",
   locations: "#fff176",

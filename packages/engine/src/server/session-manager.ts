@@ -55,7 +55,7 @@ import {
   narrativeLinesToMarkdown,
   iterDisplayLogReplay,
 } from "../context/display-log.js";
-import { hasPriorPlay } from "../context/state-persistence.js";
+import { hasPriorPlay, StatePersister, type LoadedState } from "../context/state-persistence.js";
 import { CostTracker } from "../context/cost-tracker.js";
 import { TurnManager } from "./turn-manager.js";
 import type { NarrativeLine, StyleVariant } from "@machine-violet/shared/types/tui.js";
@@ -64,7 +64,9 @@ import { createBaseFileIO } from "./fileio.js";
 import { assertSupportedCampaign, validateConfig } from "../tools/filesystem/config.js";
 import { SqliteKnowledgeStore } from "../knowledge/sqlite-store.js";
 import { KNOWLEDGE_FILE } from "../knowledge/store.js";
-import { SetupSession } from "./setup-session.js";
+import { SetupSession, buildInitialSheet } from "./setup-session.js";
+import { buildStartup, readStartup, writeStartup } from "../agents/startup.js";
+import { CoDmStreamFilter, stripCoDmAnnotations } from "../agents/co-dm-protocol.js";
 import { generateDiscordStatus } from "../agents/subagents/discord-status.js";
 import { classifyServerError, userMessageFor, performSessionFatalTeardown } from "./error-classify.js";
 
@@ -642,9 +644,14 @@ export class SessionManager {
     } catch (err) {
       this.engine?.beginTeardown();
       try {
-        // A failed startup has no healthy work to preserve: cancel first.
+        // Cancel provider work, retain accepted private feed, then join every
+        // writer before releasing the owning database connection.
         await this.awaitTeardown(this.disposeSessionProviders(), "startup provider disposal");
-        if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "startup deferred work");
+        if (this.engine) {
+          await this.engine.suspendCoDm();
+          try { await this.engine.settleDeferredWork(); }
+          catch (cleanupError) { this.logCleanupError("startup deferred work", cleanupError); }
+        }
       } finally {
         try { await this.ownedFileIO?.closeKnowledgeStores?.(); }
         catch (cleanupError) { this.logCleanupError("startup knowledge closure", cleanupError); }
@@ -688,6 +695,7 @@ export class SessionManager {
     this.providersByConnectionId.clear();
     let tierProviders: Record<ModelTier, TierProvider>;
     let imageModel: string | undefined;
+    let coDm: { provider: LLMProvider; model: string; effort?: import("../config/models.js").EffortLevel | null } | undefined;
     const replayTiers = buildReplayTierProviders();
     if (replayTiers) {
       // Full-stack replay (E2E): every tier served from the tape at
@@ -702,6 +710,10 @@ export class SessionManager {
       // Tapes every LLM call when MV_TAPE_MODE=record; identity pass-through otherwise.
       tierProviders = wrapForRecording(tierResolution.tiers);
       imageModel = tierResolution.imageModel;
+      const recordedCoDm = wrapForRecording({
+        ...tierResolution.tiers, large: tierResolution.coDm,
+      }).large;
+      coDm = { ...recordedCoDm, effort: tierResolution.coDmEffort };
       // Build the connectionId → provider lookup for management routes.
       for (const [connId, provider] of tierResolution.byConnectionId) {
         this.providersByConnectionId.set(connId, provider);
@@ -713,6 +725,7 @@ export class SessionManager {
     this.sessionProviders.add(tierProviders.large.provider);
     this.sessionProviders.add(tierProviders.medium.provider);
     this.sessionProviders.add(tierProviders.small.provider);
+    if (coDm) this.sessionProviders.add(coDm.provider);
 
     // The DM uses the large tier; keep `provider` as a local alias for the
     // many downstream sites in this method that still reference it directly.
@@ -996,6 +1009,8 @@ export class SessionManager {
     // --- Instantiate GameEngine ---
     // Pass the full tier resolution so the DM (large) and subagents
     // (medium/small) each route to the right vendor.
+    const loadedState = await new StatePersister(campaignRoot, fileIO).loadAll();
+    if (loadedState) this.hydrateLoadedState(gs, scene, loadedState);
     const engine = new GameEngine({
       provider,
       tierProviders,
@@ -1007,7 +1022,11 @@ export class SessionManager {
       callbacks,
       gitIO,
       entityTree,
+      coDm: coDm ?? { provider: tierProviders.large.provider, model: tierProviders.large.model },
     });
+    // Seed synchronously before constructor-started recovery resumes from I/O.
+    // A recovered completion must not later be replaced by this older snapshot.
+    if (loadedState?.conversation) engine.seedConversation(loadedState.conversation);
 
     this.engine = engine;
     this.gameState = gs;
@@ -1065,10 +1084,14 @@ export class SessionManager {
       const modeSession = this.engine.getModeSession();
       if (modeSession) {
         let modeResult: Awaited<ReturnType<typeof modeSession.send>> | undefined;
+        const modeFilter = new CoDmStreamFilter();
         try {
           modeResult = await modeSession.send(text, (delta) => {
-            scopedBroadcast({ type: "narrative:chunk", data: { text: delta, kind: "dm" } });
+            const visible = modeFilter.push(delta);
+            if (visible) scopedBroadcast({ type: "narrative:chunk", data: { text: visible, kind: "dm" } });
           });
+          if (modeResult.summary) modeResult.summary = stripCoDmAnnotations(modeResult.summary).publicText;
+          if (modeResult.playerAction) modeResult.playerAction = stripCoDmAnnotations(modeResult.playerAction).publicText;
         } catch (err) {
           // OOC/Dev rollback throws RollbackCompleteError to signal that
           // teardown should NOT re-persist in-memory state (would undo the
@@ -1092,6 +1115,9 @@ export class SessionManager {
             return;
           }
           throw err;
+        } finally {
+          const tail = modeFilter.finish();
+          if (tail) scopedBroadcast({ type: "narrative:chunk", data: { text: tail, kind: "dm" } });
         }
         scopedBroadcast({ type: "narrative:complete", data: { text: "" } });
         this.persistTurnState();
@@ -1214,8 +1240,26 @@ export class SessionManager {
     // existing start-failure handling (REST 400 / retryable overlay). See
     // issue #558.
     try {
-      if (isResume) {
-        await this.resumeSession(engine, config, gs, scene);
+      const existingStartup = await readStartup(campaignRoot, fileIO);
+      if (existingStartup && !await engine.hasCompletedExchange(`${existingStartup.id}:opening`)) {
+        await this.startNewGame(engine, config, gs, entityTree);
+      } else if (isResume) {
+        const startup = existingStartup;
+        if (startup?.initialSheet?.status === 'pending') {
+          const sheet = startup.initialSheet;
+          const job = buildInitialSheet(campaignRoot, { characterName: sheet.character, system: sheet.system, characterDetails: sheet.details }, fileIO, gs.homeDir, engine.getTier('small'), usage => this.costTracker?.record(usage, 'small', { role: 'initial-sheet', model: engine.getTier('small').model }));
+          engine.setStartupMechanicsBarrier(job);
+          await job;
+          sheet.status = 'ready';
+          startup.taskStatus.mechanics = 'ready';
+        }
+        if (startup) {
+          startup.taskStatus.opening = 'delivered';
+          await writeStartup(campaignRoot, fileIO, startup);
+          await engine.bootstrapStartup({ ...startup });
+        }
+        await engine.recoverPendingInput();
+        await this.resumeSession(engine, config, gs, scene, loadedState);
       } else {
         await this.startNewGame(engine, config, gs, entityTree);
       }
@@ -1228,19 +1272,8 @@ export class SessionManager {
     }
   }
 
-  /** Resume an existing campaign session. */
-  private async resumeSession(
-    engine: GameEngine,
-    config: CampaignConfig,
-    gs: GameState,
-    scene: SceneState,
-  ): Promise<void> {
-    const persister = engine.getPersister();
-    if (!persister) return;
-
-    // Load and hydrate persisted state
-    const loaded = await persister.loadAll();
-
+  /** Hydrate before constructing/waking workers so recovered writes cannot be clobbered. */
+  private hydrateLoadedState(gs: GameState, scene: SceneState, loaded: LoadedState): void {
     // Hydrate game state slices
     if (loaded.combat) Object.assign(gs.combat, loaded.combat);
     if (loaded.clocks) Object.assign(gs.clocks, loaded.clocks);
@@ -1290,8 +1323,24 @@ export class SessionManager {
       this.costTracker.seed(loaded.usage);
     }
 
+  }
+
+  /** Resume an existing campaign session. */
+  private async resumeSession(
+    engine: GameEngine,
+    config: CampaignConfig,
+    gs: GameState,
+    scene: SceneState,
+    preloaded?: LoadedState,
+  ): Promise<void> {
+    const persister = engine.getPersister();
+    if (!persister) return;
+
+    const loaded = preloaded ?? await persister.loadAll();
+    if (!preloaded) this.hydrateLoadedState(gs, scene, loaded);
+
     // Seed conversation history
-    if (loaded.conversation) {
+    if (loaded.conversation && !preloaded) {
       engine.seedConversation(loaded.conversation);
     }
 
@@ -1326,6 +1375,9 @@ export class SessionManager {
     // paths from legacy display-logs flow through unchanged).
     const historyLines = await persister.loadDisplayLogFull();
     if (historyLines.length > 0) {
+      // Recovery may have completed an accepted foreground exchange through
+      // live callbacks. The durable full log now includes that exchange once.
+      this.committedNarrative = [];
       const narrativeLines = markdownToNarrativeLines(historyLines, engine.getGameState().campaignRoot);
       const hasCheckpointHistory = narrativeLines.some(
         (line) => line.kind === "metadata" && line.event.type === "state_checkpoint",
@@ -1389,6 +1441,32 @@ export class SessionManager {
     //      relies on to avoid creating duplicate files (e.g. writing a fresh
     //      character sheet at `Janey Bruce.md` when `janey-bruce.md` already
     //      exists). Always included when the tree is non-empty.
+    const fileIO = engine.getSceneManager().getFileIO();
+    const startup = await readStartup(gs.campaignRoot, fileIO)
+      ?? await buildStartup(gs.campaignRoot, fileIO, config, engine.getSceneManager().getSessionState().contentBoundaries ?? '');
+    await writeStartup(gs.campaignRoot, fileIO, startup);
+    const sheetJob = startup.initialSheet?.status === 'pending'
+      ? buildInitialSheet(gs.campaignRoot, {
+          characterName: startup.initialSheet.character, system: startup.initialSheet.system,
+          characterDetails: startup.initialSheet.details,
+        }, fileIO, gs.homeDir, engine.getTier('small'), usage => this.costTracker?.record(usage, 'small', { role: 'initial-sheet', model: engine.getTier('small').model })).then(async () => {
+          if (startup.initialSheet) startup.initialSheet.status = 'ready';
+          startup.taskStatus.mechanics = 'ready';
+          await writeStartup(gs.campaignRoot, fileIO, startup);
+          await engine.recordCoDmEvent('lifecycle', { startupId: startup.id, mechanics: 'ready' }, `${startup.id}:mechanics`);
+        })
+      : Promise.resolve();
+    void sheetJob.catch(() => undefined); // Opening may still be streaming when required mechanics fail.
+    engine.setStartupMechanicsBarrier(sheetJob);
+    await engine.bootstrapStartup({ ...startup });
+    if (await engine.hasCompletedExchange(`${startup.id}:opening`)) {
+      await sheetJob;
+      this.broadcast({ type: 'state:snapshot', data: this.buildStateSnapshot() });
+      this.openNextTurn();
+      return;
+    }
+    startup.taskStatus.opening = 'in_progress';
+    await writeStartup(gs.campaignRoot, fileIO, startup);
     const active = getActivePlayer(gs);
     const openingParts = ["[Session begins. Set the scene."];
     if (config.premise) openingParts.push(`Campaign premise: ${config.premise}`);
@@ -1411,17 +1489,24 @@ export class SessionManager {
         + " do not create duplicates under alternate names):\n"
         + entityListing
         + "\n\nThe `Starting Location` entry is a placeholder. The first time"
-        + " your opening narration names the locale, dispatch a Scribe update"
-        + " naming the location — the Scribe will call `rename_entity` to move"
-        + " the placeholder to the real name and rewrite any wikilinks.";
+        + " your opening narration names the locale, tell the co-DM privately to rename"
+        + " that same canonical location. Preserve an existing seed location identity.";
     }
 
     this.syncUIState();
     await engine.processInput(
       active.characterName,
       priming,
-      { skipTranscript: true },
+      { skipTranscript: true, inputKind: "bootstrap", exchangeId: `${startup.id}:opening` },
     );
+
+    if (!await engine.hasCompletedExchange(`${startup.id}:opening`)) {
+      await sheetJob;
+      throw new Error('Campaign opening did not complete; accepted setup is preserved for retry.');
+    }
+    startup.taskStatus.opening = "delivered";
+    await sheetJob;
+    await writeStartup(gs.campaignRoot, fileIO, startup);
 
     // Persist resources and UI state set during the opening turn.
     this.persistTurnState();
@@ -1515,7 +1600,13 @@ export class SessionManager {
       // from reopening the database after the owning session has ended.
       if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "graceful deferred work");
       await this.awaitTeardown(this.disposeSessionProviders(), "provider disposal");
-      if (this.engine) await this.awaitTeardown(this.engine.settleDeferredWork(), "final deferred work");
+      if (this.engine) {
+        // Cancellation has already stopped provider work. Never close the owned
+        // SQLite connection while an accepted writer can still be executing.
+        await this.engine.suspendCoDm();
+        try { await this.engine.settleDeferredWork(); }
+        catch (error) { this.logCleanupError("final deferred work", error); }
+      }
       // Rollback must never flush the stale in-memory state over restored disk.
       if (this.engine && reason !== "rollback") {
         const persister = this.engine.getPersister();
