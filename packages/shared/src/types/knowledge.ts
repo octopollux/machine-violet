@@ -127,6 +127,8 @@ export type KnowledgeOperation = {
   label?: string;
 };
 export interface KnowledgeMutationResult {
+  /** Revision committed atomically with this result, including replay receipts. */
+  revision?: number;
   identities: {
     uid: string;
     name: string;

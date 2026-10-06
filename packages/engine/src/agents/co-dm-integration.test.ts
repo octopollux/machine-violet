@@ -629,6 +629,36 @@ describe('canonical and reloaded causal protection', () => {
     expect((await canonical.read('Courier')).body).toBe('new corrected biography');
     expect(JSON.stringify(f.engine.getCoDmState()?.messages)).toContain('Canonical state changed');
   });
+  it.each(['read', 'write'] as const)('does not adopt an unseen foreground revision after maintenance %s', async boundary => {
+    let calls = 0;
+    const coDm = provider(async () => {
+      if (calls++ === 0) return boundary === 'read'
+        ? tool('knowledge', { action: 'read', handle: 'Courier' })
+        : tool('remember', { operations: [{ op: 'patch', uid: 'Courier', fields: { location: 'maintenance room' } }] });
+      if (calls === 2) return tool('remember', { operations: [{ op: 'patch', uid: 'Courier', fields: { location: 'stale overwrite' } }] });
+      return response('');
+    });
+    const f = fixture([response('The courier waits.')], coDm);
+    const store = await getCampaignKnowledge(f.state.campaignRoot, f.fileIO);
+    await store.mutate([{ op: 'upsert', collection: 'Characters', name: 'Courier', fields: { location: 'initial room' } }]);
+    const mutate = store.mutate.bind(store);
+    let interleaved = false;
+    if (boundary === 'read') {
+      const read = store.read.bind(store);
+      vi.spyOn(store, 'read').mockImplementation(async (handle, options) => {
+        const result = await read(handle, options);
+        if (!interleaved && handle === 'Courier') { interleaved = true; await mutate([{ op: 'patch', uid: 'Courier', fields: { location: 'new foreground room' } }]); }
+        return result;
+      });
+    } else vi.spyOn(store, 'mutate').mockImplementation(async (operations, options) => {
+      const result = await mutate(operations, options);
+      if (!interleaved && options?.source === 'co-dm') { interleaved = true; await mutate([{ op: 'patch', uid: 'Courier', fields: { location: 'new foreground room' } }]); }
+      return result;
+    });
+    await f.engine.processInput('Aldric', 'Observe.'); await f.engine.settleCoDm();
+    expect(interleaved).toBe(true);
+    expect((await store.read('Courier')).fields.location).toBe('new foreground room');
+  });
   it('restores causal presentation revisions before pending maintenance resumes', async () => {
     const oldExchange = { id: 'old', sceneNumber: 1, knowledgeRevision: 0, presentationRevisions: {}, events: [{ kind: 'narration', payload: 'Old purchase.' }] };
     const files = {

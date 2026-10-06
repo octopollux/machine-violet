@@ -256,7 +256,14 @@ export class GameEngine {
           toolHandler: async (name, input, context) => {
             fence.assertCurrent();
             if (name === "knowledge" || name === "remember" || name === "player_profile") {
-              if (name === "knowledge") { const result = await maintenance(name, input); if (!result.is_error) canonicalRevision = await canonicalStore.revision?.() ?? 0; return result; }
+              if (name === "knowledge") {
+                const before = await canonicalStore.revision?.() ?? 0;
+                const result = await maintenance(name, input);
+                const after = await canonicalStore.revision?.() ?? 0;
+                if (!result.is_error && before !== after) return { content: "Canonical knowledge changed during this read; read again before proposing writes.", is_error: true };
+                if (!result.is_error) canonicalRevision = before;
+                return result;
+              }
               const id = `co-dm:${operationScope}:${name}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
               if (journal[id]) {
                 if (JSON.stringify(journal[id].input.operations) !== JSON.stringify(input.operations)) return { content: "This retried batch already proposed different operations at this position. Read canonical state and retry without changing committed intent.", is_error: true };
@@ -269,7 +276,12 @@ export class GameEngine {
               fence.assertCurrent();
               const acceptedInput = name === "player_profile" ? Object.fromEntries(Object.entries(journal[id].input).filter(([key]) => key !== "operationId")) : journal[id].input;
               const result = await maintenance(name, acceptedInput);
-              if (!result.is_error) canonicalRevision = await canonicalStore.revision?.() ?? 0;
+              if (!result.is_error && name === "remember") {
+                const committed = JSON.parse(result.content) as { revision?: number };
+                // Never sample a later writer's revision after our commit.
+                // Legacy receipts lacking it retain the older conservative fence.
+                if (committed.revision !== undefined) canonicalRevision = committed.revision;
+              }
               fence.assertCurrent();
               journal[id].result = result;
               await saveJournal();

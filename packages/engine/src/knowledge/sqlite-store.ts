@@ -895,7 +895,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
             default: throw new KnowledgeIntegrityError("Unknown knowledge operation");
           }
         }
-        const result: KnowledgeMutationResult = { identities: [...identityUids].map(uid => this.identity(uid)), changed: [...changed], candidates: [...candidates].sort() };
+        const result: KnowledgeMutationResult = { revision: revision + 1, identities: [...identityUids].map(uid => this.identity(uid)), changed: [...changed], candidates: [...candidates].sort() };
         if (changed.size) {
           // Outbox rows are indivisible delivery units. Chunk large batches
           // without truncating any identity or dependency candidate.
