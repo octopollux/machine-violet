@@ -99,10 +99,24 @@ billable usage or configured price, so a complete dollar total is unavailable.
 Cost parity remains future tuning work.
 
 The main run's captured 119 gameplay/helper API calls and 12 setup calls cost an
-estimated $1.649529 in text inference at the repository's configured rates:
+estimated $1.649529 in text inference at the published Standard API rates:
 co-DM $0.929946, DM $0.470904, OOC $0.119929, setup $0.126011, and Small helpers
 $0.002737. This excludes image charges and any failure without recorded usage;
 it is not the complete bill. The co-DM remains the largest measured text cost.
+
+The [Sol 6.1](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and
+[Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) rates were
+rechecked on 2026-10-05 and match the stored estimates: USD per million tokens,
+Sol input/cache read/cache write/output = 2/0.10/2.50/10; Luna =
+0.10/0.01/0.125/0.50. Both apply input/cache ×2 and output ×1.5 to the full
+request above 272,000 input tokens. Fast service doubles applicable rates;
+regional processing can add 10%. Neither was captured, so the estimates assume
+Standard service without that surcharge. ChatGPT subscription usage is valued
+at API-equivalent prices here; this does not measure subscription billing.
+The shipped model catalog now records the source, verification date and
+long-context policy, and `co-dm-cost.ts` reads that catalog instead of keeping
+a separate price table. These verified text rates leave the reported totals
+unchanged. Image costs remain unpriced because billable image usage was absent.
 
 ## Evidence and limits
 

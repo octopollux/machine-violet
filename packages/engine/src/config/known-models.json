@@ -34,6 +34,7 @@
       "maxOutput": 128000,
       "defaultTier": "large",
       "pricing": { "input": 10, "output": 50, "cacheWrite": 12.5, "cacheRead": 1 },
+      "pricingDetails": { "source": "https://developers.openai.com/api/docs/models/gpt-6-astra", "checkedAt": "2026-10-05", "serviceTier": "standard", "longContext": { "aboveInputTokens": 272000, "inputMultiplier": 2, "outputMultiplier": 1.5 } },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-6.1-sol": {
@@ -44,6 +45,7 @@
       "defaultTier": "medium",
       "effortDefaults": { "dm": "medium" },
       "pricing": { "input": 2, "output": 10, "cacheWrite": 2.5, "cacheRead": 0.1 },
+      "pricingDetails": { "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol", "checkedAt": "2026-10-05", "serviceTier": "standard", "longContext": { "aboveInputTokens": 272000, "inputMultiplier": 2, "outputMultiplier": 1.5 } },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-6-luna": {
@@ -53,6 +55,7 @@
       "maxOutput": 128000,
       "defaultTier": "small",
       "pricing": { "input": 0.1, "output": 0.5, "cacheWrite": 0.125, "cacheRead": 0.01 },
+      "pricingDetails": { "source": "https://developers.openai.com/api/docs/models/gpt-6-luna", "checkedAt": "2026-10-05", "serviceTier": "standard", "longContext": { "aboveInputTokens": 272000, "inputMultiplier": 2, "outputMultiplier": 1.5 } },
       "capabilities": { "thinking": true, "tools": true, "streaming": true, "caching": true, "imageGeneration": true }
     },
     "gpt-6-sol": {
