@@ -9,7 +9,10 @@ import {
   parseEndOOCSignal,
   parseSummaryTag,
   extractSummary,
+  OOCStreamFilter,
 } from "./ooc-mode.js";
+import { createBridge } from "../../server/bridge.js";
+import type { ServerEvent } from "@machine-violet/shared";
 import type { DMSessionState } from "../dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
@@ -27,6 +30,42 @@ import { resetPromptCache } from "../../prompts/load-prompt.js";
 beforeEach(() => {
   loadModelConfig({ reset: true });
   resetPromptCache();
+});
+
+describe("OOC public streaming privacy", () => {
+  it("streams only public prose through the bridge while retaining long summary and forwarded action", async () => {
+    const summary = "private canonical uid digest ".repeat(40);
+    const reply = `Public reply.\n<SUMMARY>${summary}</SUMMARY>\n<END_OOC>I attack</END_OOC>`;
+    const provider = mockProvider([]);
+    provider.stream = vi.fn(async (_params, onDelta) => {
+      for (let i = 0; i < reply.length; i += 3) onDelta(reply.slice(i, i + 3));
+      return textResponse(reply);
+    });
+    const events: ServerEvent[] = [];
+    const bridge = createBridge({ broadcast: event => events.push(event) });
+    const result = await enterOOC(provider, "question", {
+      campaignName: "Test", previousVariant: "playing", model: "claude-sonnet-4-6",
+    }, delta => bridge.onNarrativeDelta(delta));
+    bridge.onNarrativeComplete(result.text);
+    const serialized = JSON.stringify(events);
+    expect(serialized).toContain("Public reply.");
+    expect(serialized).not.toMatch(/SUMMARY|END_OOC|canonical uid|I attack/);
+    expect(result.text).toBe("Public reply.");
+    expect(result.summary).toBe(summary.trim());
+    expect(result.playerAction).toBe("I attack");
+    expect(result.endSession).toBe(true);
+  });
+
+  it.each(["<SUMMARY>private unterminated", "<END_OOC broken private", "<SUMMAR"])("fails closed for malformed/split tail %s", tail => {
+    const filter = new OOCStreamFilter();
+    const visible = [...`Public. ${tail}`].map(character => filter.feed(character)).join("");
+    expect(visible).toBe("Public. ");
+  });
+
+  it("preserves ordinary angle-bracket prose", () => {
+    const filter = new OOCStreamFilter();
+    expect(filter.feed("Use <skill> here.")).toBe("Use <skill> here.");
+  });
 });
 
 function mockUsage() {
@@ -110,6 +149,14 @@ describe("buildOOCPrompt (legacy)", () => {
 });
 
 describe("buildOOCPrompt (structured — reuses DM prefix)", () => {
+  it("migrates the effective production role while keeping operator corrections tool-based", () => {
+    const blocks = buildOOCPrompt({ campaignName: "Test", config: mockConfig(), sessionState: mockSessionState(), coDmEnabled: true }) as SystemBlock[];
+    const text = blocks.map(block => block.text).join("\n");
+    expect(text).not.toContain("Use `scribe` to record narrative state changes");
+    expect(text).toContain("continuing co-DM");
+    expect(blocks.at(-1)?.text).toContain("Do not emit private inline co-DM frames in OOC replies");
+    expect(text).toContain("Never narrate a PC's thoughts");
+  });
   it("returns SystemBlock[] when config and sessionState provided", () => {
     const result = buildOOCPrompt({
       campaignName: "TestCampaign",

@@ -60,6 +60,8 @@ function fixture(dmResponses: ChatResult[], coDm: LLMProvider, files: Record<str
       choices: { campaign_default: 'never', player_overrides: {} }, image_generation: 'off',
     },
   };
+  const savedResources = files["/co-dm-integration/state/resources.json"];
+  if (savedResources) { const loaded = JSON.parse(savedResources) as { resourceValues: GameState["resourceValues"]; displayResources: GameState["displayResources"] }; state.resourceValues = loaded.resourceValues; state.displayResources = loaded.displayResources; }
   const scene: SceneState = { sceneNumber: 1, slug: 'test', transcript: [], precis: '', openThreads: '', npcIntents: '',
     playerReads: [], sessionNumber: 1, sessionRecapPending: false };
   const publicDeltas: string[] = [];
@@ -80,9 +82,9 @@ function fixture(dmResponses: ChatResult[], coDm: LLMProvider, files: Record<str
   }, wholeDelta);
   const engine = new GameEngine({ provider: dm, gameState: state, scene, sessionState: {}, fileIO, callbacks,
     tierProviders: { large: { provider: dm, model: 'gpt-6.1-sol' }, medium: { provider: dm, model: 'gpt-6-luna' }, small: { provider: dm, model: 'gpt-6-luna' } },
-    coDmExperiment: { isolatedCampaign: true, provider: coDm, model: 'gpt-6.1-sol' },
+    coDm: { provider: coDm, model: 'gpt-6.1-sol' },
   });
-  return { engine, dm, files, fileIO, state, scene, writes, publicDeltas, publicComplete, errors, tui };
+  return { engine, dm, files, fileIO, state, scene, writes, publicDeltas, publicComplete, errors, tui, callbacks };
 }
 
 function latestBatch(params: ChatParams): CoDmExchange[] {
@@ -234,7 +236,7 @@ describe('real GameEngine continuing co-DM integration', () => {
       return { campaignLogEntry: 'Session closed.', changelogEntries: [], alarmsFired: [], usage };
     });
     await f.engine.endSession('Session curtain');
-    expect(f.engine.getCoDmState()?.messages).toEqual([]);
+    expect(f.engine.getCoDmState()?.messages.length).toBeGreaterThan(0);
     expect(f.engine.getCoDmState()?.frozenContext).not.toBe(originalPrefix);
     expect(f.engine.getCoDmState()?.pending).toEqual([]);
     expect(f.errors).toHaveLength(recapFails ? 1 : 0);
@@ -244,8 +246,8 @@ describe('real GameEngine continuing co-DM integration', () => {
     Object.assign(restored.scene, f.scene);
     await restored.engine.processInput('Aldric', 'A new action.');
     await restored.engine.settleCoDm();
-    expect(request?.messages).toHaveLength(1);
-    expect(JSON.stringify(request?.messages)).not.toContain('old-scene hidden intent');
+    expect(request?.messages).toHaveLength(3);
+    expect(JSON.stringify(request?.messages)).toContain('old-scene hidden intent');
     expect(latestBatch(request as ChatParams)[0]?.sceneNumber).toBe(2);
   });
 
@@ -352,7 +354,7 @@ describe('real GameEngine continuing co-DM integration', () => {
     release.resolve();
     await closing;
     expect(transition).toHaveBeenCalledTimes(1);
-    expect(f.engine.getCoDmState()).toMatchObject({ cursor: 2, pending: [], messages: [] });
+    expect(f.engine.getCoDmState()).toMatchObject({ cursor: 2, pending: [] });
   });
 
   it('rejects an abandoned provider tool result before applying presentation or feedback', async () => {
@@ -467,4 +469,203 @@ describe('real GameEngine continuing co-DM integration', () => {
     const loaded = await new StatePersister(f.state.campaignRoot, f.fileIO).loadAll();
     expect(loaded.ui).toMatchObject({ styleName: 'noir', variant: 'combat', keyColor: '#8844aa', modelines: { Other: 'CUSTOM OTHER', Aldric: 'HOLDING BREATH' } });
   });
+});
+
+
+describe('production co-DM recovery and activity', () => {
+  it('replays persisted provider intent after cursor crash without regenerating or duplicating history', async () => {
+    let calls = 0;
+    const original = provider(async () => calls++ === 0 ? tool('remember', { operations: [{ op: 'upsert', collection: 'Lore', name: 'Receipt', history: 'Accepted event once' }] }) : response(JSON.stringify({ feedback: '', continuity: 'Receipt event committed' })));
+    const first = fixture([response('An event occurs.')], original);
+    const write = first.fileIO.writeFile;
+    first.fileIO.writeFile = async (path, text) => {
+      if (norm(path).endsWith('/state/co-dm-experiment.json') && JSON.parse(text).cursor === 1) throw new Error('cursor interrupted');
+      await write(path, text);
+    };
+    await first.engine.processInput('Aldric', 'Act.');
+    await expect(first.engine.settleCoDm()).rejects.toThrow('cursor interrupted');
+    const canonical = await getCampaignKnowledge(first.state.campaignRoot, first.fileIO);
+    expect((await canonical.read('Receipt')).logs).toHaveLength(1);
+    const regenerated = provider(async () => tool('remember', { operations: [{ op: 'upsert', collection: 'Lore', name: 'Receipt', history: 'Rephrased duplicate event' }] }));
+    const restored = fixture([], regenerated, structuredClone(first.files));
+    restored.fileIO.campaignKnowledge = first.fileIO.campaignKnowledge;
+    await restored.engine.settleCoDm();
+    expect(regenerated.chat).not.toHaveBeenCalled();
+    expect((await canonical.read('Receipt')).logs).toHaveLength(1);
+    expect(restored.engine.getCoDmState()).toMatchObject({ cursor: 1, pending: [] });
+  });
+  it('emits shared tool activity with correlation and never ends a DM turn on maintenance completion', async () => {
+    const started = signal(); const release = signal(); let calls = 0;
+    const coDm = provider(async () => {
+      if (calls++ === 0) { started.resolve(); await release.promise; return tool('update_modeline', { character: 'Aldric', text: 'LOOKING AROUND' }); }
+      return response('');
+    });
+    const f = fixture([response('The scene opens.')], coDm);
+    f.callbacks.onToolStart = vi.fn(); f.callbacks.onToolEnd = vi.fn(); f.callbacks.onTurnEnd = vi.fn();
+    await f.engine.processInput('Aldric', 'Look.'); await started.promise;
+    const completedTurns = vi.mocked(f.callbacks.onTurnEnd).mock.calls.length;
+    release.resolve(); await f.engine.settleCoDm();
+    const start = vi.mocked(f.callbacks.onToolStart).mock.calls.find(call => call[0] === 'update_modeline');
+    const end = vi.mocked(f.callbacks.onToolEnd).mock.calls.find(call => call[0] === 'update_modeline');
+    expect(start?.[1]).toMatchObject({ role: 'co-dm', callId: expect.any(String) });
+    expect(end?.[2]).toEqual(start?.[1]);
+    expect(vi.mocked(f.callbacks.onTurnEnd).mock.calls.length).toBe(completedTurns);
+  });
+});
+
+
+describe('co-DM authoritative objective tracker', () => {
+  it('lists current objectives then creates without self-invalidating its causal revision', async () => {
+    let calls = 0;
+    const coDm = provider(async () => {
+      if (calls++ === 0) return tool('manage_objectives', { action: 'list' });
+      if (calls === 2) return tool('manage_objectives', { action: 'create', title: 'Deliver the letter', description: 'Accepted delivery to the harbor.' });
+      return response('');
+    });
+    const f = fixture([response('You accept the delivery.')], coDm);
+    await f.engine.processInput('Aldric', 'I agree to deliver the letter');
+    await f.engine.settleCoDm();
+    expect(Object.values(f.state.objectives.objectives)).toEqual([expect.objectContaining({ title: 'Deliver the letter' })]);
+  });
+
+  it('rejects a delayed objective update after newer foreground intent', async () => {
+    const started = signal(); const release = signal(); let calls = 0;
+    const coDm = provider(async () => {
+      if (calls++ === 0) { started.resolve(); await release.promise; return tool('manage_objectives', { action: 'update', id: 'obj-1', description: 'Stale maintenance description' }); }
+      return response('');
+    });
+    const f = fixture([response('The party accepts the rescue.')], coDm);
+    f.engine.getRegistry().dispatch(f.state, 'manage_objectives', { action: 'create', title: 'Rescue', description: 'Accepted rescue' });
+    await f.engine.processInput('Aldric', 'Accept the rescue'); await started.promise;
+    f.engine.getRegistry().dispatch(f.state, 'manage_objectives', { action: 'update', id: 'obj-1', description: 'Newer explicit DM correction' });
+    release.resolve(); await f.engine.settleCoDm();
+    expect(f.state.objectives.objectives['obj-1'].description).toBe('Newer explicit DM correction');
+    expect(JSON.parse(f.files['/co-dm-integration/state/objectives.json']).objectives['obj-1'].description).toBe('Newer explicit DM correction');
+  });
+  it('replays an accepted provider response after cursor failure without duplicating an objective', async () => {
+    let calls = 0;
+    const coDm = provider(async () => calls++ === 0 ? tool('manage_objectives', { action: 'create', title: 'Accepted rescue', description: 'Player agreed to rescue the scout.' }) : response(''));
+    const f = fixture([response('You agree to rescue the scout.')], coDm);
+    const write = f.fileIO.writeFile; let failCursor = true;
+    f.fileIO.writeFile = async (path, content) => {
+      if (norm(path).endsWith('/state/co-dm-experiment.json') && JSON.parse(content).cursor > 0 && failCursor) { failCursor = false; throw new Error('cursor interrupted'); }
+      await write(path, content);
+    };
+    await f.engine.processInput('Aldric', 'I agree');
+    await expect(f.engine.settleCoDm()).rejects.toThrow('cursor interrupted');
+    const accepted = JSON.parse(f.files['/co-dm-integration/state/objectives.json']);
+    expect(Object.keys(accepted.objectives)).toHaveLength(1);
+    expect(Object.keys(accepted.operationReceipts)).toHaveLength(1);
+    const recovered = fixture([], provider(async () => response('')), { ...f.files });
+    Object.assign(recovered.state.objectives, accepted);
+    await recovered.engine.settleCoDm();
+    expect(Object.keys(recovered.state.objectives.objectives)).toHaveLength(1);
+    expect(recovered.state.objectives.next_id).toBe(2);
+  });
+});
+
+
+describe('native in-band co-DM recovery', () => {
+  it('recovers accepted tool prefix before provider continuation after an in-band crash', async () => {
+    const original = provider(async params => {
+      if (!params.dispatchTool) throw new Error('native dispatch missing');
+      await params.dispatchTool({ id: 'native-one', name: 'remember', input: { operations: [{ op: 'upsert', collection: 'Lore', name: 'Native receipt', history: 'Accepted native event once' }] } });
+      throw new Error('native provider interrupted after effect');
+    });
+    const first = fixture([response('A native event occurs.')], original);
+    await first.engine.processInput('Aldric', 'Act.');
+    await expect(first.engine.settleCoDm()).rejects.toThrow('native provider interrupted');
+    const canonical = await getCampaignKnowledge(first.state.campaignRoot, first.fileIO);
+    expect((await canonical.read('Native receipt')).logs).toHaveLength(1);
+    let continuation: ChatParams | undefined;
+    const resumed = provider(async params => { continuation = params; return response(JSON.stringify({ feedback: '', continuity: 'Native accepted event committed' })); });
+    const restored = fixture([], resumed, structuredClone(first.files));
+    restored.fileIO.campaignKnowledge = first.fileIO.campaignKnowledge;
+    await restored.engine.settleCoDm();
+    expect(JSON.stringify(continuation?.messages)).toContain('native-one');
+    expect(JSON.stringify(continuation?.messages)).toContain('tool_result');
+    expect((await canonical.read('Native receipt')).logs).toHaveLength(1);
+    expect(restored.engine.getCoDmState()?.cursor).toBe(1);
+  });
+});
+
+
+describe('production opening stochastic recovery', () => {
+  it('resumes an interrupted opening after a durable deck draw without drawing or accepting it twice', async () => {
+    const f = fixture([tool('deck', { deck: 'opening', operation: 'draw', count: 1 })], provider(async () => response('')));
+    f.engine.getRegistry().dispatch(f.state, 'deck', { deck: 'opening', operation: 'create', template: 'standard52' });
+    await f.engine.getPersister()?.flush();
+    const opts = { skipTranscript: true, inputKind: 'bootstrap' as const, exchangeId: 'startup:crash:opening' };
+    await f.engine.processInput('Aldric', '[Session begins]', opts);
+    expect(f.errors).toHaveLength(1);
+    expect(await f.engine.hasCompletedExchange(opts.exchangeId)).toBe(false);
+    const acceptedDecks = JSON.parse(f.files['/co-dm-integration/state/decks.json']);
+    expect(acceptedDecks.decks.opening.drawPile).toHaveLength(51);
+    expect(Object.keys(acceptedDecks.operationReceipts)).toHaveLength(1);
+    const recovered = fixture([response('The card lies on the table.')], provider(async () => response('')), { ...f.files });
+    Object.assign(recovered.state.decks, acceptedDecks);
+    await recovered.engine.processInput('Aldric', '[Session begins]', opts);
+    await recovered.engine.settleCoDm();
+    expect(recovered.errors).toEqual([]);
+    expect(recovered.state.decks.decks.opening.drawPile).toHaveLength(51);
+    expect(Object.keys(recovered.state.decks.operationReceipts ?? {})).toHaveLength(1);
+    expect(await recovered.engine.hasCompletedExchange(opts.exchangeId)).toBe(true);
+    expect(recovered.dm.stream).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('canonical and reloaded causal protection', () => {
+  it('rejects older canonical patches after a newer direct foreground correction', async () => {
+    const started = signal(); const release = signal(); let calls = 0;
+    const coDm = provider(async () => { if (calls++ === 0) { started.resolve(); await release.promise; return tool('remember', { operations: [{ op: 'patch', uid: 'Courier', fields: { location: 'old room' }, body: 'old biography' }] }); } return response(''); });
+    const f = fixture([response('The courier waits.')], coDm);
+    const canonical = await getCampaignKnowledge(f.state.campaignRoot, f.fileIO);
+    await canonical.mutate([{ op: 'upsert', collection: 'Characters', name: 'Courier', fields: { location: 'initial room' }, body: 'initial biography' }]);
+    await f.engine.processInput('Aldric', 'Observe.'); await started.promise;
+    await f.engine.handleAsyncTool('remember', { operations: [{ op: 'patch', uid: 'Courier', fields: { location: 'new room' }, body: 'new corrected biography' }] });
+    release.resolve(); await f.engine.settleCoDm();
+    expect((await canonical.read('Courier')).fields.location).toBe('new room');
+    expect((await canonical.read('Courier')).body).toBe('new corrected biography');
+    expect(JSON.stringify(f.engine.getCoDmState()?.messages)).toContain('Canonical state changed');
+  });
+  it('restores causal presentation revisions before pending maintenance resumes', async () => {
+    const oldExchange = { id: 'old', sceneNumber: 1, knowledgeRevision: 0, presentationRevisions: {}, events: [{ kind: 'narration', payload: 'Old purchase.' }] };
+    const files = {
+      '/co-dm-integration/state/resources.json': JSON.stringify({ displayResources: { Aldric: ['Coin'] }, resourceValues: { Aldric: { Coin: '9' } }, presentationRevisions: { 'set_resource_values:Aldric:Coin': 2 } }),
+      '/co-dm-integration/state/co-dm-experiment.json': JSON.stringify({ version: 1, epoch: 1, cursor: 0, frozenContext: 'frozen', messages: [], pending: [oldExchange], acceptedExchangeIds: ['old'], mailbox: [], deliveredFeedbackIds: [] }),
+    };
+    let calls = 0;
+    const coDm = provider(async () => calls++ === 0 ? tool('set_resource_values', { character: 'Aldric', values: { Coin: '3', 'HOLDING BREATH': 'yes' } }) : response(''));
+    const f = fixture([], coDm, files); await f.engine.settleCoDm();
+    expect(f.state.resourceValues.Aldric).toEqual({ Coin: '9', 'HOLDING BREATH': 'yes' });
+    const persisted = await new StatePersister(f.state.campaignRoot, f.fileIO).loadAll();
+    expect(persisted.resources?.resourceValues.Aldric).toEqual({ Coin: '9', 'HOLDING BREATH': 'yes' });
+    expect(persisted.resources?.presentationRevisions?.['set_resource_values:Aldric:Coin']).toBe(2);
+  });
+});
+
+
+it('uses the actual player_profile contract while deduplicating repeated accepted notes', async () => {
+  let calls = 0;
+  const coDm = provider(async () => calls++ < 2 ? tool('player_profile', { player: 'Player', action: 'append', section: 'Content Boundaries', text: 'Avoid spiders.' }) : response(''));
+  const f = fixture([response('Boundaries are accepted.')], coDm);
+  await f.engine.processInput('Aldric', 'No spiders please.'); await f.engine.settleCoDm();
+  const profiles = Object.entries(f.files).filter(([path]) => path.includes('players/') && path.endsWith('.md'));
+  expect(profiles).toHaveLength(1); expect(profiles[0][1].match(/Avoid spiders\./g)).toHaveLength(1);
+  expect(JSON.stringify(f.engine.getCoDmState()?.messages)).not.toContain('unknown_field');
+});
+
+
+it('correlates two concurrent co-DM calls with the same tool name independently', async () => {
+  let calls = 0;
+  const coDm = provider(async () => {
+    if (calls++ > 0) return response('');
+    return { text: '', usage, stopReason: 'tool_use', toolCalls: [{ id: 'same-name-one', name: 'update_modeline', input: { character: 'Aldric', text: 'first' } }, { id: 'same-name-two', name: 'update_modeline', input: { character: 'Aldric', text: 'second' } }], assistantContent: [{ type: 'tool_use', id: 'same-name-one', name: 'update_modeline', input: { character: 'Aldric', text: 'first' } }, { type: 'tool_use', id: 'same-name-two', name: 'update_modeline', input: { character: 'Aldric', text: 'second' } }] };
+  });
+  const f = fixture([response('The scene opens.')], coDm); f.callbacks.onToolStart = vi.fn(); f.callbacks.onToolEnd = vi.fn();
+  await f.engine.processInput('Aldric', 'Look.'); await f.engine.settleCoDm();
+  const starts = vi.mocked(f.callbacks.onToolStart).mock.calls.filter(call => call[1]?.role === 'co-dm').map(call => call[1]?.callId);
+  const ends = vi.mocked(f.callbacks.onToolEnd).mock.calls.filter(call => call[2]?.role === 'co-dm').map(call => call[2]?.callId);
+  expect(new Set(starts).size).toBe(2); expect(ends.sort()).toEqual(starts.sort());
 });

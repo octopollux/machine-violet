@@ -598,10 +598,12 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
       return lines.join("\n");
     });
   }
+  revision(): Promise<number> { return this.serialized(() => Number((this.statement("SELECT value FROM metadata WHERE key='commit_revision'").get() as { value: string } | undefined)?.value ?? 0)); }
   mutate(operations: KnowledgeOperation[], options: KnowledgeMutationOptions = {}): Promise<KnowledgeMutationResult> {
     return this.serialized(() => {
       if (this.options.readOnly)
         throw new KnowledgeIntegrityError("Knowledge store is read-only");
+      options.assertCurrent?.();
       const db = this.open();
       const payload = JSON.stringify({ operations, sceneNumber: options.sceneNumber, source: options.source });
       if (options.operationId) {
@@ -613,6 +615,43 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
           if (previous.payload !== payload)
             throw new KnowledgeIntegrityError("Operation ID was reused for different mutations");
           return JSON.parse(previous.result) as KnowledgeMutationResult;
+        }
+      }
+      for (const [handle, body] of Object.entries(options.expectedBodies ?? {})) if (this.row(this.require(handle)).body !== body) throw new KnowledgeIntegrityError("Canonical body changed before mechanical commit; rebase on current body");
+      const revision = Number((this.statement("SELECT value FROM metadata WHERE key='commit_revision'").get() as { value: string } | undefined)?.value ?? 0);
+      if (options.expectedRevision !== undefined && options.expectedRevision !== revision) throw new KnowledgeIntegrityError("Canonical state changed after the observed exchange. Read canonical targets before rebasing these changes; preserve newer corrections.");
+      // Ownership is supplied by the engine using concrete handles; arbitrary
+      // user collections retain their unrestricted vocabulary.
+      if (options.protectedRoots?.length || Object.keys(options.protectedFields ?? {}).length) {
+        const protectedUids = new Set<string>();
+        for (const handle of options.protectedRoots ?? []) { const uid = this.lookup(handle); if (uid) protectedUids.add(uid); }
+        const fields = new Map<string, Set<string>>();
+        for (const [handle, keys] of Object.entries(options.protectedFields ?? {})) {
+          const uid = this.lookup(handle); if (!uid) continue;
+          fields.set(uid, new Set(keys));
+          for (const child of this.children(uid)) if (keys.includes(child.name ?? "")) protectedUids.add(child.uid);
+        }
+        const protectedNode = (uid: string): boolean => {
+          let row = this.row(uid);
+          while (true) { if (protectedUids.has(row.uid)) return true; if (!row.parent) return false; row = this.row(row.parent); }
+        };
+        const containsProtected = (uid: string): boolean => protectedNode(uid) || this.children(uid).some(child => containsProtected(child.uid));
+        for (const operation of operations) {
+          const op = operation as unknown as Record<string, unknown>;
+          if (operation.op === "upsert" && options.protectedRoots?.includes(`${op.collection}/${op.name}`)) throw new KnowledgeIntegrityError("Mutation targets protected notes");
+          const owner = this.lookup(String(op.uid ?? op.name ?? ""));
+          const reserved = owner ? fields.get(owner) : undefined;
+          if (reserved && (["patch", "upsert"].includes(operation.op) && op.body !== undefined || ["set_value", "delete", "consolidate"].includes(operation.op))) throw new KnowledgeIntegrityError("PC sheet replacement belongs to the mechanical owner; maintain biography with granular fields or history");
+          const parentUid = typeof op.parent === "string" ? this.lookup(op.parent) : null;
+          if (parentUid && fields.get(parentUid)?.has(String(op.name))) throw new KnowledgeIntegrityError("Mutation creates an engine-owned mechanical field");
+          if (reserved && op.fields && Object.keys(op.fields as object).some(key => reserved.has(key))) throw new KnowledgeIntegrityError("Mutation targets engine-owned mechanical fields");
+          if (reserved && Array.isArray(op.keys) && op.keys.some(key => reserved.has(String(key)))) throw new KnowledgeIntegrityError("Mutation removes engine-owned mechanical fields");
+          for (const key of ["uid", "parent", "target", "source"]) {
+            if (typeof op[key] !== "string") continue;
+            const uid = this.lookup(op[key] as string); if (!uid) continue;
+            if (protectedNode(uid) || ((["delete", "consolidate", "set_value", "move"].includes(operation.op) || operation.op === "patch" && op.name !== undefined) && containsProtected(uid))) throw new KnowledgeIntegrityError("Mutation targets a protected engine-owned node");
+          }
+          if (owner && protectedNode(owner)) throw new KnowledgeIntegrityError("Mutation targets protected notes");
         }
       }
       db.exec("BEGIN IMMEDIATE");
@@ -874,6 +913,7 @@ export class SqliteKnowledgeStore implements CampaignKnowledgeStore {
         }
         if (options.operationId)
           this.statement("INSERT INTO operations VALUES (?,?,?)").run(options.operationId, payload, JSON.stringify(result));
+        this.statement("INSERT INTO metadata(key,value) VALUES ('commit_revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(String(revision + 1));
         db.exec("COMMIT");
         return result;
       }

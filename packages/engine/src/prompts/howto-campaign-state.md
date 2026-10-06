@@ -14,7 +14,7 @@ If one of those fits, use it. This guide is for everything else.
 
 | You want to change | Use |
 |---|---|
-| A character / location / faction / lore / item | `knowledge` to inspect; `scribe` to record changes |
+| A character / location / faction / lore / item | `knowledge` to inspect; `remember` for explicit atomic corrections; continuing co-DM observes established narrative changes |
 | The PC roster (who's played) | `swap_pc` (see `howto_swap_pc`) |
 | The DM's personality | `swap_dm_personality` (see `howto_swap_dm_personality`) |
 | Campaign or scene DM notes | `dm_notes` |
@@ -95,14 +95,14 @@ only in-session mutations are `players[]` (via `swap_pc`) and `dm_personality`
   control. Sheet body text holds mechanics and explanation.
 - **Privacy:** private knowledge stays DM-only. Player Knowledge holds approved
   summaries; direct player-facing character sheets can be shown to players.
-  Choose the visibility on every Scribe update deliberately.
+  Choose visibility deliberately on every correction or co-DM annotation.
 
 ## Runtime gotchas
 
 - **`config.dm_personality` is read live every DM turn** — a `swap_dm_personality`
   takes effect on the next turn, no reload.
 - **PC character sheets are snapshotted at session start** (`pcSheets`) and not
-  refreshed mid-session. Sheet edits via `scribe` are committed to knowledge and visible
+  refreshed mid-session. Sheet edits are committed to knowledge and visible
   in the conversation, but the cached prompt copy stays stale until the next
   session load. The same holds for the rules appendix.
 - **Persistence is per-tool and write-through.** A tool that owns a file persists

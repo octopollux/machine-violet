@@ -1,5 +1,10 @@
 # Co-DM validation plan
 
+This is the original experiment protocol. Current implementation coverage is
+tracked in [the production co-DM documentation](../../co-dm.md); the synthetic
+fixture specifications below are not a claim that every proposed fixture has
+been executed.
+
 2026-10-05. **Prepared, not executed.** These fixtures describe a proposed protocol, not existing engine interfaces. No runner or production changes are included. JSON syntax validation establishes only parseability. The design must pass deterministic protocol checks, actual-provider shadow replay, and paired live DM tests before a latency or cost claim is justified.
 
 ## Inputs and ownership
@@ -55,6 +60,7 @@ Added after the [complete agent/tool audit](agent-tool-audit.md). These are **re
 | Case | Required evidence |
 |---|---|
 | Every role and advertised tool | Compare role manifests against registry definitions, DM exclusions, dynamic image capabilities and nested/operator tool sets. Every advertised tool has a working dispatcher, executable input contract, consequence class, ownership and feed policy. Test heterogeneous DM/co-DM/Small provider connections and per-model effort resolution. |
+| Shared tool indicators | Interleave DM/co-DM calls, including equal tool names, success/error and completion after the normal DM turn-end clear. Both roles accrue in the same activity UI. Co-DM completion cannot clear other entries; late completion cannot resurrect cleared entries. New post-boundary calls appear normally, without private arguments or contents. |
 | Resource conflict across writers | Suspend a co-DM update; apply `resolve_turn` HP/resource deltas, direct DM resource writes, and operator corrections; release it. Also change a field after observation but before its batch starts. New authoritative values survive memory, disk, broadcast and reload. Independent keys still update; a playful display key never becomes the implicit mechanical HP target. |
 | Sheet and derived-state consistency | Race promotion with co-DM body edits; preserve unrelated biography/inventory and accepted mechanics. Fail promotion after dispatch and prove it is not reported as committed. Refresh resolver/PC inputs before dependent use. Distinguish proposed conditions/positions from engine-applied deltas. |
 | All lifecycle entrances | Exercise slash save/rollback/retry, OOC rollback, Dev rollback/surgery, picker, scene cut, menu exit and idle/fatal shutdown with work in flight. Fence before restore, checkpoint a coherent state, and prevent post-close writes. Crash at commit-before-cursor and restore-before-publication boundaries. |

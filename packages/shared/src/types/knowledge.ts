@@ -148,6 +148,12 @@ export interface KnowledgeReadOptions {
   logTextLimit?: number;
 }
 export interface KnowledgeMutationOptions {
+  /** Engine supplied ownership handles, never accepted from model tool arguments. */
+  expectedBodies?: Record<string, string>;
+  expectedRevision?: number;
+  assertCurrent?: () => void;
+  protectedRoots?: string[];
+  protectedFields?: Record<string, string[]>;
   operationId?: string;
   sceneNumber?: number;
   source?: string;

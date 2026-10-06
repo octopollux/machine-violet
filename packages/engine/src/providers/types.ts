@@ -285,6 +285,8 @@ export interface ToolExecutionContext {
   provider: string;
   model: string;
   callId: string;
+  /** Trusted engine exchange identity; never supplied through model arguments. */
+  operationScope?: string;
 }
 
 // ---------------------------------------------------------------------------

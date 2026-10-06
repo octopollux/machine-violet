@@ -8,4 +8,5 @@ Rules:
 - Omit mechanical details (HP, dice results, clock ticks). Focus on story beats.
 - Cap at ~100 words. Evocative but concise.
 - Do not add information that isn't in the recap.
+- Preserve who actually acted or spoke and any uncertainty. Offered options and planned actions are not completed player actions. Do not reveal private aliases, hidden plans or private annotations; use approved public names only.
 - Output ONLY the narrative text — no headers, no bullets, no metadata.

@@ -65,6 +65,7 @@ export interface PersistedSceneState {
  *   value = present, null = use default / explicitly none, undefined = never configured.
  */
 export interface PersistedUIState {
+  presentationRevisions?: Record<string, number>;
   styleName: string;
   variant: StyleVariant;
   keyColor?: string | null;
@@ -73,6 +74,7 @@ export interface PersistedUIState {
 
 /** Persisted resource display + values */
 export interface PersistedResourceState {
+  presentationRevisions?: Record<string, number>;
   displayResources: Record<string, string[]>;
   resourceValues: Record<string, Record<string, string>>;
 }
@@ -98,6 +100,8 @@ export interface LoadedState {
  * writes to different files proceed concurrently.
  */
 export class StatePersister {
+  private revisionSource?: () => Record<string, number>;
+  setPresentationRevisionSource(source: () => Record<string, number>): void { this.revisionSource = source; }
   private root: string;
   private fileIO: FileIO;
   private onError?: (error: Error) => void;
@@ -151,6 +155,8 @@ export class StatePersister {
     await Promise.all(this.writeQueues.values());
   }
 
+  async flushSliceDurable(slice: StateSlice): Promise<void> { const file = STATE_FILES[slice]; await this.writeQueues.get(file); if (this.failedWrites.has(file)) throw new Error(`Campaign persistence failed: ${file}`); }
+
   /** Durable feedback may only be acknowledged after successful writes. */
   async flushDurable(): Promise<void> {
     await this.flush();
@@ -202,11 +208,11 @@ export class StatePersister {
   }
 
   persistResources(state: PersistedResourceState): void {
-    this.enqueueWrite(STATE_FILES.resources, JSON.stringify(state, null, 2));
+    this.enqueueWrite(STATE_FILES.resources, JSON.stringify(this.revisionSource ? { ...state, presentationRevisions: this.revisionSource() } : state, null, 2));
   }
 
   persistUI(state: PersistedUIState): void {
-    this.enqueueWrite(STATE_FILES.ui, JSON.stringify(state, null, 2));
+    this.enqueueWrite(STATE_FILES.ui, JSON.stringify(this.revisionSource ? { ...state, presentationRevisions: this.revisionSource() } : state, null, 2));
   }
 
   persistUsage(breakdown: TokenBreakdown): void {

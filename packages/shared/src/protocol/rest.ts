@@ -217,10 +217,16 @@ export const TierAssignmentSchema = Type.Object({
   modelId: Type.String(),
 });
 
+export const CoDmAssignmentSchema = Type.Object({
+  connectionId: Type.String(), modelId: Type.String(),
+  effort: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high"), Type.Literal("xhigh"), Type.Literal("max"), Type.Null()])),
+});
+
 export const ConnectionsListResponse = Type.Object({
   connections: Type.Array(SerializedConnection),
   tierAssignments: Type.Unknown(),
   imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
+  coDmAssignment: Type.Optional(Type.Union([CoDmAssignmentSchema, Type.Null()])),
 });
 
 export const AddConnectionRequest = Type.Object({
@@ -289,6 +295,7 @@ export const UpdateConnectionKeyRequest = Type.Object({
 export const TiersResponse = Type.Object({
   tierAssignments: Type.Unknown(),
   imageAssignment: Type.Union([TierAssignmentSchema, Type.Null()]),
+  coDmAssignment: Type.Optional(Type.Union([CoDmAssignmentSchema, Type.Null()])),
 });
 
 export const SetTiersRequest = Type.Object({
@@ -296,6 +303,7 @@ export const SetTiersRequest = Type.Object({
   medium: Type.Optional(TierAssignmentSchema),
   small: Type.Optional(TierAssignmentSchema),
   imageAssignment: Type.Optional(Type.Union([TierAssignmentSchema, Type.Null()])),
+  coDmAssignment: Type.Optional(Type.Union([CoDmAssignmentSchema, Type.Null()])),
 });
 
 export const ModelsResponse = Type.Object({

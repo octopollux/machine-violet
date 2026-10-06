@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { stripCoDmAnnotations } from "./co-dm-protocol.js";
+import { projectPublicTranscript, renderPublicTranscript, renderPublicIdentityContext } from "./public-transcript.js";
 import type { KnowledgeOperation } from "@machine-violet/shared/types/knowledge.js";
 import { projectCampaignCompendium } from "../entities/public-knowledge.js";
 import { getCampaignKnowledge, type KnowledgeFileIO } from "../knowledge/store.js";
@@ -76,6 +78,7 @@ export interface PendingOperation {
   calendar?: { clocks: GameState["clocks"]; alarmsFired: string[] };
   /** Generated proposals persisted before any campaign updates are applied. */
   updates?: {
+    publicSummaryVersion?: 1;
     entry: CampaignLogEntry;
     operations: KnowledgeOperation[];
     publicOperations?: KnowledgeOperation[];
@@ -156,6 +159,10 @@ export class SceneManager {
   private pendingOp: PendingOperation | null = null;
   private pcSummaries: string[];
   private aliasContext = "";
+  private coDmOwnsKnowledge = false;
+
+  /** The continuing lane is the sole writer of entity history and disclosure. */
+  setCoDmOwnsKnowledge(enabled: boolean): void { this.coDmOwnsKnowledge = enabled; }
   private entityTree: EntityTree;
   /**
    * Rendered entity-registry snapshot fed to the DM (via `entityIndex`).
@@ -289,7 +296,7 @@ export class SceneManager {
     const userContent = typeof dropped.exchange.user.content === "string"
       ? dropped.exchange.user.content
       : narrationText(dropped.exchange.user.content);
-    const assistantContent = narrationText(dropped.exchange.assistant.content);
+    const assistantContent = stripCoDmAnnotations(narrationText(dropped.exchange.assistant.content)).publicText;
     const exchangeText = `Player: ${userContent}\nDM: ${assistantContent}`;
 
     const pcIdent = this.state.config.players
@@ -322,7 +329,7 @@ export class SceneManager {
 
   /** Run the scene tracker to update open threads and NPC intents. */
   async runSceneTracker(provider: LLMProvider): Promise<UsageStats> {
-    const tail = this.scene.transcript;
+    const tail = renderPublicTranscript(projectPublicTranscript(this.scene.transcript));
     if (tail.length === 0) {
       return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
     }
@@ -774,13 +781,19 @@ export class SceneManager {
     const pending = this.pendingOp;
     if (!pending?.transitionId) throw new Error("Missing scene transition instance");
     const store = await getCampaignKnowledge(this.state.campaignRoot, this.fileIO);
+    // A recovered pre-projection journal may have used private aliases. Regenerate
+    // only its public summary when the continuing architecture takes ownership.
+    if (this.coDmOwnsKnowledge && pending.updates && !pending.updates.publicSummaryVersion) pending.updates = undefined;
     if (!pending.updates) {
       const transcript = this.scene.transcript.join("\n");
-      const playerTranscript = transcript.split("\n").filter(line => !line.startsWith("> `")).join("\n");
+      const playerTranscript = renderPublicTranscript(projectPublicTranscript(this.scene.transcript)).join("\n\n");
+      const publicProjection = await projectCampaignCompendium(store);
+      const publicAliases = renderPublicIdentityContext(Object.values(publicProjection.collections ?? {}).flat());
       const route = this.routeFor("small", provider);
       this.devLog?.("[dev] subagent:summarizer starting");
-      const summaryPromise = summarizeScene(route.provider, playerTranscript, this.aliasContext || undefined, route.model);
+      const summaryPromise = summarizeScene(route.provider, playerTranscript, publicAliases || undefined, route.model);
       const changelogPromise = (async () => {
+        if (this.coDmOwnsKnowledge) return [];
         const identities = await this.listEntityFiles();
         if (!identities.length) return [];
         this.devLog?.(`[dev] subagent:changelog starting (${identities.length} entities)`);
@@ -790,9 +803,10 @@ export class SceneManager {
         return parseChangelogEntries(generated.text);
       })();
       const compendiumPromise = summaryPromise.then(async summary => {
+        if (this.coDmOwnsKnowledge) return null;
         const current = await projectCampaignCompendium(store);
         this.devLog?.("[dev] subagent:compendium starting");
-        const generated = await updateCompendium(route.provider, current, summary.full, pending.sceneNumber, this.aliasContext || undefined, route.model);
+        const generated = await updateCompendium(route.provider, current, summary.full, pending.sceneNumber, publicAliases || undefined, route.model);
         accUsage(result.usage, generated.usage);
         this.devLog?.("[dev] subagent:compendium done");
         return generated.compendium;
@@ -817,6 +831,7 @@ export class SceneManager {
         catch (error) { publicationError = error instanceof Error ? error.message : String(error); }
       }
       pending.updates = {
+        publicSummaryVersion: 1,
         entry: { sceneNumber: pending.sceneNumber, title, full: summary.value.full, mini: summary.value.mini, transitionId: pending.transitionId },
         changelogEntries: changelog.value,
         operations, publicOperations, publicationError,
@@ -830,11 +845,11 @@ export class SceneManager {
     const journal = pending.updates;
     result.campaignLogEntry = journal.entry.full;
     result.changelogEntries = journal.changelogEntries;
-    await store.mutate(journal.operations, {
+    if (!this.coDmOwnsKnowledge) await store.mutate(journal.operations, {
       sceneNumber: pending.sceneNumber, source: "scene-updates",
       operationId: `scene-updates:${pending.transitionId}`,
     });
-    if (!journal.publicationError && journal.publicOperations?.length) {
+    if (!this.coDmOwnsKnowledge && !journal.publicationError && journal.publicOperations?.length) {
       try {
         await store.mutate(journal.publicOperations, {
           sceneNumber: pending.sceneNumber, source: "scene-publication",
@@ -971,7 +986,7 @@ export class SceneManager {
     );
     await this.fileIO.mkdir(dir);
     const transcriptPath = norm(dir) + "/transcript.md";
-    const content = `# Scene ${this.scene.sceneNumber}\n\n${this.scene.transcript.join("\n\n")}\n`;
+    const content = `# Scene ${this.scene.sceneNumber}\n\n${renderPublicTranscript(projectPublicTranscript(this.scene.transcript)).join("\n\n")}\n`;
     await this.fileIO.writeFile(transcriptPath, content);
   }
 

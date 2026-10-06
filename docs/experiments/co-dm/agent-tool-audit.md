@@ -1,5 +1,10 @@
 # Agent and tool integration audit
 
+This audit records the pre-implementation inventory and design requirements.
+See [the production co-DM contract](../../co-dm.md) for current behavior and
+regression evidence. References below to isolated or proposed behavior describe
+the audited revision, not current normal launches.
+
 **Design requirements, not shipped behavior. Audited 2026-10-05 against `d32696d1`.** This extends the [adopted co-DM architecture](README.md). The experiment remains isolated. Inventory came from executable registry definitions, provider-call sites, helper callers, setup/server paths, and `/tools/`, rather than assuming the older catalogs were current. No live calls were made for this audit; the separate startup inspection below supplies earlier live evidence.
 
 ## Inventory and governing decision
@@ -197,6 +202,7 @@ Allow player input once the opening and necessary mechanics are ready. Initial t
 | `tools/campaign-explorer` | Already a privileged read-only SQLite logical-tree/state/context viewer. Keep raw SQLite sidecars blocked and private data explicitly privileged. Add co-DM queue/cursor/watermark/epoch and pending-job visibility, context selection and role-aware spans; verify overlapping work after foreground readiness is visible. Do not render private journals as player transcripts. Its contract tests cover state-file and context-envelope changes. |
 | `tools/theme-editor` | Read-only asset preview using the real client renderer. No agent/queue change needed. Preserve theme/variant command compatibility and preview assets; runtime stale-result fencing belongs in engine/client contracts, not this editor. |
 | Server/session, shared protocol, clients | Every mutation route—including player cycling, OOC/Dev, PC/personality changes, resource/UI callbacks and manual save/restore—must pass identity/revision/lifecycle rules. Distinguish player readiness from maintenance catch-up. Reconnect snapshots must reflect current revisions. |
+| Shared tool-activity indicators | Co-DM calls generate user-facing indicators alongside DM calls, including overlapping same-name calls. Accumulate together and clear at the normal DM turn-end boundary; co-DM completion does not clear the display. Late completion cannot recreate a cleared entry or expose private arguments. |
 | Harness, goldens, debug/tape/export | Add co-DM event/barrier predicates and role buckets, startup evidence, private-frame filtering and crash schedules. Existing offline goldens can mock away helpers; they cannot substitute for semantic review. Dumps are privileged, public replay/export is filtered. |
 
 ## Integration order and release evidence

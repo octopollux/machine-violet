@@ -61,6 +61,8 @@ export interface AgentLoopConfig {
   maxToolRounds: number;
   /** Effort level. Omit to auto-resolve from agent name. */
   effort?: import("../config/models.js").EffortLevel | null;
+  operationScope?: string;
+  afterTool?: (name: string) => Promise<void>;
   /** Async tool handler override. Called before registry dispatch.
    *  Return a ToolResult to handle the tool, or null to fall through to registry. */
   asyncToolHandler?: (name: string, input: Record<string, unknown>) => Promise<ToolResult | null>;
@@ -163,18 +165,12 @@ async function runAgentLoopInternal(
   stream: boolean,
 ): Promise<AgentLoopResult> {
   const asyncHandler = config.asyncToolHandler;
-  const toolHandler = asyncHandler
-    ? async (
-        name: string,
-        input: Record<string, unknown>,
-        context: ToolExecutionContext,
-      ) => (await asyncHandler(name, input))
-        ?? registry.dispatch(gameState, name, input, context)
-    : (
-        name: string,
-        input: Record<string, unknown>,
-        context: ToolExecutionContext,
-      ) => registry.dispatch(gameState, name, input, context);
+  const toolHandler = async (name: string, input: Record<string, unknown>, context: ToolExecutionContext) => {
+    const trustedContext = { ...context, operationScope: config.operationScope };
+    const result = (await asyncHandler?.(name, input)) ?? registry.dispatch(gameState, name, input, trustedContext);
+    await config.afterTool?.(name);
+    return result;
+  };
 
   // Tool list: registry definitions (minus DM_EXCLUDED_TOOLS), plus the
   // `generate_image` function tool when image generation is gated on.

@@ -1,6 +1,7 @@
 import { prepareKnowledgeNotices } from "../knowledge/notices.js";
-import { CoDmStreamFilter, stripCoDmAnnotations } from "./co-dm-protocol.js";
+import { CoDmStreamFilter, stripCoDmAnnotations, projectPublicNarration } from "./co-dm-protocol.js";
 import { CoDmCoordinator, type CoDmExchange, type CoDmDurableState } from "./co-dm-coordinator.js";
+import { durableReplayProvider } from "./durable-provider.js";
 import { ContinuingCoDmAgent } from "./experiments/co-dm-agent.js";
 import { migrateForegroundPrompt } from "./experiments/co-dm-prompt.js";
 import { ENTITY_TOOLS, ENTITY_INPUT_POLICIES } from "../entities/tools.js";
@@ -8,7 +9,6 @@ import { buildScribeToolHandler, PLAYER_PROFILE_CONTRACT } from "./subagents/scr
 import { getCampaignKnowledge } from "../knowledge/store.js";
 import { registry as singletonRegistry } from "./tool-registry.js";
 import type { GameState } from "./game-state.js";
-import { coerceResourceKeys } from "@machine-violet/shared";
 import type {
   TranscriptChoicePresentation,
   TranscriptChoiceResolution,
@@ -32,6 +32,8 @@ import type { NarrativeLine } from "@machine-violet/shared/types/tui.js";
 
 export interface ProcessInputOptions {
   fromAI?: boolean;
+  inputKind?: "player" | "bootstrap";
+  exchangeId?: string;
   skipTranscript?: boolean;
   choiceContexts?: {
     presentation: TranscriptChoicePresentation;
@@ -61,7 +63,7 @@ import { accUsage } from "../context/usage-helpers.js";
 import { logEvent } from "../context/engine-log.js";
 import { withSpan, setSpanAttrs } from "../context/trace.js";
 import { basename } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getMaxOutput } from "../config/model-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import { isAITurn, getActivePlayer, getCombatActivePlayer } from "./player-manager.js";
@@ -85,6 +87,7 @@ import { styleTheme } from "./subagents/theme-styler.js";
 import { SCENE_TRACKER_CADENCE } from "./subagents/scene-tracker.js";
 import { DeferredWork } from "./deferred-work.js";
 import { ResolveSession } from "./resolve-session.js";
+import { readPublicCampaignRecord } from "../entities/public-knowledge.js";
 import { EntityStore } from "../entities/store.js";
 import { buildEntityToolHandler, ENTITY_TOOL_NAME_SET } from "../entities/tools.js";
 import type { ActionDeclaration, StateDelta } from "@machine-violet/shared/types/resolve-session.js";
@@ -96,6 +99,7 @@ export type { EngineState, TurnInfo, EngineCallbacks } from "@machine-violet/sha
 
 /** Cap on an `update_portrait` change description — keeps the prompt, ack, and context marker bounded. */
 const MAX_PORTRAIT_CHANGE_CHARS = 280;
+export interface CoDmOptions { provider?: LLMProvider; model?: string; effort?: import("../providers/agent-loop-bridge.js").ProviderLoopConfig["effort"]; onEvent?: (event: CoDmExperimentEvent) => void }
 export interface CoDmExperimentEvent { kind: "enqueue" | "start" | "finish" | "commit" | "error"; epoch: number; cursor?: number; batchSize?: number; eventIds?: string[] }
 
 /**
@@ -105,6 +109,68 @@ export interface CoDmExperimentEvent { kind: "enqueue" | "start" | "finish" | "c
 export class GameEngine {
   private coDm: CoDmCoordinator | null = null;
   private coDmReady: Promise<void> = Promise.resolve();
+  private pendingAppearanceChanges = new Map<string, string[]>();
+  private effectEpoch = 1;
+  private foregroundExchangeId = "";
+  private imageOperationIndex = 0;
+  private portraitJobWrites: Promise<void> = Promise.resolve();
+  private portraitRevisions = new Map<string, number>();
+  private lastCompletedInput?: { characterName: string; text: string };
+  getLastCompletedInput(): { characterName: string; text: string } | undefined { return this.lastCompletedInput ? { ...this.lastCompletedInput } : undefined; }
+  private externalMutations: Promise<unknown> = Promise.resolve();
+  private foregroundWork?: Promise<void>;
+  private startupMechanics: Promise<void> = Promise.resolve();
+  private startupSheetNoticeRequired = false;
+  private acceptedStartupSheet = "";
+  setStartupMechanicsBarrier(job: Promise<void>): void {
+    this.startupSheetNoticeRequired = true;
+    this.startupMechanics = job.then(async () => {
+      const character = this.gameState.config.players[this.gameState.activePlayerIndex]?.character;
+      if (character) this.acceptedStartupSheet = (await this.getEntityStore().read("character", character)).raw;
+    });
+  }
+  private coDmApplying = false;
+  /** All resource writers share this underlying synchronous revision boundary. */
+  private installResourceRevisionBoundary(): void {
+    const tracked = new WeakMap<object, object>();
+    const wrap = (values: Record<string, string>, character: string): Record<string, string> => {
+      const cached = tracked.get(values); if (cached) return cached as Record<string, string>;
+      const proxy = new Proxy(values, { set: (target, key, value) => {
+        if (!this.coDmApplying && typeof key === "string") { const field = `set_resource_values:${character}:${key}`; this.presentationRevisions.set(field, (this.presentationRevisions.get(field) ?? 0) + 1); }
+        return Reflect.set(target, key, value);
+      } }); tracked.set(values, proxy); tracked.set(proxy, proxy); return proxy;
+    };
+    const original = this.gameState.resourceValues;
+    for (const [character, values] of Object.entries(original)) original[character] = wrap(values, character);
+    const wrapRoot = (root: GameState["resourceValues"]) => new Proxy(root, { set: (target, key, value) => {
+      if (typeof key === "string") {
+        if (!this.coDmApplying) for (const field of new Set([...Object.keys(target[key] ?? {}), ...Object.keys(value as object)])) { const revision = `set_resource_values:${key}:${field}`; this.presentationRevisions.set(revision, (this.presentationRevisions.get(revision) ?? 0) + 1); }
+        value = wrap(value as Record<string, string>, key);
+      }
+      return Reflect.set(target, key, value);
+    } });
+    let current = wrapRoot(original);
+    Object.defineProperty(this.gameState, "resourceValues", { enumerable: true, configurable: true,
+      get: () => current,
+      set: (replacement: GameState["resourceValues"]) => {
+        if (!this.coDmApplying) for (const character of new Set([...Object.keys(current), ...Object.keys(replacement)])) for (const field of new Set([...Object.keys(current[character] ?? {}), ...Object.keys(replacement[character] ?? {})])) { const key = `set_resource_values:${character}:${field}`; this.presentationRevisions.set(key, (this.presentationRevisions.get(key) ?? 0) + 1); }
+        for (const [character, values] of Object.entries(replacement)) replacement[character] = wrap(values, character);
+        current = wrapRoot(replacement);
+      },
+    });
+    const wrapDisplay = (resources: GameState["displayResources"]): GameState["displayResources"] => {
+      const values = new Proxy(resources, { set: (target, key, value) => {
+        if (!this.coDmApplying && typeof key === "string") { const field = `set_display_resources:${key}`; this.presentationRevisions.set(field, (this.presentationRevisions.get(field) ?? 0) + 1); }
+        return Reflect.set(target, key, value);
+      } });
+      return values;
+    };
+    let display = wrapDisplay(this.gameState.displayResources);
+    Object.defineProperty(this.gameState, "displayResources", { enumerable: true, configurable: true, get: () => display, set: (replacement: GameState["displayResources"]) => {
+      if (!this.coDmApplying) for (const character of new Set([...Object.keys(display), ...Object.keys(replacement)])) { const field = `set_display_resources:${character}`; this.presentationRevisions.set(field, (this.presentationRevisions.get(field) ?? 0) + 1); }
+      display = wrapDisplay(replacement);
+    } });
+  }
   private presentationRevisions = new Map<string, number>();
   private coDmOnEvent?: (event: CoDmExperimentEvent) => void;
   private coDmUI: import("../context/state-persistence.js").PersistedUIState = { styleName: "clean", variant: "exploration", modelines: {} };
@@ -116,9 +182,9 @@ export class GameEngine {
       if (typeof command.variant === "string") this.coDmUI.variant = command.variant as import("@machine-violet/shared/types/tui.js").StyleVariant;
     }
   }
-  private async publishCoDmUI(command: TuiCommand, assertCurrent: () => void): Promise<void> {
+  private async publishCoDmUI(command: TuiCommand, assertCurrent: () => void, operationId?: string): Promise<void> {
     assertCurrent();
-    if (command.type === "set_theme" && command.save_to_location) { await this.saveThemeToLocation(command, assertCurrent); assertCurrent(); }
+    if (command.type === "set_theme" && command.save_to_location) { await this.saveThemeToLocation(command, assertCurrent, operationId); assertCurrent(); }
     this.observeCoDmUI(command);
     this.callbacks.onTuiCommand(command);
     if (command.type === "update_modeline" || command.type === "set_theme") {
@@ -144,14 +210,16 @@ export class GameEngine {
     return [`${name}:${character}`];
   }
 
-  private async initializeCoDm(options: { provider?: LLMProvider; model?: string; onEvent?: (event: CoDmExperimentEvent) => void }): Promise<void> {
+  private async initializeCoDm(options: CoDmOptions): Promise<void> {
     this.coDmOnEvent = options.onEvent;
-    const loadedUI = (await this.persister?.loadAll())?.ui;
+    const loadedState = await this.persister?.loadAll();
+    const loadedUI = loadedState?.ui;
+    for (const snapshot of [loadedState?.resources?.presentationRevisions, loadedUI?.presentationRevisions]) for (const [key, revision] of Object.entries(snapshot ?? {})) this.presentationRevisions.set(key, Math.max(revision, this.presentationRevisions.get(key) ?? 0));
     if (loadedUI) this.coDmUI = loadedUI;
     const path = norm(`${this.gameState.campaignRoot}/state/co-dm-experiment.json`);
     let initialState: CoDmDurableState | undefined;
     if (await this.fileIO.exists(path)) initialState = JSON.parse(await this.fileIO.readFile(path)) as CoDmDurableState;
-    const presentation = ["update_modeline", "set_display_resources", "set_resource_values", "set_theme", "style_scene"];
+    const presentation = ["update_modeline", "set_display_resources", "set_resource_values", "set_theme", "style_scene", "search_campaign", "manage_objectives"];
     const tools = [...ENTITY_TOOLS, PLAYER_PROFILE_CONTRACT.definition, ...this.registry.getDefinitionsFor(presentation)];
     if (this.provider.getCapabilities?.(this.model).imageGeneration && this.gameState.config.image_generation !== "off") tools.push({
       name: UPDATE_PORTRAIT_TOOL_NAME, description: "Silently revise a saved PC portrait for an established lasting appearance change. No scene images.",
@@ -159,43 +227,96 @@ export class GameEngine {
     });
     this.coDm = new CoDmCoordinator({
       initialState,
+      onFailed: state => { logEvent("co_dm:paused", { pendingCount: state.pending.length, cursor: state.cursor, epoch: state.epoch }); this.callbacks.onDevLog?.(`[co-DM] Maintenance paused; ${state.pending.length} accepted observations retained for retry.`); },
       onCommitted: (state, batch) => this.coDmOnEvent?.({ kind: "commit", epoch: state.epoch, cursor: state.cursor, batchSize: batch.length, eventIds: batch.map(exchange => exchange.id) }),
       persist: async state => { await this.fileIO.mkdir(norm(`${this.gameState.campaignRoot}/state`)); await (this.fileIO.writeFileAtomic?.(path, JSON.stringify(state)) ?? this.fileIO.writeFile(path, JSON.stringify(state))); },
       worker: async (batch, state, fence) => {
         const batchInfo = { epoch: state.epoch, cursor: state.cursor, batchSize: batch.length, eventIds: batch.map(exchange => exchange.id) };
         this.coDmOnEvent?.({ kind: "start", ...batchInfo });
-        const revisions = new Map(this.presentationRevisions);
-        const maintenance = buildScribeToolHandler(this.fileIO, this.gameState.campaignRoot, this.sceneManager.getScene().sceneNumber, [], [], [], [], this.gameState.homeDir);
-        let operation = 0;
+        const revisions = new Map(Object.entries(batch.at(-1)?.presentationRevisions ?? Object.fromEntries(this.presentationRevisions)));
+        const canonicalStore = await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO);
+        let canonicalRevision = batch.at(-1)?.knowledgeRevision ?? -1;
+        const maintenance = buildScribeToolHandler(this.fileIO, this.gameState.campaignRoot, this.sceneManager.getScene().sceneNumber, [], [], [], [], this.gameState.homeDir, "co-dm", { expectedRevision: () => canonicalRevision, assertCurrent: () => fence.assertCurrent(), protectedRoots: ["Lore/DM Notes"], protectedFields: Object.fromEntries(this.gameState.config.players.map(player => [player.character, ["stats", "stat_block", "mechanics", "character_sheet", "sheet_status", "hp", "hit_points"]])) });
+        const operationScope = `${state.epoch}:${state.cursor + 1}`;
         const journalPath = norm(`${this.gameState.campaignRoot}/state/co-dm-operations.json`);
         const journal: Record<string, { name: string; input: Record<string, unknown>; result?: import("./tool-registry.js").ToolResult }> = await this.fileIO.exists(journalPath) ? JSON.parse(await this.fileIO.readFile(journalPath)) : {};
-        const saveJournal = async () => { await (this.fileIO.writeFileAtomic?.(journalPath, JSON.stringify(journal)) ?? this.fileIO.writeFile(journalPath, JSON.stringify(journal))); };
+        let journalWrites: Promise<void> = Promise.resolve();
+        const saveJournal = (): Promise<void> => {
+          const write = journalWrites.then(async () => { fence.assertCurrent(); await (this.fileIO.writeFileAtomic?.(journalPath, JSON.stringify(journal)) ?? this.fileIO.writeFile(journalPath, JSON.stringify(journal))); });
+          journalWrites = write.catch(() => undefined); return write;
+        };
+        const replayProvider = durableReplayProvider(options.provider ?? this.provider, this.fileIO, this.gameState.campaignRoot, `co-dm:${operationScope}`, () => fence.assertCurrent());
         const agent = new ContinuingCoDmAgent({
-          provider: options.provider ?? this.provider, model: options.model ?? "gpt-6.1-sol",
-          frozenContext: state.frozenContext, messages: state.messages, tools,
+          provider: replayProvider, model: options.model ?? this.model, effort: options.effort,
+          frozenContext: state.frozenContext, continuity: state.continuity, messages: state.messages, tools,
           toolInputPolicies: { ...ENTITY_INPUT_POLICIES, ...this.registry.getInputPolicies(), player_profile: PLAYER_PROFILE_CONTRACT.policy as import("./tool-contract.js").ToolInputPolicy, update_portrait: { criticality: "expensive" } },
-          onUsage: usage => { accUsage(this.sessionUsage, usage); this.callbacks.onUsageUpdate(usage, "large"); },
+          onToolStart: (name, callId) => this.callbacks.onToolStart(name, { role: "co-dm", callId: `${operationScope}:${callId}` }),
+          onToolEnd: (name, result, callId) => this.callbacks.onToolEnd(name, result, { role: "co-dm", callId: `${operationScope}:${callId}` }),
+          onUsage: usage => { accUsage(this.sessionUsage, usage); this.callbacks.onUsageUpdate(usage, "large", { role: "co-dm", model: options.model ?? this.model }); },
           toolHandler: async (name, input, context) => {
             fence.assertCurrent();
             if (name === "knowledge" || name === "remember" || name === "player_profile") {
-              if (name !== "remember") return maintenance(name, input);
-              const id = `co-dm:${state.epoch}:${batch.map(exchange => exchange.id).join(",")}:${operation++}`;
+              if (name === "knowledge") { const result = await maintenance(name, input); if (!result.is_error) canonicalRevision = await canonicalStore.revision?.() ?? 0; return result; }
+              const id = `co-dm:${operationScope}:${name}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
               if (journal[id]) {
                 if (JSON.stringify(journal[id].input.operations) !== JSON.stringify(input.operations)) return { content: "This retried batch already proposed different operations at this position. Read canonical state and retry without changing committed intent.", is_error: true };
                 const receipt = journal[id].result;
-                if (receipt) return receipt;
+                if (receipt && !receipt.is_error) return receipt;
               } else {
-                journal[id] = { name, input: { ...input, operationId: id } };
+                journal[id] = { name, input: { ...input, ...(name === "remember" ? { operationId: id } : {}) } };
                 await saveJournal();
               }
               fence.assertCurrent();
-              const result = await maintenance(name, journal[id].input);
+              const acceptedInput = name === "player_profile" ? Object.fromEntries(Object.entries(journal[id].input).filter(([key]) => key !== "operationId")) : journal[id].input;
+              const result = await maintenance(name, acceptedInput);
+              if (!result.is_error) canonicalRevision = await canonicalStore.revision?.() ?? 0;
               fence.assertCurrent();
               journal[id].result = result;
               await saveJournal();
               return result;
             }
-            if (name === UPDATE_PORTRAIT_TOOL_NAME) return this.dispatchUpdatePortrait(input, () => fence.assertCurrent());
+            if (name === "search_campaign") {
+              const small = this.tierProviders.small;
+              const result = await searchCampaign(small.provider, { query: String(input.query), campaignRoot: this.gameState.campaignRoot }, this.fileIO, small.model);
+              fence.assertCurrent();
+              accUsage(this.sessionUsage, result.usage); this.callbacks.onUsageUpdate(result.usage, "small");
+              return { content: result.text };
+            }
+            if (name === "manage_objectives") {
+              if (input.action === "list") {
+                this.coDmApplying = true;
+                let result: import("./tool-registry.js").ToolResult;
+                try { result = this.registry.dispatch(this.gameState, name, input, context); }
+                finally { this.coDmApplying = false; }
+                // An authoritative read rebases this lane, without counting
+                // the read itself as a newer writer.
+                if (!result.is_error) revisions.set("objectives", this.presentationRevisions.get("objectives") ?? 0);
+                return result;
+              }
+              const operationId = `objective:${operationScope}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
+              const receipt = this.gameState.objectives.operationReceipts?.[operationId];
+              if (receipt) return structuredClone(receipt);
+              if ((this.presentationRevisions.get("objectives") ?? 0) !== (revisions.get("objectives") ?? 0)) return { content: "Objectives changed after the observed exchange; preserve newer player or DM intent and rebase a later batch.", is_error: true };
+              this.coDmApplying = true;
+              let result: import("./tool-registry.js").ToolResult;
+              try { result = this.registry.dispatch(this.gameState, name, input, context); }
+              finally { this.coDmApplying = false; }
+              if (!result.is_error) {
+                // Tracker effect and its acceptance receipt share one atomic
+                // durable state file. A missing outer journal cannot duplicate it.
+                (this.gameState.objectives.operationReceipts ??= {})[operationId] = structuredClone(result);
+                this.persister?.persistObjectives(this.gameState.objectives);
+                await this.persister?.flushDurable();
+                fence.assertCurrent();
+              }
+              return result;
+            }
+            if (name === UPDATE_PORTRAIT_TOOL_NAME) {
+              const portraitKey = `portrait:${String(input.character)}`;
+              if ((this.presentationRevisions.get(portraitKey) ?? 0) !== (revisions.get(portraitKey) ?? 0)) return { content: "Portrait appearance changed after the observed exchange; preserve newer intent.", is_error: true };
+              const operationId = `portrait:${operationScope}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
+              return this.dispatchUpdatePortrait(input, () => fence.assertCurrent(), operationId);
+            }
             let guardedInput = input;
             const changed = (key: string) => (this.presentationRevisions.get(key) ?? 0) !== (revisions.get(key) ?? 0);
             if (name === "set_resource_values") {
@@ -204,7 +325,10 @@ export class GameEngine {
               if (!Object.keys(values).length) return { content: "All proposed resource fields conflict with newer foreground writes; preserve them and rebase a later batch.", is_error: true };
               guardedInput = { ...input, values };
             } else if (this.presentationKeys(name, input).some(changed)) return { content: "Foreground presentation changed after this batch began. Preserve it; omit conflicting fields or rebase a later batch.", is_error: true };
-            const result = this.registry.dispatch(this.gameState, name, guardedInput, context);
+            let result: import("./tool-registry.js").ToolResult;
+            this.coDmApplying = true;
+            try { result = this.registry.dispatch(this.gameState, name, guardedInput, context); }
+            finally { this.coDmApplying = false; }
             if (!result.is_error) {
               if (name === "set_resource_values" || name === "set_display_resources") {
                 let persistedRevisions: string;
@@ -235,11 +359,12 @@ export class GameEngine {
                 if (this.presentationKeys(name, input).some(changed)) throw new Error("Foreground presentation superseded this asynchronous update");
               };
               if (command.type === "style_scene") {
-                const styled = await this.handleStyleSceneTool(command, assertPresentationCurrent);
+                const themeOperationId = `theme:${operationScope}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`;
+                const styled = await this.handleStyleSceneTool(command, assertPresentationCurrent, themeOperationId);
                 assertPresentationCurrent();
-                if (styled._tui) await this.publishCoDmUI(styled._tui as TuiCommand, assertPresentationCurrent);
+                if (styled._tui) await this.publishCoDmUI(styled._tui as TuiCommand, assertPresentationCurrent, themeOperationId);
               }
-              else await this.publishCoDmUI(command, name === "set_resource_values" ? () => fence.assertCurrent() : assertPresentationCurrent);
+              else await this.publishCoDmUI(command, name === "set_resource_values" ? () => fence.assertCurrent() : assertPresentationCurrent, `presentation:${operationScope}:${name}:${createHash("sha256").update(JSON.stringify(input)).digest("hex")}`);
             }
             return result;
           },
@@ -249,7 +374,7 @@ export class GameEngine {
         catch (error) { this.coDmOnEvent?.({ kind: "error", ...batchInfo }); throw error; }
         fence.assertCurrent();
         this.coDmOnEvent?.({ kind: "finish", ...batchInfo });
-        return { feedback: result.feedback, messages: agent.getMessages() };
+        return { feedback: result.feedback, continuity: result.continuity, messages: agent.getMessages() };
       },
     });
     await this.sceneManager.prepareKnowledgeContext();
@@ -278,6 +403,51 @@ export class GameEngine {
 
   /** Experiment observability and explicit catch-up boundary for harnesses. */
   async settleCoDm(): Promise<void> { await this.coDmReady; await this.coDm?.drain(); }
+  async bootstrapStartup(envelope: { id: string; [key: string]: unknown }): Promise<void> {
+    await this.recordCoDmEvent("bootstrap", envelope, envelope.id);
+  }
+  async recordCoDmEvent(kind: "operator" | "lifecycle" | "bootstrap", payload: unknown, id: string = randomUUID()): Promise<void> {
+    await this.coDmReady;
+    if (kind === "operator") {
+      // Direct Dev/UI mutations use the same durable state endpoint as tools.
+      this.persister?.persistResources({ displayResources: this.gameState.displayResources, resourceValues: this.gameState.resourceValues });
+      this.persister?.persistConfig(this.gameState.config);
+      this.persister?.persistCombat(this.gameState.combat);
+      this.persister?.persistClocks(this.gameState.clocks);
+      this.persister?.persistDecks(this.gameState.decks);
+      this.persister?.persistObjectives(this.gameState.objectives);
+      this.persister?.persistMaps(this.gameState.maps);
+      for (const field of ["theme:theme", "theme:key_color", "theme:variant"]) this.presentationRevisions.set(field, (this.presentationRevisions.get(field) ?? 0) + 1);
+      await this.persister?.flushDurable();
+    }
+    await this.coDm?.enqueue({ id, sceneNumber: this.sceneManager.getScene().sceneNumber,
+      knowledgeRevision: await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).revision?.(), presentationRevisions: Object.fromEntries(this.presentationRevisions), events: [{ kind, payload }] });
+  }
+  runExternalMutation<T>(task: () => Promise<T>): Promise<T> {
+    const work = this.externalMutations.then(async () => { await this.beforeExternalMutation(); return task(); });
+    this.externalMutations = work.catch(() => undefined);
+    return work;
+  }
+  async beforeExternalMutation(): Promise<void> { await this.foregroundWork; await this.coDmReady; if (this.coDm?.getStatus().failed) this.coDm.retry(); await this.coDm?.through(); }
+  getCoDmStatus(): ReturnType<CoDmCoordinator["getStatus"]> | undefined { return this.coDm?.getStatus(); }
+  async retryCoDm(): Promise<void> { await this.coDmReady; this.coDm?.retry(); await this.coDm?.through(); }
+  async recoverPendingInput(): Promise<boolean> {
+    await this.coDmReady;
+    const path = norm(`${this.gameState.campaignRoot}/state/foreground-pending.json`);
+    if (!(await this.fileIO.exists(path))) return false;
+    const pending = JSON.parse(await this.fileIO.readFile(path)) as { characterName: string; text: string; opts: ProcessInputOptions; exchangeId: string; playerEntryIndex?: number } | null;
+    if (!pending || pending.opts.inputKind === "bootstrap") return false;
+    if (await this.hasCompletedExchange(pending.exchangeId)) { await this.writeCoDmPrivate(path, "null"); return true; }
+    const playerEntry = `**[${pending.characterName}]** ${pending.text}`;
+    if (pending.playerEntryIndex === undefined || this.sceneManager.getScene().transcript[pending.playerEntryIndex] !== playerEntry) this.sceneManager.appendPlayerInput(pending.characterName, pending.text);
+    await this.processInput(pending.characterName, pending.text, { ...pending.opts, inputKind: "player", exchangeId: pending.exchangeId, skipTranscript: true });
+    if (this.lastCompletedInput?.characterName !== pending.characterName || this.lastCompletedInput?.text !== pending.text) throw new Error("Accepted foreground exchange could not resume; its durable pending input remains available for retry");
+    return true;
+  }
+  async hasCompletedExchange(id: string): Promise<boolean> { await this.coDmReady; return this.coDm?.getState().acceptedExchangeIds.includes(id) ?? false; }
+  async suspendCoDm(): Promise<void> { return this.stopCoDm(); }
+  async stopCoDm(): Promise<void> { await this.coDmReady; await this.coDm?.stop(); await this.awaitPendingPortraitRenders(); }
+  async invalidateCoDm(): Promise<void> { ++this.effectEpoch; await this.coDmReady; await this.coDm?.invalidate(); await this.coDm?.settleAll(); await this.awaitPendingPortraitRenders(); await this.awaitPendingImageRenders(); }
   getCoDmState(): CoDmDurableState | undefined { return this.coDm?.getState(); }
   private provider: LLMProvider;
   /**
@@ -454,6 +624,8 @@ export class GameEngine {
     imageModel?: string;
     gitIO?: GitIO;
     entityTree?: EntityTree;
+    /** Production lane; false selects the legacy baseline for tests/comparison. */
+    coDm?: false | CoDmOptions;
     /** Explicit isolated-campaign experiment; never enabled by normal launch. */
     coDmExperiment?: { isolatedCampaign: true; provider?: LLMProvider; model?: string; onEvent?: (event: CoDmExperimentEvent) => void };
   }) {
@@ -462,6 +634,7 @@ export class GameEngine {
     this.imageModel = params.imageModel;
     this.registry = singletonRegistry;
     this.gameState = params.gameState;
+    this.installResourceRevisionBoundary();
     this.fileIO = params.fileIO;
     this.sessionState = params.sessionState;
 
@@ -483,6 +656,7 @@ export class GameEngine {
       params.fileIO,
       (error) => this.callbacks.onError(error),
     );
+    this.persister.setPresentationRevisionSource(() => Object.fromEntries(this.presentationRevisions));
     if (this.repo) {
       const persister = this.persister;
       this.repo.snapshotHook = async (capture) => (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).withSnapshot(capture);
@@ -515,9 +689,11 @@ export class GameEngine {
     );
     this.callbacks = params.callbacks;
     this.model = params.tierProviders.large.model;
-    if (params.coDmExperiment) {
-      if (params.coDmExperiment.isolatedCampaign !== true) throw new Error("Co-DM requires an isolated campaign copy");
-      this.coDmReady = this.initializeCoDm(params.coDmExperiment);
+    const coDmOptions = params.coDm || params.coDmExperiment;
+    this.sceneManager.setCoDmOwnsKnowledge(Boolean(coDmOptions));
+    if (coDmOptions) {
+      if (params.coDmExperiment && params.coDmExperiment.isolatedCampaign !== true) throw new Error("Co-DM requires an isolated campaign copy");
+      this.coDmReady = this.initializeCoDm(coDmOptions);
     }
 
     // Set up injection registry
@@ -550,6 +726,7 @@ export class GameEngine {
     // Wire engine-specific tool hooks (combat lifecycle, player switching)
     this.registry.onToolSuccess = (toolName, state) => {
       if (this.closing) return;
+      if (toolName === "manage_objectives" && !this.coDmApplying) this.presentationRevisions.set("objectives", (this.presentationRevisions.get("objectives") ?? 0) + 1);
       if (toolName === "switch_player") {
         this.persistCurrentScene();
       }
@@ -681,6 +858,7 @@ export class GameEngine {
    * client just like the DM's.
    */
   dispatchImmediateTuiCommand(cmd: TuiCommand): void {
+    if (this.coDm && ["set_theme", "update_modeline"].includes(cmd.type)) for (const key of this.presentationKeys(cmd.type, cmd)) this.presentationRevisions.set(key, (this.presentationRevisions.get(key) ?? 0) + 1);
     if (this.closing) return;
     if (this.coDm) {
       this.observeCoDmUI(cmd);
@@ -790,6 +968,7 @@ export class GameEngine {
    * we just replay processInput with the same arguments.
    */
   retryLastTurn(): void {
+    this.coDm?.retry();
     const pending = this.lastFailedInput;
     if (!pending) return;
     // skipTranscript: true — transcript was already written on the original attempt
@@ -802,6 +981,7 @@ export class GameEngine {
    * Returns false if there's nothing to retry.
    */
   retryLastExchange(): boolean {
+    this.coDm?.retry();
     const popped = this.conversation.popLastExchange();
     if (!popped) return false;
     // Extract character name and text from the stored user message
@@ -844,6 +1024,14 @@ export class GameEngine {
    * This is the main game loop entry point.
    */
   async processInput(characterName: string, text: string, opts?: ProcessInputOptions): Promise<void> {
+    await this.externalMutations;
+    if (this.foregroundWork) return;
+    const work = this.processInputInternal(characterName, text, opts);
+    this.foregroundWork = work;
+    try { await work; } finally { if (this.foregroundWork === work) this.foregroundWork = undefined; }
+  }
+
+  private async processInputInternal(characterName: string, text: string, opts?: ProcessInputOptions): Promise<void> {
     if (this.closing) return;
     if (this.engineState !== "idle" && this.engineState !== "waiting_input") {
       return; // Already processing
@@ -1034,17 +1222,20 @@ export class GameEngine {
     // Wrap config to track tool calls this turn
     let toolCallCount = 0;
     let privateFilter = this.coDm ? new CoDmStreamFilter() : null;
-    const coDmEvents: CoDmExchange["events"] = [{ kind: "player", payload: { characterName, text } }];
-    const coDmExchangeId = randomUUID();
+    const coDmEvents: CoDmExchange["events"] = [{ kind: opts?.inputKind === "bootstrap" ? "bootstrap" : "player", payload: { characterName, text } }];
+    const coDmExchangeId = opts?.exchangeId ?? randomUUID();
+    this.foregroundExchangeId = coDmExchangeId;
+    this.imageOperationIndex = 0;
+    await this.writeCoDmPrivate(norm(`${this.gameState.campaignRoot}/state/foreground-pending.json`), JSON.stringify({ characterName, text, opts: opts ?? {}, exchangeId: coDmExchangeId, playerEntryIndex: this.sceneManager.getScene().transcript.lastIndexOf(`**[${characterName}]** ${text}`) }));
     const recordPublicFragment = (fragment: string) => {
       const previous = coDmEvents[coDmEvents.length - 1];
       if (previous?.kind === "narration" && typeof previous.payload === "string") previous.payload += fragment;
       else coDmEvents.push({ kind: "narration", payload: fragment });
     };
-    const baseConfig = this.buildAgentConfig();
+    const baseConfig = { ...this.buildAgentConfig(), operationScope: coDmExchangeId, afterTool: async (name: string) => { if (name === "deck" || name === "roll_dice") await this.persister?.flushSliceDurable("decks"); } };
     const config: AgentLoopConfig = {
       ...baseConfig,
-      ...(this.coDm ? { excludedTools: new Set(["scribe", "set_theme", "style_scene"]), portraitEnabled: false, effort: "medium" as const } : {}),
+      ...(this.coDm ? { excludedTools: new Set(["scribe", "set_theme", "style_scene"]), portraitEnabled: false } : {}),
       onTextDelta: delta => {
         const publicDelta = privateFilter ? privateFilter.push(delta) : delta;
         if (privateFilter) {
@@ -1084,8 +1275,10 @@ export class GameEngine {
       async () => {
     try {
       // Run the agent loop with streaming
+      const foregroundEpoch = this.effectEpoch;
+      const replayForeground = durableReplayProvider(this.provider, this.fileIO, this.gameState.campaignRoot, `dm:${coDmExchangeId}`, () => { if (this.effectEpoch !== foregroundEpoch || this.closing) throw new Error("Abandoned foreground exchange"); });
       const result = await agentLoopStreaming(
-        this.provider,
+        replayForeground,
         this.coDm ? migrateForegroundPrompt(systemPrompt) : systemPrompt,
         messages,
         this.registry,
@@ -1146,6 +1339,7 @@ export class GameEngine {
         assistantMessage,
         toolMessages,
         opts?.choiceContexts,
+        opts?.inputKind === "bootstrap" ? "engine" : opts?.inputKind === "player" ? "player" : opts?.skipTranscript ? "engine" : "player",
       );
 
       // Drain any background `generate_image` renders that finished since the
@@ -1205,7 +1399,7 @@ export class GameEngine {
             const displayPath = norm(`${this.gameState.campaignRoot}/state/display-log.md`);
             const previousLog = await this.fileIO.exists(displayPath) ? await this.fileIO.readFile(displayPath) : "";
             await this.writeCoDmPrivate(this.coDmCompletionPath(), JSON.stringify({
-              exchange: { id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents },
+              exchange: { id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents, knowledgeRevision: await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).revision?.(), presentationRevisions: Object.fromEntries(this.presentationRevisions) },
               scene: this.sceneManager.getScene(), conversation: this.conversation.getExchanges(), displayLog: previousLog + appendedLog,
             }));
           }
@@ -1299,7 +1493,8 @@ export class GameEngine {
         await this.persister?.flushDurable();
         const queue = this.coDm.getState();
         this.coDmOnEvent?.({ kind: "enqueue", epoch: queue.epoch, cursor: queue.cursor, batchSize: 1, eventIds: [coDmExchangeId] });
-        await this.coDm.enqueue({ id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents });
+        if (this.coDm.getStatus().failed) this.coDm.retry();
+        await this.coDm.enqueue({ id: coDmExchangeId, sceneNumber: this.sceneManager.getScene().sceneNumber, events: coDmEvents, knowledgeRevision: await (await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO)).revision?.(), presentationRevisions: Object.fromEntries(this.presentationRevisions) });
         await this.writeCoDmPrivate(this.coDmCompletionPath(), "null");
       }
       // Process deferred TUI commands — engine-side work (scene transitions,
@@ -1313,7 +1508,7 @@ export class GameEngine {
 
       // Accumulate usage
       accUsage(this.sessionUsage, result.usage);
-      this.callbacks.onUsageUpdate(result.usage, "large");
+      this.callbacks.onUsageUpdate(result.usage, "large", { role: "dm", model: this.model });
 
       logEvent("turn:dm_complete", {
         textLength: result.text.length,
@@ -1345,6 +1540,8 @@ export class GameEngine {
       // turn itself has already succeeded, so we never want this to break it.
       void this.maybeGenerateSuggestedChoices(result.text, text, opts);
 
+      await this.writeCoDmPrivate(norm(`${this.gameState.campaignRoot}/state/foreground-pending.json`), "null");
+      this.lastCompletedInput = { characterName, text };
       // Clear any pending retry on success
       this.lastFailedInput = null;
 
@@ -1352,6 +1549,9 @@ export class GameEngine {
       if (this.closing) return;
       setSpanAttrs({ failed: true });
       if (e instanceof ContentRefusalError) {
+        // Definitive refusal abandons this input; restart must not replay it.
+        await this.writeCoDmPrivate(norm(`${this.gameState.campaignRoot}/state/foreground-pending.json`), "null");
+        this.lastFailedInput = null;
         // Content classifier refusal — don't persist exchange or set retry
         // (same input would just re-trigger). Clear partial DM output and
         // show a gentle system message instead.
@@ -1371,7 +1571,7 @@ export class GameEngine {
           this.pendingOOCSummary = consumedOOCSummary;
         }
         // Store the failed input so the player can press Enter to retry
-        this.lastFailedInput = { characterName, text, opts };
+        this.lastFailedInput = { characterName, text, opts: { ...opts, exchangeId: coDmExchangeId } };
         const error = e instanceof Error ? e : new Error(String(e));
         logEvent("turn:error", {
           message: error.message,
@@ -1416,6 +1616,9 @@ export class GameEngine {
   ): Promise<void> {
     if (opts?.skipTranscript) return;
     if (this.modeSession) return;
+    const generationTurn = this.turnCounter;
+    const generationScene = this.sceneManager.getScene().sceneNumber;
+    const generationMode = this.modeSession;
     if (!narration || narration.length < 40) return;
 
     const choicesConfig = this.gameState.config.choices;
@@ -1453,7 +1656,9 @@ export class GameEngine {
       accUsage(this.sessionUsage, generated.usage);
       this.callbacks.onUsageUpdate(generated.usage, "small");
 
-      if (generated.choices.length === 0) return;
+      if (generated.choices.length === 0 || this.closing || this.turnCounter !== generationTurn || this.sceneManager.getScene().sceneNumber !== generationScene || this.modeSession !== generationMode) return;
+      const current = this.gameState.combat.active ? getCombatActivePlayer(this.gameState) : getActivePlayer(this.gameState);
+      if (current?.characterName !== active.characterName) return;
 
       this.callbacks.onTuiCommand({
         type: "present_choices",
@@ -1483,7 +1688,7 @@ export class GameEngine {
     for (const player of this.gameState.config.players) {
       const name = player.character;
       try {
-        const content = (await this.getEntityStore().read("character", name)).raw;
+        const content = (await readPublicCampaignRecord(await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO), name))?.content;
         if (content && content.trim().length > 0) {
           sheets.push(content);
         }
@@ -1728,7 +1933,9 @@ export class GameEngine {
     // finish first so its writes are part of the snapshot being reverted (not
     // racing the checkout).
     await this.deferred.settle("rollback", this.campaignId);
+    ++this.effectEpoch;
     if (this.coDm) { await this.coDm.invalidate(); await this.coDm.settleAll(); await this.awaitPendingPortraitRenders(); }
+    await this.awaitPendingImageRenders();
     this.callbacks.onDevLog?.(`[dev] rollback: rolling back to "${target}"`);
     const result = await performRollback(this.repo, target, this.gameState.campaignRoot, this.fileIO);
     this.callbacks.onTuiCommand?.({ type: "show_rollback_summary", summary: result.summary });
@@ -1753,9 +1960,15 @@ export class GameEngine {
    * tests can settle it (mirrors `awaitPendingPortraitRenders`).
    */
   async settleDeferredWork(): Promise<void> {
-    await this.settleCoDm();
-    await this.coDm?.settleAll();
-    await this.deferred.settle("teardown", this.campaignId);
+    const settled = await Promise.allSettled([
+      this.startupMechanics,
+      this.coDmReady.then(() => this.coDm?.settleAll()),
+      this.deferred.settle("teardown", this.campaignId),
+      this.awaitPendingPortraitRenders(),
+      this.awaitPendingImageRenders(),
+    ]);
+    const failures = settled.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (failures.length) throw new AggregateError(failures.map(result => result.reason), "Background work failed after all writer lanes settled");
   }
 
   /** Spawn the scribe subagent to process batched entity updates */
@@ -1763,6 +1976,7 @@ export class GameEngine {
     const updates = cmd.updates as { visibility: string; content: string }[];
     if (!updates || updates.length === 0) return;
 
+    if (this.coDm) { await this.recordCoDmEvent("operator", { compatibilityScribe: updates }); return; }
     const subStart = Date.now();
     logEvent("subagent:start", { name: "scribe" });
     try {
@@ -1829,6 +2043,7 @@ export class GameEngine {
     // Barrier: promote reads + rewrites the character sheet and upserts the
     // entity tree. A detached scribe may be rewriting the same files, so flush
     // first or the read tears / the writes clobber (last-writer-wins).
+    await this.coDm?.through();
     await this.deferred.settle("promote-character", this.campaignId);
 
     const entityStore = this.getEntityStore();
@@ -1988,13 +2203,28 @@ export class GameEngine {
     const root = this.gameState.campaignRoot;
     const generateImage = this.provider.generateImage.bind(this.provider);
 
+    const epoch = this.effectEpoch;
+    const assertEffectCurrent = () => { if (this.effectEpoch !== epoch) throw new Error("Abandoned image operation epoch"); };
+    const operationId = `${this.foregroundExchangeId || randomUUID()}:image:${this.imageOperationIndex++}`;
+    const jobId = createHash("sha256").update(operationId).digest("hex");
+    const jobPath = norm(`${root}/state/image-jobs/${jobId}.json`);
+    interface ImageJob { operationId: string; signature: string; status: "submitting" | "generated" | "complete" | "unknown"; timestamp?: number; result?: Awaited<ReturnType<NonNullable<LLMProvider["generateImage"]>>>; paths?: { absPath: string; relPath: string } };
+    const signature = JSON.stringify({ promptText, intent, effort, aspect, referenceNames });
+    let job: ImageJob | undefined = await fileIO.exists(jobPath) ? JSON.parse(await fileIO.readFile(jobPath)) : undefined;
+    if (job && job.signature !== signature) return { content: "This exchange already accepted a different image intent. Preserve that operation; a changed retry cannot submit another paid render.", is_error: true };
+    if (job && (job.status === "submitting" || job.status === "unknown")) return { content: "The accepted image render has a pending or unknown paid outcome. It will not be submitted again automatically.", is_error: true };
+    const persistJob = async () => { assertEffectCurrent(); await fileIO.mkdir(norm(`${root}/state/image-jobs`)); assertEffectCurrent(); await (fileIO.writeFileAtomic?.(jobPath, JSON.stringify(job)) ?? fileIO.writeFile(jobPath, JSON.stringify(job))); };
+
     // A single render closure shared by both modes. Resolves to the persisted
     // absolute path, or throws on failure.
     const runRender = async (): Promise<{ absPath: string; relPath: string }> => {
       const referenceImages = referenceNames.length > 0
         ? await loadCharacterReferences(referenceNames, fileIO, root)
         : [];
-      const result = await generateImage({
+      if (job?.status === "complete" && job.paths) return job.paths;
+      if (!job) { job = { operationId, signature, status: "submitting", timestamp: Date.now() }; await persistJob(); }
+      assertEffectCurrent();
+      const result = job.result ?? await generateImage({
         prompt: promptText,
         ...(this.imageModel ? { imageModel: this.imageModel } : {}),
         effort,
@@ -2002,19 +2232,25 @@ export class GameEngine {
         intent,
         ...(referenceImages.length > 0 ? { referenceImages } : {}),
       });
+      assertEffectCurrent();
+      job.result = result; job.timestamp ??= Date.now(); job.status = "generated"; await persistJob();
       const persisted = await handleImageGenerated(fileIO, root, sceneRef, {
         // Timestamp-based surrogate id — never sent to the API. Lives in the
         // on-disk sidecar JSON so each generation has a stable handle for log
         // correlation. (Earlier hosted-tool path used the response's
         // revised_prompt here; the function-tool path no longer surfaces that.)
-        id: `img-${Date.now()}`,
+        id: `img-${jobId}`,
         base64: result.base64,
         mimeType: result.mimeType,
         intent,
         ...(result.revisedPrompt ? { revisedPrompt: result.revisedPrompt } : {}),
-      });
+      }, () => job?.timestamp ?? Date.now());
       logEvent("image_gen:completed", { agent: "dm", intent, effort: result.effortUsed, aspect: result.aspectUsed });
-      return { absPath: norm(`${root}/${persisted.relPath}`), relPath: persisted.relPath };
+      assertEffectCurrent();
+      job.paths = { absPath: norm(`${root}/${persisted.relPath}`), relPath: persisted.relPath };
+      job.status = "complete"; delete job.result; await persistJob();
+      await this.recordCoDmEvent("lifecycle", { effect: "image", operationId, status: "committed", sceneNumber: sceneRef.sceneNumber, path: job.paths.relPath }, `${operationId}:committed`);
+      return job.paths;
     };
 
     // SYNCHRONOUS mode: the player asked and is waiting. Render inline and show
@@ -2033,6 +2269,7 @@ export class GameEngine {
         } as import("./tool-registry.js").ToolResult;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (job?.status === "submitting") { job.status = "unknown"; try { await persistJob(); } catch { /* Keep uncertain paid outcome; never resubmit automatically. */ } }
         logEvent("image_gen:dispatch_failed", { agent: "dm", message: msg.slice(0, 400) });
         this.callbacks.onDevLog?.(`[image] generate failed: ${msg}`);
         return { content: `Image generation failed: ${msg}`, is_error: true };
@@ -2049,6 +2286,7 @@ export class GameEngine {
         this.pendingImageDisplays.push({ filename: absPath, relPath, intent });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (job?.status === "submitting") { job.status = "unknown"; try { await persistJob(); } catch { /* Keep uncertain paid outcome; never resubmit automatically. */ } }
         // Engine log: visible to the harness + post-mortem dumps. onDevLog alone
         // goes to the TUI dev pane and disappears with the process.
         logEvent("image_gen:dispatch_failed", { agent: "dm", message: msg.slice(0, 400) });
@@ -2108,6 +2346,7 @@ export class GameEngine {
   private async dispatchUpdatePortrait(
     input: Record<string, unknown>,
     assertCurrent?: () => void,
+    operationId: string = randomUUID(),
   ): Promise<import("./tool-registry.js").ToolResult> {
     if (!this.provider.generateImage) {
       return { content: "Image generation is not available on the configured provider.", is_error: true };
@@ -2140,13 +2379,41 @@ export class GameEngine {
       };
     }
 
+    const jobPath = norm(`${root}/state/portrait-jobs.json`);
+    const jobs: Record<string, { status: "submitting" | "complete" | "unknown" | "superseded"; character: string; change: string }> = await fileIO.exists(jobPath) ? JSON.parse(await fileIO.readFile(jobPath)) : {};
+    const priorJob = jobs[operationId];
+    if (priorJob) return { content: priorJob.status === "complete" ? "Portrait operation already completed." : "Portrait operation has a pending or unknown paid outcome; do not submit it again.", ...(priorJob.status === "complete" ? {} : { is_error: true }) };
+    const revision = (this.portraitRevisions.get(name) ?? 0) + 1;
+    this.portraitRevisions.set(name, revision);
+    const appearanceChanges = [...(this.pendingAppearanceChanges.get(name) ?? []), change];
+    this.pendingAppearanceChanges.set(name, appearanceChanges);
+    const cumulativeChange = appearanceChanges.join("; ");
+    this.presentationRevisions.set(`portrait:${name}`, (this.presentationRevisions.get(`portrait:${name}`) ?? 0) + 1);
+    const assertPortraitCurrent = () => { assertCurrent?.(); if (this.portraitRevisions.get(name) !== revision) throw new Error("Portrait superseded by newer appearance intent"); };
+    const persistJobs = async () => {
+      const status = structuredClone(jobs[operationId]);
+      const write = this.portraitJobWrites.then(async () => {
+        assertCurrent?.();
+        const current: typeof jobs = await fileIO.exists(jobPath) ? JSON.parse(await fileIO.readFile(jobPath)) : {};
+        assertCurrent?.();
+        current[operationId] = status;
+        await fileIO.mkdir(norm(`${root}/state`));
+        assertCurrent?.();
+        await (fileIO.writeFileAtomic?.(jobPath, JSON.stringify(current)) ?? fileIO.writeFile(jobPath, JSON.stringify(current)));
+      });
+      this.portraitJobWrites = write.catch(() => undefined);
+      await write;
+    };
+    jobs[operationId] = { status: "submitting", character: name, change };
+    await persistJobs();
+    assertPortraitCurrent();
     logEvent("portrait_update:requested", { agent: "dm", character: name, change: change.slice(0, 200) });
 
     const generateImage = this.provider.generateImage.bind(this.provider);
     const render = (async () => {
       try {
         const result = await generateImage({
-          prompt: buildPortraitRevisionPrompt(name, change),
+          prompt: buildPortraitRevisionPrompt(name, cumulativeChange),
           ...(this.imageModel ? { imageModel: this.imageModel } : {}),
           effort: "standard",
           // The canonical portrait is the multi-angle landscape reference
@@ -2164,9 +2431,12 @@ export class GameEngine {
         // version and clobber history. The chain swallows errors so one failure
         // can't poison later commits; `commit` re-throws into the catch below.
         const commit = this.portraitCommitChain.then(async () => {
-          assertCurrent?.();
+          assertPortraitCurrent();
           const { archivedVersion } = await commitPortraitRevision(fileIO, root, name, bytes);
-          assertCurrent?.();
+          assertPortraitCurrent();
+          this.pendingAppearanceChanges.delete(name);
+          jobs[operationId].status = "complete";
+          await persistJobs();
           this.pendingPortraitInjections.push({
             name,
             change,
@@ -2178,6 +2448,9 @@ export class GameEngine {
         await commit;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        jobs[operationId].status = this.portraitRevisions.get(name) !== revision ? "superseded" : "unknown";
+        // The provider may have charged before interruption; retries never resubmit unknown outcomes.
+        try { assertCurrent?.(); await persistJobs(); } catch { /* Abandoned history must not recreate a restored job file. */ }
         logEvent("portrait_update:failed", { agent: "dm", character: name, message: msg.slice(0, 400) });
         this.callbacks.onDevLog?.(`[portrait] update for ${name} failed: ${msg}`);
       }
@@ -2239,6 +2512,7 @@ export class GameEngine {
   private async handleStyleSceneTool(
     input: Record<string, unknown>,
     assertCurrent?: () => void,
+    operationId?: string,
   ): Promise<import("./tool-registry.js").ToolResult> {
     const description = input.description as string | undefined;
     const directKeyColor = input.key_color as string | undefined;
@@ -2285,7 +2559,7 @@ export class GameEngine {
 
     // Persist to location entity if requested
     if (input.save_to_location) {
-      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location }, assertCurrent);
+      await this.saveThemeToLocation({ ...themeCmd, save_to_location: true, location: input.location }, assertCurrent, operationId);
     }
 
     // Return set_theme as _tui so agent-loop-bridge broadcasts immediately
@@ -2296,7 +2570,7 @@ export class GameEngine {
   // --- Theme <-> Location persistence ---
 
   /** Save theme + key_color to a location entity's front matter. */
-  private async saveThemeToLocation(cmd: TuiCommand, assertCurrent?: () => void): Promise<void> {
+  private async saveThemeToLocation(cmd: TuiCommand, assertCurrent?: () => void, operationId?: string): Promise<void> {
     const location = cmd.location as string | undefined;
     const themeName = cmd.theme as string | undefined;
     const keyColor = cmd.key_color as string | undefined;
@@ -2318,7 +2592,8 @@ export class GameEngine {
       const fields: Record<string, unknown> = {};
       if (themeName) fields.theme = themeName;
       if (keyColor) fields.key_color = keyColor;
-      await store.update("location", location, { frontMatter: fields, changelogEntry: `Theme updated: ${Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(", ")}` }, this.sceneManager.getScene().sceneNumber);
+      const knowledge = await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO);
+      await knowledge.mutate([{ op: "patch", uid: location, fields: fields as Record<string, import("@machine-violet/shared/types/knowledge.js").KnowledgeValue>, history: `Theme updated: ${Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(", ")}` }], { sceneNumber: this.sceneManager.getScene().sceneNumber, source: "theme", assertCurrent, operationId });
     } catch (e) {
       // A rejected experiment precondition must reach the tool result; it is
       // not a successful optional location save.
@@ -2378,13 +2653,16 @@ export class GameEngine {
 
     const active = getActivePlayer(this.gameState);
     const characterName = active.characterName;
+    const aiScene = this.sceneManager.getScene().sceneNumber;
+    const aiMode = this.modeSession;
+    const aiEpoch = this.coDm?.getState().epoch;
 
     this.setState("dm_thinking");
 
     // Load character sheet (best-effort)
     let characterSheet = `Character: ${characterName}`;
     try {
-      const content = (await this.getEntityStore().read("character", characterName)).raw;
+      const content = (await readPublicCampaignRecord(await getCampaignKnowledge(this.gameState.campaignRoot, this.fileIO), characterName))?.content;
       if (content) characterSheet = content;
     } catch (e) {
       // Missing sheet is fine — systemless or freshly-created characters.
@@ -2399,11 +2677,7 @@ export class GameEngine {
 
     // Gather recent narration from conversation
     const messages = this.conversation.getMessages();
-    const recentAssistant = messages
-      .filter((m) => m.role === "assistant")
-      .slice(-3)
-      .map((m) => (typeof m.content === "string" ? m.content : ""))
-      .join("\n");
+    const recentAssistant = projectPublicNarration(messages);
 
     try {
       // ai-player picks small or medium based on `player.model` ("haiku"/"sonnet").
@@ -2417,6 +2691,7 @@ export class GameEngine {
         recentNarration: recentAssistant || "It's your turn. What do you do?",
       }, aiTier.model);
 
+      if (this.closing || this.modeSession !== aiMode || this.sceneManager.getScene().sceneNumber !== aiScene || this.coDm?.getState().epoch !== aiEpoch || getActivePlayer(this.gameState).characterName !== characterName) return;
       // Fire AI player turn lifecycle
       this.turnCounter++;
       const aiTurn: TurnInfo = {
@@ -2433,6 +2708,7 @@ export class GameEngine {
       this.callbacks.onUsageUpdate(result.usage, aiTierName);
 
       // Feed the action into the game loop as player input
+      this.setState("waiting_input");
       await this.processInput(characterName, result.action, { fromAI: true });
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -2561,6 +2837,13 @@ export class GameEngine {
     name: string,
     input: Record<string, unknown>,
   ): Promise<import("./tool-registry.js").ToolResult | null> {
+    if (["resolve_turn", "promote_character", "start_combat", "roll_dice", "roll_check"].includes(name)) {
+      await this.startupMechanics;
+      if (this.startupSheetNoticeRequired) {
+        this.startupSheetNoticeRequired = false;
+        return { content: `The initial mechanical sheet is now accepted. Rebase this mechanical action on the accepted stats before retrying; no mechanical effect has executed.\n${this.acceptedStartupSheet}`, is_error: true };
+      }
+    }
     if (this.coDm && name === "dm_notes") {
       if (input.action === "read") return { content: this.sessionState.dmNotes ?? "(no DM notes)" };
       const notes = String(input.notes ?? "").trim();
@@ -2570,7 +2853,7 @@ export class GameEngine {
         return { content: "DM notes committed." };
       } catch (error) { return { content: error instanceof Error ? error.message : String(error), is_error: true }; }
     }
-    if (this.coDm && (name === "knowledge" || name === "search_campaign")) await this.settleCoDm();
+    if (this.coDm && (name === "knowledge" || name === "search_campaign")) { if (this.coDm.getStatus().failed) this.coDm.retry(); await this.coDm.through(); }
     if (this.coDm && ["update_modeline", "set_display_resources", "set_resource_values", "set_theme", "style_scene"].includes(name)) {
       for (const key of this.presentationKeys(name, input)) this.presentationRevisions.set(key, (this.presentationRevisions.get(key) ?? 0) + 1);
     }
@@ -2611,7 +2894,7 @@ export class GameEngine {
       };
       try {
         const result = await this.resolveSession.resolve(action);
-        this.applyResolutionDeltas(result.deltas);
+        const appliedDeltas = this.applyResolutionDeltas(result.deltas);
         if (result.deltas.some(d => d.type === "hp_change" || d.type === "resource_spend")) {
           // Emit a resource refresh so the TUI's React effect persists the updated values
           this.callbacks.onTuiCommand({ type: "resource_refresh" });
@@ -2623,7 +2906,7 @@ export class GameEngine {
         // regardless of whether the DM narrates it. This is visible in the TUI
         // as formatted text before the DM's narrative response.
         this.emitResolutionToPlayer(action.actor, result);
-        return { content: this.formatResolutionForDM(result) };
+        return { content: JSON.stringify({ resolution: this.formatResolutionForDM(result), appliedDeltas, proposedDeltas: result.deltas.filter(delta => !appliedDeltas.includes(delta)) }) };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.callbacks.onDevLog?.(`[dev] resolve_turn: failed — ${msg}`);
@@ -2781,7 +3064,8 @@ export class GameEngine {
   }
 
   /** Apply resolution deltas to game state. */
-  private applyResolutionDeltas(deltas: StateDelta[]): void {
+  private applyResolutionDeltas(deltas: StateDelta[]): StateDelta[] {
+    const applied: StateDelta[] = [];
     for (const delta of deltas) {
       switch (delta.type) {
         case "hp_change":
@@ -2793,22 +3077,28 @@ export class GameEngine {
           }
           const values = this.gameState.resourceValues[target];
           if (delta.type === "hp_change") {
-            const amount = delta.details.amount as number;
+            const amount = delta.details.amount;
+            if (typeof amount !== "number" || !Number.isFinite(amount)) break;
             // Use the resource key from the delta (system-agnostic), or fall back
             // to the first display resource for backward compat with old deltas.
             // Coerce before indexing: on a bare-string displayResources entry
             // `[0]` is the first *character*, which would silently accrue the
             // delta into a resource named "S".
             const key = (delta.details.resource as string | undefined)
-              ?? coerceResourceKeys(this.gameState.displayResources[target])[0]
               ?? "hp";
             const currentStr = values[key] ?? "0";
             const current = parseInt(currentStr, 10) || 0;
             values[key] = String(current + amount);
+            applied.push(delta);
+            const revisionKey = `set_resource_values:${target}:${key}`;
+            this.presentationRevisions.set(revisionKey, (this.presentationRevisions.get(revisionKey) ?? 0) + 1);
           } else {
             const resource = delta.details.resource as string;
             if (delta.details.remaining !== undefined) {
               values[resource] = String(delta.details.remaining);
+              applied.push(delta);
+              const revisionKey = `set_resource_values:${target}:${resource}`;
+              this.presentationRevisions.set(revisionKey, (this.presentationRevisions.get(revisionKey) ?? 0) + 1);
             }
           }
           break;
@@ -2821,6 +3111,7 @@ export class GameEngine {
           break;
       }
     }
+    return applied;
   }
 
   /**

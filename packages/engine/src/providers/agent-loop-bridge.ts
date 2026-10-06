@@ -86,8 +86,8 @@ export interface ProviderLoopConfig {
   onTuiCommand?: (cmd: TuiCommand) => void;
   terseSuffix?: boolean;
   onTextDelta?: (delta: string) => void;
-  onToolStart?: (name: string) => void;
-  onToolEnd?: (name: string, result: ToolResult) => void;
+  onToolStart?: (name: string, callId?: string) => void;
+  onToolEnd?: (name: string, result: ToolResult, callId?: string) => void;
   onComplete?: (usage: NormalizedUsage) => void;
   onError?: (error: Error) => void;
   /** Called when a retryable API error triggers a backoff wait. */
@@ -169,7 +169,7 @@ async function dispatchToolCall(
   return withSpan(
     { kind: tc.name === "generate_image" ? "image_gen" : "tool", name: tc.name },
     async () => {
-      config.onToolStart?.(tc.name);
+      config.onToolStart?.(tc.name, tc.id);
 
       const context: ToolExecutionContext = {
         agent: config.name,
@@ -205,7 +205,7 @@ async function dispatchToolCall(
           content: rejected.content,
           is_error: true,
         };
-        config.onToolEnd?.(tc.name, parseResult);
+        config.onToolEnd?.(tc.name, parseResult, tc.id);
         setSpanAttrs({ failed: true });
         return { content: parseResult.content, isError: true };
       }
@@ -223,7 +223,7 @@ async function dispatchToolCall(
             content: validation.content,
             is_error: true,
           };
-          config.onToolEnd?.(tc.name, validationResult);
+          config.onToolEnd?.(tc.name, validationResult, tc.id);
           return { content: validation.content, isError: true };
         }
         validatedInput = validation.value;
@@ -240,7 +240,7 @@ async function dispatchToolCall(
         toolResult = { content: `Tool error (${tc.name}): ${e instanceof Error ? e.message : String(e)}`, is_error: true };
       }
 
-      config.onToolEnd?.(tc.name, toolResult);
+      config.onToolEnd?.(tc.name, toolResult, tc.id);
 
       let tui: TuiCommand | undefined;
       if (tuiToolNames.has(tc.name)) {

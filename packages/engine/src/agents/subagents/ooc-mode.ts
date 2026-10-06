@@ -3,6 +3,7 @@ import type { SubagentStreamCallback } from "../subagent.js";
 import type { SubagentResult } from "../subagent.js";
 import type { DMSessionState } from "../dm-prompt.js";
 import { buildDMPrefix } from "../dm-prompt.js";
+import { migrateForegroundPrompt } from "../experiments/co-dm-prompt.js";
 import type { FileIO } from "../scene-manager.js";
 import type { GameState } from "../game-state.js";
 import type { TuiCommand } from "../agent-loop.js";
@@ -19,6 +20,7 @@ import type { ClocksState } from "@machine-violet/shared/types/clocks.js";
 import { findReferences } from "../../tools/campaign-ops/index.js";
 import { validateCampaign } from "../../tools/validation/index.js";
 import { runProviderLoop } from "../../providers/agent-loop-bridge.js";
+import type { OperatorMutationHooks } from "./dev-mode.js";
 import type { ModeSession } from "@machine-violet/shared/types/engine.js";
 
 // --- Types ---
@@ -72,6 +74,7 @@ export interface OOCResult extends SubagentResult {
  * Options for building the OOC system prompt.
  */
 export interface OOCPromptOptions {
+  coDmEnabled?: boolean;
   campaignName: string;
   config?: CampaignConfig;
   sessionState?: DMSessionState;
@@ -122,6 +125,7 @@ export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[
   // (it varies per entry and is small), and sits past the last cache_control
   // marker so BP1/BP2 keep their hits.
   const suffixParts: string[] = [`\n\n`, loadPrompt("ooc-mode", opts.model)];
+  if (opts.coDmEnabled) suffixParts.push("\n\nOperator responsibility: use knowledge and remember for explicit corrections, and promote_character for mechanical sheet generation. The engine feeds committed corrections to the continuing co-DM. Do not emit private inline co-DM frames in OOC replies; use actual correction tools and the SUMMARY handoff. Inherited narration and annotation guidance applies only when in-character play resumes.");
 
   if (opts.enterReason || opts.wasMidNarration) {
     suffixParts.push(`\n\n### OOC Entry Context\n`);
@@ -133,7 +137,7 @@ export function buildOOCPrompt(options: OOCPromptOptions): string | SystemBlock[
     }
   }
 
-  return [...prefix.system, { text: suffixParts.join("") }];
+  return [...(opts.coDmEnabled ? migrateForegroundPrompt(prefix.system) : prefix.system), { text: suffixParts.join("") }];
 }
 
 /**
@@ -206,8 +210,9 @@ export function buildOOCToolHandler(
   repo?: CampaignRepo,
   campaignRoot?: string,
   fileIO?: FileIO,
+  mutationHooks: OperatorMutationHooks = {},
 ): (name: string, input: Record<string, unknown>) => Promise<ToolResult> {
-  return async (name: string, input: Record<string, unknown>) => {
+  const dispatch = async (name: string, input: Record<string, unknown>) => {
     try {
       // 1. OOC-only extras — validate_campaign reads live maps/clocks
       // straight from gameState so reports reflect current session state,
@@ -229,6 +234,17 @@ export function buildOOCToolHandler(
       const msg = err instanceof Error ? err.message : String(err);
       return { content: msg, is_error: true };
     }
+  };
+  const readOnly = new Set([...OOC_ONLY_TOOL_NAMES, 'knowledge', 'search_campaign', 'search_content']);
+  return async (name, input) => {
+    const mutating = !readOnly.has(name as typeof OOC_ONLY_TOOL_NAMES[number]);
+    const run = async () => {
+      if (mutating) await mutationHooks.beforeMutation?.();
+      const result = await dispatch(name, input);
+      if (mutating && !result.is_error) await mutationHooks.afterMutation?.({ tool: name, outcome: ['scribe', 'promote_character', 'transition_scene', 'end_session', 'update_portrait'].includes(name) ? 'queued' : input.dry_run === true ? 'proposed' : 'committed', input, result: result.content });
+      return result;
+    };
+    return mutating && mutationHooks.runMutation ? mutationHooks.runMutation(run) : run();
   };
 }
 
@@ -291,6 +307,7 @@ export async function enterOOC(
   playerMessage: string,
   options: {
     campaignName: string;
+    coDmEnabled?: boolean;
     config?: CampaignConfig;
     sessionState?: DMSessionState;
     systemRules?: string;
@@ -324,6 +341,9 @@ export async function enterOOC(
      *  go through engine.applyDeferredTuiCommands, but kept on the surface for
      *  callers that build via createOOCSession; remove once migrations land). */
     smallTier?: TierProvider;
+    runMutation?: OperatorMutationHooks["runMutation"];
+    beforeMutation?: OperatorMutationHooks["beforeMutation"];
+    afterMutation?: OperatorMutationHooks["afterMutation"];
   },
   onStream?: SubagentStreamCallback,
 ): Promise<OOCResult> {
@@ -336,6 +356,7 @@ export async function enterOOC(
     wasMidNarration: options.wasMidNarration,
     enterReason: options.enterReason,
     model: options.model,
+    coDmEnabled: options.coDmEnabled,
   });
 
   const snapshot: OOCSnapshot = {
@@ -364,6 +385,7 @@ export async function enterOOC(
         options.repo,
         options.campaignRoot,
         options.fileIO,
+        options,
       )
     : async (name: string, input: Record<string, unknown>) => {
         if (OOC_ONLY_TOOL_SET.has(name)) {
@@ -385,6 +407,7 @@ export async function enterOOC(
 
   // Run through the same provider loop the DM uses — gets TUI command
   // extraction, deferred-list collection, and streaming for free.
+  const publicStream = new OOCStreamFilter();
   const result = await runProviderLoop(provider, systemPrompt, messages, {
     name: "ooc",
     model: options.model,
@@ -402,7 +425,10 @@ export async function enterOOC(
     cacheHints: [{ target: "tools", ttl: "1h" }],
     tuiToolNames: TUI_TOOLS,
     onTuiCommand: options.onTuiCommand,
-    onTextDelta: onStream,
+    onTextDelta: onStream ? (delta) => {
+      const visible = publicStream.feed(delta);
+      if (visible) onStream(visible);
+    } : undefined,
   });
 
   // Process deferred TUI commands (scribe, promote_character, dm_notes,
@@ -418,7 +444,7 @@ export async function enterOOC(
   const summary = summaryParse.summary ?? extractSummary(signal.cleanedText);
 
   return {
-    text: signal.cleanedText,
+    text: stripOOCProtocol(signal.cleanedText),
     usage: {
       inputTokens: result.usage.inputTokens,
       outputTokens: result.usage.outputTokens,
@@ -476,20 +502,56 @@ export function parseEndOOCSignal(text: string): EndOOCSignal {
  * of the response. Strips the tag from the visible text so the player
  * never sees it; the digest is forwarded to the DM separately.
  *
- * Scans the last 600 chars only — the SUMMARY tag belongs at the end of
- * the reply, and a tight scan keeps us from grabbing a literal example
- * tag the agent might have written earlier in the message.
+ * Scan the full reply: a long private digest must still be recognized.
  */
 export function parseSummaryTag(text: string): { summary?: string; cleanedText: string } {
   const SUMMARY_RE = /<SUMMARY>([\s\S]*?)<\/SUMMARY>\s*/;
-  const tail = text.slice(Math.max(0, text.length - 600));
-  const tailMatch = tail.match(SUMMARY_RE);
+  const tailMatch = text.match(SUMMARY_RE);
   if (!tailMatch) return { cleanedText: text };
 
   // Match position in the full string.
-  const offset = text.length - tail.length + tail.indexOf(tailMatch[0]);
+  const offset = text.indexOf(tailMatch[0]);
   const cleaned = text.slice(0, offset) + text.slice(offset + tailMatch[0].length);
   return { summary: tailMatch[1].trim(), cleanedText: cleaned.trimEnd() };
+}
+
+/** Handoff protocol belongs at the end of an OOC reply. Once its opening
+ * starts, suppress the remainder, including incomplete/malformed payloads.
+ * Prefix buffering prevents tags split across provider chunks from leaking. */
+export class OOCStreamFilter {
+  private pending = "";
+  private privateTail = false;
+
+  feed(delta: string): string {
+    if (this.privateTail) return "";
+    this.pending += delta;
+    let visible = "";
+    while (this.pending) {
+      const start = this.pending.indexOf("<");
+      if (start < 0) {
+        visible += this.pending;
+        this.pending = "";
+        break;
+      }
+      visible += this.pending.slice(0, start);
+      this.pending = this.pending.slice(start);
+      const candidate = this.pending.toUpperCase();
+      const tags = ["<SUMMARY", "<END_OOC", "</SUMMARY", "</END_OOC"];
+      if (tags.some(tag => candidate.startsWith(tag))) {
+        this.privateTail = true;
+        this.pending = "";
+        break;
+      }
+      if (tags.some(tag => tag.startsWith(candidate))) break;
+      visible += "<";
+      this.pending = this.pending.slice(1);
+    }
+    return visible;
+  }
+}
+
+export function stripOOCProtocol(text: string): string {
+  return new OOCStreamFilter().feed(text).trimEnd();
 }
 
 /**
@@ -525,6 +587,7 @@ export function createOOCSession(
   provider: LLMProvider,
   options: {
     campaignName: string;
+    coDmEnabled?: boolean;
     previousVariant: string;
     wasMidNarration?: boolean;
     enterReason?: string;
@@ -545,6 +608,9 @@ export function createOOCSession(
     /** Small-tier provider+model — kept on the surface for caller back-compat
      *  even though the engine async handler now owns small-tier dispatch. */
     smallTier?: TierProvider;
+    runMutation?: OperatorMutationHooks["runMutation"];
+    beforeMutation?: OperatorMutationHooks["beforeMutation"];
+    afterMutation?: OperatorMutationHooks["afterMutation"];
   },
 ): ModeSession {
   return {

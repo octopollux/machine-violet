@@ -167,6 +167,11 @@ describe("PlayerSelector", () => {
 });
 
 describe("ActivityLine", () => {
+  it("keeps background glyphs visible after the DM becomes input-ready without a thinking label", () => {
+    const { lastFrame } = render(<ActivityLine engineState="waiting_input" toolGlyphs={[{ glyph: "✎", color: "green" }, { glyph: "⌕", color: "cyan" }]} />);
+    expect(lastFrame()).toContain("✎⌕");
+    expect(lastFrame()).not.toContain("thinking");
+  });
   it("renders for known engine state", () => {
     const { lastFrame } = render(<ActivityLine engineState="dm_thinking" />);
     expect(lastFrame()).toContain("DM is thinking");

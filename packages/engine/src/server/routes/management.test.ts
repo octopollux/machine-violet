@@ -101,6 +101,28 @@ async function buildApp(opts: {
   return app;
 }
 
+it("persists an independent co-DM route and rejects unsupported effort before writes", async () => {
+  const configDir = mkdtempSync(join(tmpdir(), "mv-codm-route-"));
+  let app: FastifyInstance | undefined;
+  try {
+    saveConnectionStore(configDir, {
+      connections: [{ id: "co", provider: "openai-chatgpt", label: "Co", apiKey: "test", models: [{ id: "sol", displayName: "Sol", available: true, supportedReasoningEfforts: ["medium"] }], source: "manual", addedAt: "" }],
+      tierAssignments: { large: null, medium: null, small: null }, imageAssignment: null,
+    });
+    app = await buildApp({ configDir });
+    const assignment = { connectionId: "co", modelId: "sol", effort: "medium" };
+    const accepted = await app.inject({ method: "PUT", url: "/tiers", payload: { coDmAssignment: assignment } });
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(accepted.json().coDmAssignment).toEqual(assignment);
+    const rejected = await app.inject({ method: "PUT", url: "/tiers", payload: { coDmAssignment: { ...assignment, effort: "high" } } });
+    expect(rejected.statusCode).toBe(400);
+    expect(loadConnectionStore(configDir).coDmAssignment).toEqual(assignment);
+    const cleared = await app.inject({ method: "PUT", url: "/tiers", payload: { coDmAssignment: null } });
+    expect(cleared.json().coDmAssignment).toBeNull();
+    expect(loadConnectionStore(configDir).coDmAssignment).toBeUndefined();
+  } finally { await app?.close(); rmSync(configDir, { recursive: true, force: true }); }
+});
+
 describe("PUT /diagnostics — pre-session export", () => {
   let app: FastifyInstance;
 

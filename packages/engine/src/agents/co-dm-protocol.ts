@@ -110,3 +110,12 @@ export function stripCoDmAnnotations(text: string): {
   const publicText = filter.push(text) + filter.finish();
   return { publicText, annotations: [...filter.annotations] };
 }
+
+
+/** Public narration only, including normalized block-array assistant messages. */
+export function projectPublicNarration(messages: readonly import('../providers/types.js').NormalizedMessage[], limit = 3): string {
+  return messages.filter(message => message.role === 'assistant').slice(-limit).map(message => {
+    const text = typeof message.content === 'string' ? message.content : message.content.filter(part => part.type === 'text').map(part => part.text).join('');
+    return stripCoDmAnnotations(text).publicText;
+  }).filter(Boolean).join('\n');
+}

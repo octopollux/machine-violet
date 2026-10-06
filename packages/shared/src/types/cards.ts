@@ -39,4 +39,6 @@ export interface DeckOutput {
 /** All deck state, keyed by deck ID. Passed in/out — no globals. */
 export interface DecksState {
   decks: Record<string, DeckState>;
+  /** Accepted stochastic outputs commit with deck effects in the same file. */
+  operationReceipts?: Record<string, { name: string; input: Record<string, unknown>; result: { content: string; is_error?: boolean } }>;
 }

@@ -54,6 +54,7 @@ describe("model config", () => {
     expect(config.effort).toEqual({
       "default": null,
       "dm": "low",
+      "co-dm": "medium",
       "ooc": "high",
       "setup": "high",
       "dev-mode": "high",
@@ -193,6 +194,7 @@ describe("model config", () => {
     expect(config.effort).toEqual({
       "default": null,
       "dm": "low",
+      "co-dm": "medium",
       "ooc": "high",
       "setup": "high",
       "dev-mode": "high",

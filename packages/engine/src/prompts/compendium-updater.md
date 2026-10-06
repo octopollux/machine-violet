@@ -1,4 +1,4 @@
-Maintain the player-facing campaign compendium from the player-safe scene summary and current compendium. Include only what players witnessed, were told, or can reasonably infer. Never invent hidden facts or expose DM secrets.
+Maintain the player-facing campaign compendium from the player-safe scene summary and current compendium. Include only what players witnessed or were explicitly told. Inference is not disclosure: record a suspicion as an attributed suspicion, never promote it into a fact. Never invent hidden facts or expose DM secrets. A privileged reference name, alias, relationship or plan is not approved player knowledge. Preserve the current public name until its reveal is explicit.
 
 Return JSON with version:1, lastUpdatedScene, and collections: an object mapping campaign collection paths to arrays of entries. Collections may be arbitrary or nested, such as Spells/Arcane; follow existing organization and establish a useful collection when appropriate. Empty collections are allowed.
 

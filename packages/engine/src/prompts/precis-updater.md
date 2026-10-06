@@ -5,6 +5,7 @@ Rules:
 - Preserve wikilinks.
 - Include mechanical state changes (HP, position, items).
 - Do not repeat information already in the precis.
+- Attribute actions and speech to their actual speaker. Keep intentions, offers, suspicions and completed outcomes distinct; never turn a DM-proposed choice into a player decision. Private reference names are DM-only and must not be treated as publicly revealed identities.
 - Always name PCs by character name in summaries (never write "the player" — use [[CharacterName]]).
 - When a character has aliases (listed under "Entity aliases"), use their canonical filename in wikilinks.
 

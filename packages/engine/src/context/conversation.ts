@@ -11,6 +11,7 @@ import { estimateMessageTokens } from "./token-counter.js";
  * We track them as pairs for retention logic.
  */
 export interface ConversationExchange {
+  inputKind?: "player" | "engine" | "operator";
   /** Player's input message */
   user: NormalizedMessage;
   /** DM's response (may include tool_use blocks) */
@@ -44,6 +45,7 @@ export class ConversationManager {
     assistant: NormalizedMessage,
     toolResults: NormalizedMessage[] = [],
     choiceContexts?: ConversationExchange["choiceContexts"],
+    inputKind: ConversationExchange["inputKind"] = "player",
   ): DroppedExchange | null {
     const estimatedTokens =
       estimateMessageTokens(user) +
@@ -55,6 +57,7 @@ export class ConversationManager {
       assistant,
       toolResults,
       estimatedTokens,
+      inputKind,
       ...(choiceContexts?.length ? { choiceContexts } : {}),
     });
 

@@ -6,6 +6,16 @@ import { loadPrompt } from "../../prompts/load-prompt.js";
 describe("isolated co-DM prompt migration", () => {
   beforeEach(() => { resetPromptCache(); loadModelConfig({ reset: true }); });
 
+  it("routes accepted substantial missions to the existing objective tracker without promoting offered hooks", () => {
+    const prompt = loadPrompt("co-dm", "gpt-6.1-sol");
+    expect(prompt).toContain("Use manage_objectives for the existing objective tracker");
+    expect(prompt).toContain("list current objectives and add the accepted mission if absent");
+    expect(prompt).toContain("inspecting an item or asking about terms is not agreement");
+    expect(prompt).toContain("do not create a second quest list in knowledge");
+    expect(prompt).toContain("after reload or later observations");
+    expect(prompt).toContain("Do not turn every small promise");
+  });
+
   it("preserves the earned player agency, narration, mechanics and image guidance", () => {
     const source = loadPrompt("dm-directives", "gpt-6.1-sol");
     const migrated = migrateForegroundPrompt([{ text: source }, { text: "Frozen campaign tree" }]);

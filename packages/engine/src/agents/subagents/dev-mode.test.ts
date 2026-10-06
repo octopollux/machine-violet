@@ -740,3 +740,26 @@ describe("enterDevMode", () => {
     }
   });
 });
+
+
+describe('Dev mutation admission and private journals', () => {
+  it('holds exclusive admission through correction publication after actual mutation', async () => {
+    const gs = makeGameState(); const order: string[] = [];
+    const handler = buildDevToolHandler(gs, mockFileIO(), undefined, undefined, undefined, undefined, undefined, {
+      runMutation: async (task) => { order.push('enter'); try { return await task(); } finally { order.push('leave'); } },
+      beforeMutation: async () => { order.push('caught-up'); },
+      afterMutation: async (payload) => { expect(gs.combat.round).toBe(7); expect(payload).toMatchObject({ tool: 'set_game_state', outcome: 'committed' }); order.push('published'); },
+    });
+    await handler('set_game_state', { slice: 'combat', patch: { round: 7 } });
+    expect(order).toEqual(['enter', 'caught-up', 'published', 'leave']);
+  });
+  it('refuses direct writes and deletes to feed, completion, operation and startup journals', async () => {
+    const fio = mockFileIO(); const afterMutation = vi.fn();
+    const handler = buildDevToolHandler(makeGameState(), fio, undefined, undefined, undefined, undefined, undefined, { afterMutation });
+    for (const path of ['state/co-dm.json', 'state/co-dm-completion.json', 'state/co-dm-operations.json', 'state/startup.json']) {
+      expect((await handler('write_file', { path, content: 'corrupt' })).is_error).toBe(true);
+      expect((await handler('delete_file', { path })).is_error).toBe(true);
+    }
+    expect(afterMutation).not.toHaveBeenCalled();
+  });
+});

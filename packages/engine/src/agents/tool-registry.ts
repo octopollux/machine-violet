@@ -1397,12 +1397,23 @@ class ToolRegistry {
       );
       if (!validation.ok) return err(validation.content);
       const validatedInput = validation.value;
+      const receiptId = context?.operationScope && (name === "deck" || name === "roll_dice")
+        ? JSON.stringify([context.operationScope, context.agent, context.callId]) : undefined;
+      if (receiptId) {
+        const receipt = state.decks.operationReceipts?.[receiptId];
+        if (receipt) {
+          if (receipt.name !== name || JSON.stringify(receipt.input) !== JSON.stringify(validatedInput)) return err("Accepted stochastic operation cannot be retried with different input.");
+          this.persist?.(state, ["decks"]);
+          return structuredClone(receipt.result);
+        }
+      }
       const result = tool.handler(state, validatedInput);
       if (!result.is_error) {
-        const slices = TOOL_STATE_MAP[name];
+        if (receiptId) (state.decks.operationReceipts ??= {})[receiptId] = { name, input: structuredClone(validatedInput), result: structuredClone(result) };
+        const slices = receiptId ? [...new Set<StateSlice>([...(TOOL_STATE_MAP[name] ?? []), "decks"])] : TOOL_STATE_MAP[name];
         const readOps = READ_ONLY_OPS[name];
         const isReadOnly = readOps
-          && readOps.has(validatedInput.operation as string);
+          && readOps.has(validatedInput.operation as string) && !receiptId;
         if (this.persist && slices && slices.length > 0 && !isReadOnly) {
           this.persist(state, slices);
         }

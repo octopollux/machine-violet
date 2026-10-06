@@ -94,6 +94,7 @@ export function ContentPane({
         <span>{selectedFile}</span>
         <span className="token-count">~{formatK(estimateTokens(content))} tokens</span>
       </div>
+      {fileCategory === "co-dm-private" && <div className="content-header">Privileged maintenance state: queue, cursor, epoch, feedback and recovery jobs. This is not a player transcript.</div>}
       {isContextDump ? (
         <ContextDumpViewer content={content} />
       ) : isJson ? (

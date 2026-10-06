@@ -212,3 +212,55 @@ describe('continuing co-DM coordinator', () => {
     )).toEqual({ accepted: { archive: 'label unchanged' }, rejected: ['modeline', 'unknown'] });
   });
 });
+
+
+describe('production finite barriers', () => {
+  it('captures queued durable observations and does not wait for later batches', async () => {
+    const firstStarted = signal(); const firstRelease = signal();
+    const secondStarted = signal(); const secondRelease = signal();
+    const queue = new CoDmCoordinator({ persist: async () => {}, worker: async batch => {
+      if (batch[0].id === 'first') { firstStarted.resolve(); await firstRelease.promise; }
+      else { secondStarted.resolve(); await secondRelease.promise; }
+      return {};
+    } });
+    const enqueued = queue.enqueue(exchange('first'));
+    const barrier = queue.through();
+    await enqueued; await firstStarted.promise;
+    await queue.enqueue(exchange('later'));
+    firstRelease.resolve();
+    await barrier;
+    await secondStarted.promise;
+    expect(queue.getState().pending.map(item => item.id)).toEqual(['later']);
+    secondRelease.resolve(); await queue.drain();
+  });
+  it('keeps unresolved continuity across narrative scene cuts', async () => {
+    const queue = new CoDmCoordinator({ persist: async () => {}, worker: async () => ({ continuity: 'k0007: private obligation remains pending', messages: [] }) });
+    await queue.initialize('scene one'); await queue.enqueue(exchange('one')); await queue.drain();
+    await queue.resetScene('scene two');
+    expect(queue.getState()).toMatchObject({ frozenContext: 'scene two', continuity: 'k0007: private obligation remains pending' });
+    await queue.invalidate(); expect(queue.getState().continuity).toBeUndefined();
+  });
+});
+
+
+describe('recoverable shutdown', () => {
+  it('fences active effects while preserving durable accepted observations for restart', async () => {
+    const started = signal(); const release = signal(); let writes = 0;
+    const queue = new CoDmCoordinator({ persist: async () => {}, worker: async (_batch, _state, fence) => { started.resolve(); await release.promise; fence.assertCurrent(); writes++; return {}; } });
+    await queue.enqueue(exchange('accepted')); await started.promise;
+    const stopped = queue.stop(); release.resolve(); await stopped;
+    expect(writes).toBe(0); expect(queue.getState().pending.map(item => item.id)).toEqual(['accepted']);
+    const resumed = new CoDmCoordinator({ initialState: queue.getState(), persist: async () => {}, worker: async () => { writes++; return {}; } });
+    await resumed.initialize('same frozen prefix'); await resumed.drain(); expect(writes).toBe(1); expect(resumed.getState().cursor).toBe(1);
+  });
+});
+
+
+it('retains later un-compacted messages after an earlier valid continuity ledger across a scene cut', async () => {
+  let calls = 0;
+  const queue = new CoDmCoordinator({ persist: async () => {}, worker: async () => calls++ === 0 ? { continuity: 'earlier directive', messages: [] } : { messages: [{ role: 'user', content: 'later private unresolved directive' }] } });
+  await queue.enqueue(exchange('one')); await queue.drain();
+  await queue.enqueue(exchange('two')); await queue.drain(); await queue.resetScene('next scene');
+  expect(queue.getState().continuity).toBe('earlier directive');
+  expect(queue.getState().messages).toEqual([{ role: 'user', content: 'later private unresolved directive' }]);
+});

@@ -45,6 +45,7 @@ export interface SetTiersBody {
   medium?: TierAssignmentEntry;
   small?: TierAssignmentEntry;
   imageAssignment?: TierAssignmentEntry | null;
+  coDmAssignment?: import("../../api-client.js").CoDmAssignmentEntry | null;
 }
 
 export interface ConnectionsAreaProps {
@@ -54,6 +55,7 @@ export interface ConnectionsAreaProps {
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
   imageAssignment: TierAssignmentEntry | null;
+  coDmAssignment?: import("../../api-client.js").CoDmAssignmentEntry | null;
   healthResults: Record<string, ConnectionHealthResponse>;
   knownModels: Record<string, KnownModelInfo>;
   knownImageModels: Record<string, KnownImageModelInfo>;
@@ -281,6 +283,7 @@ export function ConnectionsArea(props: ConnectionsAreaProps) {
         connections={props.connections}
         tierAssignments={props.tierAssignments}
         imageAssignment={props.imageAssignment}
+        coDmAssignment={props.coDmAssignment}
         knownModels={props.knownModels}
         knownImageModels={props.knownImageModels}
         tierDefaults={props.tierDefaults}

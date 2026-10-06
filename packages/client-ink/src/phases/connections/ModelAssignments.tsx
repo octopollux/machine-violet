@@ -18,13 +18,14 @@ import type {
 import type { SetTiersBody } from "./ConnectionsArea.js";
 import { providerName } from "./providers.js";
 
-const TIERS = ["large", "medium", "small"] as const;
+const TIERS = ["large", "medium", "small", "coDmAssignment"] as const;
 type Tier = (typeof TIERS)[number];
 
 export const TIER_LABELS: Record<Tier, string> = {
   large: "DM narration",
   medium: "Helpers & AI players",
   small: "Quick tasks",
+  coDmAssignment: "Continuing co-DM",
 };
 
 const IMAGE_ROW = TIERS.length;
@@ -34,6 +35,8 @@ interface PickOption {
   /** null = provider default (image row only). */
   modelId: string | null;
   label: string;
+  connectionId?: string;
+  effort?: import("../../api-client.js").CoDmAssignmentEntry["effort"];
 }
 
 export interface ModelAssignmentsProps {
@@ -43,6 +46,7 @@ export interface ModelAssignmentsProps {
   connections: ConnectionInfo[];
   tierAssignments: TierAssignmentsResponse;
   imageAssignment: TierAssignmentEntry | null;
+  coDmAssignment?: import("../../api-client.js").CoDmAssignmentEntry | null;
   knownModels: Record<string, KnownModelInfo>;
   knownImageModels: Record<string, KnownImageModelInfo>;
   tierDefaults: Record<string, ProviderTierDefaults>;
@@ -52,7 +56,7 @@ export interface ModelAssignmentsProps {
 
 export function ModelAssignments({
   theme, columns, rows,
-  connections, tierAssignments, imageAssignment,
+  connections, tierAssignments, imageAssignment, coDmAssignment,
   knownModels, knownImageModels, tierDefaults,
   onSetTiers, onBack,
 }: ModelAssignmentsProps) {
@@ -73,6 +77,7 @@ export function ModelAssignments({
 
   /** Value text for a tier row: `Auto (X)`, `X (override)`, or `(not set)`. */
   const tierValue = (tier: Tier): string => {
+    if (tier === "coDmAssignment") return coDmAssignment ? `${connections.find(c => c.id === coDmAssignment.connectionId)?.label}: ${modelName(coDmAssignment.modelId)} (${coDmAssignment.effort ?? "auto"} effort)` : "Auto (DM narration)";
     const a = tierAssignments[tier];
     if (!a) return "(not set)";
     const name = modelName(a.modelId);
@@ -80,6 +85,17 @@ export function ModelAssignments({
   };
 
   const pickOptions = (target: Tier | "image"): PickOption[] => {
+    if (target === "coDmAssignment") {
+      const options: PickOption[] = [{ modelId: null, label: "Auto — follow DM narration" }];
+      for (const connection of connections) for (const model of connection.models.filter(m => m.available)) {
+        options.push({ connectionId: connection.id, modelId: model.id, label: `${connection.label}: ${model.displayName} (auto effort)` });
+        for (const effort of model.supportedReasoningEfforts ?? ["low", "medium", "high"]) {
+          if (!["low", "medium", "high", "xhigh", "max"].includes(effort)) continue;
+          options.push({ connectionId: connection.id, modelId: model.id, effort: effort as PickOption["effort"], label: `${connection.label}: ${model.displayName} (${effort} effort)` });
+        }
+      }
+      return options;
+    }
     if (!activeConn) return [];
     if (target === "image") {
       const options: PickOption[] = [{ modelId: null, label: "Auto — provider default (recommended)" }];
@@ -107,10 +123,13 @@ export function ModelAssignments({
 
   const applyPick = (target: Tier | "image", option: PickOption) => {
     if (!activeConn) return;
-    if (target !== "image" && option.modelId === null) return; // null is image-only
+    if (target === "coDmAssignment" && option.modelId && !option.connectionId) return;
+    if (target !== "image" && target !== "coDmAssignment" && option.modelId === null) return;
     setSaving(true);
     setError(null);
-    const body: SetTiersBody = target === "image"
+    const body: SetTiersBody = target === "coDmAssignment"
+      ? { coDmAssignment: option.modelId ? { connectionId: option.connectionId ?? activeConn.id, modelId: option.modelId, ...(option.effort !== undefined ? { effort: option.effort } : {}) } : null }
+      : target === "image"
       ? { imageAssignment: option.modelId ? { connectionId: activeConn.id, modelId: option.modelId } : null }
       : { [target]: { connectionId: activeConn.id, modelId: option.modelId } };
     void onSetTiers(body)
@@ -138,6 +157,7 @@ export function ModelAssignments({
       // Preselect the current value.
       const current = target === "image"
         ? options.findIndex((o) => o.modelId === (imageAssignment?.modelId ?? null))
+        : target === "coDmAssignment" ? options.findIndex(o => o.modelId === (coDmAssignment?.modelId ?? null) && o.connectionId === coDmAssignment?.connectionId && o.effort === coDmAssignment?.effort)
         : options.findIndex((o) => o.modelId === tierAssignments[target]?.modelId);
       setPickIndex(Math.max(0, current));
       pickScrollRef.current = 0;
@@ -170,7 +190,7 @@ export function ModelAssignments({
       const arrow = visibleIndex === 0 ? "▲" : visibleIndex === 1 ? "▼" : " ";
       const arrowAvailable = visibleIndex === 0 ? win.canScrollUp : win.canScrollDown;
       lines.push(
-        <Text key={o.modelId ?? "provider-default"} color={selected ? pal.accent : pal.fg}>
+        <Text key={`${o.connectionId ?? ""}:${o.modelId ?? "provider-default"}:${o.effort ?? "auto"}`} color={selected ? pal.accent : pal.fg}>
           {visibleIndex < 2
             ? arrowAvailable
               ? <Text color="#aaff00">{arrow}</Text>

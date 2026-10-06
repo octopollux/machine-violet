@@ -8,6 +8,7 @@ Ink (React for CLI) + Anthropic Claude SDK + TypeScript.
 | I need to... | Go to |
 |---|---|
 | Understand the system architecture | [architecture.md](architecture.md) |
+| Configure the continuing co-DM and inspect its activity | [co-dm.md](co-dm.md) |
 | Find where code lives | [module-map.md](module-map.md) |
 | Look up a tool's signature or behavior | [tools-catalog.md](tools-catalog.md) |
 | Add or change a tool input contract | [tool-input-contracts.md](tool-input-contracts.md) |

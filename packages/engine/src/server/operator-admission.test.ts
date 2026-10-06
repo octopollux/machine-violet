@@ -1,0 +1,36 @@
+import { GameEngine } from '../agents/game-engine.js';
+import { buildOOCToolHandler } from '../agents/subagents/ooc-mode.js';
+import { buildDevToolHandler } from '../agents/subagents/dev-mode.js';
+import type { FileIO, SceneState } from '../agents/scene-manager.js';
+import type { EngineCallbacks } from '@machine-violet/shared/types/engine.js';
+import type { LLMProvider } from '../providers/types.js';
+import { createDefaultCampaignConfig } from '../tools/filesystem/config.js';
+import { createClocksState } from '../tools/clocks/index.js';
+import { createCombatState, createDefaultConfig } from '../tools/combat/index.js';
+import { createDecksState } from '../tools/cards/index.js';
+import { createObjectivesState } from '../tools/objectives/index.js';
+import { resetPromptCache } from '../prompts/load-prompt.js';
+import { loadModelConfig } from '../config/models.js';
+
+beforeEach(() => { resetPromptCache(); loadModelConfig({ reset: true }); });
+it('real engine operator tool holds admission and finishes without waiting on itself', async () => {
+  const files: Record<string, string> = {};
+  const io = { readFile: async (path: string) => files[path] ?? '', writeFile: async (path: string, content: string) => { files[path] = content; }, appendFile: async () => {}, exists: async () => false, listDir: async () => [], mkdir: async () => {} } as FileIO;
+  const config = createDefaultCampaignConfig('Test', 'Player', 'Ada'); config.recovery.enable_git = false;
+  const state = { maps: {}, clocks: createClocksState(), combat: createCombatState(), combatConfig: createDefaultConfig(), decks: createDecksState(), objectives: createObjectivesState(), config, campaignRoot: '/operator', homeDir: '/home', activePlayerIndex: 0, displayResources: {}, resourceValues: {} };
+  const scene = { sceneNumber: 1, slug: 'test', transcript: [], precis: '', openThreads: '', npcIntents: '', playerReads: [], sessionNumber: 1, sessionRecapPending: false } as SceneState;
+  const provider = { providerId: 'no-calls', chat: vi.fn(), stream: vi.fn(), getCapabilities: () => ({ imageGeneration: false }) } as unknown as LLMProvider;
+  const callbacks = { onNarrativeDelta: vi.fn(), onNarrativeComplete: vi.fn(), onStateChange: vi.fn(), onTuiCommand: vi.fn(), onToolStart: vi.fn(), onToolEnd: vi.fn(), onExchangeDropped: vi.fn(), onUsageUpdate: vi.fn(), onError: vi.fn(), onTurnStart: vi.fn(), onTurnEnd: vi.fn() } as EngineCallbacks;
+  const tier = { provider, model: 'gpt-6.1-sol' };
+  const engine = new GameEngine({ provider, gameState: state, scene, sessionState: {}, fileIO: io, callbacks, tierProviders: { large: tier, medium: tier, small: tier }, coDm: false });
+  const handler = buildDevToolHandler(state, io, undefined, undefined, engine.getSceneManager(), undefined, undefined, { runMutation: task => engine.runExternalMutation(task), beforeMutation: () => engine.beforeExternalMutation(), afterMutation: payload => engine.recordCoDmEvent('operator', payload) });
+  const result = await handler('set_game_state', { slice: 'combat', patch: { round: 9 } });
+  expect(result.is_error).toBeFalsy(); expect(state.combat.round).toBe(9);
+  await engine.getPersister()?.flush();
+  expect(Object.values(files).some(text => text.includes('9'))).toBe(true);
+  const oocHandler = buildOOCToolHandler(engine.getRegistry(), state, (name, input) => engine.handleAsyncTool(name, input), undefined, '/operator', io, { runMutation: task => engine.runExternalMutation(task), beforeMutation: () => engine.beforeExternalMutation(), afterMutation: payload => engine.recordCoDmEvent('operator', payload) });
+  const correction = await oocHandler('set_resource_values', { character: 'Ada', values: { HP: '12' } });
+  expect(correction.is_error).toBeFalsy();
+  expect(state.resourceValues).toEqual({ Ada: { HP: '12' } });
+  expect(provider.chat).not.toHaveBeenCalled();
+});

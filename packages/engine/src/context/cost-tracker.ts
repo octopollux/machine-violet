@@ -54,10 +54,11 @@ export class CostTracker {
     }
     this.breakdown.tokens = { ...saved.tokens };
     this.breakdown.apiCalls = saved.apiCalls;
+    if (saved.byModel) this.breakdown.byModel = structuredClone(saved.byModel);
   }
 
   /** Record usage from an API call, bucketed by tier. */
-  record(usage: UsageStats, tier: ModelTier): void {
+  record(usage: UsageStats, tier: ModelTier, origin?: { role: string; model: string }): void {
     const t = this.breakdown.byTier[tier];
     t.input += usage.inputTokens + usage.outputTokens;
     t.output += usage.outputTokens;
@@ -67,7 +68,21 @@ export class CostTracker {
     this.breakdown.tokens.outputTokens += usage.outputTokens;
     this.breakdown.tokens.cacheReadTokens += usage.cacheReadTokens;
     this.breakdown.tokens.cacheCreationTokens += usage.cacheCreationTokens;
+    if (usage.reasoningTokens !== undefined) this.breakdown.tokens.reasoningTokens = (this.breakdown.tokens.reasoningTokens ?? 0) + usage.reasoningTokens;
     this.breakdown.apiCalls++;
+    if (origin) {
+      const byModel = this.breakdown.byModel ??= {};
+      const key = JSON.stringify([origin.role, origin.model]);
+      const bucket = byModel[key] ??= {
+        ...origin, tokens: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }, apiCalls: 0,
+      };
+      bucket.tokens.inputTokens += usage.inputTokens;
+      bucket.tokens.outputTokens += usage.outputTokens;
+      bucket.tokens.cacheReadTokens += usage.cacheReadTokens;
+      bucket.tokens.cacheCreationTokens += usage.cacheCreationTokens;
+      if (usage.reasoningTokens !== undefined) bucket.tokens.reasoningTokens = (bucket.tokens.reasoningTokens ?? 0) + usage.reasoningTokens;
+      bucket.apiCalls++;
+    }
 
     this.onRecord?.(this.getTotalTokens());
   }
@@ -87,6 +102,7 @@ export class CostTracker {
       },
       tokens: { ...this.breakdown.tokens },
       apiCalls: this.breakdown.apiCalls,
+      ...(this.breakdown.byModel ? { byModel: structuredClone(this.breakdown.byModel) } : {}),
     };
   }
 

@@ -245,6 +245,33 @@ describe("event-handler", () => {
   });
 
   describe("activity", () => {
+    it("shows real co-DM memory and resource tools after foreground readiness until its next boundary", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "waiting_input" } });
+      for (const tool of ["knowledge", "remember", "set_resource_values"]) {
+        h.dispatch({ type: "activity:update", data: { toolStarted: tool, toolRole: "co-dm", toolCallId: `co:${tool}` } });
+        h.dispatch({ type: "activity:update", data: { toolEnded: tool, toolRole: "co-dm", toolCallId: `co:${tool}` } });
+      }
+      expect(h.state.toolGlyphs).toHaveLength(3);
+      expect(h.state.engineState).toBe("waiting_input");
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+    });
+    it("shares background glyphs without changing foreground activity or clearing on completion", () => {
+      const h = makeHarness();
+      h.dispatch({ type: "activity:update", data: { engineState: "dm_thinking" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice", toolRole: "dm", toolCallId: "dm:1" } });
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice", toolRole: "co-dm", toolCallId: "co:1", engineState: "tool_running" } });
+      expect(h.state.toolGlyphs).toHaveLength(2);
+      expect(h.state.engineState).toBe("dm_thinking");
+      h.dispatch({ type: "activity:update", data: { toolEnded: "roll_dice", toolRole: "co-dm", toolCallId: "co:1" } });
+      expect(h.state.toolGlyphs).toHaveLength(2);
+      h.dispatch({ type: "activity:update", data: { engineState: "waiting_input" } });
+      expect(h.state.toolGlyphs).toEqual([]);
+      h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice", toolRole: "co-dm", toolCallId: "co:2" } });
+      expect(h.state.engineState).toBe("waiting_input");
+      expect(h.state.toolGlyphs).toHaveLength(1);
+    });
     it("accumulates tool glyphs on start (persists after end)", () => {
       const h = makeHarness();
       h.dispatch({ type: "activity:update", data: { toolStarted: "roll_dice" } });

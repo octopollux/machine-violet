@@ -60,7 +60,7 @@ export const ENTITY_CONTRACTS = [KNOWLEDGE_CONTRACT, REMEMBER_CONTRACT];
 export const ENTITY_TOOLS = ENTITY_CONTRACTS.map((contract) => contract.definition);
 export const ENTITY_TOOL_NAME_SET: ReadonlySet<string> = new Set(ENTITY_TOOLS.map((tool) => tool.name));
 export const ENTITY_INPUT_POLICIES: Readonly<Record<string, ToolInputPolicy>> = Object.fromEntries(ENTITY_CONTRACTS.map((contract) => [contract.definition.name, contract.policy as ToolInputPolicy]));
-export interface EntityToolHandlerOptions { sceneNumber?: number | (() => number); source?: string }
+export interface EntityToolHandlerOptions { sceneNumber?: number | (() => number); source?: string; expectedRevision?: () => number; assertCurrent?: () => void; protectedRoots?: string[]; protectedFields?: Record<string, string[]> }
 
 export function buildKnowledgeToolHandler(store: CampaignKnowledgeStore, options: EntityToolHandlerOptions = {}) {
   return async (name: string, input: Record<string, unknown>): Promise<ToolResult | null> => {
@@ -71,7 +71,7 @@ export function buildKnowledgeToolHandler(store: CampaignKnowledgeStore, options
     try {
       if (name === "remember") {
         const sceneNumber = typeof options.sceneNumber === "function" ? options.sceneNumber() : options.sceneNumber;
-        return { content: JSON.stringify(await store.mutate(input.operations as KnowledgeOperation[], { sceneNumber, source: options.source ?? "agent", operationId: input.operationId as string | undefined })) };
+        return { content: JSON.stringify(await store.mutate(input.operations as KnowledgeOperation[], { expectedRevision: options.expectedRevision?.(), assertCurrent: options.assertCurrent, protectedRoots: options.protectedRoots, protectedFields: options.protectedFields, sceneNumber, source: options.source ?? "agent", operationId: input.operationId as string | undefined })) };
       }
       if (input.action === "outline") return { content: JSON.stringify(await store.outline()) };
       if (input.action === "read") return { content: JSON.stringify(await store.read(input.handle as string, {

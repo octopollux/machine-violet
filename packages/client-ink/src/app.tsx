@@ -104,6 +104,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
   // Settings / management state
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
   const [tierAssignments, setTierAssignments] = useState<TierAssignmentsResponse>({ large: null, medium: null, small: null });
+  const [coDmAssignment, setCoDmAssignment] = useState<import("./api-client.js").CoDmAssignmentEntry | null>(null);
   const [imageAssignment, setImageAssignment] = useState<TierAssignmentEntry | null>(null);
   const [connHealthResults, setConnHealthResults] = useState<Record<string, ConnectionHealthResponse>>({});
   const [knownModels, setKnownModels] = useState<Record<string, KnownModelInfo>>({});
@@ -322,6 +323,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
       setConnections(resp.connections);
       setTierAssignments(resp.tierAssignments);
       setImageAssignment(resp.imageAssignment);
+    setCoDmAssignment(resp.coDmAssignment ?? null);
       if (resp.connections.length > 0) {
         setApiKeyValid(true);
         // Check health of first connection
@@ -451,10 +453,12 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     connections: ConnectionInfo[];
     tierAssignments: TierAssignmentsResponse;
     imageAssignment: TierAssignmentEntry | null;
+    coDmAssignment?: import("./api-client.js").CoDmAssignmentEntry | null;
   }) => {
     setConnections(resp.connections);
     setTierAssignments(resp.tierAssignments);
     setImageAssignment(resp.imageAssignment);
+    setCoDmAssignment(resp.coDmAssignment ?? null);
   }, []);
 
   const refreshConnections = useCallback(() => {
@@ -493,6 +497,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
     const resp = await apiClientRef.current.setTierAssignments(body);
     setTierAssignments(resp.tierAssignments);
     setImageAssignment(resp.imageAssignment);
+    setCoDmAssignment(resp.coDmAssignment ?? null);
   }, []);
 
   const checkConnectionAsync = useCallback(async (connId: string): Promise<ConnectionHealthResponse> => {
@@ -602,6 +607,7 @@ export function App({ serverUrl, playerId, campaignId, hasKittyProtocol, stdinFi
           connections={connections}
           tierAssignments={tierAssignments}
           imageAssignment={imageAssignment}
+          coDmAssignment={coDmAssignment}
           healthResults={connHealthResults}
           knownModels={knownModels}
           knownImageModels={knownImageModels}

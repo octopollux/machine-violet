@@ -1,5 +1,10 @@
 # Continuing co-DM lane
 
+**Production follow-through:** normal gameplay now launches the continuing co-DM.
+See [the production contract and regression coverage](../../co-dm.md). The design
+and prototype limitations below are retained as the historical experiment record;
+they describe the earlier isolated implementation, not current launch behavior.
+
 **ARCHITECTURE ADOPTED; IMPLEMENTATION STILL ISOLATED — 2026-10-05.** Following the latency results, the project owner selected the continuing co-DM as the direction for MV. Cost parity is an optimization objective, not an adoption gate; it has not yet been demonstrated. Correctness and production integration remain release gates. The current implementation uses an explicit `GameEngine.coDmExperiment` constructor option for isolated campaign copies; normal launches retain the existing scribe behavior until that work is complete. The [test plan](test-plan.md) distinguishes intended evaluation from measured coverage, and the [pilot report](pilot-2026-10-05.md) records evidence and limitations.
 
 ## Implemented experiment boundary
@@ -45,6 +50,8 @@ The engine must retain authoritative mechanical state separately from presentati
 Both agents may use modeline/resource presentation. Routine updates must preserve custom keys and their intended meaning: “swear jar funds remaining” and “HOLDING BREATH” are legitimate artistic choices. The co-DM must not normalize these into generic mechanics or replace a newer DM choice with stale queued work. Protection is field-specific and causal, not a permanent foreground lock: later established events can legitimately update or retire “HOLDING BREATH” and other custom keys while retaining their meaning. Mechanical resource resolution remains authoritative **before** dependent narration; a display mirror may lag. The co-DM cannot retroactively resolve an action or spend currency. Engine-owned mechanical writes/results remain authoritative, and stale background writes to the same resource must be rejected rather than overwrite them. These are separate consistency requirements, even if existing tools expose both concerns together.
 
 ## Observation and communication
+
+Co-DM actions emit the same user-facing tool-activity indicators as foreground DM calls. Both agents' activity accumulates in the shared UI and clears at the existing DM turn-end boundary, never merely because a co-DM batch completed. Overlapping calls retain distinct identities; a completion arriving after a clear must not resurrect a cleared entry. Indicators expose safe action labels, not private annotations, arguments or knowledge contents.
 
 The engine supplies a typed, durable, ordered feed containing player inputs, completed DM narration, successful **and failed** tool outcomes, authoritative state changes (including private DM notes), explicit annotations, and lifecycle events. Source and ordering must distinguish an attempted action from a committed result, a rumor from a fact, and a character's claim from authoritative narration. Neither transcript access nor a personality's unreliable narration grants access to private reasoning or makes a false claim canonical truth.
 

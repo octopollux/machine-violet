@@ -68,6 +68,17 @@ function defaultProps(overrides?: Partial<ModelAssignmentsProps>): ModelAssignme
 }
 
 describe("ModelAssignments", () => {
+  it("exposes co-DM as an independent principal role with provider and effort", async () => {
+    const rendered = render(<ModelAssignments {...defaultProps({ coDmAssignment: { connectionId: "x-1", modelId: "grok-4.5", effort: "medium" } })} />);
+    expect(rendered.lastFrame()).toContain("Continuing co-DM");
+    expect(rendered.lastFrame()).toContain("xAI: grok-4.5 (medium effort)");
+    for (let i = 0; i < 3; i++) { rendered.stdin.write("\u001b[B"); await new Promise(resolve => setImmediate(resolve)); }
+    rendered.stdin.write(ENTER);
+    await vi.waitFor(() => {
+      expect(rendered.lastFrame()).toContain("Anthropic: Claude Large (medium effort)");
+      expect(rendered.lastFrame()).toContain("xAI: Grok 4.5 (medium effort)");
+    });
+  });
   it("shows discovered future-model names and excludes hidden account models from choices", async () => {
     const rendered = render(<ModelAssignments {...defaultProps({connections:[{
       id:"a-1",provider:"anthropic",label:"Account",masked:"",source:"manual",addedAt:"",

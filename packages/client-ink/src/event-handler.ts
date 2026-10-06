@@ -414,7 +414,9 @@ function handleActivityUpdate(event: ActivityUpdateEvent, update: StateUpdater):
   // drops to an unmapped state during every TUI command, blanking the
   // full-height activity line label and the standard-tier modeline glyph.
   const isTuiPayload = typeof engineState === "string" && engineState.startsWith("tui:");
-  const incomingState = isTuiPayload ? undefined : (engineState as string | undefined);
+  // Background calls share indicators but never impersonate foreground state.
+  const incomingState = isTuiPayload || data.toolRole === "co-dm"
+    ? undefined : (engineState as string | undefined);
 
   update((prev) => {
     // Accumulate tool glyphs for the turn (don't remove on end — they persist visually)

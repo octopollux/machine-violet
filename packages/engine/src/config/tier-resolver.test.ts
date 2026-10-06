@@ -14,6 +14,28 @@ import type { ConnectionStore } from "./connections.js";
  * with a confused vendor rejecting a foreign model ID.
  */
 describe("buildTierProviders", () => {
+  it("routes co-DM independently and shares the owning connection client", () => {
+    loadModelConfig({ reset: true });
+    const store: ConnectionStore = {
+      connections: [{ id: "co", provider: "openai-apikey", label: "Co-DM", apiKey: "sk-test", models: [], source: "manual", addedAt: "" }],
+      tierAssignments: { large: null, medium: null, small: null },
+      imageAssignment: null,
+      coDmAssignment: { connectionId: "co", modelId: "gpt-6.1-sol", effort: "medium" },
+    };
+    const resolution = buildTierProvidersWithCache(store, () => createAnthropicProvider("sk-fallback"));
+    expect(resolution.coDm.model).toBe("gpt-6.1-sol");
+    expect(resolution.coDm.provider).toBe(resolution.byConnectionId.get("co"));
+    expect(resolution.coDm.provider).not.toBe(resolution.tiers.small.provider);
+    expect(resolution.coDmEffort).toBe("medium");
+    delete store.coDmAssignment;
+    const defaultRoute = buildTierProvidersWithCache(store, () => createAnthropicProvider("sk-fallback"));
+    expect(defaultRoute.coDm).toBe(defaultRoute.tiers.large);
+    store.connections[0].models = [{ id: "backend-sol", aliases: ["saved-sol-row"], displayName: "Sol", available: true, supportedReasoningEfforts: [] }];
+    store.coDmAssignment = { connectionId: "co", modelId: "saved-sol-row" };
+    const aliased = buildTierProvidersWithCache(store, () => createAnthropicProvider("sk-fallback"));
+    expect(aliased.coDm.model).toBe("backend-sol");
+    expect(aliased.coDmEffort).toBeNull();
+  });
   beforeEach(() => {
     // getModel is the fallback path; reset to canonical defaults.
     loadModelConfig({ reset: true });

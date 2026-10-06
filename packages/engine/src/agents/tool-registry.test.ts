@@ -476,3 +476,35 @@ describe("ToolRegistry", () => {
     expect(parsed.time_advance).toBeUndefined();
   });
 });
+
+
+describe('trusted stochastic operation receipts', () => {
+  const context = (callId: string) => ({ operationScope: 'startup:accepted:opening', agent: 'dm', provider: 'test', model: 'test', callId });
+  it('commits draw effects and receipts together, preserving intentionally separate draws on replay', () => {
+    const registry = createTestRegistry(); const state = mockState(); let disk = '';
+    registry.persist = (current, slices) => { if (slices.includes('decks')) disk = JSON.stringify(current.decks); };
+    registry.dispatch(state, 'deck', { deck: 'opening', operation: 'create', template: 'standard52' });
+    const input = { deck: 'opening', operation: 'draw', count: 1 };
+    const first = registry.dispatch(state, 'deck', input, context('draw-one'));
+    const second = registry.dispatch(state, 'deck', input, context('draw-two'));
+    expect(first.is_error).toBeFalsy(); expect(second.is_error).toBeFalsy();
+    expect(state.decks.decks.opening.drawPile).toHaveLength(50);
+    const restored = mockState(); restored.decks = JSON.parse(disk);
+    expect(registry.dispatch(restored, 'deck', input, context('draw-one'))).toEqual(first);
+    expect(registry.dispatch(restored, 'deck', input, context('draw-two'))).toEqual(second);
+    expect(restored.decks.decks.opening.drawPile).toHaveLength(50);
+    expect(registry.dispatch(restored, 'deck', { ...input, count: 2 }, context('draw-one')).is_error).toBe(true);
+    expect(restored.decks.decks.opening.drawPile).toHaveLength(50);
+  });
+  it('persists dice outcomes without counting distinct identical rolls as one operation', () => {
+    const registry = createTestRegistry(); const state = mockState(); let disk = '';
+    registry.persist = (current, slices) => { expect(slices).toContain('decks'); disk = JSON.stringify(current.decks); };
+    const input = { expression: '1d20', reason: 'Opening check' };
+    const first = registry.dispatch(state, 'roll_dice', input, context('roll-one'));
+    registry.dispatch(state, 'roll_dice', input, context('roll-two'));
+    const restored = mockState(); restored.decks = JSON.parse(disk);
+    expect(Object.keys(restored.decks.operationReceipts ?? {})).toHaveLength(2);
+    expect(registry.dispatch(restored, 'roll_dice', input, context('roll-one'))).toEqual(first);
+    expect(Object.keys(restored.decks.operationReceipts ?? {})).toHaveLength(2);
+  });
+});

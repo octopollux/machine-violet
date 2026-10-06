@@ -749,7 +749,7 @@ describe("GameEngine", () => {
     expect(marker.text).toContain("bare foot muddy"); // inner quotes stripped, not the tag's own
   });
 
-  it("update_portrait serializes concurrent revisions so archived history isn't clobbered", async () => {
+  it("update_portrait preserves latest appearance intent when concurrent revisions finish", async () => {
     const paths = campaignPaths("/tmp/test-campaign");
     const portraitPath = norm(paths.characterPortrait("Aldric"));
     const store = new Map<string, Uint8Array>();
@@ -802,8 +802,7 @@ describe("GameEngine", () => {
     const v1 = store.get(norm(paths.characterPortraitArchive("Aldric", 1)));
     const v2 = store.get(norm(paths.characterPortraitArchive("Aldric", 2)));
     expect(v1).toBeDefined();
-    expect(v2).toBeDefined();
-    expect([...v1!]).not.toEqual([...v2!]);
+    expect(v2).toBeUndefined();
   });
 
   it("update_portrait errors before rendering when persistence is unavailable", async () => {
@@ -2476,7 +2475,7 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     expect(state.resourceValues["Goblin"]["Hull Integrity"]).toBe("35");
   });
 
-  it("falls back to first displayResource key when delta has no resource", async () => {
+  it("uses authoritative hp instead of inferring mechanics from the first display key", async () => {
     const state = mockState();
     state.displayResources["Kael"] = ["Vitality", "Mana"];
     state.resourceValues["Kael"] = { Vitality: "100", Mana: "50" };
@@ -2491,7 +2490,8 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
     applyDeltas([{ type: "hp_change", target: "Kael", details: { amount: -20 } }]);
 
-    expect(state.resourceValues["Kael"]["Vitality"]).toBe("80");
+    expect(state.resourceValues["Kael"]["Vitality"]).toBe("100");
+    expect(state.resourceValues["Kael"]["hp"]).toBe("-20");
     expect(state.resourceValues["Kael"]["Mana"]).toBe("50"); // untouched
   });
 
@@ -2511,7 +2511,7 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     expect(state.resourceValues["Goblin"]["hp"]).toBe("-5");
   });
 
-  it("coerces a bare-string displayResources entry before taking the first key", async () => {
+  it("does not derive mechanics from a bare-string expressive display", async () => {
     const state = mockState();
     // A campaign saved before the tool boundary coerced carries the raw string.
     // Indexing [0] on it yields "S" — the delta would accrue into a resource
@@ -2529,7 +2529,8 @@ describe("applyResolutionDeltas — system-agnostic hp_change", () => {
     const applyDeltas = (engine as unknown as { applyResolutionDeltas: (d: unknown[]) => void }).applyResolutionDeltas.bind(engine);
     applyDeltas([{ type: "hp_change", target: "Luther", details: { amount: 1 } }]);
 
-    expect(state.resourceValues["Luther"]["Stress"]).toBe("3");
+    expect(state.resourceValues["Luther"]["Stress"]).toBe("2");
+    expect(state.resourceValues["Luther"]["hp"]).toBe("1");
     expect(state.resourceValues["Luther"]["S"]).toBeUndefined();
   });
 });
@@ -2561,6 +2562,19 @@ describe("content classifier refusal", () => {
     expect(refusalFired).toBe(true);
     expect(log.errors).toHaveLength(0);
     expect(engine.hasPendingRetry()).toBe(false);
+  });
+
+  it("does not replay a definitively refused input after reload", async () => {
+    const provider = mockProvider([refusalMessage()]);
+    const fileIO = mockFileIO();
+    const state = mockState();
+    const engine = makeEngine({ provider, gameState: state, scene: mockScene(), sessionState: mockSessionState(), fileIO, callbacks: mockCallbacks().callbacks });
+    await engine.processInput("Aldric", "Something problematic", { exchangeId: "refused-exchange" });
+    expect(JSON.parse(await fileIO.readFile(norm(`${state.campaignRoot}/state/foreground-pending.json`)))).toBeNull();
+    const resumedProvider = mockProvider([]);
+    const resumed = makeEngine({ provider: resumedProvider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(), fileIO, callbacks: mockCallbacks().callbacks });
+    expect(await resumed.recoverPendingInput()).toBe(false);
+    expect(resumedProvider.chat).not.toHaveBeenCalled();
   });
 
   it("fires onTurnEnd after refusal", async () => {
@@ -2755,5 +2769,28 @@ describe("external teardown continuation seal", () => {
     await engine.processInput("Aldric", "New input after quit");
     expect(provider.stream).toHaveBeenCalledTimes(calls);
     expect(files).toEqual(persisted);
+  });
+});
+
+
+describe('durable paid image acceptance', () => {
+  it('does not resubmit an unknown paid opening render after restart, while allowing a distinct later render', async () => {
+    const store = new Map<string, Uint8Array>(); const io = binaryFileIO(store);
+    const generateImage = vi.fn(async () => { throw new Error('connection interrupted after uncertain paid submission'); });
+    const imageResponse = (): ChatResult => ({ text: '', usage: mockUsage(), stopReason: 'tool_use', toolCalls: [{ id: 'image-one', name: 'generate_image', input: { prompt: 'An opening landscape.', effort: 'quality', aspect: 'landscape', intent: 'scene_snapshot' } }], assistantContent: [{ type: 'tool_use', id: 'image-one', name: 'generate_image', input: { prompt: 'An opening landscape.', effort: 'quality', aspect: 'landscape', intent: 'scene_snapshot' } }] });
+    const imageProvider = () => {
+      const responses = [imageResponse(), textMessage('The landscape opens.')]; let index = 0;
+      return { providerId: 'paid-test', generateImage, getCapabilities: () => ({ imageGeneration: true, tools: true, streaming: true }), chat: vi.fn(async () => responses[index++]), stream: vi.fn(async () => responses[index++]), healthCheck: async () => ({ status: 'valid', message: 'offline' }) } as unknown as LLMProvider;
+    };
+    const first = makeEngine({ provider: imageProvider(), gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(), fileIO: io, callbacks: mockCallbacks().callbacks });
+    await first.processInput('Aldric', 'Begin.', { skipTranscript: true, inputKind: 'bootstrap', exchangeId: 'startup:opening' }); await first.awaitPendingImageRenders();
+    expect(generateImage).toHaveBeenCalledTimes(1);
+    expect(Object.entries(files).some(([path, text]) => path.includes('/image-jobs/') && text.includes('unknown'))).toBe(true);
+    const resumedProvider = imageProvider();
+    const resumed = makeEngine({ provider: resumedProvider, gameState: mockState(), scene: mockScene(), sessionState: mockSessionState(), fileIO: io, callbacks: mockCallbacks().callbacks });
+    await resumed.processInput('Aldric', 'Begin.', { skipTranscript: true, inputKind: 'bootstrap', exchangeId: 'startup:opening' }); await resumed.awaitPendingImageRenders();
+    expect(generateImage).toHaveBeenCalledTimes(1); expect(resumedProvider.stream).not.toHaveBeenCalled();
+    await resumed.processInput('Aldric', 'Render this distinct later moment.', { exchangeId: 'later:distinct' }); await resumed.awaitPendingImageRenders();
+    expect(generateImage).toHaveBeenCalledTimes(2);
   });
 });

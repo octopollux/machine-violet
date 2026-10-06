@@ -60,7 +60,12 @@ function makeMockEngine(performRollback = true) {
   };
   return {
     getRepo: () => repo,
+    runExternalMutation: vi.fn(async (task: () => Promise<unknown>) => task()),
+    invalidateCoDm: vi.fn(async () => {}),
+    beforeExternalMutation: vi.fn(async () => {}),
+    recordCoDmEvent: vi.fn(async () => {}),
     getSceneManager: () => sceneManager,
+    getCoDmState: () => undefined,
     getTier: vi.fn((tier: string) => ({
       provider: { providerId: "test", chat: vi.fn(), stream: vi.fn(), healthCheck: vi.fn() },
       model: tier === "small" ? "claude-haiku-4-5-20251001" : "claude-sonnet-4-6",
@@ -122,6 +127,7 @@ describe("handleCommand /rollback", () => {
     );
     // The hex oid is passed straight through (not coerced to exchanges_ago:NaN).
     expect(repo.rollback).toHaveBeenCalledWith("abc1234");
+    expect(vi.mocked(engine.invalidateCoDm).mock.invocationCallOrder[0]).toBeLessThan(repo.rollback.mock.invocationCallOrder[0]);
     expect(result.endSession).toBe(true);
     expect(result.endSessionReason).toBe("rollback");
   });

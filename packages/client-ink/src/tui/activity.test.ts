@@ -10,6 +10,9 @@ import {
 } from "./activity.js";
 
 describe("activity indicators", () => {
+  it("gives every maintenance capability a public tool indicator", () => {
+    for (const name of ["knowledge", "remember", "player_profile", "search_campaign", "style_scene", "set_theme", "update_portrait", "update_modeline", "set_display_resources", "set_resource_values", "manage_objectives"]) expect(getToolGlyph(name)).toBeDefined();
+  });
   it("returns indicator for known states", () => {
     const indicator = getActivity("roll_dice");
     expect(indicator).toBeDefined();

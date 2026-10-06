@@ -1,4 +1,4 @@
-import { CoDmStreamFilter, stripCoDmAnnotations } from './co-dm-protocol.js';
+import { CoDmStreamFilter, stripCoDmAnnotations, projectPublicNarration } from './co-dm-protocol.js';
 
 function parse(chunks: string[]) {
   const parser = new CoDmStreamFilter();
@@ -93,4 +93,9 @@ describe('private co-DM streaming framing', () => {
     ]);
     expect(filter.drainSegments()).toEqual([]);
   });
+});
+
+
+it('projects block-array public narration without private frames or tool data', () => {
+  expect(projectPublicNarration([{ role: 'assistant', content: [{ type: 'text', text: 'Seen.<co_' }, { type: 'text', text: 'dm>private plan</co_dm>Next.' }, { type: 'tool_use', id: 'secret', name: 'dm_notes', input: { notes: 'private tool data' } }] }])).toBe('Seen.Next.');
 });

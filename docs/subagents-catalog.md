@@ -367,7 +367,7 @@ Developer console for power users — inspects and manipulates the running game.
 | **Trigger** | App launch → "Start a new campaign" |
 | **Source doc** | [game-initialization.md](game-initialization.md) |
 
-`SetupSession` and `world-builder.ts` orchestrate finalization, deterministic campaign scaffolding, optional small-tier character-sheet generation, approved portrait copying and the handoff to the game session. `setup-agent.ts` supplies configuration/types; it does not run a second setup model.
+`SetupSession` and `world-builder.ts` finalize accepted choices, commit the deterministic scaffold and approved portrait, and persist a private `state/startup.json` envelope. This includes the actual setup handoff, selected seed/fork detail, canonical handles, boundaries, portrait references, and scaffold/mechanics/opening stages. Setup providers are disposed before game providers start. The game Small tier prepares a required initial sheet concurrently with independent opening narration and the co-DM bootstrap; mechanical tools and input readiness await accepted stats. A canonical complete sheet survives a crash between acceptance and the final startup marker. A durable engine completion receipt for the stable startup opening ID takes precedence over an interrupted final marker on resume; a marker alone cannot claim success. Synthetic startup directions enter the private feed as bootstrap events. `setup-agent.ts` supplies configuration/types; it does not run a second setup model.
 
 The conversation collects genre/system/source, mood/difficulty, DM personality, player info and the opening directive. Code creates the campaign directory and assembles selected seed/fork data; the model does not have to reconstruct hidden seed prose.
 
@@ -507,3 +507,13 @@ Subagents with heavily dynamic system prompts (e.g. AI Player, whose prompt incl
 **Sonnet agents** (OOC, Dev Mode) use structured `TextBlockParam[]` system prompts with breakpoints separating stable (cached) and dynamic (uncached) content — the same pattern as the DM's cached prefix.
 
 **Multi-turn agents** with tools (scribe, search-campaign, search-content) set `cacheTools: true` so tool definitions are also cached across rounds. Scribe uses the configured Small slot.
+
+
+### Objective authority in the continuing co-DM lane
+
+`GameState.objectives`, persisted as `state/objectives.json`, is the authoritative objective tracker. Canonical knowledge can describe established objective context and history; it does not create a second competing acceptance/status list. Co-DM tracker mutations require established player/DM acceptance, use the observation's objective revision, and preserve newer explicit corrections. Engine operation receipts persist in the same atomic objectives state file as the actual mutation, so replaying an accepted provider response after an interrupted cursor write cannot create a duplicate objective.
+
+Session token breakdowns retain tier projections and optionally include `byModel` buckets with the actual routed model and role. A co-DM call enters total usage once, even when its dedicated model differs from Large. Reasoning token diagnostics remain separate metadata and are not added again to reported input-plus-output totals.
+
+
+Startup opening recovery freezes accepted provider requests/responses under the stable opening exchange ID. Trusted tool-call identity distinguishes intentionally separate dice rolls and draws; their accepted results and card effects commit together in `state/decks.json`. Retrying an accepted call returns its original result, while another call ID remains another action. Operators cannot patch engine receipts through raw state tools. Initial sheet acceptance rebases generated sections onto newer prose and uses canonical body/revision checks at the SQLite mutation boundary; unchanged copied metadata does not replace later biography or name corrections.
