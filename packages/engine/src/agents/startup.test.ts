@@ -1,8 +1,18 @@
 import { buildStartup, readStartup, writeStartup } from './startup.js';
 import type { FileIO } from './scene-manager.js';
 import type { CampaignConfig } from '@machine-violet/shared/types/config.js';
+import { campaignPaths } from '../tools/filesystem/index.js';
+import { norm } from '../utils/paths.js';
 
 describe('private accepted startup', () => {
+  it.each(['The Watchmaker', 'The ' + 'Extraordinarily Long Character Name '.repeat(3), '時計師'])('retains approved portrait at canonical path for %s', async character => {
+    const { io, config } = fixture();
+    config.players[0].character = character;
+    const absolute = norm(campaignPaths('/campaign').characterPortrait(character));
+    io.exists = async path => path === absolute;
+    const envelope = await buildStartup('/campaign', io, config, '');
+    expect(envelope.portraits).toEqual([{ character, path: absolute.slice('/campaign/'.length) }]);
+  });
   function fixture() {
     const files: Record<string, string> = {};
     const io = {

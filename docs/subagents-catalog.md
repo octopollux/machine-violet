@@ -491,7 +491,7 @@ Haiku, silent. Summarizes campaign book structure for DM cached prefix. See [doc
 | 13 | Theme Styler | Small | Silent | Runtime — natural-language theme interpretation |
 | 16 | Dev Mode | Medium | Player-facing | Runtime — developer console |
 
-These are caller-selected tiers, not fixed model families. The foreground DM uses Large; each helper receives the appropriate provider/model pair. The isolated continuing co-DM is additional experimental code with explicit Sol 6.1 medium defaults, not yet normal-launch routing. Content-processing model stages are inventoried separately in the linked audit. Setup orchestration is code, so it is not counted as another model role here.
+These are caller-selected tiers, not fixed model families. The foreground DM uses Large; each helper receives the appropriate provider/model pair. The continuing co-DM is part of normal startup and gameplay, follows Large by default, and supports an independent provider/model/effort assignment. It owns routine maintenance in place of the explicit and automatic Scribe lane. Content-processing model stages are inventoried separately in the linked audit. Setup orchestration is code, so it is not counted as another model role here.
 
 ## Prompt Caching
 

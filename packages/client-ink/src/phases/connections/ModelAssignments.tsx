@@ -74,10 +74,18 @@ export function ModelAssignments({
   const defaults: ProviderTierDefaults = activeConn ? (tierDefaults[activeConn.provider] ?? {}) : {};
 
   const modelName = (id: string) => activeConn?.models.find((m) => m.id === id)?.displayName ?? knownModels[id]?.displayName ?? id;
+  const effortLabel = (connectionId: string, modelId: string, effort: PickOption["effort"]) => {
+    if (effort !== null) return `${effort ?? "auto"} effort`;
+    const connection = connections.find(c => c.id === connectionId);
+    const capabilities = knownModels[modelId]?.capabilities;
+    const canDisable = connection?.provider === "anthropic" && capabilities
+      && !capabilities.alwaysAdaptiveThinking && !capabilities.minimumThinkingMode;
+    return canDisable ? "reasoning off" : "provider default";
+  };
 
   /** Value text for a tier row: `Auto (X)`, `X (override)`, or `(not set)`. */
   const tierValue = (tier: Tier): string => {
-    if (tier === "coDmAssignment") return coDmAssignment ? `${connections.find(c => c.id === coDmAssignment.connectionId)?.label}: ${modelName(coDmAssignment.modelId)} (${coDmAssignment.effort ?? "auto"} effort)` : "Auto (DM narration)";
+    if (tier === "coDmAssignment") return coDmAssignment ? `${connections.find(c => c.id === coDmAssignment.connectionId)?.label}: ${modelName(coDmAssignment.modelId)} (${effortLabel(coDmAssignment.connectionId, coDmAssignment.modelId, coDmAssignment.effort)})` : "Auto (DM narration)";
     const a = tierAssignments[tier];
     if (!a) return "(not set)";
     const name = modelName(a.modelId);
@@ -89,6 +97,7 @@ export function ModelAssignments({
       const options: PickOption[] = [{ modelId: null, label: "Auto — follow DM narration" }];
       for (const connection of connections) for (const model of connection.models.filter(m => m.available)) {
         options.push({ connectionId: connection.id, modelId: model.id, label: `${connection.label}: ${model.displayName} (auto effort)` });
+        options.push({ connectionId: connection.id, modelId: model.id, effort: null, label: `${connection.label}: ${model.displayName} (${effortLabel(connection.id, model.id, null)})` });
         for (const effort of model.supportedReasoningEfforts ?? ["low", "medium", "high"]) {
           if (!["low", "medium", "high", "xhigh", "max"].includes(effort)) continue;
           options.push({ connectionId: connection.id, modelId: model.id, effort: effort as PickOption["effort"], label: `${connection.label}: ${model.displayName} (${effort} effort)` });
@@ -190,7 +199,7 @@ export function ModelAssignments({
       const arrow = visibleIndex === 0 ? "▲" : visibleIndex === 1 ? "▼" : " ";
       const arrowAvailable = visibleIndex === 0 ? win.canScrollUp : win.canScrollDown;
       lines.push(
-        <Text key={`${o.connectionId ?? ""}:${o.modelId ?? "provider-default"}:${o.effort ?? "auto"}`} color={selected ? pal.accent : pal.fg}>
+        <Text key={`${o.connectionId ?? ""}:${o.modelId ?? "provider-default"}:${o.effort === null ? "null" : o.effort ?? "auto"}`} color={selected ? pal.accent : pal.fg}>
           {visibleIndex < 2
             ? arrowAvailable
               ? <Text color="#aaff00">{arrow}</Text>

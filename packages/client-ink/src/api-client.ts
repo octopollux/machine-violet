@@ -81,7 +81,7 @@ export interface KnownModelInfo {
   maxOutput: number;
   defaultTier: string;
   pricing: { input: number; output: number; cacheWrite: number; cacheRead: number };
-  capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean };
+  capabilities: { thinking: boolean; tools: boolean; streaming: boolean; caching: boolean; alwaysAdaptiveThinking?: boolean; minimumThinkingMode?: "between_tools" };
 }
 
 export interface KnownImageModelInfo {

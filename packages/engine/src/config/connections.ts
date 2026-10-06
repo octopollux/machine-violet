@@ -415,7 +415,9 @@ export function buildEffectiveConnections(stored: ConnectionStore, configDir?: s
   }
 
   const coDmAssignment = stored.coDmAssignment
-    && connections.some(c => c.id === stored.coDmAssignment?.connectionId)
+    && connections.some(c => c.id === stored.coDmAssignment?.connectionId
+      && c.models.some(m => m.available && (m.id === stored.coDmAssignment?.modelId
+        || m.aliases?.includes(stored.coDmAssignment?.modelId ?? ""))))
     ? stored.coDmAssignment : undefined;
   return { connections, tierAssignments, imageAssignment, coDmAssignment };
 }

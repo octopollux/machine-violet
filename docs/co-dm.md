@@ -13,7 +13,9 @@ helpers, and offers the model's discovered supported effort levels. Auto follows
 DM narration; the co-DM's agent default is medium effort where supported.
 `connections.json` persists an optional `coDmAssignment` with `connectionId`,
 `modelId`, and optional `effort`; absent assignment follows Large. Null effort is
-an explicit preference to disable reasoning where the provider permits it.
+an explicit provider-specific preference: disable reasoning where supported,
+otherwise omit the effort override and use the provider default. The picker
+distinguishes this from Auto, which follows the co-DM role's configured default.
 `GET/PUT /manage/tiers` exposes the same assignment. Known-model aliases resolve
 to the discovered backend model before co-DM capability selection. A co-DM-only
 connection shares the session provider cache and disposal lifecycle.

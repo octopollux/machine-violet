@@ -3,6 +3,7 @@ import type { FileIO } from './scene-manager.js';
 import { getCampaignKnowledge } from '../knowledge/store.js';
 import { norm } from '../utils/paths.js';
 import { createHash } from 'node:crypto';
+import { campaignPaths } from '../tools/filesystem/index.js';
 
 /** Private accepted setup state. Opening directives are plans, never observed fiction. */
 export interface StartupEnvelope {
@@ -59,8 +60,7 @@ export async function buildStartup(root: string, io: FileIO, config: CampaignCon
   const outline = await knowledge.outline();
   const portraits: StartupEnvelope['portraits'] = [];
   for (const player of config.players) {
-    const slug = player.character.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const path = norm(`characters/${slug}-portrait.png`);
+    const path = norm(campaignPaths(root).characterPortrait(player.character)).slice(norm(root).replace(/\/$/, '').length + 1);
     if (await io.exists(norm(`${root}/${path}`))) portraits.push({ character: player.character, path });
   }
   return {
