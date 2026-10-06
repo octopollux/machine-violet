@@ -18,6 +18,8 @@ Theme revision guards reject stale styling and recheck after location lookup bef
 
 ## Purpose and boundary
 
+The [agent and tool integration audit](agent-tool-audit.md) inventories all 21 gameplay/setup model roles, five content-processing stages, 37 registered tools, dynamic image tools, operator paths and developer tools. It also incorporates the live startup inspection. Its ownership and release requirements extend this plan; proposed changes there are not yet implemented by the isolated prototype.
+
 Keep the foreground DM immersed in running the world while a continuing background co-DM observes completed exchanges and maintains campaign memory and routine presentation. The co-DM replaces/evolves the existing small-context scribe lane; it does not add an obligatory third storyteller or another mandatory scribe pass. Other existing helpers remain independently scoped and must be included in any accounting.
 
 Today the [scribe prompt](../../../packages/engine/src/prompts/scribe.md) receives explicit narrative handoffs and bounded current records in a fresh invocation ([implementation](../../../packages/engine/src/agents/subagents/scribe.ts)). The [DM directives](../../../packages/engine/src/prompts/dm-directives.md) consequently require the DM to spell out updates and identity handles. The proposed co-DM instead has a persistent scene conversation and an ordered observation feed. The foreground DM knows it observes both the transcript and authoritative state events, including private notes, and communicates only what observation cannot supply.
@@ -62,9 +64,21 @@ The current engine [settles deferred lanes at ordinary turn boundaries](../../..
 
 ## Lifecycle and recovery requirements
 
+Lifecycle ownership includes **all entry points**, not only DM tools: slash commands, OOC/Dev surgery, menu shutdown, startup, manual saves and restore/picker paths. They must share the engine's fences and durable mutation protocol. Mechanical resource changes, specialist sheet replacements and canonical updates must advance revisions at the actual write boundary. Observing only presentation-tool calls is insufficient. Successful tool dispatch, successful underlying mutation and completed asynchronous asset work are distinct feed events.
+
 On scene transition, close the current exchange and establish a watermark. Drain both the foreground work queue and co-DM queue through that watermark before capturing an atomic, recovery-safe snapshot. Only then clear/rebuild the two scene contexts and capture the next frozen tree. Events created during closure must belong to a defined side of the cut. Scene summaries and other existing helpers are part of the barrier/accounting rather than assumed free work.
 
 Rollback must invalidate abandoned queued events, in-flight writes, mailbox messages, and asynchronous presentation results before they can mutate restored state. A generation/epoch guard or equivalent is needed even if waiting is used. Save/reload must retain pending events, the consumed cursor, delivery state, and enough continuing context to resume deterministically, or explicitly drain before saving. An in-memory queue alone is insufficient. Crash/retry handling must prevent duplicate history, repeated portrait work, lost observations, and partially closed scenes. These are requirements for the experiment; no new storage schema is specified here.
+
+## Campaign start and specialist integration
+
+Campaign start has its own private bootstrap event. After accepted setup is committed into a minimal deterministic scaffold, both principal conversations receive the same canonical handles, accepted choices, seed/fork provenance, boundaries, approved portrait, private handoff letter, opening directive and task status. The DM authors the opening; the co-DM can begin routine initialization immediately. The initial sheet specialist may overlap independent narration, but any dependent mechanical action waits for its accepted result. A proposed opening is not an observed event. Preserve setup/game provider-disposal ordering and distinguish startup instructions from player speech.
+
+Startup progress must distinguish scaffold ready, opening in progress/delivered, required mechanics ready and background jobs pending. Keys and values initialize the resource display together; authoritative snapshots preserve newer background updates. Reload resumes the same startup operation instead of replaying an opening or paid render. See the [startup analysis and measured baseline](agent-tool-audit.md#campaign-start-integration).
+
+Most specialists remain: combat resolution stays on the dependent foreground path; theme styling follows co-DM maintenance; choice generation and AI players retain strictly player-safe input; summarization, compendium and recap remain bounded closing helpers. The co-DM owns event history during play, so closing changelogs must not duplicate it. Public disclosure uses one canonical publication protocol shared with the compendium helper. Derived trackers/precis remain hints, not a second source of authoritative facts. Their remaining latency and usage must still be measured.
+
+The normal co-DM replaces explicit **and automatic** scribe invocations, including indirect operator handoffs. Its limited capability set adds bounded campaign-history retrieval and established-objective recording to maintenance, profile, theme, portrait and shared display tools; it does not gain dice, decks, scene cuts, scene images or narrative authority. Full per-tool ownership and dependencies are in the [disposition matrix](agent-tool-audit.md#complete-registered-tool-disposition). Production routing gets an explicit co-DM role/model/effort setting rather than the experiment's hardcoded defaults.
 
 ## Prompt migration preserves earned guidance
 

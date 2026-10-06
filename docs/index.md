@@ -55,7 +55,7 @@ Production docs describe only what is implemented. Planned features normally liv
 
 ## Experiments
 
-- [Continuing co-DM lane](experiments/co-dm/README.md) — **design draft / not implemented**; proposed foreground/background responsibilities, ordered observation feed, lifecycle invariants, and a controlled test plan.
+- [Continuing co-DM lane](experiments/co-dm/README.md) — **architecture adopted; isolated prototype, not production**; responsibilities, ordered feed, lifecycle invariants, pilot evidence and test plan. The [agent/tool audit](experiments/co-dm/agent-tool-audit.md) covers startup, all model roles/tools and operator/developer integration.
 - [Narrative dependency bookkeeping](experiments/metadata-dependencies/README.md) — isolated exploratory Luna screen, fixtures, raw results, and limitations; not a production contract.
 
 ## Running the Project
