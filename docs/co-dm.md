@@ -77,7 +77,10 @@ resubmitted: the operator must reconcile its outcome. These boundaries do not
 provide universal exactly-once behavior for external providers.
 
 Canonical revision checks conservatively reject maintenance computed from stale
-knowledge. At the long-scene context cap, invalid continuity invokes explicit
+knowledge. A knowledge read only advances the maintenance revision if the store
+stayed unchanged across that read; a successful mutation carries its own atomic
+committed revision, including replay receipts. An unrelated foreground commit
+cannot make older maintenance appear current. At the long-scene context cap, invalid continuity invokes explicit
 compaction; invalid compaction fails closed and retains the pending backlog
 rather than silently discarding it.
 
