@@ -232,7 +232,7 @@ export function InlineImage({
       }
       cur = cur.parentNode ?? null;
     }
-    const terminalRows = stdout.rows || 0;
+    const terminalRows = (stdout as NodeJS.WritableStream & { rows?: number }).rows || 0;
     const cursorRow = terminalRows > 0 && appHeight >= terminalRows ? appHeight - 1 : appHeight;
     return { slotTop: top, slotLeft: left, cursorRow };
   };

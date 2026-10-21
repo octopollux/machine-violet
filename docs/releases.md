@@ -2,6 +2,51 @@
 
 How Machine Violet is shipped, and how to cut a release.
 
+## Packaged runtime security
+
+`.node-version` pins the exact distribution builder and CI runtime (currently
+26.12.1, including the [October 2026 Node security fixes](https://nodejs.org/en/blog/vulnerability/october-2026-security-releases)
+and compromised eMudhra intermediate revocation). `build-dist.js` refuses a
+different builder version, targets Node 26, and invokes `process.execPath` for
+SEA creation so PATH cannot select a different Node. Windows retains the
+signature-strip/rcedit/postject flow; macOS/Linux retain `--build-sea` (with
+macOS ad-hoc re-signing). Changes to this pin require rebuilding every platform;
+updating npm dependencies alone cannot update the Node/OpenSSL/CA data embedded
+in an existing executable.
+
+The actual executable exposes `--runtime-info` as JSON before environment,
+terminal, or game startup: SEA status, executable path, platform/architecture,
+and `process.versions` (including Node, OpenSSL, Undici and SQLite). Build-time
+verification asserts SEA status and the exact pinned Node version. After
+artifact extraction the packaged replay gate additionally runs:
+
+```sh
+node scripts/ci/verify-runtime.js /path/to/MachineViolet --check-certificates
+```
+
+This requests the [incident site's](https://emudhra.we-have-a-problem.com/)
+direct and Sectigo-cross-signed DV-G3B endpoints with strict TLS and a ten-second
+wall-clock deadline per request. Both must fail specifically with `CERT_REVOKED`.
+TLS acceptance, DNS/network failures, timeouts, and other certificate errors
+fail the gate; unavailable endpoints are not evidence of safe revocation.
+Consequently this security gate requires network access even though the golden
+replay remains offline. `--runtime-info --check-certificates` reports probe
+outcomes for support; `verify-runtime.js` is what asserts them and exits nonzero.
+These two chains are targeted regression checks, not a comprehensive TLS audit.
+Focused offline checks run with `node --import tsx/esm --test scripts/runtime-info.test.ts`.
+
+Every build also generates `dist/sbom.cdx.json` using
+`npm sbom --sbom-format=cyclonedx --omit=dev --package-lock-only` and validates
+that it is a nonempty CycloneDX document. Its scope is the resolved production
+workspace lock graph, including workspace components; it is not the exact set
+of modules retained by esbuild, nor an inventory of separately vendored native
+Node/Windows Terminal/Codex binaries. `dist/runtime.json` records the builder's
+platform, architecture and complete runtime versions. Both ship beside the
+executable in tarballs and Velopack payloads.
+
+Runtime/security checks and replay do not replace the interactive install-method
+smoke below or validate signing/installer behavior on a local portable build.
+
 ## Channels
 
 Three Velopack update channels. Each is **sticky** — installers only auto-update within their own channel.

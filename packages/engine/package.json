@@ -12,27 +12,27 @@
     "start": "node --max-semi-space-size=16 dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
-    "@fastify/cors": "^11.0.0",
-    "@fastify/swagger": "^9.7.0",
-    "@fastify/websocket": "^11.0.0",
+    "@anthropic-ai/sdk": "^1.0.0",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/websocket": "^11.3.4",
     "@machine-violet/shared": "*",
-    "@openai/codex": "^0.160.0",
-    "@scalar/fastify-api-reference": "^1.49.7",
-    "@sinclair/typebox": "^0.34.0",
+    "@openai/codex": "^0.163.0",
+    "@scalar/fastify-api-reference": "^1.75.1",
+    "@sinclair/typebox": "^0.34.52",
     "ajv": "^8.20.0",
-    "dotenv": "^17.4.2",
-    "fastify": "^5.8.5",
-    "fflate": "^0.8.2",
-    "isomorphic-git": "^1.37.1",
-    "openai": "^6.49.0",
+    "dotenv": "^18.0.8",
+    "fastify": "^5.12.7",
+    "fflate": "^0.8.3",
+    "isomorphic-git": "^1.44.3",
+    "openai": "^7.41.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.0",
+    "@types/ws": "^8.18.2",
     "typescript": "^6.0.3",
-    "vitest": "^4.0.18"
+    "vitest": "^5.0.5"
   }
 }

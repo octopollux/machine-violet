@@ -9,7 +9,7 @@ export default defineConfig({
     // build is required during test runs). Matches packages/engine/vitest.config.ts.
     conditions: ["source"],
     alias: {
-      "@machine-violet/shared": resolve(__dirname, "../../packages/shared/src"),
+      "@machine-violet/shared": resolve(import.meta.dirname, "../../packages/shared/src"),
     },
   },
   test: {

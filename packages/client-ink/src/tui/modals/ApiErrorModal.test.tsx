@@ -1,7 +1,7 @@
-import React from "react";
+import React, { act } from "react";
 import { Box } from "ink";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render } from "ink-testing-library";
+import { cleanup, render } from "ink-testing-library";
 import { ApiErrorModal } from "./ApiErrorModal.js";
 import { resolveTheme } from "../themes/resolver.js";
 import { resetThemeCache } from "../themes/loader.js";
@@ -67,6 +67,7 @@ describe("ApiErrorModal", () => {
     });
 
     afterEach(() => {
+      cleanup();
       vi.useRealTimers();
     });
 
@@ -78,10 +79,16 @@ describe("ApiErrorModal", () => {
       );
       expect(lastFrame()).toContain("Retrying in 5s...");
 
-      await vi.advanceTimersByTimeAsync(2000);
+      // Flush the mount effect before advancing the clock, then flush React's
+      // scheduled state updates before reading Ink's frame (React 19.3/Ink 8).
+      await act(async () => {});
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(lastFrame()).toContain("Retrying in 4s...");
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
       expect(lastFrame()).toContain("Retrying in 3s...");
 
-      await vi.advanceTimersByTimeAsync(10_000);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
       // Clamps at 0 — never goes negative.
       expect(lastFrame()).toContain("Retrying in 0s...");
     });
@@ -96,7 +103,8 @@ describe("ApiErrorModal", () => {
         </Box>,
       );
 
-      await vi.advanceTimersByTimeAsync(15_000);
+      await act(async () => {});
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
       expect(lastFrame()).toContain("Retrying in 0s...");
 
       // Same status, same delay — only attemptId differs (new retry attempt).
@@ -106,7 +114,7 @@ describe("ApiErrorModal", () => {
         </Box>,
       );
       // Flush the post-rerender effect so the timer reset is observable.
-      await vi.advanceTimersByTimeAsync(0);
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
 
       expect(lastFrame()).toContain("Retrying in 12s...");
     });

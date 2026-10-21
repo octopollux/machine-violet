@@ -172,7 +172,7 @@ Actual access to AI models is not included - that's up to you.
 
 ## Development
 
-Requires Node.js 25+.
+Requires Node.js 26.12.1+. Distribution builds use the exact patched runtime pinned in `.node-version`.
 
 ```bash
 npm install
