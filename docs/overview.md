@@ -12,7 +12,7 @@ The DM agent runs on the engine server with tools that manipulate game state. UI
 Game state lives on the filesystem as markdown and JSON. Automatic git snapshots (via isomorphic-git, no system dependency) provide rollback and recovery.
 
 Tech stack:
-- **Runtime**: Node.js (22+)
+- **Runtime**: Node.js 26.12.1+ (distribution builder pinned exactly in `.node-version`)
 - **Language**: TypeScript
 - **UI**: Ink (React for CLI)
 - **AI**: Anthropic Claude SDK (Opus for DM, Sonnet for setup/OOC, Haiku for mechanical tasks)

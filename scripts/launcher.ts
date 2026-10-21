@@ -25,6 +25,7 @@
  *   ANTHROPIC_API_KEY — Required for the engine
  */
 import { join } from "node:path";
+import { runtimeInfo } from "./runtime-info.js";
 import { handleVelopackHook } from "../packages/engine/src/config/velopack-hooks.js";
 import { createServer } from "../packages/engine/src/server/server.js";
 import { defaultCampaignRoot } from "../packages/engine/src/tools/filesystem/platform.js";
@@ -33,6 +34,12 @@ import { loadEnv } from "../packages/engine/src/config/first-launch.js";
 import { checkTerminal } from "../packages/engine/src/config/terminal-check.js";
 import { versionBanner } from "../packages/engine/src/config/app-version.js";
 import { disableReactPerfTrackUnlessRequested } from "../packages/client-ink/src/react-perf-track.js";
+
+// Support diagnostics bypass environment loading, terminal checks, and startup.
+if (process.argv.includes("--runtime-info")) {
+  console.log(JSON.stringify(await runtimeInfo(process.argv.includes("--check-certificates"))));
+  process.exit(0);
+}
 
 // --- Version flag ---
 // Must precede every other startup step, and especially checkTerminal(): both

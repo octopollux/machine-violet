@@ -5,8 +5,8 @@
  * Bundles with esbuild, creates a Node SEA executable, applies Windows
  * metadata via rcedit, and assembles asset directories alongside the binary.
  *
- * SEA creation is platform-split: macOS/Linux use --build-sea (postject
- * corrupts Node 25's Mach-O layout); Windows uses the postject workflow
+ * SEA creation uses the pinned Node 26 builder: macOS/Linux use --build-sea
+ * (postject historically corrupted Node 25's Mach-O layout); Windows uses postject
  * (--build-sea breaks Velopack/Authenticode signing).
  *
  * Usage:
@@ -16,6 +16,8 @@
  */
 
 import { build } from "esbuild";
+import process from "node:process";
+import console from "node:console";
 import {
   mkdirSync,
   cpSync,
@@ -32,6 +34,10 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
+const expectedNode = readFileSync(join(ROOT, ".node-version"), "utf8").trim();
+if (process.versions.node !== expectedNode) {
+  throw new Error(`Distribution builds require Node ${expectedNode}; running ${process.versions.node} at ${process.execPath}`);
+}
 const DIST = join(ROOT, "dist");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8"));
 
@@ -88,7 +94,7 @@ await build({
   bundle: true,
   outfile: join(DIST, "bundle.js"),
   platform: "node",
-  target: "node25",
+  target: "node26",
   format: "esm",
   jsx: "automatic",
   external: ["node:*"],
@@ -133,7 +139,7 @@ if (isWindows) {
   };
   writeFileSync(seaConfigPath, JSON.stringify(seaConfig, null, 2));
 
-  execSync(`node --experimental-sea-config dist/sea-config.json`, {
+  execFileSync(process.execPath, ["--experimental-sea-config", "dist/sea-config.json"], {
     stdio: "inherit",
     cwd: ROOT,
   });
@@ -195,7 +201,7 @@ if (isWindows) {
   writeFileSync(seaConfigPath, JSON.stringify(seaConfig, null, 2));
 
   if (existsSync(exePath)) rmSync(exePath);
-  execSync(`node --build-sea=dist/sea-config.json`, {
+  execFileSync(process.execPath, ["--build-sea=dist/sea-config.json"], {
     stdio: "inherit",
     cwd: ROOT,
   });
@@ -211,6 +217,10 @@ if (isWindows) {
 }
 
 // Clean up intermediate bundle
+// Fail locally as well as in CI if injection produced a stale or unusable runtime.
+execFileSync(process.execPath, [join(ROOT, "scripts/ci/verify-runtime.js"), exePath], {
+  stdio: "inherit", cwd: ROOT,
+});
 rmSync(join(DIST, "bundle.js"), { force: true });
 
 // --- Step 3: Copy assets ---
@@ -292,6 +302,21 @@ if (existsSync(licensePath)) {
 }
 
 // Version file
+// Resolved production workspace graph, not an exact inventory of esbuild's
+// retained modules or the separately vendored Node/Terminal native runtimes.
+const sbom = JSON.parse(execSync(
+  "npm sbom --sbom-format=cyclonedx --omit=dev --package-lock-only",
+  { cwd: ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+));
+if (sbom.bomFormat !== "CycloneDX" || !Array.isArray(sbom.components) || sbom.components.length === 0) {
+  throw new Error("npm sbom did not produce a nonempty CycloneDX dependency inventory");
+}
+writeFileSync(join(DIST, "sbom.cdx.json"), JSON.stringify(sbom, null, 2));
+writeFileSync(join(DIST, "runtime.json"), JSON.stringify({
+  node: process.versions.node, versions: process.versions,
+  platform: process.platform, arch: process.arch,
+}, null, 2));
+
 writeFileSync(
   join(DIST, "version.json"),
   JSON.stringify({ version, releaseDate: releaseDate || null }, null, 2),

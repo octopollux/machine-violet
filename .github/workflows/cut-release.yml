@@ -53,14 +53,14 @@ jobs:
           echo "In the Actions UI, pick 'release' from the 'Use workflow from' branch selector."
           exit 1
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: release
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 25
+          node-version-file: .node-version
 
       - name: Configure git
         run: |

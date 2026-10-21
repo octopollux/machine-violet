@@ -13,13 +13,13 @@
 # Run from the repo root, after build-dist.js has populated dist/.
 set -euo pipefail
 
-# Preview 1.25+ adds Kitty keyboard protocol support, which fixes
+# Stable 1.25 includes Kitty keyboard protocol support, which fixes
 # Backspace/Home/End input corruption on Windows (ConPTY bug).
-WT_VERSION="1.25.622.0"
-WT_ZIP="Microsoft.WindowsTerminalPreview_${WT_VERSION}_x64.zip"
+WT_VERSION="1.25.2733.0"
+WT_ZIP="Microsoft.WindowsTerminal_${WT_VERSION}_x64.zip"
 WT_URL="https://github.com/microsoft/terminal/releases/download/v${WT_VERSION}/${WT_ZIP}"
 # Update this hash when bumping WT_VERSION.
-WT_SHA256="ba5b75eb769e99221e68fe4bfb3580ed1ade81f24b70334de4cb4742edf1b017"
+WT_SHA256="bf3ef2012f6c44d8340a4c58125acc9498d19b580f9890dc043cdf831852e796"
 
 echo "Downloading Windows Terminal portable ${WT_VERSION}..."
 curl -fSL -o wt-portable.zip "$WT_URL"
