@@ -66,13 +66,13 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prep.outputs.tag }}
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 25
+          node-version-file: .node-version
           cache: npm
 
       - run: npm ci
@@ -162,12 +162,12 @@ jobs:
             asset_suffix: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prep.outputs.tag }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 25
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - name: Build shared package
@@ -191,7 +191,7 @@ jobs:
     needs: [prep, build, verify-package]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prep.outputs.tag }}
           fetch-depth: 0
@@ -568,7 +568,7 @@ jobs:
     if: needs.prep.outputs.channel == 'stable'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prep.outputs.tag }}
 

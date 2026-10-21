@@ -16,7 +16,7 @@ jobs:
       timestamp: ${{ steps.ts.outputs.timestamp }}
       nightly_version: ${{ steps.ts.outputs.nightly_version }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Compute nightly version
         id: ts
         run: |
@@ -42,11 +42,11 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
-          node-version: 25
+          node-version-file: .node-version
           cache: npm
 
       - run: npm ci
@@ -133,10 +133,10 @@ jobs:
             asset_suffix: linux-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 25
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - name: Build shared package
@@ -160,7 +160,7 @@ jobs:
     needs: [prepare, build, verify-package]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -531,7 +531,7 @@ jobs:
     needs: [prepare, release]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Update Homebrew formula
         env:
