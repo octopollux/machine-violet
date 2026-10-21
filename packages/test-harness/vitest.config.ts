@@ -12,7 +12,7 @@ export default defineConfig({
   resolve: {
     conditions: ["source"],
     alias: {
-      "@machine-violet/shared": resolve(__dirname, "../../packages/shared/src"),
+      "@machine-violet/shared": resolve(import.meta.dirname, "../../packages/shared/src"),
     },
   },
   test: {

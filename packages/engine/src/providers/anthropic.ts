@@ -283,7 +283,11 @@ export function toAnthropicParams(params: ChatParams): {
         }
         if (stampIdx >= 0) {
           blocks[stampIdx] = { ...blocks[stampIdx], cache_control: { type: "ephemeral" } };
-          messages[stampMsgIdx] = { role: last.role, content: blocks as unknown as Anthropic.MessageParam["content"] };
+          // SDK 1.x models system messages separately: only text blocks are
+          // legal there, while conversation messages accept multimodal blocks.
+          messages[stampMsgIdx] = last.role === "system"
+            ? { role: last.role, content: blocks as unknown as Anthropic.TextBlockParam[] }
+            : { role: last.role, content: blocks as unknown as Exclude<Anthropic.MessageParam, { role: "system" }>["content"] };
         }
       }
     }

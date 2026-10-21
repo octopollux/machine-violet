@@ -40,5 +40,8 @@ if [ -z "$BIN" ] || [ ! -f "$BIN" ]; then
   exit 1
 fi
 
+echo "Verifying packaged runtime and certificate revocation: $BIN"
+node scripts/ci/verify-runtime.js "$BIN" --check-certificates
+
 echo "Replaying goldens against packaged binary: $BIN"
 node --import tsx/esm packages/test-harness/bin/replay-golden.ts --binary "$BIN"
